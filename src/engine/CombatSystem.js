@@ -52,8 +52,9 @@ export class CombatSystem {
 
         const targetPos = this.currentTarget.getPosition();
         const distance = playerPos.distanceTo(targetPos);
+        const range = this.character.getAttackRange();
 
-        if (distance > this.attackRange) {
+        if (distance > range) {
             // Move toward target
             this.character.moveToward(targetPos, dt);
         } else {
@@ -67,7 +68,7 @@ export class CombatSystem {
 
             if (this.globalCooldown <= 0) {
                 this._performAttack();
-                this.globalCooldown = this.character.attackCooldown;
+                this.globalCooldown = this.character.getAttackCooldown();
             }
         }
     }

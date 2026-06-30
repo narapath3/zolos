@@ -40,9 +40,197 @@ export class CharacterManager {
             play_time: 0,
         };
 
+        this.equippedWeapon = null;
+
+        // Custom property getters for base stats + weapon bonuses
+        this.stats._baseAtk = 10;
+        this.stats._baseMaxSp = 50;
+
+        Object.defineProperty(this.stats, 'atk', {
+            get: () => {
+                const bonus = this.getWeaponAtkBonus(this.equippedWeapon);
+                return this.stats._baseAtk + bonus;
+            },
+            set: (val) => {
+                this.stats._baseAtk = val;
+            },
+            configurable: true,
+            enumerable: true
+        });
+
+        Object.defineProperty(this.stats, 'max_sp', {
+            get: () => {
+                const bonus = this.getWeaponSpBonus(this.equippedWeapon);
+                return this.stats._baseMaxSp + bonus;
+            },
+            set: (val) => {
+                this.stats._baseMaxSp = val;
+            },
+            configurable: true,
+            enumerable: true
+        });
+
         this.characterId = null;
 
         this._createModel();
+    }
+
+    getWeaponAtkBonus(weaponName) {
+        if (!weaponName) return 0;
+        if (weaponName === 'Sword') return 15;
+        if (weaponName === 'Bow') return 10;
+        if (weaponName === 'Gun') return 22;
+        if (weaponName === 'Fishing Rod') return 2;
+        return 0;
+    }
+
+    getWeaponSpBonus(weaponName) {
+        if (weaponName === 'Bow') return 10;
+        return 0;
+    }
+
+    getAttackRange() {
+        const weapon = this.equippedWeapon;
+        if (weapon === 'Bow') return 6.0;
+        if (weapon === 'Gun') return 7.0;
+        return 1.8; // Default range
+    }
+
+    getAttackCooldown() {
+        const weapon = this.equippedWeapon;
+        if (weapon === 'Sword') return 0.9;
+        if (weapon === 'Bow') return 1.2;
+        if (weapon === 'Gun') return 1.5;
+        if (weapon === 'Fishing Rod') return 1.2;
+        return 1.0; // Default cooldown
+    }
+
+    equipWeapon(itemName) {
+        this.equippedWeapon = itemName;
+        this.updateWeaponVisuals(itemName);
+    }
+
+    updateWeaponVisuals(itemName) {
+        // Remove existing weapon mesh from right arm
+        if (this.weaponMesh) {
+            this.rightArm.remove(this.weaponMesh);
+            this.weaponMesh = null;
+        }
+
+        if (!itemName) {
+            // Unequipped: no weapon mesh (fists)
+            return;
+        }
+
+        if (itemName === 'Sword') {
+            const group = new THREE.Group();
+
+            const bladeGeo = new THREE.BoxGeometry(0.08, 1.0, 0.04);
+            const bladeMat = new THREE.MeshLambertMaterial({ color: 0xc0c0d0 });
+            const blade = new THREE.Mesh(bladeGeo, bladeMat);
+            blade.position.set(0, 0.3, 0);
+            blade.castShadow = true;
+            group.add(blade);
+
+            const guardGeo = new THREE.BoxGeometry(0.24, 0.06, 0.1);
+            const guardMat = new THREE.MeshLambertMaterial({ color: 0xffd040 });
+            const guard = new THREE.Mesh(guardGeo, guardMat);
+            guard.position.set(0, -0.2, 0);
+            guard.castShadow = true;
+            group.add(guard);
+
+            const handleGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 6);
+            const handleMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+            const handle = new THREE.Mesh(handleGeo, handleMat);
+            handle.position.set(0, -0.35, 0);
+            handle.castShadow = true;
+            group.add(handle);
+
+            group.position.set(0, -0.2, 0.15);
+            group.rotation.x = 0;
+
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Bow') {
+            const group = new THREE.Group();
+
+            const riserGeo = new THREE.BoxGeometry(0.05, 0.3, 0.05);
+            const woodMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+            const riser = new THREE.Mesh(riserGeo, woodMat);
+            riser.castShadow = true;
+            group.add(riser);
+
+            const limbGeo = new THREE.BoxGeometry(0.04, 0.4, 0.04);
+            const limbUpper = new THREE.Mesh(limbGeo, woodMat);
+            limbUpper.position.set(0, 0.32, -0.08);
+            limbUpper.rotation.x = -0.4;
+            limbUpper.castShadow = true;
+            group.add(limbUpper);
+
+            const limbLower = new THREE.Mesh(limbGeo, woodMat);
+            limbLower.position.set(0, -0.32, -0.08);
+            limbLower.rotation.x = 0.4;
+            limbLower.castShadow = true;
+            group.add(limbLower);
+
+            const stringGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.96, 4);
+            const stringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+            const bowString = new THREE.Mesh(stringGeo, stringMat);
+            bowString.position.set(0, 0, -0.2);
+            group.add(bowString);
+
+            group.position.set(0, -0.1, 0.15);
+            group.rotation.x = Math.PI / 2;
+
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Gun') {
+            const group = new THREE.Group();
+
+            const barrelGeo = new THREE.BoxGeometry(0.08, 0.45, 0.08);
+            const metalMat = new THREE.MeshLambertMaterial({ color: 0x4a4a4a });
+            const barrel = new THREE.Mesh(barrelGeo, metalMat);
+            barrel.position.set(0, 0.1, 0.05);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.castShadow = true;
+            group.add(barrel);
+
+            const gripGeo = new THREE.BoxGeometry(0.07, 0.22, 0.07);
+            const gripMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+            const grip = new THREE.Mesh(gripGeo, gripMat);
+            grip.position.set(0, -0.1, 0);
+            grip.rotation.x = 0.2;
+            grip.castShadow = true;
+            group.add(grip);
+
+            group.position.set(0, -0.2, 0.15);
+
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Fishing Rod') {
+            const group = new THREE.Group();
+
+            const shaftGeo = new THREE.CylinderGeometry(0.02, 0.03, 1.4, 6);
+            const rodMat = new THREE.MeshLambertMaterial({ color: 0xd9b38c });
+            const shaft = new THREE.Mesh(shaftGeo, rodMat);
+            shaft.position.set(0, 0.4, 0.3);
+            shaft.rotation.x = -Math.PI / 4;
+            shaft.castShadow = true;
+            group.add(shaft);
+
+            const lineGeo = new THREE.CylinderGeometry(0.005, 0.005, 1.2, 4);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
+            const line = new THREE.Mesh(lineGeo, lineMat);
+            const tipY = 0.4 + 0.7 * Math.cos(-Math.PI / 4);
+            const tipZ = 0.3 + 0.7 * Math.sin(-Math.PI / 4);
+            line.position.set(0, tipY - 0.6, tipZ);
+            group.add(line);
+
+            group.position.set(0, -0.2, 0.15);
+
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        }
     }
 
     _createModel() {
@@ -95,19 +283,8 @@ export class CharacterManager {
         this.rightArm.castShadow = true;
         this.mesh.add(this.rightArm);
 
-        // Weapon (sword)
-        const swordGeo = new THREE.BoxGeometry(0.08, 1.0, 0.04);
-        const swordMat = new THREE.MeshLambertMaterial({ color: 0xc0c0d0 });
-        this.weaponMesh = new THREE.Mesh(swordGeo, swordMat);
-        this.weaponMesh.position.set(0, -0.3, 0.15);
-        this.rightArm.add(this.weaponMesh);
-
-        // Sword guard
-        const guardGeo = new THREE.BoxGeometry(0.2, 0.06, 0.1);
-        const guardMat = new THREE.MeshLambertMaterial({ color: 0xffd040 });
-        const guard = new THREE.Mesh(guardGeo, guardMat);
-        guard.position.y = 0.2;
-        this.weaponMesh.add(guard);
+        // Build starting weapon visuals (defaults to Sword until loaded from DB)
+        this.updateWeaponVisuals('Sword');
 
         // Legs
         const legGeo = new THREE.BoxGeometry(0.22, 0.5, 0.25);
@@ -253,8 +430,8 @@ export class CharacterManager {
                 hp: this.stats.hp,
                 max_hp: this.stats.max_hp,
                 sp: this.stats.sp,
-                max_sp: this.stats.max_sp,
-                atk: this.stats.atk,
+                max_sp: this.stats._baseMaxSp !== undefined ? this.stats._baseMaxSp : this.stats.max_sp,
+                atk: this.stats._baseAtk !== undefined ? this.stats._baseAtk : this.stats.atk,
                 def: this.stats.def,
                 gold: this.stats.gold,
                 total_kills: this.stats.total_kills,

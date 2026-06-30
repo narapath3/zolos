@@ -9,7 +9,7 @@ import { SoundManager } from './engine/SoundManager.js';
 import { InputManager } from './engine/InputManager.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { GameUI } from './ui/GameUI.js';
-import { SKILLS } from './engine/GameData.js';
+import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
     saveCharacter,
@@ -30,6 +30,8 @@ let onlinePlayers = [];
 const remotePlayersMap = new Map();
 let lastBroadcastTime = 0;
 let portalCooldown = 0;
+let fishingTimer = 0;
+const FISHING_INTERVAL = 3.0; // seconds between fishing catches
 
 // ============ Initialize Auth ============
 const authUI = new AuthUI(async (authData) => {
@@ -107,7 +109,7 @@ async function initGame() {
                 character.targetNPC = hit.object;
                 character.targetMonster = null;
                 character.targetDest = null;
-                gameUI.addCombatLog('🚶 Move to Kafra NPC...', 'system');
+                gameUI.addCombatLog('🚶 เดินทางไปยังร้านค้า...', 'system');
             } else if (hit.type === 'ground') {
                 character.targetDest = hit.point;
                 character.targetMonster = null;
@@ -512,15 +514,48 @@ function gameLoop() {
             }
         }
 
+        // ============ Auto-Fishing Loop ============
+        const playerPos = character.getPosition();
+        const inWater = sceneManager.isInWater(playerPos);
+        const hasFishingRod = character.equippedWeapon === 'Fishing Rod';
+
+        if (inWater && hasFishingRod && character.isAlive()) {
+            fishingTimer += dt;
+            if (fishingTimer >= FISHING_INTERVAL) {
+                fishingTimer = 0;
+
+                // Splash particles
+                if (particles) {
+                    particles.spawnWaterSplash(playerPos);
+                }
+
+                // Determine catch: 65% Fish, 35% Trash
+                const roll = Math.random();
+                const catchName = roll < 0.65 ? 'Fish' : 'Trash';
+                const catchItem = ITEMS[catchName];
+
+                if (catchItem && gameUI) {
+                    gameUI.addItem({ name: catchName, emoji: catchItem.emoji, type: catchItem.type });
+                    gameUI.addCombatLog(`🎣 ตกได้ ${catchItem.emoji} ${catchName}!`, 'system');
+                }
+
+                if (soundManager && soundManager.playUseItemSound) {
+                    soundManager.playUseItemSound();
+                }
+            }
+        } else {
+            fishingTimer = 0;
+        }
+
         // NPC proximity range checks
         const npc = sceneManager.getNPC();
         if (npc) {
             const pPos = character.getPosition();
             const npcDist = pPos.distanceTo(npc.position);
             const shopPanel = document.getElementById('shop-panel');
-            if (npcDist > 4.5 && shopPanel && shopPanel.style.display === 'flex') {
+            if (npcDist > 4.5 && shopPanel && shopPanel.style.display !== 'none') {
                 shopPanel.style.display = 'none';
-                gameUI.addCombatLog('👋 Walked too far from Kafra Shop.', 'system');
+                gameUI.addCombatLog('👋 เดินห่างจากร้านค้ามากเกินไป', 'system');
             }
         }
     }

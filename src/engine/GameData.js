@@ -22,7 +22,13 @@ export const ITEMS = {
     'Blue Herb': { emoji: '💙', type: 'consumable', desc: 'สมุนไพรสีน้ำเงินหายากมาก ทานเพื่อฟื้นฟูพลังเวทมนตร์ SP +25 หน่วยทันที', price: 150, restoreSp: 25 },
     'Orange Juice': { emoji: '🧃', type: 'consumable', desc: 'น้ำส้มคั้นสดกล่อง ฟื้นฟู HP +180 หน่วยทันที', price: 120, healHp: 180 },
     'Sticky Webfoot': { emoji: '🦶', type: 'material', desc: 'พังผืดเท้าเหนียวๆ ของมอนสเตอร์ประเภทครึ่งบกครึ่งน้ำ', price: 35 },
-    'Crystal Blue': { emoji: '🔵', type: 'material', desc: 'แร่ธาตุน้ำตกผลึกสีน้ำเงิน ประกายประกายเย็นเยือก นิยมนำไปใช้ตีบวกอาวุธธาตุน้ำ', price: 250 }
+    'Crystal Blue': { emoji: '🔵', type: 'material', desc: 'แร่ธาตุน้ำตกผลึกสีน้ำเงิน ประกายประกายเย็นเยือก นิยมนำไปใช้ตีบวกอาวุธธาตุน้ำ', price: 250 },
+    'Sword': { emoji: '🗡️', type: 'weapon', desc: 'ดาบเหล็กกล้าคลาสสิกของ Novice เพิ่มพลังโจมตี ATK +15 หน่วยเมื่อสวมใส่', price: 200, atkBonus: 15 },
+    'Bow': { emoji: '🏹', type: 'weapon', desc: 'ธนูไม้ดัดที่มีความยืดหยุ่นสูง เพิ่มพลังโจมตี ATK +10 และฟื้นฟู SP +10 หน่วยเมื่อสวมใส่', price: 250, atkBonus: 10, spBonus: 10 },
+    'Gun': { emoji: '🔫', type: 'weapon', desc: 'ปืนสั้นกลไกสไตล์กัปตัน เพิ่มพลังโจมตี ATK +22 หน่วยเมื่อสวมใส่', price: 400, atkBonus: 22 },
+    'Fishing Rod': { emoji: '🎣', type: 'fishing_rod', desc: 'เบ็ดตกปลาไม้ไผ่ ช่วยให้สามารถทำ Auto-Fishing บริเวณริมแม่น้ำได้ (ATK +2)', price: 150, atkBonus: 2, isFishingRod: true },
+    'Fish': { emoji: '🐟', type: 'consumable', desc: 'ปลาสดเนื้อชุ่มฉ่ำที่ตกได้จากแม่น้ำ ทานเพื่อฟื้นฟู HP +15 หน่วย หรือนำไปขายต่อในร้านค้า', price: 15, healHp: 15 },
+    'Trash': { emoji: '👞', type: 'material', desc: 'ขยะเปียกหรือรองเท้าเก่าๆ ที่ดึงขึ้นมาได้จากแม่น้ำ สามารถนำไปขายต่อในร้านค้าได้', price: 2 }
 };
 
 // ============ MONSTERS ============
@@ -348,6 +354,10 @@ export const SHOP_ITEMS = [
     { name: 'Orange Juice', price: 120 },
     { name: 'Blue Herb', price: 150 },
     { name: 'Grape', price: 50 },
+    { name: 'Sword', price: 200 },
+    { name: 'Bow', price: 250 },
+    { name: 'Gun', price: 400 },
+    { name: 'Fishing Rod', price: 150 },
 ];
 
 // ============ EXP TABLE ============

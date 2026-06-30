@@ -1,6 +1,6 @@
 // Game UI — HUD, panels, combat log, and all in-game UI
 import { getExpRequired, ITEMS, SHOP_ITEMS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats } from '../network/GameSync.js';
 
 export class GameUI {
   constructor(character = null, soundManager = null) {
@@ -223,13 +223,14 @@ export class GameUI {
     const meta = ITEMS[item.item_name];
     return {
       item_name: item.item_name,
-      item_type: item.item_type || (meta?.type === 'consumable' ? 'consumable' : 'material'),
+      item_type: item.item_type || meta?.type || 'material',
       quantity: item.quantity,
       emoji: meta?.emoji || item.emoji || '📦',
       desc: meta?.desc || 'ไม่มีข้อมูลรายละเอียดสเตตัสเพิ่มเติมสำหรับไอเทมสไตล์ RO ชิ้นนี้',
       price: meta?.price || 10,
       healHp: meta?.healHp || 0,
-      restoreSp: meta?.restoreSp || 0
+      restoreSp: meta?.restoreSp || 0,
+      stats: item.stats || {}
     };
   }
 
@@ -238,6 +239,14 @@ export class GameUI {
     try {
       const rawInv = await loadInventory(characterId);
       this.inventory = rawInv.map(i => this._enrichItem(i));
+
+      // Auto equip weapon on load if present in inventory
+      const equippedItem = this.inventory.find(i => i.stats && i.stats.equipped === true);
+      if (equippedItem && this.character) {
+        this.character.equipWeapon(equippedItem.item_name);
+      } else if (this.character) {
+        this.character.equipWeapon(null);
+      }
     } catch (e) {
       console.error('Failed to load inventory:', e);
       this.inventory = [];
@@ -280,6 +289,8 @@ export class GameUI {
     let filtered = this.inventory;
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
+    } else if (this.currentTab === 'equip') {
+      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod'].includes(i.item_type));
     } else if (this.currentTab === 'etc') {
       filtered = this.inventory.filter(i => i.item_type === 'material');
     }
@@ -292,11 +303,17 @@ export class GameUI {
 
       if (i < filtered.length) {
         const item = filtered[i];
+        const isEquipped = item.stats && item.stats.equipped === true;
+        if (isEquipped) {
+          slot.classList.add('equipped');
+        }
+
         slot.innerHTML = `
                   <span>${item.emoji}</span>
                   <span class="inv-qty">${item.quantity}</span>
+                  ${isEquipped ? '<span class="inv-equipped-badge">E</span>' : ''}
                 `;
-        slot.title = `${item.item_name} x${item.quantity}`;
+        slot.title = `${item.item_name} x${item.quantity}${isEquipped ? ' (Equipped)' : ''}`;
 
         if (this.selectedItemName === item.item_name) {
           slot.classList.add('selected');
@@ -339,7 +356,16 @@ export class GameUI {
 
     document.getElementById('detail-icon').textContent = item.emoji;
     document.getElementById('detail-name').textContent = item.item_name;
-    document.getElementById('detail-type').textContent = item.item_type === 'consumable' ? 'Usable Item' : 'Etc. Item';
+
+    let typeStr = 'Etc. Item';
+    if (item.item_type === 'consumable') {
+      typeStr = 'Usable Item';
+    } else if (item.item_type === 'weapon') {
+      typeStr = 'Weapon';
+    } else if (item.item_type === 'fishing_rod') {
+      typeStr = 'Fishing Tool';
+    }
+    document.getElementById('detail-type').textContent = typeStr;
     document.getElementById('detail-desc').textContent = item.desc;
     document.getElementById('detail-price-val').textContent = item.price;
 
@@ -347,6 +373,10 @@ export class GameUI {
     if (item.item_type === 'consumable') {
       useBtn.style.display = 'block';
       useBtn.textContent = `ใช้งาน (x${item.quantity})`;
+    } else if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
+      useBtn.style.display = 'block';
+      const isEquipped = item.stats && item.stats.equipped === true;
+      useBtn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
     } else {
       useBtn.style.display = 'none';
     }
@@ -359,6 +389,12 @@ export class GameUI {
     if (itemIdx === -1) return;
 
     const item = this.inventory[itemIdx];
+
+    if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
+      await this._toggleEquipItem(item);
+      return;
+    }
+
     if (item.item_type !== 'consumable' || item.quantity <= 0) return;
 
     let used = false;
@@ -401,6 +437,50 @@ export class GameUI {
       this.updateHUD(this.character.stats);
       this.updateStats(this.character.stats);
     }
+  }
+
+  async _toggleEquipItem(item) {
+    if (!this.character || !item) return;
+
+    const isEquipped = item.stats && item.stats.equipped === true;
+
+    if (isEquipped) {
+      // Unequip
+      item.stats.equipped = false;
+      this.character.equipWeapon(null);
+      if (this.characterId) {
+        await updateInventoryItemStats(this.characterId, item.item_name, {});
+      }
+      this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
+    } else {
+      // Un-equip any currently equipped weapon
+      for (const otherItem of this.inventory) {
+        if ((otherItem.item_type === 'weapon' || otherItem.item_type === 'fishing_rod') && otherItem.stats && otherItem.stats.equipped === true) {
+          otherItem.stats.equipped = false;
+          if (this.characterId) {
+            await updateInventoryItemStats(this.characterId, otherItem.item_name, {});
+          }
+        }
+      }
+
+      // Equip new weapon
+      if (!item.stats) item.stats = {};
+      item.stats.equipped = true;
+      this.character.equipWeapon(item.item_name);
+
+      if (this.characterId) {
+        await updateInventoryItemStats(this.characterId, item.item_name, { equipped: true });
+      }
+      this.addCombatLog(`⚔️ สวมใส่ ${item.emoji} ${item.item_name} เพิ่มความแข็งแกร่ง!`, 'system');
+    }
+
+    if (this.soundManager) {
+      this.soundManager.playUseItemSound();
+    }
+
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
   }
 
   // ============ Leaderboard ============
@@ -639,7 +719,8 @@ export class GameUI {
           price: itemRegistry.price,
           healHp: itemRegistry.healHp || 0,
           restoreSp: itemRegistry.restoreSp || 0,
-          quantity: 1
+          quantity: 1,
+          stats: {}
         });
       }
 

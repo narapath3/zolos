@@ -429,7 +429,7 @@ export class SceneManager {
 
         for (let i = 0; i < positions.count; i++) {
             const x = positions.getX(i);
-            const z = positions.getY(i); // Y in plane space = Z in world
+            const z = -positions.getY(i); // Y in plane space = -Z in world after -90deg X rotation
 
             // Winding river logic: z = sin(x * 0.08) * 10 - 2
             const riverZ = Math.sin(x * 0.08) * 10 - 2;
@@ -1155,7 +1155,7 @@ export class SceneManager {
     // ============ Portals ============
     _createPortals(mapId) {
         const portalPositions = mapId === 'prontera'
-            ? [{ x: 25, z: 0, target: 'payon' }]
+            ? [{ x: 25, z: -5, target: 'payon' }]
             : [{ x: -25, z: 0, target: 'prontera' }];
 
         portalPositions.forEach(p => {
@@ -1457,7 +1457,7 @@ export class SceneManager {
         ctx.font = 'bold 36px Arial';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd040';
-        ctx.fillText('🏪 Kafra Shop', 256, 60);
+        ctx.fillText('🏪 ร้านค้า', 256, 60);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });

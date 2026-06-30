@@ -62,6 +62,8 @@ export async function createCharacter(userId) {
         localDb.set(`char_${userId}`, charData);
         // Update local leaderboard
         updateLocalLeaderboard(charData);
+        // Give starting Sword
+        await saveInventoryItem(charData.id, 'Sword', 'weapon', 1, { equipped: true });
         return charData;
     }
 
@@ -72,6 +74,9 @@ export async function createCharacter(userId) {
         .single();
 
     if (error) throw error;
+
+    // Give starting Sword
+    await saveInventoryItem(data.id, 'Sword', 'weapon', 1, { equipped: true });
     return data;
 }
 
@@ -138,7 +143,11 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
         const existing = inv.find(i => i.item_name === itemName);
         if (existing) {
             existing.quantity += quantity;
-        } else {
+            if (existing.quantity <= 0) {
+                const idx = inv.indexOf(existing);
+                inv.splice(idx, 1);
+            }
+        } else if (quantity > 0) {
             inv.push({
                 id: 'inv_' + Math.random().toString(36).substring(2, 10),
                 character_id: characterId,
@@ -161,15 +170,41 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
         .single();
 
     if (existing) {
-        await supabase
-            .from('inventory')
-            .update({ quantity: existing.quantity + quantity })
-            .eq('id', existing.id);
-    } else {
+        const newQty = existing.quantity + quantity;
+        if (newQty <= 0) {
+            await supabase
+                .from('inventory')
+                .delete()
+                .eq('id', existing.id);
+        } else {
+            await supabase
+                .from('inventory')
+                .update({ quantity: newQty })
+                .eq('id', existing.id);
+        }
+    } else if (quantity > 0) {
         await supabase
             .from('inventory')
             .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity, stats });
     }
+}
+
+export async function updateInventoryItemStats(characterId, itemName, stats) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        const inv = localDb.get(`inventory_${characterId}`) || [];
+        const existing = inv.find(i => i.item_name === itemName);
+        if (existing) {
+            existing.stats = stats;
+            localDb.set(`inventory_${characterId}`, inv);
+        }
+        return;
+    }
+
+    await supabase
+        .from('inventory')
+        .update({ stats })
+        .eq('character_id', characterId)
+        .eq('item_name', itemName);
 }
 
 // ============ Leaderboard ============
