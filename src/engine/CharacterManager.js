@@ -1,6 +1,6 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS } from './GameData.js';
 
 export class CharacterManager {
     constructor(scene) {
@@ -16,6 +16,13 @@ export class CharacterManager {
         this.attackCooldown = 1.0; // seconds between attacks
         this.target = null;
         this.moveSpeed = 4;
+
+        // Skill cooldown state
+        this.cooldowns = {
+            bash: 0,
+            heal: 0,
+            magnumBreak: 0
+        };
 
         // Stats (will be loaded from DB)
         this.stats = {
@@ -261,6 +268,13 @@ export class CharacterManager {
         this.animTimer += dt;
         this.attackTimer += dt;
 
+        // Count down skill cooldowns
+        for (const skillId in this.cooldowns) {
+            if (this.cooldowns[skillId] > 0) {
+                this.cooldowns[skillId] = Math.max(0, this.cooldowns[skillId] - dt);
+            }
+        }
+
         // Idle bobbing
         if (this.state === 'idle') {
             this.mesh.position.y = Math.sin(this.animTimer * 2) * 0.05;
@@ -310,6 +324,138 @@ export class CharacterManager {
 
         // Play time tracker
         this.stats.play_time += dt;
+    }
+
+    // ============ Skill System Action ============
+    useSkill(skillId, currentTarget, monsterManager, gameUI, soundManager, particleSystem, effectCallback) {
+        if (!this.isAlive()) return false;
+
+        const skill = SKILLS[skillId];
+        if (!skill) return false;
+
+        // Check SP
+        if (this.stats.sp < skill.spCost) {
+            if (gameUI) gameUI.addCombatLog('❌ พลังเวทมนตร์ (SP) ไม่เพียงพอ!', 'system');
+            return false;
+        }
+
+        // Check Cooldown
+        if (this.cooldowns[skillId] > 0) {
+            if (gameUI) gameUI.addCombatLog(`❌ สกิล ${skill.name} ยังติด Cooldown (${this.cooldowns[skillId].toFixed(1)}s)`, 'system');
+            return false;
+        }
+
+        // Set state for animation swing
+        this.state = 'attacking';
+        this.animTimer = 0;
+
+        // Deduct SP and set cooldown
+        this.stats.sp -= skill.spCost;
+        this.cooldowns[skillId] = skill.cooldown;
+
+        // Sound effect
+        if (soundManager) {
+            soundManager.playSkillSound(skillId);
+        }
+
+        // Execute action
+        if (skillId === 'bash') {
+            if (!currentTarget) {
+                if (gameUI) gameUI.addCombatLog('❌ ต้องการเป้าหมายในการใช้ Bash!', 'system');
+                // Refund
+                this.stats.sp += skill.spCost;
+                this.cooldowns[skillId] = 0;
+                return false;
+            }
+
+            // Deal 1.5x damage
+            const dmgBase = this.stats.atk * skill.damageMultiplier;
+            const finalDmg = Math.max(1, Math.floor(dmgBase * (0.9 + Math.random() * 0.2)));
+            const actualDmg = currentTarget.takeDamage(finalDmg);
+
+            if (gameUI) {
+                gameUI.addCombatLog(`⚔️ ใช้ [Bash] โจมตี ${currentTarget.name}! สร้างความเสียหาย ${actualDmg}`, 'atk');
+            }
+
+            // Spawn skill burst particles
+            if (particleSystem) {
+                if (particleSystem.createCriticalBurst) {
+                    particleSystem.createCriticalBurst(currentTarget.mesh.position);
+                } else if (particleSystem.createHitBurst) {
+                    particleSystem.createHitBurst(currentTarget.mesh.position);
+                }
+            }
+
+            if (effectCallback) effectCallback('bash', currentTarget, actualDmg);
+
+        } else if (skillId === 'heal') {
+            // Heal calculation
+            const healVal = this.stats.level * skill.healBase + Math.floor(this.stats.atk * 0.5);
+            this.heal(healVal);
+
+            if (gameUI) {
+                gameUI.addCombatLog(`💚 ใช้ [Heal] ฟื้นฟูวิญญาณศักดิ์สิทธิ์! พลังชีวิตเพิ่มขึ้น +${healVal}`, 'heal');
+            }
+
+            // Spawn green healing sparkles
+            if (particleSystem) {
+                if (particleSystem.createLevelUpShimmer) {
+                    particleSystem.createLevelUpShimmer(this.mesh.position, 0x40ff60);
+                }
+            }
+
+            if (effectCallback) effectCallback('heal', this, healVal);
+
+        } else if (skillId === 'magnumBreak') {
+            // AoE Shockwave
+            if (gameUI) {
+                gameUI.addCombatLog('🔥 ระเบิดพลังงาน [Magnum Break]!', 'atk');
+            }
+
+            const origin = this.mesh.position;
+            let hits = 0;
+
+            if (monsterManager && monsterManager.monsters) {
+                monsterManager.monsters.forEach(m => {
+                    const dist = origin.distanceTo(m.mesh.position);
+                    if (dist <= skill.aoeRange && m.isAlive()) {
+                        const dmgBase = this.stats.atk * skill.damageMultiplier;
+                        const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
+                        const actualDmg = m.takeDamage(finalDmg);
+                        hits++;
+
+                        if (gameUI) {
+                            gameUI.addCombatLog(`🔥 Magnum Break โดน ${m.name}! แดมเมจ ${actualDmg}`, 'atk');
+                        }
+
+                        if (particleSystem) {
+                            if (particleSystem.createHitBurst) {
+                                particleSystem.createHitBurst(m.mesh.position);
+                            }
+                        }
+
+                        if (effectCallback) effectCallback('magnumBreak', m, actualDmg);
+                    }
+                });
+            }
+
+            if (particleSystem) {
+                // Fire ring sweep effect
+                if (particleSystem.createCriticalBurst) {
+                    particleSystem.createCriticalBurst(origin);
+                }
+                if (particleSystem.createLevelUpShimmer) {
+                    particleSystem.createLevelUpShimmer(origin, 0xff4000);
+                }
+            }
+        }
+
+        // Save Stats
+        if (this.characterId && this.saveStatsToDatabase) {
+            this.saveStatsToDatabase().catch(() => { });
+        }
+
+        return true;
     }
 
     // Move toward a position

@@ -9,6 +9,7 @@ import { SoundManager } from './engine/SoundManager.js';
 import { InputManager } from './engine/InputManager.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { GameUI } from './ui/GameUI.js';
+import { SKILLS } from './engine/GameData.js';
 import {
     loadCharacter,
     saveCharacter,
@@ -69,6 +70,18 @@ async function initGame() {
 
     // Spawn monsters
     monsters.spawnInitial(character.stats.level);
+
+    // Setup skill callbacks
+    if (inputManager) {
+        inputManager.setupSkillHotkey((skillId) => {
+            executeActiveSkill(skillId);
+        });
+    }
+    if (gameUI) {
+        gameUI.setupSkillClicks((skillId) => {
+            executeActiveSkill(skillId);
+        });
+    }
 
     // Setup auto-farm button
     gameUI.setupAutoFarmButton(() => {
@@ -239,6 +252,47 @@ function handleCombatEvent(event) {
     }
 }
 
+// ============ Active Skill Cast Handler ============
+function executeActiveSkill(skillId) {
+    if (!character || !character.isAlive()) return;
+
+    let targetMonster = null;
+    const skill = SKILLS[skillId];
+    if (!skill) return;
+
+    if (skill.target === 'single') {
+        // Find nearest monster within casting range
+        targetMonster = monsters.findNearest(character.getPosition(), 15);
+    }
+
+    const success = character.useSkill(
+        skillId,
+        targetMonster,
+        monsters,
+        gameUI,
+        soundManager,
+        particles,
+        (type, target, val) => {
+            const screen = sceneManager.worldToScreen(target.getPosition());
+            if (type === 'heal') {
+                particles.spawnDamageNumber(screen.x, screen.y - 40, `+${val}`, 'heal');
+                particles.spawnHitEffect(target.getPosition(), true);
+            } else if (type === 'bash' || type === 'magnumBreak') {
+                const label = `💥 ${val}`;
+                particles.spawnDamageNumber(screen.x, screen.y - 20, label, 'critical');
+                particles.spawnHitEffect(target.getPosition(), true);
+            }
+        }
+    );
+
+    if (success) {
+        if (gameUI) {
+            gameUI.updateHUD(character.stats);
+            gameUI.updateStats(character.stats);
+        }
+    }
+}
+
 // ============ Game Loop ============
 function gameLoop() {
     requestAnimationFrame(gameLoop);
@@ -260,6 +314,69 @@ function gameLoop() {
     monsters.update(dt, sceneManager.camera, character.stats.level);
     combat.update(dt);
     particles.update(dt);
+
+    if (sceneManager) {
+        sceneManager.updateAnimations(dt);
+
+        // Map Portals transition check
+        const portals = sceneManager.getPortals();
+        const playerPos = character.getPosition();
+        for (const portal of portals) {
+            const dist = playerPos.distanceTo(portal.position);
+            if (dist <= 1.8) {
+                const targetMap = portal.userData.targetMap;
+                gameUI.addCombatLog(`🌀 Entering Portal... Transitioning to ${targetMap === 'payon' ? 'Payon Forest' : 'Prontera Field'}`, 'system');
+
+                // Clear current monsters
+                monsters.monsters.forEach(m => m.destroy());
+                monsters.monsters = [];
+                monsters.deadQueue = [];
+
+                // Swap map visual
+                sceneManager.loadMap(targetMap);
+
+                // Set monster manager map details
+                monsters.mapId = targetMap;
+                monsters.spawnInitial(character.stats.level);
+
+                // Sound Effect
+                if (soundManager) {
+                    if (soundManager.playPortalSound) {
+                        soundManager.playPortalSound();
+                    } else {
+                        soundManager.playLevelUpSound();
+                    }
+                }
+
+                // Place arriving character slightly inward
+                if (targetMap === 'payon') {
+                    character.mesh.position.set(-20, 0, 0);
+                } else {
+                    character.mesh.position.set(20, 0, 0);
+                }
+                break;
+            }
+        }
+
+        // NPC proximity range checks
+        const npc = sceneManager.getNPC();
+        if (npc) {
+            const npcDist = playerPos.distanceTo(npc.position);
+            const shopPanel = document.getElementById('shop-panel');
+            if (npcDist > 4.5 && shopPanel && shopPanel.style.display === 'flex') {
+                shopPanel.style.display = 'none';
+                gameUI.addCombatLog('👋 Walked too far from Kafra Shop.', 'system');
+            }
+        }
+    }
+
+    // Update skills cooldown overlays in game UI
+    for (const skillId in character.cooldowns) {
+        const skill = SKILLS[skillId];
+        if (skill && gameUI) {
+            gameUI.updateSkillCooldown(skillId, character.cooldowns[skillId], skill.cooldown);
+        }
+    }
 
     // Update remote players
     for (const remotePlayer of remotePlayersMap.values()) {

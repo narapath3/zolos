@@ -1,6 +1,6 @@
 // Monster Manager — Monster spawning, AI, and management
 import * as THREE from 'three';
-import { MONSTERS, pickRandomMonster } from './GameData.js';
+import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters } from './GameData.js';
 
 const MAX_MONSTERS = 12;
 const SPAWN_RANGE = 12;
@@ -223,35 +223,35 @@ export class MonsterManager {
         this.scene = scene;
         this.monsters = [];
         this.deadQueue = []; // { monster, timer }
+        this.mapId = 'prontera';
     }
 
     spawnInitial(playerLevel) {
         const rng = createSeededRng(getDailySeed());
         const count = Math.min(MAX_MONSTERS, 6 + Math.floor(playerLevel / 2));
+
+        // Spawn seeded monsters using map-specific database
+        const spawnTable = getSpawnTable(playerLevel, this.mapId);
+
         for (let i = 0; i < count; i++) {
-            this._spawnOneSeeded(playerLevel, rng);
+            if (spawnTable.length === 0) continue;
+            // Roll using seeded rng
+            const entry = spawnTable[Math.floor(rng() * spawnTable.length)];
+            const angle = rng() * Math.PI * 2;
+            const dist = 4 + rng() * (SPAWN_RANGE - 4);
+            const pos = new THREE.Vector3(
+                Math.cos(angle) * dist,
+                0,
+                Math.sin(angle) * dist
+            );
+
+            const monster = new Monster(this.scene, entry.type, pos);
+            this.monsters.push(monster);
         }
     }
 
-    _spawnOneSeeded(playerLevel, rng) {
-        // Use seeded rng for deterministic type and position
-        const types = Object.keys(MONSTERS);
-        const type = types[Math.floor(rng() * types.length)];
-        const angle = rng() * Math.PI * 2;
-        const dist = 4 + rng() * (SPAWN_RANGE - 4);
-        const pos = new THREE.Vector3(
-            Math.cos(angle) * dist,
-            0,
-            Math.sin(angle) * dist
-        );
-
-        const monster = new Monster(this.scene, type, pos);
-        this.monsters.push(monster);
-        return monster;
-    }
-
     _spawnOne(playerLevel) {
-        const type = pickRandomMonster(playerLevel);
+        const type = pickRandomMonster(playerLevel, this.mapId);
         const angle = Math.random() * Math.PI * 2;
         const dist = 4 + Math.random() * (SPAWN_RANGE - 4);
         const pos = new THREE.Vector3(
@@ -277,15 +277,25 @@ export class MonsterManager {
             if (this.deadQueue[i].timer <= 0) {
                 const entry = this.deadQueue.splice(i, 1)[0];
                 // Respawn with new type
-                const type = pickRandomMonster(playerLevel);
+                const type = pickRandomMonster(playerLevel, this.mapId);
                 const angle = Math.random() * Math.PI * 2;
                 const dist = 4 + Math.random() * (SPAWN_RANGE - 4);
                 const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
                 entry.monster.type = type;
-                entry.monster.data = MONSTERS[type];
-                entry.monster.maxHp = MONSTERS[type].hp;
-                entry.monster.reset(pos);
+                const allMonsters = getAllMonsters();
+                const monsterData = allMonsters[type];
+                if (monsterData) {
+                    entry.monster.data = monsterData;
+                    entry.monster.maxHp = monsterData.hp;
+
+                    // Repaint bodyMesh to new monster color
+                    if (entry.monster.bodyMesh && entry.monster.bodyMesh.material) {
+                        entry.monster.bodyMesh.material.color.setHex(monsterData.color);
+                    }
+                    // Re-render hp bar scale and status
+                    entry.monster.reset(pos);
+                }
             }
         }
 

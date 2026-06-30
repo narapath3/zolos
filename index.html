@@ -86,6 +86,25 @@
       </button>
     </div>
 
+    <!-- Skill Bar HUD -->
+    <div id="skill-bar">
+      <div class="skill-slot" data-skill="bash" title="[1] Bash">
+        <span class="skill-key">1</span>
+        <span class="skill-icon">⚔️</span>
+        <div class="skill-cooldown-overlay" id="cooldown-bash"></div>
+      </div>
+      <div class="skill-slot" data-skill="heal" title="[2] Heal">
+        <span class="skill-key">2</span>
+        <span class="skill-icon">💚</span>
+        <div class="skill-cooldown-overlay" id="cooldown-heal"></div>
+      </div>
+      <div class="skill-slot" data-skill="magnumBreak" title="[3] Magnum Break">
+        <span class="skill-key">3</span>
+        <span class="skill-icon">🔥</span>
+        <div class="skill-cooldown-overlay" id="cooldown-magnumBreak"></div>
+      </div>
+    </div>
+
     <!-- Bottom HUD -->
     <div id="hud-bottom">
       <button class="hud-btn" id="btn-stats" title="Stats">
@@ -95,6 +114,10 @@
       <button class="hud-btn" id="btn-inventory" title="Inventory">
         <span>🎒</span>
         <small>Bag</small>
+      </button>
+      <button class="hud-btn" id="btn-shop" title="Kafra Shop">
+        <span>🏪</span>
+        <small>Shop</small>
       </button>
       <button class="hud-btn" id="btn-leaderboard" title="Leaderboard">
         <span>🏆</span>
@@ -152,6 +175,41 @@
             <div class="detail-actions">
               <span class="detail-price">Value: <span id="detail-price-val">0</span> z</span>
               <button id="btn-use-item" class="btn-use-item" style="display: none;">Use</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop Panel -->
+    <div id="shop-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>🏪 Kafra Shop</h3>
+        <button class="panel-close" data-close="shop-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="gold-display">💰 <span id="shop-gold-amount">0</span> Zeny</div>
+
+        <div class="shop-tabs">
+          <button class="shop-tab active" data-tab="buy">Buy</button>
+          <button class="shop-tab" data-tab="sell">Sell</button>
+        </div>
+
+        <div class="shop-grid" id="shop-grid"></div>
+
+        <div id="shop-detail-box" class="shop-detail-box">
+          <div id="shop-detail-placeholder" class="shop-detail-placeholder">Select an item to buy/sell</div>
+          <div id="shop-detail-content" class="shop-detail-content" style="display: none;">
+            <div class="detail-row">
+              <span id="shop-detail-icon" class="detail-icon">📦</span>
+              <div class="detail-info-block">
+                <div id="shop-detail-name" class="detail-name">Item Name</div>
+                <div id="shop-detail-price" class="detail-type" style="color: var(--primary);">Price: 0 z</div>
+              </div>
+            </div>
+            <div id="shop-detail-desc" class="detail-desc">No description.</div>
+            <div class="shop-actions">
+              <button id="btn-shop-action" class="btn-use-item" style="width: 100%;">Buy</button>
             </div>
           </div>
         </div>

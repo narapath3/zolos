@@ -10,6 +10,8 @@ export class InputManager {
 
         // Reset keys on window blur (prevents stuck keys)
         window.addEventListener('blur', () => { this.keys = {}; });
+
+        this.onSkillHotkeyCallback = null;
     }
 
     _onKeyDown(e) {
@@ -18,10 +20,21 @@ export class InputManager {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
         this.keys[e.code] = true;
+
+        // Skill hotkeys triggers: 1, 2, 3
+        if ((e.key === '1' || e.key === '2' || e.key === '3') && this.onSkillHotkeyCallback) {
+            // Map key '1' -> 'bash', '2' -> 'heal', '3' -> 'magnumBreak'
+            const skillId = e.key === '1' ? 'bash' : e.key === '2' ? 'heal' : 'magnumBreak';
+            this.onSkillHotkeyCallback(skillId);
+        }
     }
 
     _onKeyUp(e) {
         this.keys[e.code] = false;
+    }
+
+    setupSkillHotkey(callback) {
+        this.onSkillHotkeyCallback = callback;
     }
 
     /**

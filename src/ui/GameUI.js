@@ -1,5 +1,5 @@
 // Game UI — HUD, panels, combat log, and all in-game UI
-import { getExpRequired, ITEMS } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, SHOP_ITEMS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem } from '../network/GameSync.js';
 
 export class GameUI {
@@ -16,8 +16,13 @@ export class GameUI {
     this.currentTab = 'all';
     this.selectedItemName = null;
 
+    // NPC Shop state
+    this.shopTab = 'buy';
+    this.selectedShopItemName = null;
+
     this._setupPanels();
     this._setupROInventoryEvents();
+    this._setupShopEvents();
   }
 
   show() {
@@ -32,6 +37,10 @@ export class GameUI {
     // Panel toggle buttons
     document.getElementById('btn-stats').addEventListener('click', () => this._togglePanel('stats-panel'));
     document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
+    document.getElementById('btn-shop').addEventListener('click', () => {
+      this._togglePanel('shop-panel');
+      this._renderShop();
+    });
     document.getElementById('btn-leaderboard').addEventListener('click', () => {
       this._togglePanel('leaderboard-panel');
       this._refreshLeaderboard();
@@ -488,5 +497,222 @@ export class GameUI {
 
   setAutoFarmState(active) {
     document.getElementById('btn-auto-farm').classList.toggle('active', active);
+  }
+
+  // ============ Kafra Shop Logic ============
+  _setupShopEvents() {
+    // Tab switching
+    const tabs = document.querySelectorAll('.shop-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.shopTab = tab.getAttribute('data-tab');
+        this.selectedShopItemName = null;
+        this._renderShop();
+      });
+    });
+
+    // Action button (Buy / Sell)
+    const actionBtn = document.getElementById('btn-shop-action');
+    if (actionBtn) {
+      actionBtn.addEventListener('click', () => this._performShopAction());
+    }
+  }
+
+  _renderShop() {
+    const grid = document.getElementById('shop-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    // Update gold display
+    const goldDisplay = document.getElementById('shop-gold-amount');
+    if (goldDisplay && this.character) {
+      goldDisplay.textContent = this.character.stats.gold;
+    }
+
+    if (this.shopTab === 'buy') {
+      // Render buyable list
+      SHOP_ITEMS.forEach(shopItem => {
+        const itemInfo = ITEMS[shopItem.name];
+        if (!itemInfo) return;
+
+        const slot = document.createElement('div');
+        slot.className = 'inventory-slot';
+        if (this.selectedShopItemName === shopItem.name) {
+          slot.classList.add('selected');
+        }
+        slot.innerHTML = `
+          <div class="slot-icon">${itemInfo.emoji}</div>
+          <div class="slot-quantity" style="font-size:7px;background:rgba(0,0,0,0.7);">z${shopItem.price}</div>
+        `;
+        slot.addEventListener('click', () => {
+          this.selectedShopItemName = shopItem.name;
+          this._renderShop();
+          this._updateShopDetailBox(shopItem.name, 'buy', shopItem.price);
+        });
+        grid.appendChild(slot);
+      });
+    } else {
+      // Render sellable inventory (Any etc/usable item)
+      if (this.inventory.length === 0) {
+        grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9px;padding:20px 0;">No items to sell</div>';
+      }
+      this.inventory.forEach(item => {
+        const slot = document.createElement('div');
+        slot.className = 'inventory-slot';
+        if (this.selectedShopItemName === item.item_name) {
+          slot.classList.add('selected');
+        }
+        const sellPrice = Math.floor(item.price * 0.5); // Sell at 50% value
+        slot.innerHTML = `
+          <div class="slot-icon">${item.emoji}</div>
+          <div class="slot-quantity">x${item.quantity}</div>
+        `;
+        slot.addEventListener('click', () => {
+          this.selectedShopItemName = item.item_name;
+          this._renderShop();
+          this._updateShopDetailBox(item.item_name, 'sell', sellPrice);
+        });
+        grid.appendChild(slot);
+      });
+    }
+
+    // sync placeholder
+    if (!this.selectedShopItemName) {
+      document.getElementById('shop-detail-placeholder').style.display = 'block';
+      document.getElementById('shop-detail-content').style.display = 'none';
+    }
+  }
+
+  _updateShopDetailBox(itemName, type, price) {
+    const registryItem = ITEMS[itemName];
+    if (!registryItem) return;
+
+    document.getElementById('shop-detail-placeholder').style.display = 'none';
+    const content = document.getElementById('shop-detail-content');
+    content.style.display = 'flex';
+
+    document.getElementById('shop-detail-icon').textContent = registryItem.emoji;
+    document.getElementById('shop-detail-name').textContent = itemName;
+
+    const priceEl = document.getElementById('shop-detail-price');
+    priceEl.textContent = `${type === 'buy' ? 'Buy Price' : 'Sell Value'}: ${price} Zeny`;
+
+    document.getElementById('shop-detail-desc').textContent = registryItem.desc || 'No description.';
+
+    const actionBtn = document.getElementById('btn-shop-action');
+    actionBtn.textContent = type === 'buy' ? '💸 Buy Item' : '💰 Sell Item';
+  }
+
+  async _performShopAction() {
+    if (!this.selectedShopItemName || !this.character) return;
+
+    const itemName = this.selectedShopItemName;
+    const itemRegistry = ITEMS[itemName];
+    if (!itemRegistry) return;
+
+    if (this.shopTab === 'buy') {
+      const shopItem = SHOP_ITEMS.find(i => i.name === itemName);
+      if (!shopItem) return;
+
+      const price = shopItem.price;
+      if (this.character.stats.gold < price) {
+        this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอสำหรับการสั่งซื้อ!', 'system');
+        if (this.soundManager) this.soundManager.playErrorSound?.(); // Fallback to avoid error
+        return;
+      }
+
+      // Deduct gold
+      this.character.stats.gold -= price;
+
+      // Add to local inventory state
+      const existing = this.inventory.find(i => i.item_name === itemName);
+      if (existing) {
+        existing.quantity++;
+      } else {
+        this.inventory.push({
+          item_name: itemName,
+          item_type: itemRegistry.type,
+          emoji: itemRegistry.emoji,
+          desc: itemRegistry.desc,
+          price: itemRegistry.price,
+          healHp: itemRegistry.healHp || 0,
+          restoreSp: itemRegistry.restoreSp || 0,
+          quantity: 1
+        });
+      }
+
+      // Sync and log
+      this.addCombatLog(`🛒 ซื้อ ${itemRegistry.emoji} ${itemName} สำเร็จ (-${price} Zeny)`, 'system');
+      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
+
+      if (this.characterId) {
+        saveInventoryItem(this.characterId, itemName, itemRegistry.type, 1).catch(() => { });
+        // Trigger character database save for gold
+        if (this.character.saveStatsToDatabase) {
+          this.character.saveStatsToDatabase().catch(() => { });
+        }
+      }
+
+    } else {
+      // Sell action
+      const itemIdx = this.inventory.findIndex(i => i.item_name === itemName);
+      if (itemIdx === -1) return;
+
+      const item = this.inventory[itemIdx];
+      if (item.quantity <= 0) return;
+
+      const sellPrice = Math.floor(item.price * 0.5);
+
+      // Add gold
+      this.character.stats.gold += sellPrice;
+
+      // Update quantity
+      item.quantity--;
+      if (item.quantity <= 0) {
+        this.inventory.splice(itemIdx, 1);
+        this.selectedShopItemName = null;
+      }
+
+      this.addCombatLog(`💰 ขาย ${item.emoji} ${itemName} ได้รับ +${sellPrice} Zeny`, 'system');
+      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
+
+      if (this.characterId) {
+        saveInventoryItem(this.characterId, itemName, item.item_type, -1).catch(() => { });
+        if (this.character.saveStatsToDatabase) {
+          this.character.saveStatsToDatabase().catch(() => { });
+        }
+      }
+    }
+
+    // Refresh displays
+    this._renderShop();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
+  }
+
+  // ============ Skill HUD Updates ============
+  updateSkillCooldown(skillId, currentCooldown, maxCooldown) {
+    const overlay = document.getElementById(`cooldown-${skillId}`);
+    if (!overlay) return;
+
+    if (currentCooldown <= 0) {
+      overlay.style.height = '0%';
+    } else {
+      const percentage = (currentCooldown / maxCooldown) * 100;
+      overlay.style.height = `${percentage}%`;
+    }
+  }
+
+  setupSkillClicks(callback) {
+    const slots = document.querySelectorAll('.skill-slot');
+    slots.forEach(slot => {
+      slot.addEventListener('click', () => {
+        const skillId = slot.getAttribute('data-skill');
+        callback(skillId);
+      });
+    });
   }
 }

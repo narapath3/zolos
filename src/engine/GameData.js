@@ -148,6 +148,134 @@ export const MONSTERS = {
     }
 };
 
+// ============ PAYON FOREST MONSTERS ============
+export const PAYON_MONSTERS = {
+    horn: {
+        name: 'Horn',
+        emoji: '🪲',
+        color: 0x8a6040,
+        hp: 120,
+        atk: 20,
+        def: 12,
+        exp: 65,
+        gold: { min: 12, max: 35 },
+        size: 0.7,
+        speed: 0.3,
+        loot: [
+            { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.5 },
+            { name: 'Worm Peeling', emoji: '🧬', type: 'material', chance: 0.3 },
+            { name: 'Yellow Herb', emoji: '🌾', type: 'consumable', chance: 0.2 },
+        ]
+    },
+    savage: {
+        name: 'Savage',
+        emoji: '🐗',
+        color: 0x8a5030,
+        hp: 200,
+        atk: 30,
+        def: 15,
+        exp: 100,
+        gold: { min: 20, max: 50 },
+        size: 0.9,
+        speed: 0.7,
+        loot: [
+            { name: 'Tree Root', emoji: '🪵', type: 'material', chance: 0.4 },
+            { name: 'Red Herb', emoji: '🌺', type: 'consumable', chance: 0.25 },
+            { name: 'Wooden Heart', emoji: '❤️‍🔥', type: 'material', chance: 0.08 },
+        ]
+    },
+    boa: {
+        name: 'Boa',
+        emoji: '🐍',
+        color: 0x40a040,
+        hp: 180,
+        atk: 25,
+        def: 10,
+        exp: 85,
+        gold: { min: 15, max: 45 },
+        size: 0.6,
+        speed: 0.5,
+        loot: [
+            { name: 'Poison Spore', emoji: '☠️', type: 'material', chance: 0.4 },
+            { name: 'Green Herb', emoji: '🌿', type: 'consumable', chance: 0.3 },
+            { name: 'Silk', emoji: '🧵', type: 'material', chance: 0.15 },
+        ]
+    },
+    bigfoot: {
+        name: 'Bigfoot',
+        emoji: '🐻',
+        color: 0x6a4020,
+        hp: 350,
+        atk: 40,
+        def: 20,
+        exp: 160,
+        gold: { min: 30, max: 70 },
+        size: 1.1,
+        speed: 0.4,
+        loot: [
+            { name: 'Orange Juice', emoji: '🧃', type: 'consumable', chance: 0.3 },
+            { name: 'Crystal Blue', emoji: '🔵', type: 'material', chance: 0.08 },
+            { name: 'Blue Herb', emoji: '💙', type: 'consumable', chance: 0.06 },
+        ]
+    },
+};
+
+// ============ SKILLS ============
+export const SKILLS = {
+    bash: {
+        id: 'bash',
+        name: 'Bash',
+        emoji: '⚔️',
+        desc: 'สกิลโจมตีทางกายภาพพลังแรง ดีลดาเมจ 1.5 เท่าต่อเป้าหมายเดี่ยว',
+        type: 'physical',
+        target: 'single',
+        damageMultiplier: 1.5,
+        spCost: 8,
+        cooldown: 3,
+        hotkey: '1',
+        color: 0xff6040,
+    },
+    heal: {
+        id: 'heal',
+        name: 'Heal',
+        emoji: '💚',
+        desc: 'เวทมนตร์ศักดิ์สิทธิ์ฟื้นฟูพลังชีวิต HP ตาม Level x 8 + ATK',
+        type: 'heal',
+        target: 'self',
+        healBase: 8,
+        spCost: 15,
+        cooldown: 5,
+        hotkey: '2',
+        color: 0x40ff60,
+    },
+    magnumBreak: {
+        id: 'magnumBreak',
+        name: 'Magnum Break',
+        emoji: '🔥',
+        desc: 'ระเบิดพลังไฟรอบตัว ดีลดาเมจ 2 เท่าแก่มอนสเตอร์รอบ 5 หน่วย พร้อมเอฟเฟกต์ไฟ',
+        type: 'physical_aoe',
+        target: 'aoe',
+        damageMultiplier: 2.0,
+        aoeRange: 5,
+        spCost: 20,
+        cooldown: 8,
+        hotkey: '3',
+        color: 0xff4000,
+    },
+};
+
+// ============ SHOP ITEMS ============
+export const SHOP_ITEMS = [
+    { name: 'Apple', price: 15 },
+    { name: 'Carrot', price: 20 },
+    { name: 'Green Herb', price: 30 },
+    { name: 'Yellow Herb', price: 60 },
+    { name: 'Red Herb', price: 100 },
+    { name: 'Orange Juice', price: 120 },
+    { name: 'Blue Herb', price: 150 },
+    { name: 'Grape', price: 50 },
+];
+
 // ============ EXP TABLE ============
 export function getExpRequired(level) {
     return Math.floor(100 * Math.pow(1.35, level - 1));
@@ -163,13 +291,20 @@ export function getStatGains(level) {
     };
 }
 
-// ============ SPAWN TABLE (by level) ============
-export function getSpawnTable(playerLevel) {
+// ============ SPAWN TABLE (by level + map) ============
+export function getSpawnTable(playerLevel, mapId = 'prontera') {
     const table = [];
 
-    // Always spawn Porings
-    table.push({ type: 'poring', weight: Math.max(10, 40 - playerLevel * 3) });
+    if (mapId === 'payon') {
+        table.push({ type: 'horn', weight: 30 });
+        table.push({ type: 'boa', weight: 25 });
+        if (playerLevel >= 5) table.push({ type: 'savage', weight: 20 });
+        if (playerLevel >= 10) table.push({ type: 'bigfoot', weight: 12 });
+        return table;
+    }
 
+    // Prontera Field
+    table.push({ type: 'poring', weight: Math.max(10, 40 - playerLevel * 3) });
     if (playerLevel >= 1) table.push({ type: 'lunatic', weight: 30 });
     if (playerLevel >= 3) table.push({ type: 'fabre', weight: 25 });
     if (playerLevel >= 5) table.push({ type: 'rocker', weight: 20 });
@@ -180,8 +315,8 @@ export function getSpawnTable(playerLevel) {
     return table;
 }
 
-export function pickRandomMonster(playerLevel) {
-    const table = getSpawnTable(playerLevel);
+export function pickRandomMonster(playerLevel, mapId = 'prontera') {
+    const table = getSpawnTable(playerLevel, mapId);
     const totalWeight = table.reduce((sum, e) => sum + e.weight, 0);
     let roll = Math.random() * totalWeight;
 
@@ -190,4 +325,9 @@ export function pickRandomMonster(playerLevel) {
         if (roll <= 0) return entry.type;
     }
     return table[0].type;
+}
+
+// All monsters combined (for lookup)
+export function getAllMonsters() {
+    return { ...MONSTERS, ...PAYON_MONSTERS };
 }
