@@ -242,6 +242,17 @@ export class GameUI {
         });
     }
 
+    setupLogoutButton(callback) {
+        const btn = document.getElementById('btn-logout');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to logout?')) {
+                    callback();
+                }
+            });
+        }
+    }
+
     setAutoFarmState(active) {
         document.getElementById('btn-auto-farm').classList.toggle('active', active);
     }
