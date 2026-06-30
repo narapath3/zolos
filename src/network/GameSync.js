@@ -6,6 +6,7 @@ let autoSaveInterval = null;
 let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
 let mockPlayers = [];
+let channelSubscribed = false;
 
 // ============ Character CRUD ============
 export async function loadCharacter(userId) {
@@ -193,9 +194,10 @@ export async function fetchLeaderboard() {
     return data || [];
 }
 
-// ============ Realtime Presence ============
-export function joinPresence(userId, username, level, onPlayersUpdate) {
+// ============ Realtime Presence & Broadcast ============
+export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate) {
     onlinePlayersCallback = onPlayersUpdate;
+    channelSubscribed = false;
 
     if (isOfflineMode || !supabase) {
         // Simulate real online players
@@ -212,13 +214,23 @@ export function joinPresence(userId, username, level, onPlayersUpdate) {
             mockPlayers.push({
                 userId: 'player_' + name.toLowerCase(),
                 username: name,
-                level: Math.floor(level + (Math.random() - 0.2) * 5)
+                level: Math.floor(level + (Math.random() - 0.2) * 5),
+                x: (Math.random() - 0.5) * 15,
+                y: 0,
+                z: (Math.random() - 0.5) * 15,
+                rY: Math.random() * Math.PI * 2,
+                state: 'idle'
             });
         }
 
         if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
+        if (onPlayerPositionUpdate) {
+            mockPlayers.forEach(p => {
+                if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
+            });
+        }
 
-        // Periodic simulation (join/leave/level up)
+        // Periodic simulation (join/leave/level up/wander)
         presenceUpdateInterval = setInterval(() => {
             // 20% chance to level up someone
             if (Math.random() < 0.2 && mockPlayers.length > 1) {
@@ -229,27 +241,70 @@ export function joinPresence(userId, username, level, onPlayersUpdate) {
             // 10% chance to leave
             if (mockPlayers.length > 2 && Math.random() < 0.1) {
                 const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
-                mockPlayers.splice(leaveIdx, 1);
+                const left = mockPlayers.splice(leaveIdx, 1)[0];
+                // Notify via online players callback
+                if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
             }
 
             // 10% chance to join
             if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
                 const name = names.shift();
-                mockPlayers.push({
+                const newPlayer = {
                     userId: 'player_' + name.toLowerCase(),
                     username: name,
-                    level: Math.max(1, Math.floor(level + (Math.random() - 0.2) * 4))
-                });
+                    level: Math.max(1, Math.floor(level + (Math.random() - 0.2) * 4)),
+                    x: (Math.random() - 0.5) * 15,
+                    y: 0,
+                    z: (Math.random() - 0.5) * 15,
+                    rY: Math.random() * Math.PI * 2,
+                    state: 'idle'
+                };
+                mockPlayers.push(newPlayer);
+                if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
+                if (onPlayerPositionUpdate) onPlayerPositionUpdate(newPlayer);
             }
 
+            // Simulate wandering movement for mock players
+            mockPlayers.forEach((p, idx) => {
+                if (p.userId === 'player_me') return;
+
+                // Move slightly
+                if (Math.random() < 0.4) {
+                    p.state = Math.random() < 0.3 ? 'attacking' : 'walking';
+                    p.x += (Math.random() - 0.5) * 2;
+                    p.z += (Math.random() - 0.5) * 2;
+                    p.rY = Math.random() * Math.PI * 2;
+                } else {
+                    p.state = 'idle';
+                }
+
+                if (onPlayerPositionUpdate) {
+                    onPlayerPositionUpdate(p);
+                }
+            });
+
             if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
-        }, 10000);
+        }, 3000);
 
         return;
     }
 
+    // ===== ONLINE MODE =====
+    console.log('[Zolos] 🌐 Connecting to realtime channel... userId:', userId, 'username:', username);
+
+    // Clean up any existing channel
+    if (presenceChannel) {
+        try {
+            presenceChannel.unsubscribe();
+        } catch (e) { /* ignore */ }
+        presenceChannel = null;
+    }
+
     presenceChannel = supabase.channel('online-players', {
-        config: { presence: { key: userId } }
+        config: {
+            presence: { key: userId },
+            broadcast: { self: false, ack: true }
+        }
     });
 
     presenceChannel
@@ -265,13 +320,58 @@ export function joinPresence(userId, username, level, onPlayersUpdate) {
                     });
                 }
             }
+            console.log('[Zolos] 👥 Presence sync — online players:', players.length, players.map(p => p.username));
             if (onlinePlayersCallback) onlinePlayersCallback(players);
         })
-        .subscribe(async (status) => {
+        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+            console.log('[Zolos] ➕ Player joined:', key, newPresences);
+        })
+        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+            console.log('[Zolos] ➖ Player left:', key, leftPresences);
+        })
+        .on('broadcast', { event: 'pos' }, ({ payload }) => {
+            if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
+                onPlayerPositionUpdate(payload);
+            }
+        })
+        .subscribe(async (status, err) => {
+            console.log('[Zolos] 📡 Channel status:', status, err ? 'Error: ' + err : '');
             if (status === 'SUBSCRIBED') {
-                await presenceChannel.track({ username, level });
+                channelSubscribed = true;
+                console.log('[Zolos] ✅ Successfully subscribed! Tracking presence...');
+                try {
+                    await presenceChannel.track({
+                        username: username,
+                        level: level,
+                        online_at: new Date().toISOString()
+                    });
+                    console.log('[Zolos] ✅ Presence tracked successfully for:', username);
+                } catch (trackErr) {
+                    console.error('[Zolos] ❌ Failed to track presence:', trackErr);
+                }
+            } else if (status === 'CHANNEL_ERROR') {
+                channelSubscribed = false;
+                console.error('[Zolos] ❌ Channel error:', err);
+            } else if (status === 'TIMED_OUT') {
+                channelSubscribed = false;
+                console.error('[Zolos] ⏱️ Channel timed out, retrying...');
+                // Retry after 3 seconds
+                setTimeout(() => {
+                    if (presenceChannel) {
+                        presenceChannel.subscribe();
+                    }
+                }, 3000);
             }
         });
+}
+
+export function broadcastPosition(userId, username, level, position, rotationY, state) {
+    if (isOfflineMode || !supabase || !presenceChannel || !channelSubscribed) return;
+    presenceChannel.send({
+        type: 'broadcast',
+        event: 'pos',
+        payload: { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state }
+    });
 }
 
 export function updatePresence(level) {
@@ -282,12 +382,14 @@ export function updatePresence(level) {
         return;
     }
 
-    if (presenceChannel) {
+    if (presenceChannel && channelSubscribed) {
         presenceChannel.track({ level });
     }
 }
 
 export function leavePresence() {
+    channelSubscribed = false;
+
     if (presenceUpdateInterval) {
         clearInterval(presenceUpdateInterval);
         presenceUpdateInterval = null;
