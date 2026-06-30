@@ -8,9 +8,14 @@ let presenceUpdateInterval = null;
 let mockPlayers = [];
 let channelSubscribed = false;
 
+// Track active player info for presence updating
+let currentUserId = null;
+let currentUsername = 'Adventurer';
+let currentLevel = 1;
+
 // ============ Character CRUD ============
 export async function loadCharacter(userId) {
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
         const char = localDb.get(`char_${userId}`);
         if (char) return char;
         return await createCharacter(userId);
@@ -53,7 +58,7 @@ export async function createCharacter(userId) {
         updated_at: new Date().toISOString()
     };
 
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
         localDb.set(`char_${userId}`, charData);
         // Update local leaderboard
         updateLocalLeaderboard(charData);
@@ -71,8 +76,8 @@ export async function createCharacter(userId) {
 }
 
 export async function saveCharacter(characterId, updates) {
-    if (isOfflineMode || !supabase) {
-        // CharacterId is activeUserId in offline mode
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        // CharacterId is activeUserId in offline mode or guest mode
         const userId = characterId;
         const char = localDb.get(`char_${userId}`);
         if (char) {
@@ -114,7 +119,7 @@ function updateLocalLeaderboard(char) {
 
 // ============ Inventory ============
 export async function loadInventory(characterId) {
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         return localDb.get(`inventory_${characterId}`) || [];
     }
 
@@ -128,7 +133,7 @@ export async function loadInventory(characterId) {
 }
 
 export async function saveInventoryItem(characterId, itemName, itemType, quantity, stats = {}) {
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         const inv = localDb.get(`inventory_${characterId}`) || [];
         const existing = inv.find(i => i.item_name === itemName);
         if (existing) {
@@ -198,6 +203,11 @@ export async function fetchLeaderboard() {
 export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate) {
     onlinePlayersCallback = onPlayersUpdate;
     channelSubscribed = false;
+
+    // Store player info for later use in updatePresence/broadcast
+    currentUserId = userId;
+    currentUsername = username;
+    currentLevel = level;
 
     if (isOfflineMode || !supabase) {
         // Simulate real online players
@@ -303,7 +313,7 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
     presenceChannel = supabase.channel('online-players', {
         config: {
             presence: { key: userId },
-            broadcast: { self: false, ack: true }
+            broadcast: { self: false, ack: false }
         }
     });
 
@@ -375,6 +385,8 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
 }
 
 export function updatePresence(level) {
+    currentLevel = level;
+
     if (isOfflineMode || !supabase) {
         const me = mockPlayers.find(p => p.userId === 'player_me');
         if (me) me.level = level;
@@ -383,7 +395,11 @@ export function updatePresence(level) {
     }
 
     if (presenceChannel && channelSubscribed) {
-        presenceChannel.track({ level });
+        presenceChannel.track({
+            username: currentUsername,
+            level: level,
+            online_at: new Date().toISOString()
+        });
     }
 }
 

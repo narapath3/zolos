@@ -101,19 +101,29 @@ export async function signInAnonymously() {
     return { user: { id: userId, is_anonymous: true }, guestName };
   }
 
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) throw error;
+  try {
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
 
-  // Create guest profile
-  if (data.user) {
+    // Create guest profile
+    if (data.user) {
+      const guestName = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        username: guestName
+      });
+      return { ...data, guestName };
+    }
+    return data;
+  } catch (e) {
+    console.warn("Supabase anonymous sign-in failed, utilizing local guest session fallback:", e.message);
+    const userId = 'guest_' + Math.random().toString(36).substring(2, 10);
     const guestName = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      username: guestName
-    });
-    return { ...data, guestName };
+    const profile = { id: userId, username: guestName, created_at: new Date().toISOString() };
+    localDb.set(`profile_${userId}`, profile);
+    saveActiveSession(userId);
+    return { user: { id: userId, is_anonymous: true }, guestName };
   }
-  return data;
 }
 
 export async function getSession() {
