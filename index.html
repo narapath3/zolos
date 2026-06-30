@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="Zolos — Idle RPG Online inspired by Ragnarok Online with auto-farm, real-time multiplayer, and 3D graphics" />
+  <title>Zolos — Idle RPG Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles/index.css" />
+</head>
+
+<body>
+  <!-- Auth Screen -->
+  <div id="auth-screen">
+    <div class="auth-container">
+      <div class="auth-logo">
+        <div class="logo-emblem">
+          <span class="logo-wing left">⚔️</span>
+          <div class="logo-text-wrap">
+            <h1 class="game-title">ZOLOS</h1>
+            <div class="logo-shine"></div>
+          </div>
+          <span class="logo-wing right">🛡️</span>
+        </div>
+        <p class="game-subtitle">— Idle RPG Online —</p>
+        <p class="game-tagline">เข้าสู่โลกแห่งการผจญภัย</p>
+      </div>
+      <div class="auth-form" id="login-form">
+        <input type="text" id="auth-username" placeholder="Username" autocomplete="off" />
+        <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+        <button id="btn-login" class="btn-primary">⚔️ Login</button>
+        <button id="btn-register" class="btn-secondary">📜 Register</button>
+        <div class="auth-divider"><span>or</span></div>
+        <button id="btn-guest" class="btn-guest">🎮 Play as Guest</button>
+      </div>
+      <div class="auth-status" id="auth-status"></div>
+      <div class="online-count">
+        <span class="pulse-dot"></span>
+        <span id="online-players-auth">0</span> adventurers online
+      </div>
+    </div>
+    <div class="auth-particles" id="auth-particles"></div>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="game-screen" style="display: none;">
+    <!-- Three.js Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Top HUD -->
+    <div id="hud-top">
+      <div class="player-info">
+        <div class="player-name" id="hud-name">Adventurer</div>
+        <div class="player-level">Lv.<span id="hud-level">1</span></div>
+      </div>
+      <div class="bars-container">
+        <div class="bar hp-bar">
+          <div class="bar-fill" id="hp-fill"></div>
+          <span class="bar-text" id="hp-text">100/100</span>
+        </div>
+        <div class="bar sp-bar">
+          <div class="bar-fill" id="sp-fill"></div>
+          <span class="bar-text" id="sp-text">50/50</span>
+        </div>
+        <div class="bar exp-bar">
+          <div class="bar-fill" id="exp-fill"></div>
+          <span class="bar-text" id="exp-text">0/100</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto Farm Button -->
+    <div id="auto-farm-container">
+      <button id="btn-auto-farm" class="btn-auto">
+        <span class="auto-icon">⚡</span>
+        <span class="auto-text">AUTO</span>
+      </button>
+    </div>
+
+    <!-- Bottom HUD -->
+    <div id="hud-bottom">
+      <button class="hud-btn" id="btn-stats" title="Stats">
+        <span>📊</span>
+        <small>Stats</small>
+      </button>
+      <button class="hud-btn" id="btn-inventory" title="Inventory">
+        <span>🎒</span>
+        <small>Bag</small>
+      </button>
+      <button class="hud-btn" id="btn-leaderboard" title="Leaderboard">
+        <span>🏆</span>
+        <small>Rank</small>
+      </button>
+      <button class="hud-btn" id="btn-players-list" title="Online Players">
+        <span>👥</span>
+        <small>Online</small>
+      </button>
+    </div>
+
+    <!-- Stats Panel -->
+    <div id="stats-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>📊 Character Stats</h3>
+        <button class="panel-close" data-close="stats-panel">✕</button>
+      </div>
+      <div class="panel-body" id="stats-body"></div>
+    </div>
+
+    <!-- Inventory Panel -->
+    <div id="inventory-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>🎒 Inventory</h3>
+        <button class="panel-close" data-close="inventory-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="gold-display">💰 <span id="gold-amount">0</span> Zeny</div>
+        <div class="inventory-grid" id="inventory-grid"></div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Panel -->
+    <div id="leaderboard-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>🏆 Leaderboard</h3>
+        <button class="panel-close" data-close="leaderboard-panel">✕</button>
+      </div>
+      <div class="panel-body" id="leaderboard-body"></div>
+    </div>
+
+    <!-- Online Players Panel -->
+    <div id="players-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>👥 Online Players</h3>
+        <button class="panel-close" data-close="players-panel">✕</button>
+      </div>
+      <div class="panel-body" id="players-body"></div>
+    </div>
+
+    <!-- Combat Log -->
+    <div id="combat-log">
+      <div id="combat-log-messages"></div>
+    </div>
+
+    <!-- Kill Counter -->
+    <div id="kill-counter">
+      <span class="kill-icon">💀</span>
+      <span id="kill-count">0</span>
+    </div>
+
+    <!-- Map Name -->
+    <div id="map-name">Prontera Field</div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
