@@ -6,6 +6,23 @@ const MAX_MONSTERS = 12;
 const SPAWN_RANGE = 12;
 const RESPAWN_TIME = 3;
 
+// Seeded PRNG (mulberry32) — ensures all clients spawn monsters at the same positions
+function createSeededRng(seed) {
+    let s = seed | 0;
+    return function () {
+        s = (s + 0x6D2B79F5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// Daily seed — same UTC date = same monster layout for all players
+function getDailySeed() {
+    const d = new Date();
+    return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+}
+
 class Monster {
     constructor(scene, type, position) {
         this.scene = scene;
@@ -209,10 +226,28 @@ export class MonsterManager {
     }
 
     spawnInitial(playerLevel) {
+        const rng = createSeededRng(getDailySeed());
         const count = Math.min(MAX_MONSTERS, 6 + Math.floor(playerLevel / 2));
         for (let i = 0; i < count; i++) {
-            this._spawnOne(playerLevel);
+            this._spawnOneSeeded(playerLevel, rng);
         }
+    }
+
+    _spawnOneSeeded(playerLevel, rng) {
+        // Use seeded rng for deterministic type and position
+        const types = Object.keys(MONSTERS);
+        const type = types[Math.floor(rng() * types.length)];
+        const angle = rng() * Math.PI * 2;
+        const dist = 4 + rng() * (SPAWN_RANGE - 4);
+        const pos = new THREE.Vector3(
+            Math.cos(angle) * dist,
+            0,
+            Math.sin(angle) * dist
+        );
+
+        const monster = new Monster(this.scene, type, pos);
+        this.monsters.push(monster);
+        return monster;
     }
 
     _spawnOne(playerLevel) {
