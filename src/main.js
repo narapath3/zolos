@@ -29,6 +29,7 @@ let username = 'Adventurer';
 let onlinePlayers = [];
 const remotePlayersMap = new Map();
 let lastBroadcastTime = 0;
+let portalCooldown = 0;
 
 // ============ Initialize Auth ============
 const authUI = new AuthUI(async (authData) => {
@@ -404,49 +405,68 @@ function gameLoop() {
         sceneManager.updateAnimations(dt);
 
         // Map Portals transition check
-        const portals = sceneManager.getPortals();
-        const playerPos = character.getPosition();
-        for (const portal of portals) {
-            const dist = playerPos.distanceTo(portal.position);
-            if (dist <= 1.8) {
-                const targetMap = portal.userData.targetMap;
-                gameUI.addCombatLog(`🌀 Entering Portal... Transitioning to ${targetMap === 'payon' ? 'Payon Forest' : 'Prontera Field'}`, 'system');
+        if (portalCooldown > 0) {
+            portalCooldown -= dt;
+        } else {
+            const portals = sceneManager.getPortals();
+            const playerPos = character.getPosition();
+            for (const portal of portals) {
+                const dist = playerPos.distanceTo(portal.position);
+                if (dist <= 1.8) {
+                    const targetMap = portal.userData.targetMap;
+                    gameUI.addCombatLog(`🌀 Entering Portal... Transitioning to ${targetMap === 'payon' ? 'Payon Forest' : 'Prontera Field'}`, 'system');
 
-                // Clear current monsters
-                monsters.monsters.forEach(m => m.destroy());
-                monsters.monsters = [];
-                monsters.deadQueue = [];
+                    // Set portal cooldown to prevent re-trigger
+                    portalCooldown = 2.0;
 
-                // Swap map visual
-                sceneManager.loadMap(targetMap);
-
-                // Set monster manager map details
-                monsters.mapId = targetMap;
-                monsters.spawnInitial(character.stats.level);
-
-                // Sound Effect
-                if (soundManager) {
-                    if (soundManager.playPortalSound) {
-                        soundManager.playPortalSound();
-                    } else {
-                        soundManager.playLevelUpSound();
+                    // Stop any combat / auto-farm during transition
+                    if (combat.autoFarm) {
+                        combat.toggleAutoFarm();
+                        gameUI.setAutoFarmState(false);
                     }
-                }
+                    character.targetDest = null;
+                    character.targetMonster = null;
+                    character.targetNPC = null;
+                    character.state = 'idle';
 
-                // Place arriving character slightly inward
-                if (targetMap === 'payon') {
-                    character.mesh.position.set(-20, 0, 0);
-                } else {
-                    character.mesh.position.set(20, 0, 0);
+                    // Clear current monsters
+                    monsters.monsters.forEach(m => m.destroy());
+                    monsters.monsters = [];
+                    monsters.deadQueue = [];
+
+                    // Move player to safe spawn BEFORE loading new map
+                    if (targetMap === 'payon') {
+                        character.mesh.position.set(-5, 0, 0);
+                    } else {
+                        character.mesh.position.set(5, 0, 0);
+                    }
+
+                    // Swap map visual
+                    sceneManager.loadMap(targetMap);
+
+                    // Set monster manager map details
+                    monsters.mapId = targetMap;
+                    monsters.spawnInitial(character.stats.level);
+
+                    // Sound Effect
+                    if (soundManager) {
+                        if (soundManager.playPortalSound) {
+                            soundManager.playPortalSound();
+                        } else {
+                            soundManager.playLevelUpSound();
+                        }
+                    }
+
+                    break;
                 }
-                break;
             }
         }
 
         // NPC proximity range checks
         const npc = sceneManager.getNPC();
         if (npc) {
-            const npcDist = playerPos.distanceTo(npc.position);
+            const pPos = character.getPosition();
+            const npcDist = pPos.distanceTo(npc.position);
             const shopPanel = document.getElementById('shop-panel');
             if (npcDist > 4.5 && shopPanel && shopPanel.style.display === 'flex') {
                 shopPanel.style.display = 'none';
