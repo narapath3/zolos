@@ -80,19 +80,98 @@ export class GameUI {
 
     updateStats(stats) {
         const body = document.getElementById('stats-body');
+        const expRequired = getExpRequired(stats.level);
+
+        const hpPct = Math.min(100, Math.max(0, Math.floor((stats.hp / stats.max_hp) * 100)));
+        const spPct = Math.min(100, Math.max(0, Math.floor((stats.sp / stats.max_sp) * 100)));
+        const expPct = Math.min(100, Math.max(0, Math.floor((stats.exp / expRequired) * 100)));
+
         body.innerHTML = `
-      <div class="stat-row"><span class="stat-label">Name</span><span class="stat-value">${stats.name}</span></div>
-      <div class="stat-row"><span class="stat-label">Level</span><span class="stat-value">${stats.level}</span></div>
-      <div class="stat-row"><span class="stat-label">HP</span><span class="stat-value">${Math.floor(stats.hp)} / ${stats.max_hp}</span></div>
-      <div class="stat-row"><span class="stat-label">SP</span><span class="stat-value">${Math.floor(stats.sp)} / ${stats.max_sp}</span></div>
-      <div class="stat-row"><span class="stat-label">ATK</span><span class="stat-value">${stats.atk}</span></div>
-      <div class="stat-row"><span class="stat-label">DEF</span><span class="stat-value">${stats.def}</span></div>
-      <div class="stat-row"><span class="stat-label">EXP</span><span class="stat-value">${stats.exp} / ${getExpRequired(stats.level)}</span></div>
-      <div class="stat-row"><span class="stat-label">Gold</span><span class="stat-value">💰 ${stats.gold.toLocaleString()}</span></div>
-      <div class="stat-row"><span class="stat-label">Total Kills</span><span class="stat-value">💀 ${stats.total_kills.toLocaleString()}</span></div>
-      <div class="stat-row"><span class="stat-label">Play Time</span><span class="stat-value">${this._formatTime(stats.play_time)}</span></div>
+      <!-- Avatar & Basic Info Card -->
+      <div class="stats-avatar-card">
+        <div class="stats-avatar-wrapper">
+          <span>🧙‍♂️</span>
+          <div class="stats-level-badge">Lv.${stats.level}</div>
+        </div>
+        <div class="stats-meta">
+          <div class="stats-meta-name">${stats.name}</div>
+          <div class="stats-meta-time">⏱️ Play Time: ${this._formatTime(stats.play_time)}</div>
+        </div>
+      </div>
+
+      <!-- Graphical Status Bars -->
+      <div class="stats-bars-section">
+        <!-- HP -->
+        <div class="stats-bar-container">
+          <div class="stats-bar-header">
+            <span class="stats-bar-label">HP</span>
+            <span class="stats-bar-val">${Math.floor(stats.hp)} / ${stats.max_hp}</span>
+          </div>
+          <div class="stats-bar-bg">
+            <div class="stats-bar-fill hp" style="width: ${hpPct}%;"></div>
+          </div>
+        </div>
+
+        <!-- SP -->
+        <div class="stats-bar-container">
+          <div class="stats-bar-header">
+            <span class="stats-bar-label">SP</span>
+            <span class="stats-bar-val">${Math.floor(stats.sp)} / ${stats.max_sp}</span>
+          </div>
+          <div class="stats-bar-bg">
+            <div class="stats-bar-fill sp" style="width: ${spPct}%;"></div>
+          </div>
+        </div>
+
+        <!-- EXP -->
+        <div class="stats-bar-container">
+          <div class="stats-bar-header">
+            <span class="stats-bar-label">EXP</span>
+            <span class="stats-bar-val">${stats.exp} / ${expRequired} (${expPct}%)</span>
+          </div>
+          <div class="stats-bar-bg">
+            <div class="stats-bar-fill exp" style="width: ${expPct}%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat Cards Grid -->
+      <div class="stats-grid">
+        <div class="stats-card atk">
+          <div class="stats-card-header">
+            <span class="stats-card-icon">⚔️</span>
+            <span class="stats-card-title">Attack</span>
+          </div>
+          <div class="stats-card-value">${stats.atk}</div>
+        </div>
+
+        <div class="stats-card def">
+          <div class="stats-card-header">
+            <span class="stats-card-icon">🛡️</span>
+            <span class="stats-card-title">Defense</span>
+          </div>
+          <div class="stats-card-value">${stats.def}</div>
+        </div>
+
+        <div class="stats-card kills">
+          <div class="stats-card-header">
+            <span class="stats-card-icon">💀</span>
+            <span class="stats-card-title">Kills</span>
+          </div>
+          <div class="stats-card-value">${stats.total_kills.toLocaleString()}</div>
+        </div>
+
+        <div class="stats-card gold">
+          <div class="stats-card-header">
+            <span class="stats-card-icon">💰</span>
+            <span class="stats-card-title">Gold</span>
+          </div>
+          <div class="stats-card-value">${stats.gold.toLocaleString()}</div>
+        </div>
+      </div>
     `;
     }
+
 
     _formatTime(seconds) {
         const h = Math.floor(seconds / 3600);
