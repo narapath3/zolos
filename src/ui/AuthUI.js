@@ -79,7 +79,11 @@ export class AuthUI {
                 this.hide();
             }, 500);
         } catch (e) {
-            this._setStatus(e.message || 'Login failed', 'error');
+            let errorMsg = e.message || 'Login failed';
+            if (errorMsg.toLowerCase().includes('rate limit') || errorMsg.toLowerCase().includes('rate_limit')) {
+                errorMsg += ' (Try Guest Mode or check Supabase settings)';
+            }
+            this._setStatus(errorMsg, 'error');
         }
     }
 
@@ -109,7 +113,11 @@ export class AuthUI {
                 this.hide();
             }, 800);
         } catch (e) {
-            this._setStatus(e.message || 'Registration failed', 'error');
+            let errorMsg = e.message || 'Registration failed';
+            if (errorMsg.toLowerCase().includes('rate limit') || errorMsg.toLowerCase().includes('rate_limit')) {
+                errorMsg += ' (Try Guest Mode or disable Email Confirmation in Supabase settings)';
+            }
+            this._setStatus(errorMsg, 'error');
         }
     }
 
