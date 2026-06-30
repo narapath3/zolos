@@ -1,7 +1,7 @@
 // ZOLOS — Idle RPG Online
 // Main Entry Point
 import { SceneManager } from './engine/SceneManager.js';
-import { CharacterManager } from './engine/CharacterManager.js';
+import { CharacterManager, RemotePlayer } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
 import { CombatSystem } from './engine/CombatSystem.js';
 import { ParticleSystem } from './engine/ParticleSystem.js';
@@ -15,6 +15,7 @@ import {
     leavePresence,
     startAutoSave,
     stopAutoSave,
+    broadcastPosition,
 } from './network/GameSync.js';
 
 // ============ App State ============
@@ -22,6 +23,8 @@ let sceneManager, character, monsters, combat, particles, gameUI;
 let userId = null;
 let username = 'Adventurer';
 let onlinePlayers = [];
+const remotePlayersMap = new Map();
+let lastBroadcastTime = 0;
 
 // ============ Initialize Auth ============
 const authUI = new AuthUI(async (authData) => {
@@ -73,10 +76,69 @@ async function initGame() {
         return isActive;
     });
 
+    // Setup logout button
+    gameUI.setupLogoutButton(async () => {
+        if (combat && combat.autoFarmActive) {
+            combat.toggleAutoFarm();
+            gameUI.setAutoFarmState(false);
+        }
+        if (character && character.characterId) {
+            try {
+                await saveCharacter(character.characterId, character.getSaveData().updates);
+            } catch (e) {
+                console.error('Failed to save character on logout:', e);
+            }
+        }
+        leavePresence();
+        stopAutoSave();
+        const { clearActiveSession } = await import('./network/SupabaseClient.js');
+        clearActiveSession();
+        location.reload();
+    });
+
     // Join presence
+    const activePlayerIds = new Set();
     joinPresence(userId, username, character.stats.level, (players) => {
         onlinePlayers = players;
         gameUI.updateOnlinePlayers(players);
+
+        // Update active player IDs
+        activePlayerIds.clear();
+        players.forEach(p => {
+            if (p.userId !== userId) activePlayerIds.add(p.userId);
+        });
+
+        // Clean up players who are no longer present
+        for (const [rId, remotePlayer] of remotePlayersMap.entries()) {
+            if (!activePlayerIds.has(rId)) {
+                remotePlayer.destroy();
+                remotePlayersMap.delete(rId);
+                gameUI.addCombatLog(`👋 ${remotePlayer.username} left the field`, 'system');
+            }
+        }
+    }, (posData) => {
+        if (posData.userId === userId) return;
+
+        let remotePlayer = remotePlayersMap.get(posData.userId);
+        if (!remotePlayer) {
+            // Pick a consistent color based on username
+            const charCodeSum = posData.username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const colors = [0x40c060, 0xc0a040, 0x8a40c5, 0x4080c5, 0xc05040, 0xe080a0];
+            const color = colors[charCodeSum % colors.length];
+
+            remotePlayer = new RemotePlayer(
+                sceneManager.scene,
+                posData.userId,
+                posData.username,
+                posData.level,
+                { x: posData.x, y: posData.y, z: posData.z },
+                color
+            );
+            remotePlayersMap.set(posData.userId, remotePlayer);
+            gameUI.addCombatLog(`👋 ${posData.username} (Lv.${posData.level}) joined the field!`, 'system');
+        }
+
+        remotePlayer.updateData(posData);
     });
 
     // Start auto-save
@@ -169,6 +231,18 @@ function gameLoop() {
     monsters.update(dt, sceneManager.camera, character.stats.level);
     combat.update(dt);
     particles.update(dt);
+
+    // Update remote players
+    for (const remotePlayer of remotePlayersMap.values()) {
+        remotePlayer.update(dt);
+    }
+
+    // Broadcast own position every 100ms
+    const now = performance.now();
+    if (now - lastBroadcastTime > 100 && character && userId) {
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state);
+        lastBroadcastTime = now;
+    }
 
     // Update UI every few frames
     if (Math.random() < 0.3) {
