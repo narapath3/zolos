@@ -579,6 +579,30 @@ export class GameUI {
     document.getElementById('btn-auto-farm').classList.toggle('active', active);
   }
 
+  // ============ Fishing Button ============
+  setupFishingButton(callback) {
+    const btn = document.getElementById('btn-fishing');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        callback();
+      });
+    }
+  }
+
+  setFishingButtonVisible(visible) {
+    const btn = document.getElementById('btn-fishing');
+    if (btn) btn.style.display = visible ? 'flex' : 'none';
+  }
+
+  setFishingState(active) {
+    const btn = document.getElementById('btn-fishing');
+    if (btn) {
+      btn.classList.toggle('active', active);
+      const textEl = btn.querySelector('.fishing-text');
+      if (textEl) textEl.textContent = active ? 'STOP' : 'FISH';
+    }
+  }
+
   // ============ Kafra Shop Logic ============
   _setupShopEvents() {
     // Tab switching

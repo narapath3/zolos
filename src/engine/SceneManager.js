@@ -1661,5 +1661,177 @@ export class SceneManager {
             portal.children[0].scale.setScalar(scale); // ring pulse
             portal.children[1].material.opacity = 0.3 + Math.sin(this.time * 2) * 0.15;
         });
+
+        // Animate fishing bobber & line
+        this._updateFishingAnimations(dt);
+    }
+
+    // ============ 3D Fishing Visuals ============
+    createFishingLine(playerPos) {
+        this.removeFishingLine();
+
+        this._fishingGroup = new THREE.Group();
+
+        // Bobber landing position — water near bridge edge
+        const bobberX = 2.8;
+        const bobberZ = -2;
+        const bobberY = 0.05;
+
+        // Create curved fishing line from player hand to bobber
+        const curve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(playerPos.x, playerPos.y + 1.4, playerPos.z),
+            new THREE.Vector3(
+                (playerPos.x + bobberX) / 2,
+                2.5,
+                (playerPos.z + bobberZ) / 2
+            ),
+            new THREE.Vector3(bobberX, bobberY, bobberZ)
+        );
+        const points = curve.getPoints(24);
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({
+            color: 0xc0c0c0,
+            linewidth: 1,
+            transparent: true,
+            opacity: 0.85,
+        });
+        this._fishingLineMesh = new THREE.Line(lineGeo, lineMat);
+        this._fishingGroup.add(this._fishingLineMesh);
+
+        // Bobber (orange/red sphere)
+        const bobberGeo = new THREE.SphereGeometry(0.12, 8, 6);
+        const bobberMat = new THREE.MeshLambertMaterial({ color: 0xff4020 });
+        this._fishingBobber = new THREE.Mesh(bobberGeo, bobberMat);
+        this._fishingBobber.position.set(bobberX, bobberY, bobberZ);
+        this._fishingGroup.add(this._fishingBobber);
+
+        // Bobber white stripe
+        const stripeGeo = new THREE.SphereGeometry(0.13, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.4);
+        const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+        stripe.position.set(bobberX, bobberY + 0.04, bobberZ);
+        this._fishingGroup.add(stripe);
+
+        // Store metadata
+        this._fishingBobberBaseY = bobberY;
+        this._fishingPlayerPos = { ...playerPos };
+        this._fishingBiteActive = false;
+        this._fishingBiteTimer = 0;
+
+        this.scene.add(this._fishingGroup);
+    }
+
+    animateFishBite() {
+        if (!this._fishingGroup || !this._fishingBobber) return;
+
+        this._fishingBiteActive = true;
+        this._fishingBiteTimer = 0;
+
+        // Create fish mesh swimming up
+        if (this._fishingFishMesh) {
+            this._fishingGroup.remove(this._fishingFishMesh);
+        }
+        const fishGroup = new THREE.Group();
+
+        // Fish body
+        const bodyGeo = new THREE.SphereGeometry(0.15, 6, 4);
+        bodyGeo.scale(1.8, 0.8, 1);
+        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4080ff });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        fishGroup.add(body);
+
+        // Tail fin
+        const tailGeo = new THREE.ConeGeometry(0.12, 0.2, 4);
+        const tailMat = new THREE.MeshLambertMaterial({ color: 0x3060d0 });
+        const tail = new THREE.Mesh(tailGeo, tailMat);
+        tail.position.set(-0.28, 0, 0);
+        tail.rotation.z = Math.PI / 2;
+        fishGroup.add(tail);
+
+        // Eye
+        const eyeGeo = new THREE.SphereGeometry(0.03, 4, 4);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const eye = new THREE.Mesh(eyeGeo, eyeMat);
+        eye.position.set(0.15, 0.04, 0.08);
+        fishGroup.add(eye);
+
+        const bx = this._fishingBobber.position.x;
+        const bz = this._fishingBobber.position.z;
+        fishGroup.position.set(bx + 0.8, -0.3, bz);
+        fishGroup.rotation.y = Math.PI / 2;
+
+        this._fishingFishMesh = fishGroup;
+        this._fishingGroup.add(fishGroup);
+    }
+
+    removeFishingLine() {
+        if (this._fishingGroup) {
+            this.scene.remove(this._fishingGroup);
+            this._fishingGroup = null;
+        }
+        this._fishingLineMesh = null;
+        this._fishingBobber = null;
+        this._fishingFishMesh = null;
+        this._fishingBiteActive = false;
+    }
+
+    _updateFishingAnimations(dt) {
+        if (!this._fishingGroup || !this._fishingBobber) return;
+
+        // Idle bobber floating
+        const baseY = this._fishingBobberBaseY || 0.05;
+        const bob = Math.sin(this.time * 2.5) * 0.03;
+        this._fishingBobber.position.y = baseY + bob;
+
+        // Bite animation
+        if (this._fishingBiteActive) {
+            this._fishingBiteTimer += dt;
+            const t = this._fishingBiteTimer;
+
+            // Bobber dips down sharply
+            const dipAmount = Math.sin(t * 12) * 0.15 * Math.max(0, 1 - t * 1.5);
+            this._fishingBobber.position.y = baseY - Math.abs(dipAmount) - 0.05;
+
+            // Fish swims toward bobber
+            if (this._fishingFishMesh) {
+                const bx = this._fishingBobber.position.x;
+                const bz = this._fishingBobber.position.z;
+                const fishTargetX = bx;
+                const fishTargetZ = bz;
+
+                this._fishingFishMesh.position.x += (fishTargetX - this._fishingFishMesh.position.x) * 2.5 * dt;
+                this._fishingFishMesh.position.z += (fishTargetZ - this._fishingFishMesh.position.z) * 2.5 * dt;
+                this._fishingFishMesh.position.y = -0.15 + Math.sin(t * 8) * 0.05;
+
+                // Tail wiggle
+                this._fishingFishMesh.rotation.y = Math.PI / 2 + Math.sin(t * 10) * 0.3;
+            }
+
+            // End bite after 1s
+            if (t > 1.0) {
+                this._fishingBiteActive = false;
+                if (this._fishingFishMesh) {
+                    this._fishingGroup.remove(this._fishingFishMesh);
+                    this._fishingFishMesh = null;
+                }
+            }
+        }
+
+        // Update the fishing line curve dynamically
+        if (this._fishingLineMesh && this._fishingPlayerPos) {
+            const pp = this._fishingPlayerPos;
+            const bp = this._fishingBobber.position;
+            const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(pp.x, (pp.y || 0) + 1.4, pp.z),
+                new THREE.Vector3(
+                    (pp.x + bp.x) / 2,
+                    2.5 + Math.sin(this.time * 1.5) * 0.1,
+                    (pp.z + bp.z) / 2
+                ),
+                new THREE.Vector3(bp.x, bp.y, bp.z)
+            );
+            const points = curve.getPoints(24);
+            this._fishingLineMesh.geometry.setFromPoints(points);
+        }
     }
 }

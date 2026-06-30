@@ -504,6 +504,10 @@ body {
   bottom: 100px;
   right: 20px;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
 }
 
 .btn-auto {
@@ -567,6 +571,70 @@ body {
   font-family: var(--font-pixel);
   font-size: 10px;
   color: var(--primary);
+}
+
+/* ========== FISHING BUTTON ========== */
+.btn-fishing {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid rgba(64, 180, 220, 0.4);
+  background: var(--bg-card);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: all 0.3s;
+  animation: fishBreathe 3s ease-in-out infinite;
+}
+
+@keyframes fishBreathe {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(64, 180, 220, 0.1);
+  }
+
+  50% {
+    box-shadow: 0 0 30px rgba(64, 180, 220, 0.25);
+  }
+}
+
+.btn-fishing:hover {
+  transform: scale(1.1);
+  border-color: #40b4dc;
+}
+
+.btn-fishing.active {
+  border-color: #40b4dc;
+  background: linear-gradient(135deg, rgba(64, 180, 220, 0.3), rgba(32, 120, 180, 0.3));
+  box-shadow: 0 0 40px rgba(64, 180, 220, 0.3);
+  animation: fishGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes fishGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 30px rgba(64, 180, 220, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 60px rgba(64, 180, 220, 0.4), 0 0 100px rgba(64, 180, 220, 0.15);
+  }
+}
+
+.fishing-icon {
+  font-size: 22px;
+}
+
+.fishing-text {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: #40b4dc;
 }
 
 /* ========== BOTTOM HUD ========== */

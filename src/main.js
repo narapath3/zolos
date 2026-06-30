@@ -30,8 +30,12 @@ let onlinePlayers = [];
 const remotePlayersMap = new Map();
 let lastBroadcastTime = 0;
 let portalCooldown = 0;
+// Fishing state machine
+let fishingState = 'idle'; // idle | walking | casting | waiting | catching
 let fishingTimer = 0;
-const FISHING_INTERVAL = 3.0; // seconds between fishing catches
+const FISHING_SPOT = { x: 1.5, y: 0, z: -2 }; // on the bridge edge
+const FISHING_BASE_DELAY = 3.0; // seconds between catches (base)
+let lastFishingBtnVisible = false;
 
 // ============ Initialize Auth ============
 const authUI = new AuthUI(async (authData) => {
@@ -122,6 +126,8 @@ async function initGame() {
     gameUI.setupAutoFarmButton(() => {
         const isActive = combat.toggleAutoFarm();
         if (isActive) {
+            // Stop fishing if active
+            stopFishing();
             // Clear mouse targets on auto-farm start
             character.targetDest = null;
             character.targetMonster = null;
@@ -131,6 +137,15 @@ async function initGame() {
             gameUI.addCombatLog('⏸️ Auto-Farm paused', 'system');
         }
         return isActive;
+    });
+
+    // Setup fishing button
+    gameUI.setupFishingButton(() => {
+        if (fishingState !== 'idle') {
+            stopFishing();
+        } else {
+            startFishing();
+        }
     });
 
     // Setup logout button
@@ -332,6 +347,31 @@ function executeActiveSkill(skillId) {
     }
 }
 
+// ============ Fishing Actions ============
+function startFishing() {
+    if (!character || !character.isAlive()) return;
+    if (combat && combat.autoFarm) {
+        combat.toggleAutoFarm();
+        gameUI.setAutoFarmState(false);
+    }
+    character.targetDest = null;
+    character.targetMonster = null;
+    character.targetNPC = null;
+    fishingState = 'walking';
+    gameUI.setFishingState(true);
+    gameUI.addCombatLog('🎣 เริ่มการตกปลาแบบออโต้! เริ่มเดินไปยังสะพาน...', 'system');
+}
+
+function stopFishing() {
+    if (fishingState === 'idle') return;
+    fishingState = 'idle';
+    gameUI.setFishingState(false);
+    if (sceneManager) {
+        sceneManager.removeFishingLine();
+    }
+    gameUI.addCombatLog('⏸️ หยุดการตกปลาแล้ว', 'system');
+}
+
 // ============ Game Loop ============
 function gameLoop() {
     requestAnimationFrame(gameLoop);
@@ -514,22 +554,39 @@ function gameLoop() {
             }
         }
 
-        // ============ Auto-Fishing Loop ============
-        const playerPos = character.getPosition();
-        const inWater = sceneManager.isInWater(playerPos);
-        const hasFishingRod = character.equippedWeapon === 'Fishing Rod';
-
-        if (inWater && hasFishingRod && character.isAlive()) {
-            fishingTimer += dt;
-            if (fishingTimer >= FISHING_INTERVAL) {
+        // ============ Manual Fishing State Machine ============
+        if (fishingState === 'walking') {
+            const arrived = character.moveToward(FISHING_SPOT, dt);
+            if (arrived) {
+                fishingState = 'casting';
                 fishingTimer = 0;
-
-                // Splash particles
+                // Face toward water (right side)
+                character.mesh.rotation.y = Math.PI / 2;
+                character.state = 'idle';
+                sceneManager.createFishingLine(character.getPosition());
+                gameUI.addCombatLog('🎣 เบ็ดลงน้ำแล้ว... รอปลามากินเบ็ด', 'system');
+            }
+        } else if (fishingState === 'casting') {
+            fishingTimer += dt;
+            if (fishingTimer >= 1.0) {
+                fishingState = 'waiting';
+                fishingTimer = 0;
+            }
+        } else if (fishingState === 'waiting') {
+            fishingTimer += dt;
+            if (fishingTimer >= FISHING_BASE_DELAY) {
+                fishingState = 'catching';
+                fishingTimer = 0;
+                sceneManager.animateFishBite();
                 if (particles) {
-                    particles.spawnWaterSplash(playerPos);
+                    const bp = { x: 2.8, y: 0, z: -2 };
+                    particles.spawnWaterSplash(bp);
                 }
-
-                // Determine catch: 65% Fish, 35% Trash
+            }
+        } else if (fishingState === 'catching') {
+            fishingTimer += dt;
+            if (fishingTimer >= 1.0) {
+                // Determine catch
                 const roll = Math.random();
                 const catchName = roll < 0.65 ? 'Fish' : 'Trash';
                 const catchItem = ITEMS[catchName];
@@ -538,13 +595,24 @@ function gameLoop() {
                     gameUI.addItem({ name: catchName, emoji: catchItem.emoji, type: catchItem.type });
                     gameUI.addCombatLog(`🎣 ตกได้ ${catchItem.emoji} ${catchName}!`, 'system');
                 }
-
                 if (soundManager && soundManager.playUseItemSound) {
                     soundManager.playUseItemSound();
                 }
+
+                // Loop back to waiting
+                fishingState = 'waiting';
+                fishingTimer = 0;
             }
-        } else {
-            fishingTimer = 0;
+        }
+
+        // Show/hide fishing button based on rod equipped
+        const hasFishingRod = character.equippedWeapon === 'Fishing Rod';
+        if (hasFishingRod !== lastFishingBtnVisible) {
+            lastFishingBtnVisible = hasFishingRod;
+            gameUI.setFishingButtonVisible(hasFishingRod);
+            if (!hasFishingRod && fishingState !== 'idle') {
+                stopFishing();
+            }
         }
 
         // NPC proximity range checks
