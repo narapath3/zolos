@@ -1317,20 +1317,94 @@ body {
     width: calc(100vw - 32px);
   }
 
+  /* Bottom HUD mobile tuning */
+  #hud-bottom {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    gap: 4px;
+    padding: 6px;
+    width: calc(100% - 16px);
+    box-sizing: border-box;
+    justify-content: space-around;
+  }
+
+  .hud-btn {
+    padding: 6px 4px;
+    gap: 0;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .hud-btn span {
+    font-size: 18px;
+  }
+
+  .hud-btn small {
+    font-size: 8px;
+  }
+
+  /* Skill bar mobile tuning */
+  #skill-bar {
+    bottom: 74px;
+    left: 50%;
+    transform: translateX(-50%);
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .skill-slot {
+    width: 38px;
+    height: 38px;
+  }
+
+  .skill-icon {
+    font-size: 16px;
+  }
+
+  .skill-key {
+    top: -4px;
+    left: -4px;
+    font-size: 6px;
+    padding: 1px 3px;
+  }
+
+  /* Combat log mobile tuning */
   #combat-log {
-    width: 200px;
-    bottom: 70px;
+    width: calc(100% - 100px);
+    bottom: 136px;
+    left: 8px;
   }
 
-  .btn-auto {
-    width: 64px;
-    height: 64px;
+  /* Auto farm / Fishing mobile tuning */
+  #auto-farm-container {
+    bottom: 74px;
+    right: 8px;
+    gap: 8px;
   }
 
+  .btn-auto,
+  .btn-fishing {
+    width: 56px;
+    height: 56px;
+  }
+
+  .auto-icon,
+  .fishing-icon {
+    font-size: 18px;
+  }
+
+  .auto-text,
+  .fishing-text {
+    font-size: 8px;
+  }
+
+  /* Kill counter mobile tuning */
   #kill-counter {
-    top: auto;
-    bottom: 80px;
-    right: 90px;
+    top: 76px;
+    bottom: auto;
+    right: 8px;
     padding: 6px 10px;
     font-size: 11px;
   }
