@@ -140,11 +140,24 @@ export async function getSession() {
   }
 
   const { data } = await supabase.auth.getSession();
-  return data.session;
+  if (data?.session) {
+    return data.session;
+  }
+
+  // Fallback to local guest session if offline guest fallback was used
+  const activeUserId = localDb.get('active_session_user_id');
+  if (activeUserId && activeUserId.startsWith('guest_')) {
+    const profile = localDb.get(`profile_${activeUserId}`);
+    if (profile) {
+      return { user: { id: activeUserId, is_anonymous: true } };
+    }
+  }
+
+  return null;
 }
 
 export async function getProfile(userId) {
-  if (isOfflineMode || !supabase) {
+  if (isOfflineMode || !supabase || (userId && userId.startsWith('guest_'))) {
     return localDb.get(`profile_${userId}`);
   }
 

@@ -8,6 +8,7 @@ export class AuthUI {
         this.statusEl = document.getElementById('auth-status');
         this._unsubOnlineCount = null;
         this._isRegisterMode = false;
+        this._sessionData = null;
 
         this._setupButtons();
         this._createParticles();
@@ -21,7 +22,9 @@ export class AuthUI {
         this._registerBtn = document.getElementById('btn-register');
 
         this._loginBtn.addEventListener('click', () => {
-            if (this._isRegisterMode) {
+            if (this._sessionData) {
+                this._enterGameWithSession();
+            } else if (this._isRegisterMode) {
                 this._setMode(false);
             } else {
                 this._handleLogin();
@@ -29,7 +32,9 @@ export class AuthUI {
         });
 
         this._registerBtn.addEventListener('click', () => {
-            if (!this._isRegisterMode) {
+            if (this._sessionData) {
+                this._handleSignOut();
+            } else if (!this._isRegisterMode) {
                 this._setMode(true);
             } else {
                 this._handleRegister();
@@ -81,19 +86,75 @@ export class AuthUI {
             if (session) {
                 const profile = await getProfile(session.user.id);
                 const username = profile?.username || 'Adventurer';
-                this._setStatus('Welcome back, ' + username + '!', 'success');
-                setTimeout(() => {
-                    this.onAuthSuccess({
-                        userId: session.user.id,
-                        username,
-                        isGuest: session.user.is_anonymous === true,
-                    });
-                    this.hide();
-                }, 800);
+                this._sessionData = {
+                    userId: session.user.id,
+                    username,
+                    isGuest: session.user.is_anonymous === true,
+                };
+                this._setStatus('Found active session for ' + username + '.', 'info');
+                this._showSessionMode(username);
             }
         } catch (e) {
             // No session, show login
         }
+    }
+
+    _showSessionMode(username) {
+        document.getElementById('auth-username').style.display = 'none';
+        document.getElementById('auth-password').style.display = 'none';
+        if (this._charnameEl) this._charnameEl.style.display = 'none';
+
+        this._loginBtn.textContent = `⚔️ Enter Game as ${username}`;
+        this._registerBtn.textContent = '🚪 Switch Account';
+
+        const guestBtn = document.getElementById('btn-guest');
+        if (guestBtn) guestBtn.style.display = 'none';
+
+        const dividers = document.querySelectorAll('.auth-divider');
+        dividers.forEach(el => el.style.display = 'none');
+    }
+
+    _enterGameWithSession() {
+        if (!this._sessionData) return;
+        this._setStatus('Connecting to world... ⚔️', 'success');
+        setTimeout(() => {
+            this.onAuthSuccess(this._sessionData);
+            this.hide();
+        }, 500);
+    }
+
+    async _handleSignOut() {
+        this._setStatus('Signing out...', 'info');
+        try {
+            const { clearActiveSession, supabase } = await import('../network/SupabaseClient.js');
+            clearActiveSession();
+            if (supabase) {
+                await supabase.auth.signOut();
+            }
+        } catch (e) {
+            console.error('Sign out error:', e);
+        }
+
+        // Reset session state
+        this._sessionData = null;
+
+        // Restore normal inputs and buttons
+        document.getElementById('auth-username').style.display = '';
+        document.getElementById('auth-password').style.display = '';
+        document.getElementById('auth-username').value = '';
+        document.getElementById('auth-password').value = '';
+
+        const guestBtn = document.getElementById('btn-guest');
+        if (guestBtn) guestBtn.style.display = '';
+
+        const dividers = document.querySelectorAll('.auth-divider');
+        dividers.forEach(el => el.style.display = '');
+
+        // Restore register button to default
+        this._isRegisterMode = false;
+        this._loginBtn.textContent = '⚔️ Login';
+        this._registerBtn.textContent = '📜 Register';
+        this._setStatus('', 'info');
     }
 
     async _handleLogin() {
