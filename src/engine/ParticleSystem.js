@@ -8,6 +8,59 @@ export class ParticleSystem {
         this.deathEffects = [];
         this.hitEffects = [];
         this.shockwaves = [];
+        this.splashEffects = [];
+        this.splashCooldown = 0;
+    }
+
+    // ============ Water Splash Effect ============
+    spawnWaterSplash(position) {
+        // Rate limit splashes
+        if (this.splashCooldown > 0) return;
+        this.splashCooldown = 0.15; // max ~6 splashes/sec
+
+        const dropCount = 8;
+        const colors = [0x6ec6ff, 0xaae0ff, 0xffffff, 0x4aa8d8];
+
+        for (let i = 0; i < dropCount; i++) {
+            const size = 0.03 + Math.random() * 0.04;
+            const geo = new THREE.SphereGeometry(size, 4, 4);
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const mat = new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 0.85,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(position);
+            mesh.position.y += 0.05;
+
+            // Spray outward and up
+            const angle = (Math.PI * 2 * i) / dropCount + Math.random() * 0.4;
+            const speed = 1.5 + Math.random() * 2;
+            const velocity = new THREE.Vector3(
+                Math.cos(angle) * speed * 0.6,
+                2.5 + Math.random() * 2,
+                Math.sin(angle) * speed * 0.6
+            );
+
+            this.scene.add(mesh);
+            this.splashEffects.push({ mesh, velocity, life: 0.6 + Math.random() * 0.2 });
+        }
+
+        // Ripple ring on water surface
+        const rippleGeo = new THREE.RingGeometry(0.05, 0.15, 16);
+        const rippleMat = new THREE.MeshBasicMaterial({
+            color: 0xaaddff,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide,
+        });
+        const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+        ripple.position.copy(position);
+        ripple.position.y = 0.02;
+        ripple.rotation.x = -Math.PI / 2;
+        this.scene.add(ripple);
+        this.shockwaves.push({ mesh: ripple, life: 0.5, maxLife: 0.5 });
     }
 
     // Spawn floating damage number (using DOM overlay)
@@ -156,6 +209,9 @@ export class ParticleSystem {
     }
 
     update(dt) {
+        // Splash cooldown
+        if (this.splashCooldown > 0) this.splashCooldown -= dt;
+
         // Update death particles
         for (let i = this.deathEffects.length - 1; i >= 0; i--) {
             const p = this.deathEffects[i];
@@ -211,6 +267,23 @@ export class ParticleSystem {
                 s.mesh.geometry.dispose();
                 s.mesh.material.dispose();
                 this.shockwaves.splice(i, 1);
+            }
+        }
+
+        // Update water splash droplets
+        for (let i = this.splashEffects.length - 1; i >= 0; i--) {
+            const p = this.splashEffects[i];
+            p.life -= dt;
+            p.velocity.y -= 9.8 * dt; // gravity
+            p.mesh.position.add(p.velocity.clone().multiplyScalar(dt));
+            p.mesh.material.opacity = Math.max(0, p.life * 1.4);
+            p.mesh.scale.setScalar(Math.max(0.01, p.life * 0.8));
+
+            if (p.life <= 0 || p.mesh.position.y < -0.5) {
+                this.scene.remove(p.mesh);
+                p.mesh.geometry.dispose();
+                p.mesh.material.dispose();
+                this.splashEffects.splice(i, 1);
             }
         }
     }

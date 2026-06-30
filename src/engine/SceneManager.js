@@ -129,6 +129,8 @@ export class SceneManager {
         this.waterMesh = null;
         this.cloudSprites = [];
         this.npcMesh = null;
+        this.swayingObjects = [];
+        this.birds = [];
 
         this.currentMap = mapId;
 
@@ -147,6 +149,7 @@ export class SceneManager {
         this._createWater(config);
         this._createEnvironment(config);
         this._createPortals(mapId);
+        this._createBirds();
 
         if (mapId === 'prontera') {
             this._createNPC();
@@ -206,39 +209,207 @@ export class SceneManager {
         this.scene.add(sky);
         this.envObjects.push(sky);
 
+        // Stylized Sun & Corona Glow
+        const sunDir = new THREE.Vector3(12, 25, 10).normalize();
+        const sunPos = sunDir.clone().multiplyScalar(75); // Inner dome limit
+
+        // Sun core sphere
+        const sunGeo = new THREE.SphereGeometry(5.2, 16, 16);
+        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffefb8 });
+        const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        sunMesh.position.copy(sunPos);
+        this.scene.add(sunMesh);
+        this.envObjects.push(sunMesh);
+        this.sunMesh = sunMesh;
+
+        // Custom Halo Ring / Corona (billboard look-at)
+        const coronaGeo = new THREE.RingGeometry(5.6, 9.2, 32);
+        const coronaMat = new THREE.MeshBasicMaterial({
+            color: 0xffaa33,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false
+        });
+        const corona = new THREE.Mesh(coronaGeo, coronaMat);
+        corona.position.copy(sunPos);
+        corona.lookAt(0, 0, 0);
+        this.scene.add(corona);
+        this.envObjects.push(corona);
+        this.sunCorona = corona;
+
+        // Volumetric Sunbeams
+        this._createSunbeams();
+
         // Clouds
         this._createClouds();
     }
 
-    _createClouds() {
-        const cloudGeo = new THREE.PlaneGeometry(8, 4);
-        const cloudMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+    _createSunbeams() {
+        const rayGeo = new THREE.CylinderGeometry(0.05, 3.2, 45, 8, 1, true);
+        const rayMat = new THREE.MeshBasicMaterial({
+            color: 0xffedd0,
             transparent: true,
-            opacity: 0.35,
+            opacity: 0.08,
+            blending: THREE.AdditiveBlending,
             side: THREE.DoubleSide,
-            depthWrite: false,
+            depthWrite: false
         });
 
-        for (let i = 0; i < 15; i++) {
-            const cloud = new THREE.Mesh(cloudGeo.clone(), cloudMat.clone());
+        // Scatter group
+        const alignGroup = new THREE.Group();
+        alignGroup.name = "sunbeams";
+        const sunDir = new THREE.Vector3(-12, -25, -10).normalize();
+
+        for (let i = 0; i < 4; i++) {
+            const beam = new THREE.Mesh(rayGeo.clone(), rayMat.clone());
+            const offset = new THREE.Vector3(
+                (Math.random() - 0.5) * 20,
+                0,
+                (Math.random() - 0.5) * 20
+            );
+
+            const pivot = new THREE.Group();
+            pivot.position.set(offset.x, 18, offset.z);
+
+            // Align cylinder to sun direction
+            const up = new THREE.Vector3(0, 1, 0);
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(up, sunDir);
+            pivot.quaternion.copy(quaternion);
+
+            // Offset beam center along local -Y direction
+            beam.position.set(0, -12, 0);
+            pivot.add(beam);
+            alignGroup.add(pivot);
+        }
+
+        this.scene.add(alignGroup);
+        this.envObjects.push(alignGroup);
+        this.sunbeamGroup = alignGroup;
+    }
+
+    _createBirds() {
+        this.birds = [];
+        const birdCount = 6;
+
+        const bodyGeo = new THREE.BoxGeometry(0.16, 0.08, 0.38);
+        const bodyMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // pure white stylized look
+        const wingGeo = new THREE.PlaneGeometry(0.38, 0.16);
+        const wingMat = new THREE.MeshBasicMaterial({ color: 0xeeeeee, side: THREE.DoubleSide });
+
+        for (let i = 0; i < birdCount; i++) {
+            const bird = new THREE.Group();
+
+            // Body
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            bird.add(body);
+
+            // Left Wing + joint
+            const leftWingPivot = new THREE.Group();
+            leftWingPivot.position.set(-0.08, 0, 0);
+            const leftWingMesh = new THREE.Mesh(wingGeo, wingMat);
+            leftWingMesh.position.set(-0.19, 0, 0);
+            leftWingPivot.add(leftWingMesh);
+            bird.add(leftWingPivot);
+
+            // Right Wing + joint
+            const rightWingPivot = new THREE.Group();
+            rightWingPivot.position.set(0.08, 0, 0);
+            const rightWingMesh = new THREE.Mesh(wingGeo, wingMat);
+            rightWingMesh.position.set(0.19, 0, 0);
+            rightWingPivot.add(rightWingMesh);
+            bird.add(rightWingPivot);
+
             const angle = Math.random() * Math.PI * 2;
-            const radius = 50 + Math.random() * 30;
-            const height = 30 + Math.random() * 20;
-            cloud.position.set(
+            const radius = 18 + Math.random() * 8;
+            const height = 12 + Math.random() * 4;
+            const speed = 0.5 + Math.random() * 0.4;
+            const flapSpeed = 12 + Math.random() * 6;
+
+            bird.position.set(
                 Math.cos(angle) * radius,
                 height,
                 Math.sin(angle) * radius
             );
-            cloud.lookAt(0, height, 0);
-            cloud.scale.setScalar(0.8 + Math.random() * 1.5);
-            cloud.userData.speed = 0.02 + Math.random() * 0.03;
-            cloud.userData.angle = angle;
-            cloud.userData.radius = radius;
-            cloud.userData.height = height;
-            this.scene.add(cloud);
-            this.envObjects.push(cloud);
-            this.cloudSprites.push(cloud);
+
+            bird.userData = {
+                angle,
+                radius,
+                height,
+                speed,
+                flapSpeed,
+                flapOffset: Math.random() * Math.PI * 2,
+                leftWing: leftWingPivot,
+                rightWing: rightWingPivot
+            };
+
+            this.scene.add(bird);
+            this.envObjects.push(bird);
+            this.birds.push(bird);
+        }
+    }
+
+    _createClouds() {
+        const cloudMat = new THREE.MeshLambertMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.82,
+            flatShading: true,
+        });
+
+        for (let i = 0; i < 14; i++) {
+            const cloudGroup = new THREE.Group();
+
+            // Build fluffy overlapping box modules (voxel style!)
+            const centerGeo = new THREE.BoxGeometry(4.5, 1.8, 3.2);
+            const centerMesh = new THREE.Mesh(centerGeo, cloudMat);
+            cloudGroup.add(centerMesh);
+
+            const sideGeo1 = new THREE.BoxGeometry(2.8, 1.3, 2.4);
+            const sideMesh1 = new THREE.Mesh(sideGeo1, cloudMat);
+            sideMesh1.position.set(-2.2, -0.2, 0.4);
+            cloudGroup.add(sideMesh1);
+
+            const sideMesh2 = new THREE.Mesh(sideGeo1, cloudMat);
+            sideMesh2.position.set(2.2, -0.2, -0.4);
+            cloudGroup.add(sideMesh2);
+
+            const topGeo = new THREE.BoxGeometry(2.4, 1.0, 2.0);
+            const topMesh = new THREE.Mesh(topGeo, cloudMat);
+            topMesh.position.set(-0.2, 0.9, -0.2);
+            cloudGroup.add(topMesh);
+
+            const frontGeo = new THREE.BoxGeometry(1.8, 0.9, 1.4);
+            const frontMesh = new THREE.Mesh(frontGeo, cloudMat);
+            frontMesh.position.set(0.6, -0.4, 1.5);
+            cloudGroup.add(frontMesh);
+
+            // Orbit path settings
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 45 + Math.random() * 25;
+            const height = 24 + Math.random() * 16;
+
+            cloudGroup.position.set(
+                Math.cos(angle) * radius,
+                height,
+                Math.sin(angle) * radius
+            );
+
+            // Rotation so they point naturally along orbit direction
+            cloudGroup.rotation.y = -angle + Math.PI / 2;
+
+            cloudGroup.scale.setScalar(0.7 + Math.random() * 0.9);
+
+            cloudGroup.userData = {
+                speed: 0.015 + Math.random() * 0.02,
+                angle: angle,
+                radius: radius,
+                height: height
+            };
+
+            this.scene.add(cloudGroup);
+            this.envObjects.push(cloudGroup);
+            this.cloudSprites.push(cloudGroup);
         }
     }
 
@@ -246,7 +417,7 @@ export class SceneManager {
     _createGround(config) {
         // Main textured ground with vertex colors
         const size = 70;
-        const segments = 40;
+        const segments = 60; // Higher density for smooth river curves
         const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
 
         // Add vertex colors for terrain variation
@@ -260,24 +431,56 @@ export class SceneManager {
             const x = positions.getX(i);
             const z = positions.getY(i); // Y in plane space = Z in world
 
-            // Gentle terrain displacement
-            const noise = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
-            positions.setZ(i, noise);
+            // Winding river logic: z = sin(x * 0.08) * 10 - 2
+            const riverZ = Math.sin(x * 0.08) * 10 - 2;
+            const distToRiver = Math.abs(z - riverZ);
 
-            // Color variation
+            // Base noise height
+            let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
+
+            // Carve riverbed and build river banks
+            if (distToRiver < 7.0) {
+                // Smooth valley drop down to -1.3
+                const t = distToRiver / 7.0; // 0 (center) to 1 (bank)
+                height = -1.3 * (1.0 - t * t);
+            } else if (distToRiver < 10.0) {
+                // Raised bank ridge sloping down to ground
+                const t = (distToRiver - 7.0) / 3.0; // 0 to 1
+                const bankSwell = 0.35 * Math.sin(t * Math.PI);
+                height += bankSwell;
+            }
+
+            positions.setZ(i, height);
+
+            // Vertex coloring based on coordinates
             let color = baseColor.clone();
             const distFromCenter = Math.sqrt(x * x + z * z);
 
-            // Path areas (cross paths)
-            if (Math.abs(x) < 2.0 || Math.abs(z) < 2.0) {
-                color.lerp(pathColor, 0.7 - distFromCenter * 0.01);
+            if (distToRiver < 5.5) {
+                // Muddy dark riverbed
+                const t = distToRiver / 3.2;
+                const mudColor = new THREE.Color(0x3a2e24);
+                const sandColor = new THREE.Color(0x8a7258);
+                color = mudColor.lerp(sandColor, t);
+            } else if (distToRiver < 5.2) {
+                // Sandy wet shore blending into grass
+                const t = (distToRiver - 3.2) / 2.0;
+                const sandColor = new THREE.Color(0x8a7258);
+                const grassColor = baseColor.clone().lerp(altColor, 0.4);
+                color = sandColor.lerp(grassColor, t);
             } else {
-                // Natural variation
-                const noiseVal = Math.sin(x * 0.5 + 1.3) * Math.cos(z * 0.7 + 0.8);
-                color.lerp(altColor, noiseVal * 0.5 + 0.5);
+                // Standard paths and fields color blending
+                if (Math.abs(x) < 2.0 || Math.abs(z) < 2.0) {
+                    // Path crosses
+                    color.lerp(pathColor, 0.7 - distFromCenter * 0.01);
+                } else {
+                    // Grass color variation
+                    const noiseVal = Math.sin(x * 0.5 + 1.3) * Math.cos(z * 0.7 + 0.8);
+                    color.lerp(altColor, noiseVal * 0.5 + 0.5);
+                }
             }
 
-            // Edge darkening
+            // Vignette shading on outer edges
             const edgeFade = Math.max(0, 1 - distFromCenter / (size * 0.4));
             color.multiplyScalar(0.6 + edgeFade * 0.5);
 
@@ -297,87 +500,152 @@ export class SceneManager {
         this.scene.add(ground);
         this.envObjects.push(ground);
 
-        // Path overlay with better material
-        const pathGeo = new THREE.PlaneGeometry(2.8, 50, 1, 10);
+        // Path overlays (cut or split to not float over the river)
         const pathMat = new THREE.MeshLambertMaterial({
             color: config.pathColor,
             transparent: true,
             opacity: 0.6
         });
-        const path = new THREE.Mesh(pathGeo, pathMat);
-        path.rotation.x = -Math.PI / 2;
-        path.position.y = 0.02;
-        this.scene.add(path);
-        this.envObjects.push(path);
 
-        const crossPath = new THREE.Mesh(pathGeo.clone(), pathMat.clone());
-        crossPath.rotation.x = -Math.PI / 2;
-        crossPath.rotation.z = Math.PI / 2;
-        crossPath.position.y = 0.02;
-        this.scene.add(crossPath);
-        this.envObjects.push(crossPath);
+        // Vertical Path Segment 1 (North)
+        const pathGeoNorth = new THREE.PlaneGeometry(2.8, 20);
+        const pathNorth = new THREE.Mesh(pathGeoNorth, pathMat);
+        pathNorth.rotation.x = -Math.PI / 2;
+        pathNorth.position.set(0, 0.02, 16);
+        this.scene.add(pathNorth);
+        this.envObjects.push(pathNorth);
+
+        // Vertical Path Segment 2 (South)
+        const pathGeoSouth = new THREE.PlaneGeometry(2.8, 20);
+        const pathSouth = new THREE.Mesh(pathGeoSouth, pathMat);
+        pathSouth.rotation.x = -Math.PI / 2;
+        pathSouth.position.set(0, 0.02, -20);
+        this.scene.add(pathSouth);
+        this.envObjects.push(pathSouth);
+
+        // Horizontal Path segment that spans east/west (above river curves)
+        const pathGeoEastWest = new THREE.PlaneGeometry(2.8, 64);
+        const pathEastWest = new THREE.Mesh(pathGeoEastWest, pathMat);
+        pathEastWest.rotation.x = -Math.PI / 2;
+        pathEastWest.rotation.z = Math.PI / 2;
+        pathEastWest.position.set(0, 0.02, 10); // Placed at z = 10 where it avoids central river curve
+        this.scene.add(pathEastWest);
+        this.envObjects.push(pathEastWest);
     }
 
     // ============ Water ============
     _createWater(config) {
-        const waterGeo = new THREE.PlaneGeometry(8, 6, 20, 15);
+        // Large river water plane centered around z = -2, length 80, width 32
+        const waterGeo = new THREE.PlaneGeometry(80, 40, 40, 15);
         const waterMat = new THREE.MeshPhongMaterial({
             color: config.waterColor,
             transparent: true,
-            opacity: 0.65,
-            shininess: 100,
-            specular: 0xffffff,
+            opacity: 0.72,
+            shininess: 90,
+            specular: 0xe0f0ff,
             side: THREE.DoubleSide,
         });
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
-        water.position.set(-12, 0.05, 8);
+        water.position.set(0, -0.26, -2);
         water.receiveShadow = true;
         this.scene.add(water);
         this.envObjects.push(water);
         this.waterMesh = water;
 
-        // Pond edge rocks
-        const rockPositions = [
-            [-15, 6], [-15, 10], [-9, 6], [-9, 10],
-            [-16, 8], [-8, 8], [-13, 5.5], [-11, 10.5],
+        // Custom riverbank rocks
+        const bankRocks = [
+            [-22, Math.sin(-22 * 0.08) * 10 - 6.2],
+            [-16, Math.sin(-16 * 0.08) * 10 - 6.5],
+            [-10, Math.sin(-10 * 0.08) * 10 - 6.0],
+            [-5, Math.sin(-5 * 0.08) * 10 + 2.7],
+            [5, Math.sin(5 * 0.08) * 10 - 6.5],
+            [11, Math.sin(11 * 0.08) * 10 + 2.5],
+            [18, Math.sin(18 * 0.08) * 10 + 2.6],
+            [25, Math.sin(25 * 0.08) * 10 - 6.3],
+            [-28, Math.sin(-28 * 0.08) * 10 + 2.4]
         ];
-        rockPositions.forEach(([x, z]) => {
-            this._createRock(x, z, 0.25 + Math.random() * 0.2);
+        bankRocks.forEach(([rx, rz]) => {
+            this._createRock(rx, rz, 0.35 + Math.random() * 0.3);
         });
 
-        // Small bridge over water
-        this._createBridge(-12, 8);
+        // Floating Lily Pads
+        const lilyMat = new THREE.MeshLambertMaterial({ color: 0x226b3a, side: THREE.DoubleSide });
+        for (let i = 0; i < 8; i++) {
+            const rx = -20 + Math.random() * 40;
+            const rz = Math.sin(rx * 0.08) * 10 - 2 + (Math.random() - 0.5) * 2.5;
+            const padGeo = new THREE.CircleGeometry(0.24 + Math.random() * 0.16, 8);
+            const pad = new THREE.Mesh(padGeo, lilyMat);
+            pad.rotation.x = -Math.PI / 2;
+            pad.position.set(rx, -0.22, rz);
+            this.scene.add(pad);
+            this.envObjects.push(pad);
+        }
+
+        // Bridge over the winding river at x = 0, z = -2
+        this._createBridge(0, -2);
     }
 
     _createBridge(x, z) {
         const group = new THREE.Group();
 
-        // Bridge planks
-        const plankGeo = new THREE.BoxGeometry(3, 0.12, 0.4);
-        const plankMat = new THREE.MeshLambertMaterial({ color: 0x7a5a3a });
-        for (let i = 0; i < 7; i++) {
-            const plank = new THREE.Mesh(plankGeo, plankMat);
-            plank.position.set(0, 0.35, -1.5 + i * 0.5);
+        // Bridge deck support beams (horizontal, underneath)
+        const supportGeo = new THREE.BoxGeometry(0.2, 0.15, 16);
+        const supportMat = new THREE.MeshLambertMaterial({ color: 0x3a2510 });
+        [-1.2, 0, 1.2].forEach(xOff => {
+            const beam = new THREE.Mesh(supportGeo, supportMat);
+            beam.position.set(xOff, 0.12, 0);
+            beam.castShadow = true;
+            group.add(beam);
+        });
+
+        // Bridge planks (covering Z range from -8 to 8 for wider river)
+        const plankGeo = new THREE.BoxGeometry(3.6, 0.14, 0.42);
+        const plankMatDark = new THREE.MeshLambertMaterial({ color: 0x664a30 });
+        const plankMatLight = new THREE.MeshLambertMaterial({ color: 0x7a5838 });
+        for (let i = 0; i < 34; i++) {
+            const mat = i % 3 === 0 ? plankMatLight : plankMatDark;
+            const plank = new THREE.Mesh(plankGeo, mat);
+            plank.position.set(0, 0.28, -8.0 + i * 0.48);
             plank.castShadow = true;
             group.add(plank);
         }
 
-        // Bridge rails
-        const railGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.6, 6);
-        const railMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
-        [-1.3, 1.3].forEach(xOff => {
-            [-1.5, 0, 1.5].forEach(zOff => {
+        // Bridge handrails (vertical posts)
+        const railGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.75, 6);
+        const railMat = new THREE.MeshLambertMaterial({ color: 0x4a321a });
+        [-1.6, 1.6].forEach(xOff => {
+            [-8, -6, -4, -2, 0, 2, 4, 6, 8].forEach(zOff => {
                 const post = new THREE.Mesh(railGeo, railMat);
-                post.position.set(xOff, 0.6, zOff);
+                post.position.set(xOff, 0.65, zOff);
+                post.castShadow = true;
                 group.add(post);
             });
-            // Rail bar
-            const barGeo = new THREE.CylinderGeometry(0.04, 0.04, 3.2, 4);
+            // Horizontal rail bars (top rail)
+            const barGeo = new THREE.CylinderGeometry(0.05, 0.05, 16.2, 6);
             const bar = new THREE.Mesh(barGeo, railMat);
             bar.rotation.x = Math.PI / 2;
-            bar.position.set(xOff, 0.85, 0);
+            bar.position.set(xOff, 0.95, 0);
+            bar.castShadow = true;
             group.add(bar);
+
+            // Lower horizontal rail
+            const lowerBarGeo = new THREE.CylinderGeometry(0.035, 0.035, 16.2, 6);
+            const lowerBar = new THREE.Mesh(lowerBarGeo, railMat);
+            lowerBar.rotation.x = Math.PI / 2;
+            lowerBar.position.set(xOff, 0.55, 0);
+            group.add(lowerBar);
+        });
+
+        // Decorative rope/lantern posts at entry/exit
+        const postTopGeo = new THREE.SphereGeometry(0.1, 6, 6);
+        const postTopMat = new THREE.MeshLambertMaterial({ color: 0xc08a40 });
+        [-1.6, 1.6].forEach(xOff => {
+            [-8, 8].forEach(zOff => {
+                const sphere = new THREE.Mesh(postTopGeo, postTopMat);
+                sphere.position.set(xOff, 1.08, zOff);
+                group.add(sphere);
+            });
         });
 
         group.position.set(x, 0, z);
@@ -386,7 +654,14 @@ export class SceneManager {
     }
 
     // ============ Environment ============
+    _isOnLand(x, z) {
+        // Returns true if not in the river zone (wider river)
+        const riverZ = Math.sin(x * 0.08) * 10 - 2;
+        return Math.abs(z - riverZ) > 7.0;
+    }
+
     _createEnvironment(config) {
+        // --- Trees ---
         const treePositions = [
             [-12, -10], [-15, 2], [10, -12], [13, 7], [-8, 14],
             [16, -6], [-17, -4], [6, 16], [-10, -16], [14, 13],
@@ -395,48 +670,84 @@ export class SceneManager {
         ];
 
         treePositions.forEach(([x, z], idx) => {
-            const typeIdx = idx % config.treeTypes.length;
-            const type = config.treeTypes[typeIdx];
-            this._createTree(x, z, type);
+            if (this._isOnLand(x, z)) {
+                const typeIdx = idx % config.treeTypes.length;
+                const type = config.treeTypes[typeIdx];
+                this._createTree(x, z, type);
+            }
         });
 
-        // Rocks scattered
+        // --- Rocks scattered ---
         const rockPosMain = [
             [-5, -5], [6, -3], [-3, 9], [10, 10], [-9, 5],
             [4, -8], [-7, -13], [11, -9], [-12, 3], [8, 5],
-            [15, 0], [-4, 7]
+            [15, 0], [-4, 7], [-16, 8], [9, -14], [-11, -8],
+            [14, -3], [-2, -11], [7, 12], [-13, 14], [3, 14],
         ];
-        rockPosMain.forEach(([x, z]) => this._createRock(x, z));
+        rockPosMain.forEach(([x, z]) => {
+            if (this._isOnLand(x, z)) this._createRock(x, z);
+        });
 
-        // Decorations
         const density = config.decorDensity;
-        // Flowers
-        for (let i = 0; i < Math.floor(50 * density); i++) {
-            const x = (Math.random() - 0.5) * 36;
-            const z = (Math.random() - 0.5) * 36;
-            if (Math.abs(x) < 1.5 && Math.abs(z) < 1.5) continue; // skip path
+
+        // --- Flowers (doubled) ---
+        for (let i = 0; i < Math.floor(110 * density); i++) {
+            const x = (Math.random() - 0.5) * 42;
+            const z = (Math.random() - 0.5) * 42;
+            if (Math.abs(x) < 1.5 && Math.abs(z) < 1.5) continue;
+            if (!this._isOnLand(x, z)) continue;
             this._createFlower(x, z);
         }
 
-        // Grass tufts
-        for (let i = 0; i < Math.floor(80 * density); i++) {
-            const x = (Math.random() - 0.5) * 40;
-            const z = (Math.random() - 0.5) * 40;
+        // --- Grass tufts (tripled) ---
+        for (let i = 0; i < Math.floor(260 * density); i++) {
+            const x = (Math.random() - 0.5) * 48;
+            const z = (Math.random() - 0.5) * 48;
+            if (!this._isOnLand(x, z)) continue;
             this._createGrassTuft(x, z);
         }
 
-        // Mushrooms
-        for (let i = 0; i < Math.floor(12 * density); i++) {
-            const x = (Math.random() - 0.5) * 30;
-            const z = (Math.random() - 0.5) * 30;
+        // --- Mushrooms (doubled) ---
+        for (let i = 0; i < Math.floor(28 * density); i++) {
+            const x = (Math.random() - 0.5) * 34;
+            const z = (Math.random() - 0.5) * 34;
             if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
+            if (!this._isOnLand(x, z)) continue;
             this._createMushroom(x, z);
         }
 
-        // Fence segments along one edge
+        // --- Pebbles / small stones ---
+        for (let i = 0; i < Math.floor(120 * density); i++) {
+            const x = (Math.random() - 0.5) * 46;
+            const z = (Math.random() - 0.5) * 46;
+            if (!this._isOnLand(x, z)) continue;
+            this._createPebble(x, z);
+        }
+
+        // --- Clover / ground cover patches ---
+        for (let i = 0; i < Math.floor(55 * density); i++) {
+            const x = (Math.random() - 0.5) * 40;
+            const z = (Math.random() - 0.5) * 40;
+            if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
+            if (!this._isOnLand(x, z)) continue;
+            this._createCloverPatch(x, z);
+        }
+
+        // --- Fallen leaf piles ---
+        for (let i = 0; i < Math.floor(35 * density); i++) {
+            const x = (Math.random() - 0.5) * 38;
+            const z = (Math.random() - 0.5) * 38;
+            if (!this._isOnLand(x, z)) continue;
+            this._createFallenLeaves(x, z);
+        }
+
+        // --- Stepping stone paths ---
+        this._createSteppingStones();
+
+        // --- Fence segments along one edge ---
         this._createFence();
 
-        // Signpost near spawn
+        // --- Signpost near spawn ---
         this._createSignpost(2.5, 2.5);
     }
 
@@ -598,6 +909,9 @@ export class SceneManager {
         group.scale.setScalar(scale);
         this.scene.add(group);
         this.envObjects.push(group);
+        if (type !== 'bush') {
+            this.swayingObjects.push(group);
+        }
     }
 
     // ============ Decorations ============
@@ -685,6 +999,111 @@ export class SceneManager {
         group.scale.setScalar(scale);
         this.scene.add(group);
         this.envObjects.push(group);
+    }
+
+    // ============ Pebbles ============
+    _createPebble(x, z) {
+        const size = 0.04 + Math.random() * 0.08;
+        const geo = new THREE.SphereGeometry(size, 4, 3);
+        const shade = 0x60 + Math.floor(Math.random() * 0x30);
+        const mat = new THREE.MeshLambertMaterial({
+            color: new THREE.Color(shade / 255, (shade - 0x08) / 255, (shade - 0x10) / 255)
+        });
+        const peb = new THREE.Mesh(geo, mat);
+        peb.position.set(x, size * 0.3, z);
+        peb.scale.y = 0.5 + Math.random() * 0.3;
+        peb.rotation.set(Math.random(), Math.random(), 0);
+        this.scene.add(peb);
+        this.envObjects.push(peb);
+    }
+
+    // ============ Clover / Ground Cover ============
+    _createCloverPatch(x, z) {
+        const group = new THREE.Group();
+        const count = 3 + Math.floor(Math.random() * 5);
+        const patchColors = [0x2a6a2a, 0x3a7a2a, 0x2a5a1a, 0x4a8a3a];
+        for (let i = 0; i < count; i++) {
+            const cloverGeo = new THREE.CircleGeometry(0.06 + Math.random() * 0.05, 5);
+            const color = patchColors[Math.floor(Math.random() * patchColors.length)];
+            const cloverMat = new THREE.MeshLambertMaterial({
+                color,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.8,
+            });
+            const clover = new THREE.Mesh(cloverGeo, cloverMat);
+            clover.position.set(
+                (Math.random() - 0.5) * 0.5,
+                0.02,
+                (Math.random() - 0.5) * 0.5
+            );
+            clover.rotation.x = -Math.PI / 2 + (Math.random() - 0.5) * 0.15;
+            clover.rotation.z = Math.random() * Math.PI;
+            group.add(clover);
+        }
+        group.position.set(x, 0, z);
+        this.scene.add(group);
+        this.envObjects.push(group);
+    }
+
+    // ============ Fallen Leaves ============
+    _createFallenLeaves(x, z) {
+        const group = new THREE.Group();
+        const count = 2 + Math.floor(Math.random() * 4);
+        const leafColors = [0xc07830, 0xa06020, 0xd09040, 0x905020, 0xb86830, 0xe0a050];
+        for (let i = 0; i < count; i++) {
+            const leafGeo = new THREE.PlaneGeometry(0.1 + Math.random() * 0.1, 0.06 + Math.random() * 0.06);
+            const color = leafColors[Math.floor(Math.random() * leafColors.length)];
+            const leafMat = new THREE.MeshLambertMaterial({
+                color,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.75,
+            });
+            const leaf = new THREE.Mesh(leafGeo, leafMat);
+            leaf.position.set(
+                (Math.random() - 0.5) * 0.6,
+                0.015,
+                (Math.random() - 0.5) * 0.6
+            );
+            leaf.rotation.x = -Math.PI / 2;
+            leaf.rotation.z = Math.random() * Math.PI * 2;
+            group.add(leaf);
+        }
+        group.position.set(x, 0, z);
+        this.scene.add(group);
+        this.envObjects.push(group);
+    }
+
+    // ============ Stepping Stones ============
+    _createSteppingStones() {
+        // A winding path of flat stones from spawn area outward
+        const stonePositions = [
+            [0, 3], [0.5, 4.5], [-0.3, 6], [0.2, 7.5], [0.8, 9],
+            [1.5, 10.5], [2.5, 11.5], [3.5, 12],
+            // Path toward left
+            [-1, 3.5], [-2.5, 4], [-4, 4.5], [-5.5, 5.5], [-7, 6],
+            // Scattered around field
+            [6, 7], [7, 8.5], [8, 6], [-10, 8], [-11, 9.5],
+            [5, -6], [6, -7.5], [3, -9], [-6, -8], [-7, -10],
+        ];
+
+        const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8a8a7a });
+        const stoneMat2 = new THREE.MeshLambertMaterial({ color: 0x7a7a6a });
+
+        stonePositions.forEach(([sx, sz]) => {
+            if (!this._isOnLand(sx, sz)) return;
+            const w = 0.4 + Math.random() * 0.3;
+            const d = 0.3 + Math.random() * 0.2;
+            const stoneGeo = new THREE.BoxGeometry(w, 0.06, d);
+            const mat = Math.random() > 0.5 ? stoneMat : stoneMat2;
+            const stone = new THREE.Mesh(stoneGeo, mat);
+            stone.position.set(sx + (Math.random() - 0.5) * 0.3, 0.04, sz + (Math.random() - 0.5) * 0.3);
+            stone.rotation.y = Math.random() * Math.PI;
+            stone.receiveShadow = true;
+            this.scene.add(stone);
+            this.envObjects.push(stone);
+        });
     }
 
     _createFence() {
@@ -786,61 +1205,269 @@ export class SceneManager {
         });
     }
 
-    // ============ NPC ============
+    // ============ NPC — Kafra Shop Stall ============
     _createNPC() {
         const group = new THREE.Group();
         group.userData.isNPC = true;
         group.userData.npcType = 'shop';
 
-        // Body
-        const bodyGeo = new THREE.CylinderGeometry(0.25, 0.35, 1.2, 8);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4060c0 });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 0.9;
-        body.castShadow = true;
-        group.add(body);
+        const woodDark = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+        const woodLight = new THREE.MeshLambertMaterial({ color: 0x8a6a3a });
+        const woodPlank = new THREE.MeshLambertMaterial({ color: 0x9a7a4a });
+        const roofTile = new THREE.MeshLambertMaterial({ color: 0x8b2020 });
+        const roofTrim = new THREE.MeshLambertMaterial({ color: 0x6a1818 });
+        const clothRed = new THREE.MeshLambertMaterial({ color: 0xc03030 });
 
-        // Cape / dress
-        const dressGeo = new THREE.ConeGeometry(0.55, 0.8, 8);
-        const dressMat = new THREE.MeshLambertMaterial({ color: 0x3050a0 });
-        const dress = new THREE.Mesh(dressGeo, dressMat);
-        dress.position.y = 0.4;
-        group.add(dress);
+        // ---- Platform base ----
+        const platformGeo = new THREE.BoxGeometry(4.5, 0.18, 3.5);
+        const platform = new THREE.Mesh(platformGeo, woodPlank);
+        platform.position.y = 0.09;
+        platform.castShadow = true;
+        platform.receiveShadow = true;
+        group.add(platform);
 
-        // Head
-        const headGeo = new THREE.SphereGeometry(0.25, 8, 6);
-        const headMat = new THREE.MeshLambertMaterial({ color: 0xf5d0a0 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.7;
-        head.castShadow = true;
-        group.add(head);
+        // Platform edge trim
+        const trimGeo = new THREE.BoxGeometry(4.6, 0.06, 3.6);
+        const trim = new THREE.Mesh(trimGeo, woodDark);
+        trim.position.y = 0.2;
+        group.add(trim);
 
-        // Hat (kafra style)
-        const hatGeo = new THREE.ConeGeometry(0.3, 0.4, 6);
-        const hatMat = new THREE.MeshLambertMaterial({ color: 0xf0c040 });
-        const hat = new THREE.Mesh(hatGeo, hatMat);
-        hat.position.y = 2.05;
-        group.add(hat);
+        // ---- 4 Corner posts ----
+        const postGeo = new THREE.CylinderGeometry(0.1, 0.12, 3.2, 6);
+        const postPositions = [
+            [-2.0, 1.8, -1.5],
+            [2.0, 1.8, -1.5],
+            [-2.0, 1.8, 1.5],
+            [2.0, 1.8, 1.5],
+        ];
+        postPositions.forEach(([px, py, pz]) => {
+            const post = new THREE.Mesh(postGeo, woodDark);
+            post.position.set(px, py, pz);
+            post.castShadow = true;
+            group.add(post);
+        });
 
-        // Floating name tag
+        // ---- Sloped roof ----
+        // Main roof slab (slightly tilted forward for charm)
+        const roofGeo = new THREE.BoxGeometry(5.2, 0.15, 4.2);
+        const roof = new THREE.Mesh(roofGeo, roofTile);
+        roof.position.set(0, 3.5, 0.1);
+        roof.rotation.x = -0.08; // slight forward tilt
+        roof.castShadow = true;
+        group.add(roof);
+
+        // Roof ridge beam
+        const ridgeGeo = new THREE.BoxGeometry(5.4, 0.12, 0.2);
+        const ridge = new THREE.Mesh(ridgeGeo, roofTrim);
+        ridge.position.set(0, 3.6, 0);
+        group.add(ridge);
+
+        // Roof overhang trim (front & back decorative strip)
+        const overhangGeo = new THREE.BoxGeometry(5.2, 0.08, 0.15);
+        const overhangFront = new THREE.Mesh(overhangGeo, roofTrim);
+        overhangFront.position.set(0, 3.45, 2.15);
+        group.add(overhangFront);
+        const overhangBack = new THREE.Mesh(overhangGeo, roofTrim);
+        overhangBack.position.set(0, 3.45, -2.0);
+        group.add(overhangBack);
+
+        // ---- Awning / cloth banner (front) ----
+        const awningGeo = new THREE.PlaneGeometry(3.6, 0.7);
+        const awning = new THREE.Mesh(awningGeo, clothRed);
+        awning.position.set(0, 3.1, 1.55);
+        awning.rotation.x = -0.3;
+        group.add(awning);
+
+        // ---- Counter desk (front-facing) ----
+        const counterGeo = new THREE.BoxGeometry(3.6, 0.9, 0.6);
+        const counter = new THREE.Mesh(counterGeo, woodLight);
+        counter.position.set(0, 0.65, 1.2);
+        counter.castShadow = true;
+        group.add(counter);
+
+        // Counter top surface
+        const counterTopGeo = new THREE.BoxGeometry(3.8, 0.06, 0.8);
+        const counterTop = new THREE.Mesh(counterTopGeo, woodPlank);
+        counterTop.position.set(0, 1.13, 1.2);
+        group.add(counterTop);
+
+        // ---- Back wall (half-height for cozy feel) ----
+        const backWallGeo = new THREE.BoxGeometry(4.3, 2.0, 0.1);
+        const backWallMat = new THREE.MeshLambertMaterial({ color: 0x9a8060 });
+        const backWall = new THREE.Mesh(backWallGeo, backWallMat);
+        backWall.position.set(0, 1.2, -1.5);
+        group.add(backWall);
+
+        // ---- Side panels (left & right, partial) ----
+        const sidePanelGeo = new THREE.BoxGeometry(0.1, 2.0, 2.8);
+        const sidePanelMat = new THREE.MeshLambertMaterial({ color: 0x8a7050 });
+        const leftPanel = new THREE.Mesh(sidePanelGeo, sidePanelMat);
+        leftPanel.position.set(-2.15, 1.2, 0);
+        group.add(leftPanel);
+        const rightPanel = new THREE.Mesh(sidePanelGeo, sidePanelMat);
+        rightPanel.position.set(2.15, 1.2, 0);
+        group.add(rightPanel);
+
+        // ---- Decorative props ----
+        // Barrel (right side)
+        const barrelGeo = new THREE.CylinderGeometry(0.35, 0.38, 0.9, 8);
+        const barrelMat = new THREE.MeshLambertMaterial({ color: 0x6a4a2a });
+        const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+        barrel.position.set(1.6, 0.65, -0.6);
+        barrel.castShadow = true;
+        group.add(barrel);
+
+        // Barrel ring trim
+        const ringGeo = new THREE.TorusGeometry(0.36, 0.025, 6, 12);
+        const ringMat = new THREE.MeshLambertMaterial({ color: 0x444444 });
+        const ring1 = new THREE.Mesh(ringGeo, ringMat);
+        ring1.position.set(1.6, 0.45, -0.6);
+        ring1.rotation.x = Math.PI / 2;
+        group.add(ring1);
+        const ring2 = new THREE.Mesh(ringGeo, ringMat);
+        ring2.position.set(1.6, 0.85, -0.6);
+        ring2.rotation.x = Math.PI / 2;
+        group.add(ring2);
+
+        // Crate (left side)
+        const crateGeo = new THREE.BoxGeometry(0.7, 0.6, 0.7);
+        const crateMat = new THREE.MeshLambertMaterial({ color: 0x7a5a2a });
+        const crate = new THREE.Mesh(crateGeo, crateMat);
+        crate.position.set(-1.5, 0.5, -0.5);
+        crate.rotation.y = 0.25;
+        crate.castShadow = true;
+        group.add(crate);
+
+        // Small crate on top
+        const smallCrateGeo = new THREE.BoxGeometry(0.45, 0.4, 0.45);
+        const smallCrate = new THREE.Mesh(smallCrateGeo, crateMat);
+        smallCrate.position.set(-1.4, 1.0, -0.4);
+        smallCrate.rotation.y = -0.4;
+        group.add(smallCrate);
+
+        // ---- Hanging Lantern ----
+        // Lantern arm (from front post)
+        const armGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.8, 4);
+        const arm = new THREE.Mesh(armGeo, woodDark);
+        arm.position.set(1.6, 3.0, 1.5);
+        arm.rotation.z = Math.PI / 2;
+        group.add(arm);
+
+        // Lantern body
+        const lanternGeo = new THREE.BoxGeometry(0.2, 0.3, 0.2);
+        const lanternMat = new THREE.MeshBasicMaterial({ color: 0xffe080 });
+        const lantern = new THREE.Mesh(lanternGeo, lanternMat);
+        lantern.position.set(1.2, 2.75, 1.5);
+        group.add(lantern);
+
+        // Lantern warm glow
+        const lanternLight = new THREE.PointLight(0xffcc66, 1.2, 8);
+        lanternLight.position.set(1.2, 2.6, 1.5);
+        group.add(lanternLight);
+
+        // ---- Merchant character (behind counter) ----
+        const merchantGroup = new THREE.Group();
+
+        // Merchant body (apron style - wider torso)
+        const mBodyGeo = new THREE.BoxGeometry(0.55, 0.75, 0.35);
+        const mBodyMat = new THREE.MeshLambertMaterial({ color: 0xd4a050 }); // warm vest
+        const mBody = new THREE.Mesh(mBodyGeo, mBodyMat);
+        mBody.position.y = 1.0;
+        mBody.castShadow = true;
+        merchantGroup.add(mBody);
+
+        // White apron overlay
+        const apronGeo = new THREE.BoxGeometry(0.48, 0.55, 0.02);
+        const apronMat = new THREE.MeshLambertMaterial({ color: 0xf0e8d0 });
+        const apron = new THREE.Mesh(apronGeo, apronMat);
+        apron.position.set(0, 0.9, 0.18);
+        merchantGroup.add(apron);
+
+        // Merchant head
+        const mHeadGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+        const mHeadMat = new THREE.MeshLambertMaterial({ color: 0xf5d0a0 });
+        const mHead = new THREE.Mesh(mHeadGeo, mHeadMat);
+        mHead.position.y = 1.62;
+        mHead.castShadow = true;
+        merchantGroup.add(mHead);
+
+        // Merchant eyes
+        const mEyeGeo = new THREE.BoxGeometry(0.07, 0.07, 0.04);
+        const mEyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const mEyeL = new THREE.Mesh(mEyeGeo, mEyeMat);
+        mEyeL.position.set(-0.1, 1.65, 0.22);
+        merchantGroup.add(mEyeL);
+        const mEyeR = new THREE.Mesh(mEyeGeo, mEyeMat);
+        mEyeR.position.set(0.1, 1.65, 0.22);
+        merchantGroup.add(mEyeR);
+
+        // Merchant hat (merchant cap / beret)
+        const mHatGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.2, 8);
+        const mHatMat = new THREE.MeshLambertMaterial({ color: 0x8a3030 });
+        const mHat = new THREE.Mesh(mHatGeo, mHatMat);
+        mHat.position.y = 1.9;
+        merchantGroup.add(mHat);
+
+        // Hat brim
+        const brimGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.04, 8);
+        const brim = new THREE.Mesh(brimGeo, mHatMat);
+        brim.position.y = 1.82;
+        merchantGroup.add(brim);
+
+        // Merchant arms
+        const mArmGeo = new THREE.BoxGeometry(0.18, 0.5, 0.18);
+        const mArmMat = new THREE.MeshLambertMaterial({ color: 0xd4a050 });
+        const mArmL = new THREE.Mesh(mArmGeo, mArmMat);
+        mArmL.position.set(-0.4, 0.95, 0);
+        merchantGroup.add(mArmL);
+        const mArmR = new THREE.Mesh(mArmGeo, mArmMat);
+        mArmR.position.set(0.4, 0.95, 0);
+        merchantGroup.add(mArmR);
+
+        // Merchant legs
+        const mLegGeo = new THREE.BoxGeometry(0.2, 0.45, 0.22);
+        const mLegMat = new THREE.MeshLambertMaterial({ color: 0x3a3a5a });
+        const mLegL = new THREE.Mesh(mLegGeo, mLegMat);
+        mLegL.position.set(-0.14, 0.4, 0);
+        merchantGroup.add(mLegL);
+        const mLegR = new THREE.Mesh(mLegGeo, mLegMat);
+        mLegR.position.set(0.14, 0.4, 0);
+        merchantGroup.add(mLegR);
+
+        // Position merchant behind counter, facing forward
+        merchantGroup.position.set(0, 0.18, 0.5);
+        merchantGroup.rotation.y = 0; // facing +Z (toward player)
+        group.add(merchantGroup);
+
+        // ---- Floating shop name tag ----
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 512;
+        canvas.height = 96;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0, 0, 256, 64);
-        ctx.font = 'bold 24px Arial';
+        // Background
+        ctx.fillStyle = 'rgba(40, 20, 10, 0.7)';
+        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.fill();
+        // Border
+        ctx.strokeStyle = '#c8a050';
+        ctx.lineWidth = 3;
+        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.stroke();
+        // Text
+        ctx.font = 'bold 36px Arial';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffd040';
-        ctx.fillText('🏪 Kafra Shop', 128, 38);
+        ctx.fillText('🏪 Kafra Shop', 256, 60);
+
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        const sprite = new THREE.Sprite(spriteMat);
-        sprite.position.y = 2.8;
-        sprite.scale.set(2.5, 0.6, 1);
-        group.add(sprite);
+        const nameTag = new THREE.Sprite(spriteMat);
+        nameTag.position.y = 4.4;
+        nameTag.scale.set(3.5, 0.7, 1);
+        group.add(nameTag);
 
-        group.position.set(5, 0, -3);
+        // ---- Position the entire shop on dry land ----
+        group.position.set(-8, 0, 5);
         this.scene.add(group);
         this.envObjects.push(group);
         this.npcMesh = group;
@@ -929,6 +1556,25 @@ export class SceneManager {
         this.camera.lookAt(targetPos.x, targetPos.y, targetPos.z);
     }
 
+    // Check if a position is in the winding river (and not on the bridge)
+    isInWater(position) {
+        if (!this.waterMesh) return false;
+
+        // Check if on the bridge (approximate bounds)
+        // Bridge is centered at xOffset = 0, zOffset = -2
+        // Bridge planks have width 3.6 (x between -1.8 and 1.8), and span z from -10 to +6
+        if (Math.abs(position.x) < 1.8 && position.z >= -10 && position.z <= 6) {
+            return false;
+        }
+
+        // River centerline: z = sin(x * 0.08) * 10 - 2
+        const riverZ = Math.sin(position.x * 0.08) * 10 - 2;
+        const distToRiver = Math.abs(position.z - riverZ);
+
+        // Riverbed cut boundary for wider river
+        return distToRiver < 5.5;
+    }
+
     // World to screen position
     worldToScreen(worldPos) {
         const vec = worldPos.clone();
@@ -943,7 +1589,7 @@ export class SceneManager {
     updateAnimations(dt) {
         this.time += dt;
 
-        // Animate water
+        // Animate water waves
         if (this.waterMesh) {
             const positions = this.waterMesh.geometry.attributes.position;
             for (let i = 0; i < positions.count; i++) {
@@ -956,12 +1602,58 @@ export class SceneManager {
             positions.needsUpdate = true;
         }
 
-        // Animate clouds
+        // Animate voxel clouds
         this.cloudSprites.forEach(cloud => {
             cloud.userData.angle += cloud.userData.speed * dt;
             cloud.position.x = Math.cos(cloud.userData.angle) * cloud.userData.radius;
             cloud.position.z = Math.sin(cloud.userData.angle) * cloud.userData.radius;
+            // Face parallel to flight circle tangent (tangent is Z normal facing)
+            cloud.rotation.y = -cloud.userData.angle + Math.PI / 2;
         });
+
+        // Animate wind sway on trees
+        if (this.swayingObjects) {
+            this.swayingObjects.forEach(obj => {
+                const offset = obj.position.x * 0.15 + obj.position.z * 0.15;
+                const swaySpeed = 1.6;
+                const swayStrength = 0.022;
+                obj.rotation.x = Math.sin(this.time * swaySpeed + offset) * swayStrength;
+                obj.rotation.z = Math.cos(this.time * (swaySpeed * 0.8) + offset) * (swayStrength * 0.7);
+            });
+        }
+
+        // Animate sunbeams shimmer
+        if (this.sunbeamGroup) {
+            this.sunbeamGroup.children.forEach((pivot, idx) => {
+                const pulse = 0.05 + Math.sin(this.time * 1.1 + idx * 1.5) * 0.035;
+                pivot.children[0].material.opacity = pulse;
+            });
+        }
+
+        // Animate flying birds
+        if (this.birds) {
+            this.birds.forEach(bird => {
+                const u = bird.userData;
+                u.angle += u.speed * dt;
+
+                // Fly in matching circle
+                bird.position.set(
+                    Math.cos(u.angle) * u.radius,
+                    u.height,
+                    Math.sin(u.angle) * u.radius
+                );
+
+                // Tangent yaw heading matching motion
+                const tangentX = -Math.sin(u.angle);
+                const tangentZ = Math.cos(u.angle);
+                bird.rotation.y = Math.atan2(tangentX, tangentZ);
+
+                // Wing flaps
+                const flap = Math.sin(this.time * u.flapSpeed + u.flapOffset) * 0.75;
+                u.leftWing.rotation.z = -flap;
+                u.rightWing.rotation.z = flap;
+            });
+        }
 
         // Animate portal glow
         this.portalMeshes.forEach(portal => {

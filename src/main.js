@@ -45,13 +45,19 @@ async function initGame() {
     // Init engine
     sceneManager = new SceneManager(canvas);
     character = new CharacterManager(sceneManager.scene);
-    monsters = new MonsterManager(sceneManager.scene);
+    monsters = new MonsterManager(sceneManager.scene, sceneManager);
     particles = new ParticleSystem(sceneManager.scene);
     soundManager = new SoundManager();
     inputManager = new InputManager();
 
     // Init UI
     gameUI = new GameUI(character, soundManager);
+
+    // Expose for debugging
+    window.sceneManager = sceneManager;
+    window.character = character;
+    window.monsters = monsters;
+    window.gameUI = gameUI;
 
     // Load character from DB
     try {
@@ -390,8 +396,24 @@ function gameLoop() {
                 character.targetDest = null;
                 character.state = 'idle';
             }
-        } else if (character.state === 'walking' || character.state === 'running') {
+        } else if (character.state === 'walking' || character.state === 'running' || character.state === 'swimming') {
             character.state = 'idle';
+        }
+    }
+
+    // Swimming state detection: if player is in water, switch to swimming and slow down
+    if (sceneManager && character.isAlive()) {
+        const pPos = character.getPosition();
+        const inWater = sceneManager.isInWater(pPos);
+        if (inWater && (character.state === 'walking' || character.state === 'running')) {
+            character.state = 'swimming';
+            // Slow down in water (reduce position change)
+            character.moveSpeed = 2.4; // 60% of normal 4
+        } else if (!inWater && character.state === 'swimming') {
+            character.state = 'walking';
+            character.moveSpeed = 4; // Restore normal speed
+        } else if (!inWater) {
+            character.moveSpeed = 4;
         }
     }
 
@@ -400,6 +422,32 @@ function gameLoop() {
     monsters.update(dt, sceneManager.camera, character.stats.level);
     combat.update(dt);
     particles.update(dt);
+
+    // Trigger water splash particles when characters traverse the winding river
+    if (sceneManager && particles) {
+        // Local player splash
+        const pPos = character.getPosition();
+        if ((character.state === 'walking' || character.state === 'running' || character.state === 'swimming') && sceneManager.isInWater(pPos)) {
+            particles.spawnWaterSplash(pPos);
+        }
+
+        // Remote players splash
+        for (const remotePlayer of remotePlayersMap.values()) {
+            const rPos = remotePlayer.mesh.position;
+            if ((remotePlayer.state === 'walking' || remotePlayer.state === 'running') && sceneManager.isInWater(rPos)) {
+                particles.spawnWaterSplash(rPos);
+            }
+        }
+
+        // Monsters splash
+        if (monsters && monsters.monsters) {
+            for (const m of [...monsters.monsters, ...monsters.waterMonsters]) {
+                if (m.alive && m.isMoving && sceneManager.isInWater(m.mesh.position)) {
+                    particles.spawnWaterSplash(m.mesh.position);
+                }
+            }
+        }
+    }
 
     if (sceneManager) {
         sceneManager.updateAnimations(dt);
@@ -432,6 +480,8 @@ function gameLoop() {
                     // Clear current monsters
                     monsters.monsters.forEach(m => m.destroy());
                     monsters.monsters = [];
+                    monsters.waterMonsters.forEach(m => m.destroy());
+                    monsters.waterMonsters = [];
                     monsters.deadQueue = [];
 
                     // Move player to safe spawn BEFORE loading new map

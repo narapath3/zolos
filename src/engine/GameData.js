@@ -220,6 +220,80 @@ export const PAYON_MONSTERS = {
     },
 };
 
+// ============ WATER MONSTERS ============
+export const WATER_MONSTERS = {
+    shrimp: {
+        name: 'Shrimp',
+        emoji: '🦐',
+        color: 0xff6060,
+        hp: 35,
+        atk: 6,
+        def: 2,
+        exp: 18,
+        gold: { min: 3, max: 10 },
+        size: 0.4,
+        speed: 0.7,
+        waterOnly: true,
+        loot: [
+            { name: 'Sticky Mucus', emoji: '💧', type: 'material', chance: 0.5 },
+            { name: 'Apple', emoji: '🍎', type: 'consumable', chance: 0.2 },
+        ]
+    },
+    clam: {
+        name: 'Clam',
+        emoji: '🐚',
+        color: 0xd0b890,
+        hp: 60,
+        atk: 4,
+        def: 15,
+        exp: 25,
+        gold: { min: 8, max: 20 },
+        size: 0.45,
+        speed: 0.1,
+        waterOnly: true,
+        loot: [
+            { name: 'Jellopy', emoji: '💎', type: 'material', chance: 0.6 },
+            { name: 'Crystal Blue', emoji: '🔵', type: 'material', chance: 0.08 },
+        ]
+    },
+    crab: {
+        name: 'Crab',
+        emoji: '🦀',
+        color: 0xe04040,
+        hp: 80,
+        atk: 16,
+        def: 10,
+        exp: 45,
+        gold: { min: 10, max: 25 },
+        size: 0.55,
+        speed: 0.4,
+        waterOnly: true,
+        loot: [
+            { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.4 },
+            { name: 'Green Herb', emoji: '🌿', type: 'consumable', chance: 0.25 },
+            { name: 'Yellow Herb', emoji: '🌾', type: 'consumable', chance: 0.1 },
+        ]
+    },
+    fish: {
+        name: 'Fish',
+        emoji: '🐟',
+        color: 0x4080ff,
+        hp: 50,
+        atk: 12,
+        def: 5,
+        exp: 30,
+        gold: { min: 5, max: 18 },
+        size: 0.5,
+        speed: 1.0,
+        waterOnly: true,
+        loot: [
+            { name: 'Sticky Webfoot', emoji: '🦶', type: 'material', chance: 0.4 },
+            { name: 'Carrot', emoji: '🥕', type: 'consumable', chance: 0.2 },
+            { name: 'Blue Herb', emoji: '💙', type: 'consumable', chance: 0.05 },
+        ]
+    },
+};
+
 // ============ SKILLS ============
 export const SKILLS = {
     bash: {
@@ -315,6 +389,16 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
     return table;
 }
 
+// ============ WATER SPAWN TABLE ============
+export function getWaterSpawnTable(playerLevel) {
+    const table = [];
+    table.push({ type: 'shrimp', weight: 30 });
+    table.push({ type: 'clam', weight: 20 });
+    if (playerLevel >= 3) table.push({ type: 'fish', weight: 25 });
+    if (playerLevel >= 6) table.push({ type: 'crab', weight: 20 });
+    return table;
+}
+
 export function pickRandomMonster(playerLevel, mapId = 'prontera') {
     const table = getSpawnTable(playerLevel, mapId);
     const totalWeight = table.reduce((sum, e) => sum + e.weight, 0);
@@ -327,7 +411,19 @@ export function pickRandomMonster(playerLevel, mapId = 'prontera') {
     return table[0].type;
 }
 
+export function pickRandomWaterMonster(playerLevel) {
+    const table = getWaterSpawnTable(playerLevel);
+    const totalWeight = table.reduce((sum, e) => sum + e.weight, 0);
+    let roll = Math.random() * totalWeight;
+
+    for (const entry of table) {
+        roll -= entry.weight;
+        if (roll <= 0) return entry.type;
+    }
+    return table[0].type;
+}
+
 // All monsters combined (for lookup)
 export function getAllMonsters() {
-    return { ...MONSTERS, ...PAYON_MONSTERS };
+    return { ...MONSTERS, ...PAYON_MONSTERS, ...WATER_MONSTERS };
 }

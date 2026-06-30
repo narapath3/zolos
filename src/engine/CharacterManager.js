@@ -302,6 +302,17 @@ export class CharacterManager {
             this.rightArm.rotation.x = Math.sin(this.animTimer * 14) * 0.5;
         }
 
+        // Swimming animation (sink lower, breaststroke arms, kicking legs)
+        if (this.state === 'swimming') {
+            this.mesh.position.y = -0.6 + Math.sin(this.animTimer * 3) * 0.08;
+            this.leftArm.rotation.x = Math.sin(this.animTimer * 4) * 0.8;
+            this.rightArm.rotation.x = Math.sin(this.animTimer * 4 + Math.PI) * 0.8;
+            this.leftArm.rotation.z = Math.sin(this.animTimer * 4) * 0.3;
+            this.rightArm.rotation.z = -Math.sin(this.animTimer * 4) * 0.3;
+            this.leftLeg.rotation.x = Math.sin(this.animTimer * 5) * 0.4;
+            this.rightLeg.rotation.x = Math.sin(this.animTimer * 5 + Math.PI) * 0.4;
+        }
+
         // Attack animation
         if (this.state === 'attacking') {
             const t = (this.animTimer % 0.5) / 0.5;

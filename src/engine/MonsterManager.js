@@ -1,8 +1,9 @@
 // Monster Manager — Monster spawning, AI, and management
 import * as THREE from 'three';
-import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters } from './GameData.js';
+import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster } from './GameData.js';
 
 const MAX_MONSTERS = 12;
+const MAX_WATER_MONSTERS = 4;
 const SPAWN_RANGE = 12;
 const RESPAWN_TIME = 3;
 
@@ -27,7 +28,8 @@ class Monster {
     constructor(scene, type, position) {
         this.scene = scene;
         this.type = type;
-        this.data = MONSTERS[type];
+        const allMonsters = getAllMonsters();
+        this.data = allMonsters[type];
         this.hp = this.data.hp;
         this.maxHp = this.data.hp;
         this.alive = true;
@@ -36,6 +38,8 @@ class Monster {
         this.wanderTarget = null;
         this.wanderTimer = 0;
         this.hitFlash = 0;
+        this.isMoving = false; // Flag to track movement for water splashing
+        this.isWaterMonster = !!this.data.waterOnly;
 
         this._createModel(position);
     }
@@ -82,7 +86,7 @@ class Monster {
 
         this.hpBarFill = new THREE.Mesh(
             new THREE.PlaneGeometry(0.78, 0.06),
-            new THREE.MeshBasicMaterial({ color: 0xff2020 })
+            new THREE.MeshBasicMaterial({ color: this.isWaterMonster ? 0x2080ff : 0xff2020 })
         );
         this.hpBarFill.position.y = this.data.size + 0.3;
         this.hpBarFill.position.z = 0.001;
@@ -94,7 +98,7 @@ class Monster {
         canvas.height = 64;
         const ctx = canvas.getContext('2d');
         ctx.font = 'bold 24px "Press Start 2P", monospace';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = this.isWaterMonster ? '#80c0ff' : '#ffffff';
         ctx.textAlign = 'center';
         ctx.fillText(this.data.name, 128, 40);
 
@@ -114,6 +118,10 @@ class Monster {
         this.mesh.add(shadow);
 
         this.mesh.position.copy(position);
+        // Water monsters sink slightly
+        if (this.isWaterMonster) {
+            this.mesh.position.y = -0.3;
+        }
         this.scene.add(this.mesh);
     }
 
@@ -142,7 +150,7 @@ class Monster {
         return this.mesh.position.distanceTo(pos);
     }
 
-    update(dt, camera) {
+    update(dt, camera, sceneManager) {
         if (!this.alive) return;
 
         this.animTimer += dt;
@@ -150,7 +158,12 @@ class Monster {
 
         // Bounce animation
         const bounce = Math.abs(Math.sin(this.animTimer * 2.5)) * 0.1;
-        this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
+        if (this.isWaterMonster) {
+            this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
+            this.mesh.position.y = -0.3 + Math.sin(this.animTimer * 1.5) * 0.05;
+        } else {
+            this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
+        }
         this.bodyMesh.scale.y = 1 + bounce * 0.5;
         this.bodyMesh.scale.x = 1 - bounce * 0.15;
         this.bodyMesh.scale.z = 1 - bounce * 0.15;
@@ -170,15 +183,43 @@ class Monster {
             this.wanderTimer = 2 + Math.random() * 4;
             const angle = Math.random() * Math.PI * 2;
             const dist = 1 + Math.random() * 2;
-            this.wanderTarget = new THREE.Vector3(
-                this.mesh.position.x + Math.cos(angle) * dist,
-                0,
-                this.mesh.position.z + Math.sin(angle) * dist
-            );
+            const newX = this.mesh.position.x + Math.cos(angle) * dist;
+            const newZ = this.mesh.position.z + Math.sin(angle) * dist;
+
+            // Land monsters must not wander into water; water monsters must stay in water
+            if (sceneManager) {
+                const testPos = new THREE.Vector3(newX, 0, newZ);
+                const targetInWater = sceneManager.isInWater(testPos);
+
+                if (this.isWaterMonster) {
+                    // Water monster: only wander within water
+                    if (targetInWater) {
+                        this.wanderTarget = testPos;
+                    } else {
+                        // Pick new target toward river center
+                        const riverZ = Math.sin(this.mesh.position.x * 0.08) * 10 - 2;
+                        this.wanderTarget = new THREE.Vector3(
+                            this.mesh.position.x + (Math.random() - 0.5) * 2,
+                            0,
+                            riverZ + (Math.random() - 0.5) * 4
+                        );
+                    }
+                } else {
+                    // Land monster: avoid water
+                    if (!targetInWater) {
+                        this.wanderTarget = testPos;
+                    }
+                    // If target is in water, skip this wander cycle (stay put)
+                }
+            } else {
+                this.wanderTarget = new THREE.Vector3(newX, 0, newZ);
+            }
 
             // Keep in bounds
-            this.wanderTarget.x = THREE.MathUtils.clamp(this.wanderTarget.x, -SPAWN_RANGE, SPAWN_RANGE);
-            this.wanderTarget.z = THREE.MathUtils.clamp(this.wanderTarget.z, -SPAWN_RANGE, SPAWN_RANGE);
+            if (this.wanderTarget) {
+                this.wanderTarget.x = THREE.MathUtils.clamp(this.wanderTarget.x, -SPAWN_RANGE, SPAWN_RANGE);
+                this.wanderTarget.z = THREE.MathUtils.clamp(this.wanderTarget.z, -SPAWN_RANGE, SPAWN_RANGE);
+            }
         }
 
         if (this.wanderTarget) {
@@ -187,10 +228,28 @@ class Monster {
             const dist = Math.sqrt(dx * dx + dz * dz);
             if (dist > 0.2) {
                 const speed = this.data.speed * dt;
-                this.mesh.position.x += (dx / dist) * speed;
-                this.mesh.position.z += (dz / dist) * speed;
+                const nextX = this.mesh.position.x + (dx / dist) * speed;
+                const nextZ = this.mesh.position.z + (dz / dist) * speed;
+
+                // Final check: prevent land monster from stepping into water
+                if (!this.isWaterMonster && sceneManager) {
+                    const nextPos = new THREE.Vector3(nextX, 0, nextZ);
+                    if (sceneManager.isInWater(nextPos)) {
+                        this.wanderTarget = null;
+                        this.isMoving = false;
+                        return;
+                    }
+                }
+
+                this.mesh.position.x = nextX;
+                this.mesh.position.z = nextZ;
                 this.mesh.rotation.y = Math.atan2(dx, dz);
+                this.isMoving = true;
+            } else {
+                this.isMoving = false;
             }
+        } else {
+            this.isMoving = false;
         }
 
         // Billboard HP bar to camera
@@ -209,6 +268,9 @@ class Monster {
         this.alive = true;
         this.mesh.visible = true;
         this.mesh.position.copy(position);
+        if (this.isWaterMonster) {
+            this.mesh.position.y = -0.3;
+        }
         this.hpBarFill.scale.x = 1;
         this.hitFlash = 0;
     }
@@ -219,10 +281,12 @@ class Monster {
 }
 
 export class MonsterManager {
-    constructor(scene) {
+    constructor(scene, sceneManager) {
         this.scene = scene;
+        this.sceneManager = sceneManager;
         this.monsters = [];
-        this.deadQueue = []; // { monster, timer }
+        this.waterMonsters = [];
+        this.deadQueue = []; // { monster, timer, isWater }
         this.mapId = 'prontera';
     }
 
@@ -230,45 +294,82 @@ export class MonsterManager {
         const rng = createSeededRng(getDailySeed());
         const count = Math.min(MAX_MONSTERS, 6 + Math.floor(playerLevel / 2));
 
-        // Spawn seeded monsters using map-specific database
+        // Spawn seeded land monsters using map-specific database
         const spawnTable = getSpawnTable(playerLevel, this.mapId);
 
         for (let i = 0; i < count; i++) {
             if (spawnTable.length === 0) continue;
-            // Roll using seeded rng
             const entry = spawnTable[Math.floor(rng() * spawnTable.length)];
-            const angle = rng() * Math.PI * 2;
-            const dist = 4 + rng() * (SPAWN_RANGE - 4);
-            const pos = new THREE.Vector3(
-                Math.cos(angle) * dist,
-                0,
-                Math.sin(angle) * dist
-            );
+            let pos;
+            // Ensure land monsters don't spawn in water
+            for (let attempt = 0; attempt < 10; attempt++) {
+                const angle = rng() * Math.PI * 2;
+                const dist = 4 + rng() * (SPAWN_RANGE - 4);
+                pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                if (!this.sceneManager || !this.sceneManager.isInWater(pos)) break;
+            }
 
             const monster = new Monster(this.scene, entry.type, pos);
             this.monsters.push(monster);
+        }
+
+        // Spawn water monsters (Prontera only since that's where the river is)
+        if (this.mapId === 'prontera') {
+            this._spawnWaterMonsters(playerLevel, rng);
+        }
+    }
+
+    _spawnWaterMonsters(playerLevel, rng) {
+        const useRng = rng || Math.random;
+        for (let i = 0; i < MAX_WATER_MONSTERS; i++) {
+            const type = pickRandomWaterMonster(playerLevel);
+            // Spawn along the river centerline
+            const rx = -20 + useRng() * 40;
+            const riverZ = Math.sin(rx * 0.08) * 10 - 2;
+            const rz = riverZ + (useRng() - 0.5) * 4;
+            const pos = new THREE.Vector3(rx, 0, rz);
+
+            const monster = new Monster(this.scene, type, pos);
+            this.waterMonsters.push(monster);
         }
     }
 
     _spawnOne(playerLevel) {
         const type = pickRandomMonster(playerLevel, this.mapId);
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 4 + Math.random() * (SPAWN_RANGE - 4);
-        const pos = new THREE.Vector3(
-            Math.cos(angle) * dist,
-            0,
-            Math.sin(angle) * dist
-        );
+        let pos;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 4 + Math.random() * (SPAWN_RANGE - 4);
+            pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+            if (!this.sceneManager || !this.sceneManager.isInWater(pos)) break;
+        }
 
         const monster = new Monster(this.scene, type, pos);
         this.monsters.push(monster);
         return monster;
     }
 
+    _spawnOneWater(playerLevel) {
+        const type = pickRandomWaterMonster(playerLevel);
+        const rx = -20 + Math.random() * 40;
+        const riverZ = Math.sin(rx * 0.08) * 10 - 2;
+        const rz = riverZ + (Math.random() - 0.5) * 4;
+        const pos = new THREE.Vector3(rx, 0, rz);
+
+        const monster = new Monster(this.scene, type, pos);
+        this.waterMonsters.push(monster);
+        return monster;
+    }
+
     update(dt, camera, playerLevel) {
-        // Update alive monsters
+        // Update alive land monsters
         for (const m of this.monsters) {
-            m.update(dt, camera);
+            m.update(dt, camera, this.sceneManager);
+        }
+
+        // Update alive water monsters
+        for (const m of this.waterMonsters) {
+            m.update(dt, camera, this.sceneManager);
         }
 
         // Handle respawns
@@ -276,31 +377,56 @@ export class MonsterManager {
             this.deadQueue[i].timer -= dt;
             if (this.deadQueue[i].timer <= 0) {
                 const entry = this.deadQueue.splice(i, 1)[0];
-                // Respawn with new type
-                const type = pickRandomMonster(playerLevel, this.mapId);
-                const angle = Math.random() * Math.PI * 2;
-                const dist = 4 + Math.random() * (SPAWN_RANGE - 4);
-                const pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
-                entry.monster.type = type;
-                const allMonsters = getAllMonsters();
-                const monsterData = allMonsters[type];
-                if (monsterData) {
-                    entry.monster.data = monsterData;
-                    entry.monster.maxHp = monsterData.hp;
+                if (entry.isWater) {
+                    // Respawn as water monster
+                    const type = pickRandomWaterMonster(playerLevel);
+                    const rx = -20 + Math.random() * 40;
+                    const riverZ = Math.sin(rx * 0.08) * 10 - 2;
+                    const rz = riverZ + (Math.random() - 0.5) * 4;
+                    const pos = new THREE.Vector3(rx, 0, rz);
 
-                    // Repaint bodyMesh to new monster color
-                    if (entry.monster.bodyMesh && entry.monster.bodyMesh.material) {
-                        entry.monster.bodyMesh.material.color.setHex(monsterData.color);
+                    entry.monster.type = type;
+                    const allMonsters = getAllMonsters();
+                    const monsterData = allMonsters[type];
+                    if (monsterData) {
+                        entry.monster.data = monsterData;
+                        entry.monster.maxHp = monsterData.hp;
+                        entry.monster.isWaterMonster = true;
+                        if (entry.monster.bodyMesh && entry.monster.bodyMesh.material) {
+                            entry.monster.bodyMesh.material.color.setHex(monsterData.color);
+                        }
+                        entry.monster.reset(pos);
                     }
-                    // Re-render hp bar scale and status
-                    entry.monster.reset(pos);
+                } else {
+                    // Respawn as land monster
+                    const type = pickRandomMonster(playerLevel, this.mapId);
+                    let pos;
+                    for (let attempt = 0; attempt < 10; attempt++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 4 + Math.random() * (SPAWN_RANGE - 4);
+                        pos = new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+                        if (!this.sceneManager || !this.sceneManager.isInWater(pos)) break;
+                    }
+
+                    entry.monster.type = type;
+                    const allMonsters = getAllMonsters();
+                    const monsterData = allMonsters[type];
+                    if (monsterData) {
+                        entry.monster.data = monsterData;
+                        entry.monster.maxHp = monsterData.hp;
+                        entry.monster.isWaterMonster = false;
+                        if (entry.monster.bodyMesh && entry.monster.bodyMesh.material) {
+                            entry.monster.bodyMesh.material.color.setHex(monsterData.color);
+                        }
+                        entry.monster.reset(pos);
+                    }
                 }
             }
         }
 
         // Ensure monster count
-        const aliveCount = this.monsters.filter(m => m.alive).length + this.deadQueue.length;
+        const aliveCount = this.monsters.filter(m => m.alive).length + this.deadQueue.filter(d => !d.isWater).length;
         const targetCount = Math.min(MAX_MONSTERS, 6 + Math.floor(playerLevel / 2));
         while (aliveCount + this.monsters.length < targetCount && this.monsters.length < MAX_MONSTERS) {
             this._spawnOne(playerLevel);
@@ -309,18 +435,21 @@ export class MonsterManager {
 
     // Queue a monster for respawn
     queueRespawn(monster) {
+        const isWater = monster.isWaterMonster;
         this.deadQueue.push({
             monster,
-            timer: RESPAWN_TIME + Math.random() * 2
+            timer: RESPAWN_TIME + Math.random() * 2,
+            isWater
         });
     }
 
-    // Find nearest alive monster to a position
+    // Find nearest alive monster to a position (searches both land and water)
     findNearest(position, maxRange = 20) {
         let nearest = null;
         let nearestDist = maxRange;
 
-        for (const m of this.monsters) {
+        const allMonsters = [...this.monsters, ...this.waterMonsters];
+        for (const m of allMonsters) {
             if (!m.alive) continue;
             const d = m.distanceTo(position);
             if (d < nearestDist) {
@@ -332,8 +461,8 @@ export class MonsterManager {
         return nearest;
     }
 
-    // Get all alive monsters
+    // Get all alive monsters (land + water)
     getAlive() {
-        return this.monsters.filter(m => m.alive);
+        return [...this.monsters, ...this.waterMonsters].filter(m => m.alive);
     }
 }
