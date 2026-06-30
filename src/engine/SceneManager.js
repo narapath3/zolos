@@ -189,6 +189,24 @@ export class SceneManager {
         this.renderer.render(this.scene, this.camera);
     }
 
+    // Follow a target position (camera follows player)
+    followTarget(targetPos) {
+        const offsetX = 0;
+        const offsetY = 18;
+        const offsetZ = 18;
+        const smoothing = 0.08;
+
+        const targetCamX = targetPos.x + offsetX;
+        const targetCamY = targetPos.y + offsetY;
+        const targetCamZ = targetPos.z + offsetZ;
+
+        this.camera.position.x += (targetCamX - this.camera.position.x) * smoothing;
+        this.camera.position.y += (targetCamY - this.camera.position.y) * smoothing;
+        this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
+
+        this.camera.lookAt(targetPos.x, targetPos.y, targetPos.z);
+    }
+
     // World to screen position
     worldToScreen(worldPos) {
         const vec = worldPos.clone();

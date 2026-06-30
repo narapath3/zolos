@@ -5,6 +5,8 @@ import { CharacterManager, RemotePlayer } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
 import { CombatSystem } from './engine/CombatSystem.js';
 import { ParticleSystem } from './engine/ParticleSystem.js';
+import { SoundManager } from './engine/SoundManager.js';
+import { InputManager } from './engine/InputManager.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { GameUI } from './ui/GameUI.js';
 import {
@@ -20,6 +22,7 @@ import {
 
 // ============ App State ============
 let sceneManager, character, monsters, combat, particles, gameUI;
+let soundManager, inputManager;
 let userId = null;
 let username = 'Adventurer';
 let onlinePlayers = [];
@@ -42,6 +45,8 @@ async function initGame() {
     character = new CharacterManager(sceneManager.scene);
     monsters = new MonsterManager(sceneManager.scene);
     particles = new ParticleSystem(sceneManager.scene);
+    soundManager = new SoundManager();
+    inputManager = new InputManager();
 
     // Init UI
     gameUI = new GameUI();
@@ -148,6 +153,7 @@ async function initGame() {
     gameUI.show();
     gameUI.addCombatLog(`Welcome to Prontera Field, ${username}!`, 'system');
     gameUI.addCombatLog('Press AUTO to start farming! ⚔️', 'system');
+    gameUI.addCombatLog('Use W/A/S/D to move, Space+W to sprint 🏃', 'system');
 
     // Start game loop
     gameLoop();
@@ -161,6 +167,17 @@ function handleCombatEvent(event) {
             const label = event.critical ? `💥 ${event.damage}` : `${event.damage}`;
             const type = event.critical ? 'critical' : 'player-dmg';
             particles.spawnDamageNumber(screen.x, screen.y, label, type);
+
+            // Hit effects
+            particles.spawnHitEffect(event.targetPos, event.critical);
+
+            // Sound effects
+            if (event.critical) {
+                soundManager.playCriticalSound();
+            } else {
+                soundManager.playHitSound();
+            }
+
             gameUI.addCombatLog(
                 `⚔️ Hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`,
                 'damage'
@@ -190,14 +207,16 @@ function handleCombatEvent(event) {
             gameUI.addCombatLog(`📦 Got ${event.item.emoji} ${event.item.name}!`, 'loot');
             gameUI.addItem(event.item);
 
-            // Death particles
+            // Death particles + sound
             const screen = sceneManager.worldToScreen(event.targetPos);
             particles.spawnDeathEffect(event.targetPos, 0xffd040);
+            soundManager.playDeathSound();
             break;
         }
 
         case 'levelUp': {
             particles.showLevelUpEffect(event.level);
+            soundManager.playLevelUpSound();
             gameUI.addCombatLog(`🎉 LEVEL UP! You are now Lv.${event.level}!`, 'levelup');
 
             // Save to DB immediately on level up
@@ -226,6 +245,16 @@ function gameLoop() {
 
     const dt = Math.min(sceneManager.getDelta(), 0.05); // Cap dt
 
+    // WASD Manual movement (only when auto-farm is off)
+    if (inputManager && !combat.autoFarm) {
+        const dir = inputManager.getMovementDirection();
+        if (dir) {
+            character.manualMove(dir, inputManager.isRunning(), dt);
+        } else if (character.state === 'walking' || character.state === 'running') {
+            character.state = 'idle';
+        }
+    }
+
     // Update systems
     character.update(dt);
     monsters.update(dt, sceneManager.camera, character.stats.level);
@@ -236,6 +265,9 @@ function gameLoop() {
     for (const remotePlayer of remotePlayersMap.values()) {
         remotePlayer.update(dt);
     }
+
+    // Camera follow player
+    sceneManager.followTarget(character.getPosition());
 
     // Broadcast own position every 100ms
     const now = performance.now();

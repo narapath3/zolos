@@ -274,6 +274,15 @@ export class CharacterManager {
             this.rightArm.rotation.x = Math.sin(this.animTimer * 8) * 0.3;
         }
 
+        // Running animation (faster legs, more bounce)
+        if (this.state === 'running') {
+            this.mesh.position.y = Math.abs(Math.sin(this.animTimer * 14)) * 0.12;
+            this.leftLeg.rotation.x = Math.sin(this.animTimer * 14) * 0.8;
+            this.rightLeg.rotation.x = Math.sin(this.animTimer * 14 + Math.PI) * 0.8;
+            this.leftArm.rotation.x = Math.sin(this.animTimer * 14 + Math.PI) * 0.5;
+            this.rightArm.rotation.x = Math.sin(this.animTimer * 14) * 0.5;
+        }
+
         // Attack animation
         if (this.state === 'attacking') {
             const t = (this.animTimer % 0.5) / 0.5;
@@ -315,6 +324,23 @@ export class CharacterManager {
             return false;
         }
         return true;
+    }
+
+    // Manual WASD movement
+    manualMove(direction, isRunning, dt) {
+        const speed = this.moveSpeed * (isRunning ? 2.2 : 1.0) * dt;
+        this.mesh.position.x += direction.x * speed;
+        this.mesh.position.z += direction.z * speed;
+
+        // Clamp to map bounds
+        this.mesh.position.x = Math.max(-28, Math.min(28, this.mesh.position.x));
+        this.mesh.position.z = Math.max(-28, Math.min(28, this.mesh.position.z));
+
+        // Face the direction of movement
+        this.mesh.rotation.y = Math.atan2(direction.x, direction.z);
+
+        // Set state
+        this.state = isRunning ? 'running' : 'walking';
     }
 }
 
