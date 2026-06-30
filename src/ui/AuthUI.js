@@ -1,26 +1,66 @@
 // Auth UI — Login/Register/Guest screen
-import { signUp, signIn, signInAnonymously, getSession, getProfile } from '../network/SupabaseClient.js';
+import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount } from '../network/SupabaseClient.js';
 
 export class AuthUI {
     constructor(onAuthSuccess) {
         this.onAuthSuccess = onAuthSuccess;
         this.screen = document.getElementById('auth-screen');
         this.statusEl = document.getElementById('auth-status');
+        this._unsubOnlineCount = null;
+        this._isRegisterMode = false;
 
         this._setupButtons();
         this._createParticles();
+        this._subscribeOnlineCount();
         this._checkExistingSession();
     }
 
     _setupButtons() {
-        document.getElementById('btn-login').addEventListener('click', () => this._handleLogin());
-        document.getElementById('btn-register').addEventListener('click', () => this._handleRegister());
+        this._charnameEl = document.getElementById('auth-charname');
+        this._loginBtn = document.getElementById('btn-login');
+        this._registerBtn = document.getElementById('btn-register');
+
+        this._loginBtn.addEventListener('click', () => {
+            if (this._isRegisterMode) {
+                this._setMode(false);
+            } else {
+                this._handleLogin();
+            }
+        });
+
+        this._registerBtn.addEventListener('click', () => {
+            if (!this._isRegisterMode) {
+                this._setMode(true);
+            } else {
+                this._handleRegister();
+            }
+        });
+
         document.getElementById('btn-guest').addEventListener('click', () => this._handleGuest());
 
         // Enter key support
         document.getElementById('auth-password').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this._handleLogin();
+            if (e.key === 'Enter') {
+                if (this._isRegisterMode) {
+                    this._charnameEl.focus();
+                } else {
+                    this._handleLogin();
+                }
+            }
         });
+        this._charnameEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this._handleRegister();
+        });
+    }
+
+    _setMode(isRegister) {
+        this._isRegisterMode = isRegister;
+        this._charnameEl.style.display = isRegister ? '' : 'none';
+        if (!isRegister) this._charnameEl.value = '';
+        this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 Register';
+        this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ Login';
+        this._setStatus(isRegister ? 'Choose your character name!' : '', 'info');
+        if (isRegister) this._charnameEl.focus();
     }
 
     _createParticles() {
@@ -57,23 +97,23 @@ export class AuthUI {
     }
 
     async _handleLogin() {
-        const username = document.getElementById('auth-username').value.trim();
+        const input = document.getElementById('auth-username').value.trim();
         const password = document.getElementById('auth-password').value.trim();
-        if (!username || !password) {
-            this._setStatus('Please enter username and password', 'error');
+        if (!input || !password) {
+            this._setStatus('Please enter email/username and password', 'error');
             return;
         }
 
         this._setStatus('Logging in...', 'info');
         try {
-            const email = username.includes('@') ? username : `${username}@zolos.game`;
+            const email = input.includes('@') ? input : `${input}@zolos.game`;
             const data = await signIn(email, password);
             const profile = await getProfile(data.user.id);
             this._setStatus('Welcome back! ⚔️', 'success');
             setTimeout(() => {
                 this.onAuthSuccess({
                     userId: data.user.id,
-                    username: profile?.username || username,
+                    username: profile?.username || input,
                     isGuest: false,
                 });
                 this.hide();
@@ -88,10 +128,21 @@ export class AuthUI {
     }
 
     async _handleRegister() {
-        const username = document.getElementById('auth-username').value.trim();
+        const input = document.getElementById('auth-username').value.trim();
         const password = document.getElementById('auth-password').value.trim();
-        if (!username || !password) {
-            this._setStatus('Please enter username and password', 'error');
+        const charName = this._charnameEl.value.trim();
+
+        if (!input || !password) {
+            this._setStatus('Please enter email/username and password', 'error');
+            return;
+        }
+        if (!charName) {
+            this._setStatus('Please enter a character name', 'error');
+            this._charnameEl.focus();
+            return;
+        }
+        if (charName.length < 2 || charName.length > 16) {
+            this._setStatus('Character name must be 2-16 characters', 'error');
             return;
         }
         if (password.length < 6) {
@@ -101,13 +152,13 @@ export class AuthUI {
 
         this._setStatus('Creating account...', 'info');
         try {
-            const email = `${username}@zolos.game`;
-            const data = await signUp(email, password, username);
-            this._setStatus('Account created! Welcome, ' + username + '! ⚔️', 'success');
+            const email = input.includes('@') ? input : `${input}@zolos.game`;
+            const data = await signUp(email, password, charName);
+            this._setStatus('Account created! Welcome, ' + charName + '! ⚔️', 'success');
             setTimeout(() => {
                 this.onAuthSuccess({
                     userId: data.user.id,
-                    username,
+                    username: charName,
                     isGuest: false,
                 });
                 this.hide();
@@ -147,7 +198,19 @@ export class AuthUI {
                 : '#60a0ff';
     }
 
+    _subscribeOnlineCount() {
+        const el = document.getElementById('online-players-auth');
+        if (!el) return;
+        this._unsubOnlineCount = subscribeOnlineCount((count) => {
+            el.textContent = count;
+        });
+    }
+
     hide() {
+        if (this._unsubOnlineCount) {
+            this._unsubOnlineCount();
+            this._unsubOnlineCount = null;
+        }
         this.screen.style.display = 'none';
     }
 

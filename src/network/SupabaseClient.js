@@ -160,3 +160,37 @@ export function clearActiveSession() {
   localDb.set('active_session_user_id', null);
 }
 
+// ============ Realtime Online Count (Auth Screen) ============
+export function subscribeOnlineCount(callback) {
+  if (isOfflineMode || !supabase) {
+    // Simulate a fluctuating online count for offline mode
+    let fakeCount = 1 + Math.floor(Math.random() * 4);
+    callback(fakeCount);
+    const interval = setInterval(() => {
+      fakeCount = Math.max(1, fakeCount + (Math.random() > 0.5 ? 1 : -1));
+      callback(fakeCount);
+    }, 5000);
+    return () => clearInterval(interval);
+  }
+
+  const mainChannel = supabase.channel('online-players', {
+    config: { presence: { key: '_counter_' } }
+  });
+
+  mainChannel
+    .on('presence', { event: 'sync' }, () => {
+      const state = mainChannel.presenceState();
+      const count = Object.keys(state).filter(k => k !== '_counter_').length;
+      callback(count);
+    })
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[Zolos] 📊 Online count watcher subscribed');
+      }
+    });
+
+  return () => {
+    try { mainChannel.unsubscribe(); } catch (e) { /* ignore */ }
+  };
+}
+
