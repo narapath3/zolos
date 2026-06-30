@@ -291,6 +291,7 @@ export class SceneManager {
             vertexColors: true,
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
+        this.groundMesh = ground;
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         this.scene.add(ground);
@@ -843,6 +844,54 @@ export class SceneManager {
         this.scene.add(group);
         this.envObjects.push(group);
         this.npcMesh = group;
+    }
+
+    getMouseIntersection(event, monsters, npc) {
+        if (!this.canvas) return null;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+
+        const targets = [];
+
+        if (this.groundMesh) targets.push(this.groundMesh);
+        if (npc) targets.push(npc);
+        if (monsters && monsters.monsters) {
+            monsters.monsters.forEach(m => {
+                if (m.alive && m.mesh) {
+                    targets.push(m.mesh);
+                }
+            });
+        }
+
+        const intersects = raycaster.intersectObjects(targets, true);
+        if (intersects.length > 0) {
+            const hit = intersects[0];
+            let obj = hit.object;
+
+            while (obj) {
+                if (obj === npc) {
+                    return { type: 'npc', point: hit.point, object: npc };
+                }
+                if (monsters && monsters.monsters) {
+                    const matchedMonster = monsters.monsters.find(m => m.mesh === obj && m.alive);
+                    if (matchedMonster) {
+                        return { type: 'monster', point: hit.point, object: matchedMonster };
+                    }
+                }
+                obj = obj.parent;
+            }
+
+            if (hit.object === this.groundMesh) {
+                return { type: 'ground', point: hit.point };
+            }
+        }
+
+        return null;
     }
 
     // ============ Core Methods ============

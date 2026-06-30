@@ -83,10 +83,40 @@ async function initGame() {
         });
     }
 
+    // Setup canvas click listener for mouse movement and targeting
+    canvas.addEventListener('click', (event) => {
+        if (!combat || combat.autoFarm) return;
+        if (!character || !character.isAlive()) return;
+
+        const npc = sceneManager.getNPC();
+        const hit = sceneManager.getMouseIntersection(event, monsters, npc);
+        if (hit) {
+            if (hit.type === 'monster') {
+                character.targetMonster = hit.object;
+                character.targetNPC = null;
+                character.targetDest = null;
+                gameUI.addCombatLog(`🎯 Target lock: ${hit.object.data.name}`, 'system');
+            } else if (hit.type === 'npc') {
+                character.targetNPC = hit.object;
+                character.targetMonster = null;
+                character.targetDest = null;
+                gameUI.addCombatLog('🚶 Move to Kafra NPC...', 'system');
+            } else if (hit.type === 'ground') {
+                character.targetDest = hit.point;
+                character.targetMonster = null;
+                character.targetNPC = null;
+            }
+        }
+    });
+
     // Setup auto-farm button
     gameUI.setupAutoFarmButton(() => {
         const isActive = combat.toggleAutoFarm();
         if (isActive) {
+            // Clear mouse targets on auto-farm start
+            character.targetDest = null;
+            character.targetMonster = null;
+            character.targetNPC = null;
             gameUI.addCombatLog('⚡ Auto-Farm ACTIVATED!', 'system');
         } else {
             gameUI.addCombatLog('⏸️ Auto-Farm paused', 'system');
@@ -299,11 +329,66 @@ function gameLoop() {
 
     const dt = Math.min(sceneManager.getDelta(), 0.05); // Cap dt
 
-    // WASD Manual movement (only when auto-farm is off)
+    // WASD and Mouse manual movement (only when auto-farm is off)
     if (inputManager && !combat.autoFarm) {
         const dir = inputManager.getMovementDirection();
         if (dir) {
+            // Keyboard active — override and clear click targets
+            character.targetDest = null;
+            character.targetMonster = null;
+            character.targetNPC = null;
             character.manualMove(dir, inputManager.isRunning(), dt);
+        } else if (character.targetMonster) {
+            const m = character.targetMonster;
+            if (!m.alive) {
+                character.targetMonster = null;
+                if (character.state === 'walking' || character.state === 'running' || character.state === 'attacking') {
+                    character.state = 'idle';
+                }
+            } else {
+                const playerPos = character.getPosition();
+                const targetPos = m.getPosition();
+                const dist = playerPos.distanceTo(targetPos);
+
+                if (dist > combat.attackRange) {
+                    character.moveToward(targetPos, dt);
+                } else {
+                    if (character.state !== 'attacking') {
+                        character.state = 'attacking';
+                        character.animTimer = 0;
+                    }
+                    // Face target
+                    const dx = targetPos.x - playerPos.x;
+                    const dz = targetPos.z - playerPos.z;
+                    character.mesh.rotation.y = Math.atan2(dx, dz);
+
+                    // Perform attack
+                    if (combat.globalCooldown <= 0) {
+                        combat.currentTarget = m;
+                        combat._performAttack();
+                        combat.globalCooldown = character.attackCooldown;
+                    }
+                }
+            }
+        } else if (character.targetNPC) {
+            const npcPos = character.targetNPC.position;
+            const playerPos = character.getPosition();
+            const dist = playerPos.distanceTo(npcPos);
+
+            if (dist > 3.0) {
+                character.moveToward(npcPos, dt);
+            } else {
+                character.targetNPC = null;
+                character.state = 'idle';
+                const btnShop = document.getElementById('btn-shop');
+                if (btnShop) btnShop.click();
+            }
+        } else if (character.targetDest) {
+            const arrived = character.moveToward(character.targetDest, dt);
+            if (arrived) {
+                character.targetDest = null;
+                character.state = 'idle';
+            }
         } else if (character.state === 'walking' || character.state === 'running') {
             character.state = 'idle';
         }

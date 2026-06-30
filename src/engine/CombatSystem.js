@@ -32,7 +32,7 @@ export class CombatSystem {
         }
 
         if (!this.autoFarm) {
-            if (this.character.state !== 'idle') {
+            if (this.character.state === 'attacking' && this.character.animTimer >= 0.5) {
                 this.character.state = 'idle';
             }
             return;
