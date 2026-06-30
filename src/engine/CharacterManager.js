@@ -217,6 +217,11 @@ export class CharacterManager {
         this.stats.hp = Math.min(this.stats.max_hp, this.stats.hp + amount);
     }
 
+    // Restore SP
+    restoreSp(amount) {
+        this.stats.sp = Math.min(this.stats.max_sp, this.stats.sp + amount);
+    }
+
     // Is alive
     isAlive() {
         return this.stats.hp > 0;

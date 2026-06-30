@@ -49,7 +49,7 @@ async function initGame() {
     inputManager = new InputManager();
 
     // Init UI
-    gameUI = new GameUI();
+    gameUI = new GameUI(character, soundManager);
 
     // Load character from DB
     try {

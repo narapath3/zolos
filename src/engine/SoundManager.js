@@ -187,6 +187,38 @@ export class SoundManager {
         this._playNoiseBurst(ctx, t + 0.5, 0.3, this.masterVolume * 0.15, 3000, 8000);
     }
 
+    // ============ Use Item (Potion) Sound ============
+    playUseItemSound() {
+        if (!this.enabled) return;
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+
+        // Liquidy bubble sound (ascending frequency)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, t);
+        osc.frequency.exponentialRampToValueAtTime(1000, t + 0.15);
+        gain.gain.setValueAtTime(this.masterVolume * 0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.15);
+
+        // High sparkle ring
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1800, t + 0.05);
+        osc2.frequency.exponentialRampToValueAtTime(2500, t + 0.2);
+        gain2.gain.setValueAtTime(0.001, t);
+        gain2.gain.linearRampToValueAtTime(this.masterVolume * 0.2, t + 0.05);
+        gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc2.connect(gain2).connect(ctx.destination);
+        osc2.start(t);
+        osc2.stop(t + 0.2);
+    }
+
     // ============ Helpers ============
     _playNoiseBurst(ctx, startTime, duration, volume, lowFreq, highFreq) {
         const bufferSize = ctx.sampleRate * duration;

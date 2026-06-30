@@ -127,7 +127,34 @@
       </div>
       <div class="panel-body">
         <div class="gold-display">💰 <span id="gold-amount">0</span> Zeny</div>
+
+        <!-- RO-style Filter Tabs -->
+        <div class="inventory-tabs">
+          <button class="inv-tab active" data-tab="all">All</button>
+          <button class="inv-tab" data-tab="usable">Usable</button>
+          <button class="inv-tab" data-tab="etc">Etc</button>
+        </div>
+
         <div class="inventory-grid" id="inventory-grid"></div>
+
+        <!-- RO-style Item Details Area -->
+        <div id="item-detail-box" class="item-detail-box">
+          <div id="detail-placeholder" class="detail-placeholder">Click an item to view details</div>
+          <div id="detail-content" class="detail-content" style="display: none;">
+            <div class="detail-row">
+              <span id="detail-icon" class="detail-icon">📦</span>
+              <div class="detail-info-block">
+                <div id="detail-name" class="detail-name">Item Name</div>
+                <div id="detail-type" class="detail-type">Etc</div>
+              </div>
+            </div>
+            <div id="detail-desc" class="detail-desc">No description.</div>
+            <div class="detail-actions">
+              <span class="detail-price">Value: <span id="detail-price-val">0</span> z</span>
+              <button id="btn-use-item" class="btn-use-item" style="display: none;">Use</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

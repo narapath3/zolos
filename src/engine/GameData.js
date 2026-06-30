@@ -1,5 +1,30 @@
 // Game Data — Monster definitions, items, EXP curve, etc.
 
+// ============ ITEMS REGISTRY ============
+export const ITEMS = {
+    'Jellopy': { emoji: '💎', type: 'material', desc: 'เศษอัญมณีสีคริสตัลใสที่พบได้ชิ้นเล็กๆ นิยมนำมาใช้ทำยาและผลิตของมีค่า', price: 5 },
+    'Sticky Mucus': { emoji: '💧', type: 'material', desc: 'เมือกเหนียวที่เหนอะหนะ พบได้จากพวกลิงก์และสไลม์ นำไปเป็นสารเหนียวในการแปรรูป', price: 10 },
+    'Apple': { emoji: '🍎', type: 'consumable', desc: 'แอปเปิ้ลสีแดงรสหวานกรอบ ทานเพื่อฟื้นฟู HP +25 หน่วยทันที', price: 15, healHp: 25 },
+    'Clover': { emoji: '🍀', type: 'material', desc: 'ใบโคลเวอร์สี่แฉก สัญลักษณ์แห่งความโชคดี มักรวบรวมเพื่อนำไปประดิษฐ์เครื่องราง', price: 12 },
+    'Feather': { emoji: '🪶', type: 'material', desc: 'ขนนกสีขาวฟูนุ่ม น้ำหนักเบาจากตัว Lunatic เหมาะสำหรับทำหมวกแฟชั่นหรือเครื่องประดับ', price: 15 },
+    'Carrot': { emoji: '🥕', type: 'consumable', desc: 'แครอทสีส้มสด หัวผักกรุบกรอบ ทานเพื่อฟื้นฟู HP +35 หน่วยทันที', price: 20, healHp: 35 },
+    'Worm Peeling': { emoji: '🧬', type: 'material', desc: 'เปลือกผิวหนังชั้นนอกที่ลอกคราบของหนอน Fabre มีความเหนียวทนทาน', price: 18 },
+    'Green Herb': { emoji: '🌿', type: 'consumable', desc: 'สมุนไพรสีเขียวตามธรรมชาติ ทานเพื่อฟื้นฟู HP +45 หน่วยทันที', price: 30, healHp: 45 },
+    'Silk': { emoji: '🧵', type: 'material', desc: 'เส้นใยไหมธรรมชาติ ละเอียดอ่อนและมีความยืดหยุ่นสูง ใช้ถักทอเสื้อผ้าชั้นสูง', price: 50 },
+    'Grasshopper Leg': { emoji: '🦿', type: 'material', desc: 'ขาตั๊กแตน Rocker ขนาดใหญ่ แข็งแรงมาก นิยมนำไปศึกษาด้านพลังกระโดด', price: 25 },
+    'Scell': { emoji: '🪙', type: 'material', desc: 'แผ่นเปลือกนอกของแมลงที่หักเป็นรูปคล้ายเหรียญเกร็ด นำไปแลกเปลี่ยนหรือแปรรูป', price: 20 },
+    'Yellow Herb': { emoji: '🌾', type: 'consumable', desc: 'สมุนไพรโบราณสีเหลืองทอง ทานเพื่อฟื้นฟู HP +75 หน่วยทันที', price: 60, healHp: 75 },
+    'Tree Root': { emoji: '🪵', type: 'material', desc: 'รากไม้โบราณกิ่งก้านหนาของ Willow แข็งแกร่ง สามารถแปรรูปเป็นอาวุธไม้ได้', price: 25 },
+    'Wooden Heart': { emoji: '❤️‍🔥', type: 'material', desc: 'แกนกลางหัวใจไม้ที่มีพลังเวทมนตร์แฝงอยู่ นำไปทำเป็นยากลั่นหรือของวิเศษ', price: 80 },
+    'Red Herb': { emoji: '🌺', type: 'consumable', desc: 'สมุนไพรสีแดงเข้มสด ทานเพื่อฟื้นฟู HP +120 หน่วยทันที', price: 100, healHp: 120 },
+    'Grape': { emoji: '🍇', type: 'consumable', desc: 'องุ่นไร้เมล็ด สีม่วงฉ่ำน้ำ ทานเพื่อฟื้นฟู HP +60 หน่วย', price: 50, healHp: 60 },
+    'Poison Spore': { emoji: '☠️', type: 'material', desc: 'สปอร์พิษร้ายแรงสีม่วงหม่นจากเห็ดหรือมอนสเตอร์อันตราย', price: 40 },
+    'Blue Herb': { emoji: '💙', type: 'consumable', desc: 'สมุนไพรสีน้ำเงินหายากมาก ทานเพื่อฟื้นฟูพลังเวทมนตร์ SP +25 หน่วยทันที', price: 150, restoreSp: 25 },
+    'Orange Juice': { emoji: '🧃', type: 'consumable', desc: 'น้ำส้มคั้นสดกล่อง ฟื้นฟู HP +180 หน่วยทันที', price: 120, healHp: 180 },
+    'Sticky Webfoot': { emoji: '🦶', type: 'material', desc: 'พังผืดเท้าเหนียวๆ ของมอนสเตอร์ประเภทครึ่งบกครึ่งน้ำ', price: 35 },
+    'Crystal Blue': { emoji: '🔵', type: 'material', desc: 'แร่ธาตุน้ำตกผลึกสีน้ำเงิน ประกายประกายเย็นเยือก นิยมนำไปใช้ตีบวกอาวุธธาตุน้ำ', price: 250 }
+};
+
 // ============ MONSTERS ============
 export const MONSTERS = {
     poring: {
