@@ -984,13 +984,13 @@ export class GameUI {
       if (monster.loot && monster.loot.length > 0) {
         dropHtml = `<div class="wiki-section-title">🎁 Loot Drops / อัตราดรอป:</div><div class="wiki-drops-list">`;
         monster.loot.forEach(lootInfo => {
-          const itemMeta = ITEMS[lootInfo.item];
-          const emoji = itemMeta?.emoji || '📦';
+          const itemMeta = ITEMS[lootInfo.name];
+          const emoji = itemMeta?.emoji || lootInfo.emoji || '📦';
           const rarity = itemMeta?.rarity || 'common';
           const pct = (lootInfo.chance * 100).toFixed(1);
           dropHtml += `
             <div class="wiki-drop-item">
-              <span class="color-${rarity}">${emoji} ${lootInfo.item}</span>
+              <span class="color-${rarity}">${emoji} ${lootInfo.name}</span>
               <span style="color:#20e060">${pct}%</span>
             </div>
           `;
@@ -1000,17 +1000,21 @@ export class GameUI {
         dropHtml = `<div class="wiki-section-title">🎁 Loot Drops:</div><div style="font-size:11px;color:var(--text-dim)">No drops</div>`;
       }
 
+      // Calculate an approximate level based on stats since it's not explicitly in DB
+      const approxLevel = Math.max(1, Math.floor(monster.hp / 20) + Math.floor(monster.atk / 4));
+      const goldText = (typeof monster.gold === 'object') ? (monster.gold.min + ' - ' + monster.gold.max) : monster.gold;
+
       content.innerHTML = `
         <div class="detail-row">
           <span class="detail-icon" style="background:${monster.color}22">${monster.emoji || '👾'}</span>
           <div class="detail-info-block">
             <div class="wiki-detail-title">${monster.name}</div>
-            <div class="detail-type" style="color:#ff6080">Monster (Lv.${monster.level})</div>
+            <div class="detail-type" style="color:#ff6080">Monster (Lv.${approxLevel})</div>
           </div>
         </div>
         <div class="detail-desc" style="margin-top:8px">
-          HP: ${monster.hp} | ATK: ${monster.atk} | DEF: ${monster.def}<br/>
-          EXP Gain: ${monster.exp} | Zeny: ${monster.gold}<br/>
+          HP: ${monster.hp} | ATK: ${monster.atk} | DEF: ${monster.def}<br />
+          EXP Gain: ${monster.exp} | Zeny: ${goldText}<br />
           Area: ${monster.waterOnly ? 'Water Zone' : 'Land Area'}
         </div>
         ${dropHtml}
@@ -1023,10 +1027,10 @@ export class GameUI {
       let statsHtml = '';
       if (item.atkBonus || item.defBonus || item.hpBonus || item.spBonus) {
         statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div><div class="detail-desc">`;
-        if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br/>`;
-        if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br/>`;
-        if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br/>`;
-        if (item.spBonus) statsHtml += `💙 SP Bonus: +${item.spBonus}<br/>`;
+        if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br />`;
+        if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br />`;
+        if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br />`;
+        if (item.spBonus) statsHtml += `💙 SP Bonus: +${item.spBonus}<br />`;
         statsHtml += `</div>`;
       }
 
@@ -1044,7 +1048,7 @@ export class GameUI {
       });
 
       if (droppers.length > 0) {
-        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
+        droppedByHtml = `< div class="wiki-section-title" >👾 Dropped By / ได้จากมอนสเตอร์:</div > <div class="wiki-drops-list">`;
         droppers.forEach(d => {
           droppedByHtml += `
             <div class="wiki-drop-item">
@@ -1057,7 +1061,7 @@ export class GameUI {
       }
 
       content.innerHTML = `
-        <div class="detail-row">
+          <div class="detail-row">
           <span class="detail-icon">${item.emoji || '📦'}</span>
           <div class="detail-info-block">
             <div class="wiki-detail-title color-${item.rarity || 'common'}">${key}</div>
@@ -1065,7 +1069,7 @@ export class GameUI {
           </div>
         </div>
         <div class="detail-desc" style="margin-top:8px">
-          ${item.desc}<br/>
+          ${item.desc}<br />
           <span style="color:#d0d040">Zeny Price: ${item.price}z</span>
         </div>
         ${statsHtml}
