@@ -70,6 +70,9 @@ export const ITEMS = {
     'Bow': { emoji: '🏹', type: 'weapon', rarity: 'rare', desc: 'ธนูไม้ดัดที่มีความยืดหยุ่นสูง เพิ่มพลังโจมตี ATK +10 และฟื้นฟู SP +10 หน่วยเมื่อสวมใส่', price: 250, atkBonus: 10, spBonus: 10 },
     'Gun': { emoji: '🔫', type: 'weapon', rarity: 'rare', desc: 'ปืนสั้นกลไกสไตล์กัปตัน เพิ่มพลังโจมตี ATK +22 หน่วยเมื่อสวมใส่', price: 400, atkBonus: 22 },
     'Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'rare', desc: 'เบ็ดตกปลาไม้ไผ่ ช่วยให้สามารถทำ Auto-Fishing บริเวณริมแม่น้ำได้ (ATK +2)', price: 150, atkBonus: 2, isFishingRod: true },
+    'Sunglasses': { emoji: '🕶️', type: 'glasses', rarity: 'rare', desc: 'แว่นกันแดดสีดำสุดคูล ปิดบังดวงตาเสริมคาริสมาแสดงออกให้ดูเท่แบบลับๆ', price: 300 },
+    'Classic Glasses': { emoji: '👓', type: 'glasses', rarity: 'rare', desc: 'แว่นตากรอบแดงสไตล์แอคเดมิค เลนส์ใสสบายตา เพิ่มสติปัญญาและรูปลักษณ์ที่ดูเชื่อถือ', price: 350 },
+    'Cowboy Hat': { emoji: '🤠', type: 'hat', rarity: 'rare', desc: 'หมวกคาวบอยหนังสีน้ำตาลเข้ม ปีกกว้างกันแดดลม สไตล์ตะวันตกดุดัน', price: 400 },
     'Adventurer Suit': { emoji: '🥋', type: 'armor', rarity: 'rare', desc: 'ชุดนักผจญภัยหนังสลักลาย เดินตะคุยมอนสเตอร์เหนียวแน่นปลอดภัย (DEF +8, HP +80)', price: 800, defBonus: 8, hpBonus: 80 },
     'Iron Shield': { emoji: '🛡️', type: 'shield', rarity: 'rare', desc: 'โล่ทำจากแผ่นเหล็กหนาร่วมตอกหมุด ทนแรงกระแทกจากเขาควายได้ยอด (DEF +12)', price: 750, defBonus: 12 },
     'Mage Staff': { emoji: '🪄', type: 'weapon', rarity: 'rare', desc: 'ไม้เท้าแอปเปิ้ลโอ๊คร่ายเวท ส่งประกายคาถามินิ (ATK +8, SP +30)', price: 600, atkBonus: 8, spBonus: 30 },
@@ -97,6 +100,8 @@ export const ITEMS = {
     'Gorgon Ring': { emoji: '💍', type: 'armor', rarity: 'epic', desc: 'แหวนดวงตาพิศวง ช่วยสะกดทนของศัตรู ล้อมเขตพลังรอบตัวป้องกัน (DEF +5, HP +200)', price: 4200, defBonus: 5, hpBonus: 200 },
     'Gold Earring': { emoji: '💎', type: 'armor', rarity: 'epic', desc: 'ตุ้มหูทองอัญมณีฟ้าเปล่งประกาย สุขกุมหัวใจและเสริมพลังชีวิต (DEF +3, HP +120)', price: 3500, defBonus: 3, hpBonus: 120 },
     'Shadow Garment': { emoji: '🧥', type: 'armor', rarity: 'epic', desc: 'ผ้าคลุมทอจากด้ายรัตติกาลลี้ลับ ช่วยอำพรางร่องผัดขัดเกลา (DEF +15, HP +180)', price: 4500, defBonus: 15, hpBonus: 180 },
+    'Wizard Hat': { emoji: '🧙', type: 'hat', rarity: 'epic', desc: 'หมวกพ่อมดสีม่วงเข้มยอดแหลมพร้อมริบบิ้นทอง แฝงแสงเวทมนตร์อาถรรพ์ เสริมพลังเวทมนตร์', price: 2000 },
+    'Crown': { emoji: '👑', type: 'hat', rarity: 'epic', desc: 'มงกุฎทองคำประดับยอดแหลม 6 แฉก สง่างามราวกษัตริย์ผู้ปกครองสรรพสิ่ง', price: 5000 },
 
     // ---- 9 LEGENDARY ITEMS ----
     'Pure Emperium': { emoji: '🔮', type: 'material', rarity: 'legendary', desc: 'ผลึกทองคำเทวทูตแร่สูงสุดใช้คราฟท์ของเทพ ก่อกำเนิดประกายออร่ากิลด์บึน', price: 5000 },
@@ -153,6 +158,7 @@ export const MONSTERS = {
             { name: 'Clover', emoji: '🍀', type: 'material', chance: 0.5 },
             { name: 'Feather', emoji: '🪶', type: 'material', chance: 0.3 },
             { name: 'Carrot', emoji: '🥕', type: 'consumable', chance: 0.15 },
+            { name: 'Sunglasses', emoji: '🕶️', type: 'glasses', chance: 0.02 },
         ]
     },
     fabre: {
@@ -189,6 +195,7 @@ export const MONSTERS = {
             { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.5 },
             { name: 'Yellow Herb', emoji: '🌾', type: 'consumable', chance: 0.2 },
             { name: 'Tough Vine', emoji: '🪢', type: 'material', chance: 0.05 },
+            { name: 'Classic Glasses', emoji: '👓', type: 'glasses', chance: 0.02 },
         ]
     },
     willow: {
@@ -207,6 +214,7 @@ export const MONSTERS = {
             { name: 'Tree Root', emoji: '🪵', type: 'material', chance: 0.5 },
             { name: 'Wooden Heart', emoji: '❤️‍🔥', type: 'material', chance: 0.1 },
             { name: 'Red Herb', emoji: '🌺', type: 'consumable', chance: 0.25 },
+            { name: 'Cowboy Hat', emoji: '🤠', type: 'hat', chance: 0.03 },
         ]
     },
     poporing: {
@@ -261,7 +269,8 @@ export const MONSTERS = {
             { name: 'Devil Horn', emoji: '😈', type: 'material', chance: 0.3 },
             { name: 'Coal', emoji: '🖤', type: 'material', chance: 0.4 },
             { name: 'Silver Ring', emoji: '💍', type: 'armor', chance: 0.05 },
-            { name: 'Katana', emoji: '⚔️', type: 'weapon', chance: 0.02 }
+            { name: 'Katana', emoji: '⚔️', type: 'weapon', chance: 0.02 },
+            { name: 'Wizard Hat', emoji: '🧙', type: 'hat', chance: 0.03 },
         ]
     },
     ghostring: {
@@ -281,7 +290,8 @@ export const MONSTERS = {
             { name: 'Pure Emperium', emoji: '🔮', type: 'material', chance: 0.08 },
             { name: 'Yggdrasil Berry', emoji: '🍇', type: 'consumable', chance: 0.05 },
             { name: 'Excalibur', emoji: '🗡️', type: 'weapon', chance: 0.01 },
-            { name: 'Ragnarok Blade', emoji: '🔱', type: 'weapon', chance: 0.002 } // Ultra rare mythic
+            { name: 'Ragnarok Blade', emoji: '🔱', type: 'weapon', chance: 0.002 }, // Ultra rare mythic
+            { name: 'Crown', emoji: '👑', type: 'hat', chance: 0.01 },
         ]
     }
 };
@@ -322,6 +332,7 @@ export const PAYON_MONSTERS = {
             { name: 'Animal Skin', emoji: '🥩', type: 'material', chance: 0.45 },
             { name: 'Tough Vine', emoji: '🪢', type: 'material', chance: 0.25 },
             { name: 'Honey', emoji: '🍯', type: 'consumable', chance: 0.15 },
+            { name: 'Cowboy Hat', emoji: '🤠', type: 'hat', chance: 0.04 },
         ]
     },
     boa: {
@@ -395,7 +406,9 @@ export const PAYON_MONSTERS = {
             { name: 'Nine Tail Fur', emoji: '🦊', type: 'material', chance: 0.4 },
             { name: 'Gilding Ingot', emoji: '🧱', type: 'material', chance: 0.1 },
             { name: 'Ranger Hood', emoji: '🦹', type: 'armor', chance: 0.04 },
-            { name: 'Rudra Bow', emoji: '🏹', type: 'weapon', chance: 0.01 }
+            { name: 'Rudra Bow', emoji: '🏹', type: 'weapon', chance: 0.01 },
+            { name: 'Wizard Hat', emoji: '🧙', type: 'hat', chance: 0.02 },
+            { name: 'Sunglasses', emoji: '🕶️', type: 'glasses', chance: 0.03 },
         ]
     }
 };
@@ -472,7 +485,8 @@ export const WATER_MONSTERS = {
         loot: [
             { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.4 },
             { name: 'Green Herb', emoji: '🌿', type: 'consumable', chance: 0.25 },
-            { name: 'Copper Coin', emoji: '🪙', type: 'material', chance: 0.1 }, // mapped as Scell in drops
+            { name: 'Copper Coin', emoji: '🪙', type: 'material', chance: 0.1 },
+            { name: 'Classic Glasses', emoji: '👓', type: 'glasses', chance: 0.03 },
         ]
     },
     marina: {
@@ -492,7 +506,8 @@ export const WATER_MONSTERS = {
             { name: 'Squid Ink', emoji: '🖤', type: 'material', chance: 0.45 },
             { name: 'Pointed Scale', emoji: '🦈', type: 'material', chance: 0.3 },
             { name: 'Crystal Blue', emoji: '🔵', type: 'material', chance: 0.12 },
-            { name: 'Tear Shield', emoji: '🛡️', type: 'shield', chance: 0.03 }
+            { name: 'Tear Shield', emoji: '🛡️', type: 'shield', chance: 0.03 },
+            { name: 'Crown', emoji: '👑', type: 'hat', chance: 0.02 },
         ]
     }
 };

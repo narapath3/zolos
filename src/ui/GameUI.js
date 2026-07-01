@@ -837,15 +837,55 @@ export class GameUI {
         if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
         if (pantsInput) pantsInput.value = hexToStr(this.character.pantsColor || 0x3a3a5a);
         if (hairInput) hairInput.value = hexToStr(this.character.hairColor || 0xc04040);
-        if (hatSelect) hatSelect.value = this.character.equippedHat || 'None';
-        if (glassesSelect) glassesSelect.value = this.character.equippedGlasses || 'None';
 
-        // Set weapon dropdown to currently equipped weapon
+        // --- Dynamically populate weapon dropdown from inventory ---
         if (weaponSelect) {
-          const equippedWeapon = this.inventory.find(i =>
-            (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true
+          // Keep 'None' default, clear added options
+          weaponSelect.innerHTML = '<option value="None">👊 None / มือเปล่า</option>';
+          const weaponItems = (this.inventory || []).filter(i =>
+            i.item_type === 'weapon' || i.item_type === 'fishing_rod'
           );
+          const emojiMap = { 'Sword': '⚔️', 'Bow': '🏹', 'Gun': '🔫', 'Fishing Rod': '🎣', 'Katana': '⚔️', 'Crossbow': '🏹', 'Silver Dagger': '🗡️', 'Heavy Warhammer': '🔨', 'Excalibur': '🗡️', 'Rudra Bow': '🏹', 'Ragnarok Blade': '🔱', 'Novice Cutter': '🔪', 'Mage Staff': '🪄' };
+          weaponItems.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.item_name;
+            const em = emojiMap[i.item_name] || '⚔️';
+            opt.textContent = `${em} ${i.item_name}`;
+            weaponSelect.appendChild(opt);
+          });
+          // Select current weapon
+          const equippedWeapon = weaponItems.find(i => i.stats && i.stats.equipped === true);
           weaponSelect.value = equippedWeapon ? equippedWeapon.item_name : 'None';
+        }
+
+        // --- Dynamically populate hat dropdown from inventory ---
+        if (hatSelect) {
+          hatSelect.innerHTML = '<option value="None">❌ None / ไม่ใส่</option>';
+          const hatEmojiMap = { 'Wizard Hat': '🧙', 'Crown': '👑', 'Cowboy Hat': '🤠' };
+          const hatItems = (this.inventory || []).filter(i => i.item_type === 'hat');
+          hatItems.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.item_name;
+            const em = hatEmojiMap[i.item_name] || '🎩';
+            opt.textContent = `${em} ${i.item_name}`;
+            hatSelect.appendChild(opt);
+          });
+          hatSelect.value = this.character.equippedHat || 'None';
+        }
+
+        // --- Dynamically populate glasses dropdown from inventory ---
+        if (glassesSelect) {
+          glassesSelect.innerHTML = '<option value="None">❌ None / ไม่ใส่</option>';
+          const glassesEmojiMap = { 'Sunglasses': '🕶️', 'Classic Glasses': '👓' };
+          const glassesItems = (this.inventory || []).filter(i => i.item_type === 'glasses');
+          glassesItems.forEach(i => {
+            const opt = document.createElement('option');
+            opt.value = i.item_name;
+            const em = glassesEmojiMap[i.item_name] || '👓';
+            opt.textContent = `${em} ${i.item_name}`;
+            glassesSelect.appendChild(opt);
+          });
+          glassesSelect.value = this.character.equippedGlasses || 'None';
         }
       }
 
