@@ -1217,6 +1217,7 @@ export class GameUI {
         cave: 'Cave / ในถ้ำ 🪨',
         mountain: 'Mountain / ภูเขา 🏔️'
       };
+      const envName = envDict[monster.environment] || monster.environment || 'Unknown';
       content.innerHTML = `
         <div class="detail-row">
           <span class="detail-icon" style="background:${monster.color}22">${monster.emoji || '👾'}</span>
@@ -1240,7 +1241,7 @@ export class GameUI {
       // Equip stats details
       let statsHtml = '';
       if (item.atkBonus || item.defBonus || item.hpBonus || item.spBonus) {
-        statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div> <div class="detail-desc">`;
+        statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div><div class="detail-desc">`;
         if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br />`;
         if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br />`;
         if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br />`;
@@ -1263,7 +1264,7 @@ export class GameUI {
       });
 
       if (droppers.length > 0) {
-        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div> <div class="wiki-drops-list">`;
+        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
         droppers.forEach(d => {
           droppedByHtml += `
             <div class="wiki-drop-item">
