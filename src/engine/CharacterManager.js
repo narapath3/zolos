@@ -1,6 +1,6 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS } from './GameData.js';
 
 export class CharacterManager {
     constructor(scene) {
@@ -41,10 +41,14 @@ export class CharacterManager {
         };
 
         this.equippedWeapon = null;
+        this.equippedArmor = null;
+        this.equippedShield = null;
 
-        // Custom property getters for base stats + weapon bonuses
+        // Custom property getters for base stats + equipment bonuses
         this.stats._baseAtk = 10;
         this.stats._baseMaxSp = 50;
+        this.stats._baseMaxHp = 100;
+        this.stats._baseDef = 5;
 
         Object.defineProperty(this.stats, 'atk', {
             get: () => {
@@ -60,11 +64,35 @@ export class CharacterManager {
 
         Object.defineProperty(this.stats, 'max_sp', {
             get: () => {
-                const bonus = this.getWeaponSpBonus(this.equippedWeapon);
+                const bonus = this.getWeaponSpBonus(this.equippedWeapon) + this.getArmorSpBonus(this.equippedArmor);
                 return this.stats._baseMaxSp + bonus;
             },
             set: (val) => {
                 this.stats._baseMaxSp = val;
+            },
+            configurable: true,
+            enumerable: true
+        });
+
+        Object.defineProperty(this.stats, 'max_hp', {
+            get: () => {
+                const bonus = this.getArmorHpBonus(this.equippedArmor);
+                return this.stats._baseMaxHp + bonus;
+            },
+            set: (val) => {
+                this.stats._baseMaxHp = val;
+            },
+            configurable: true,
+            enumerable: true
+        });
+
+        Object.defineProperty(this.stats, 'def', {
+            get: () => {
+                const bonus = this.getArmorDefBonus(this.equippedArmor) + this.getShieldDefBonus(this.equippedShield);
+                return this.stats._baseDef + bonus;
+            },
+            set: (val) => {
+                this.stats._baseDef = val;
             },
             configurable: true,
             enumerable: true
@@ -76,17 +104,33 @@ export class CharacterManager {
     }
 
     getWeaponAtkBonus(weaponName) {
-        if (!weaponName) return 0;
-        if (weaponName === 'Sword') return 15;
-        if (weaponName === 'Bow') return 10;
-        if (weaponName === 'Gun') return 22;
-        if (weaponName === 'Fishing Rod') return 2;
-        return 0;
+        if (!weaponName || !ITEMS[weaponName]) return 0;
+        return ITEMS[weaponName].atkBonus || 0;
     }
 
     getWeaponSpBonus(weaponName) {
-        if (weaponName === 'Bow') return 10;
-        return 0;
+        if (!weaponName || !ITEMS[weaponName]) return 0;
+        return ITEMS[weaponName].spBonus || 0;
+    }
+
+    getArmorSpBonus(armorName) {
+        if (!armorName || !ITEMS[armorName]) return 0;
+        return ITEMS[armorName].spBonus || 0;
+    }
+
+    getArmorHpBonus(armorName) {
+        if (!armorName || !ITEMS[armorName]) return 0;
+        return ITEMS[armorName].hpBonus || 0;
+    }
+
+    getArmorDefBonus(armorName) {
+        if (!armorName || !ITEMS[armorName]) return 0;
+        return ITEMS[armorName].defBonus || 0;
+    }
+
+    getShieldDefBonus(shieldName) {
+        if (!shieldName || !ITEMS[shieldName]) return 0;
+        return ITEMS[shieldName].defBonus || 0;
     }
 
     getAttackRange() {

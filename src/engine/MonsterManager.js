@@ -49,11 +49,80 @@ class Monster {
 
         // Main body (slime-like shape)
         const bodyGeo = new THREE.SphereGeometry(this.data.size * 0.5, 8, 6);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: this.data.color });
+        const bodyMat = new THREE.MeshLambertMaterial({
+            color: this.data.color,
+            transparent: this.type === 'ghostring',
+            opacity: this.type === 'ghostring' ? 0.6 : 1.0
+        });
         this.bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
         this.bodyMesh.position.y = this.data.size * 0.4;
         this.bodyMesh.castShadow = true;
         this.mesh.add(this.bodyMesh);
+
+        // Feature decorations
+        if (this.type === 'lunatic') {
+            // rabbit ears
+            const earGeo = new THREE.BoxGeometry(0.06, 0.25, 0.04);
+            const earMat = new THREE.MeshLambertMaterial({ color: 0xffe0f0 });
+            const earL = new THREE.Mesh(earGeo, earMat);
+            earL.position.set(-0.1, this.data.size * 0.5, 0);
+            earL.rotation.z = 0.2;
+            this.bodyMesh.add(earL);
+
+            const earR = new THREE.Mesh(earGeo, earMat);
+            earR.position.set(0.1, this.data.size * 0.5, 0);
+            earR.rotation.z = -0.2;
+            this.bodyMesh.add(earR);
+        } else if (this.type === 'willow') {
+            // wooden branches/horns
+            const branchGeo = new THREE.BoxGeometry(0.08, 0.4, 0.08);
+            const branchMat = new THREE.MeshLambertMaterial({ color: 0x5a3713 });
+            const branch = new THREE.Mesh(branchGeo, branchMat);
+            branch.position.set(0, this.data.size * 0.55, 0);
+            this.bodyMesh.add(branch);
+        } else if (this.type === 'deviruchi') {
+            // devil horns
+            const hornGeo = new THREE.ConeGeometry(0.06, 0.2, 4);
+            const hornMat = new THREE.MeshLambertMaterial({ color: 0x220022 });
+            const hornL = new THREE.Mesh(hornGeo, hornMat);
+            hornL.position.set(-0.12, this.data.size * 0.45, 0);
+            hornL.rotation.z = 0.3;
+            this.bodyMesh.add(hornL);
+
+            const hornR = new THREE.Mesh(hornGeo, hornMat);
+            hornR.position.set(0.12, this.data.size * 0.45, 0);
+            hornR.rotation.z = -0.3;
+            this.bodyMesh.add(hornR);
+        } else if (this.type === 'crab') {
+            // crab claws
+            const clawGeo = new THREE.BoxGeometry(0.16, 0.1, 0.12);
+            const clawMat = new THREE.MeshLambertMaterial({ color: 0xff4040 });
+
+            const clawL = new THREE.Mesh(clawGeo, clawMat);
+            clawL.position.set(-0.25, 0, 0.2);
+            this.bodyMesh.add(clawL);
+
+            const clawR = new THREE.Mesh(clawGeo, clawMat);
+            clawR.position.set(0.25, 0, 0.2);
+            this.bodyMesh.add(clawR);
+        } else if (this.type === 'fish' || this.type === 'shrimp') {
+            // back fin tail
+            const finGeo = new THREE.ConeGeometry(0.1, 0.28, 4);
+            const finMat = new THREE.MeshLambertMaterial({ color: this.data.color });
+            const fin = new THREE.Mesh(finGeo, finMat);
+            fin.position.set(0, 0, -this.data.size * 0.45);
+            fin.rotation.x = Math.PI / 2;
+            this.bodyMesh.add(fin);
+        } else if (this.type === 'marina') {
+            // tentacles
+            const tentacleGeo = new THREE.CylinderGeometry(0.04, 0.02, 0.25, 4);
+            const tentacleMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            for (let i = -1; i <= 1; i++) {
+                const tentacle = new THREE.Mesh(tentacleGeo, tentacleMat);
+                tentacle.position.set(i * 0.15, -this.data.size * 0.35, 0);
+                this.bodyMesh.add(tentacle);
+            }
+        }
 
         // Eyes
         const eyeGeo = new THREE.SphereGeometry(0.06, 6, 6);

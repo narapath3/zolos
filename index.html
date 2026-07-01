@@ -131,6 +131,10 @@
         <span>👥</span>
         <small>Online</small>
       </button>
+      <button class="hud-btn" id="btn-wiki" title="Wiki">
+        <span>📖</span>
+        <small>Wiki</small>
+      </button>
       <button class="hud-btn" id="btn-logout" title="Logout">
         <span>🚪</span>
         <small>Logout</small>
@@ -237,6 +241,39 @@
         <button class="panel-close" data-close="players-panel">✕</button>
       </div>
       <div class="panel-body" id="players-body"></div>
+    </div>
+
+    <!-- Wiki Panel -->
+    <div id="wiki-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>📖 Game Wiki</h3>
+        <button class="panel-close" data-close="wiki-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <!-- Tab Selectors -->
+        <div class="wiki-tabs">
+          <button class="wiki-tab active" data-tab="monsters">Monsters</button>
+          <button class="wiki-tab" data-tab="items">Items</button>
+        </div>
+
+        <!-- Search bar -->
+        <div class="wiki-search-box">
+          <input type="text" id="wiki-search-input" placeholder="🔍 ค้นหาอาวุธ มอนสเตอร์..." autocomplete="off">
+        </div>
+
+        <div class="wiki-main-container">
+          <!-- List grid -->
+          <div id="wiki-list" class="wiki-list"></div>
+
+          <!-- Detail box -->
+          <div id="wiki-detail-box" class="wiki-detail-box">
+            <div id="wiki-detail-placeholder" class="detail-placeholder">คลิกสิ่งใดเพื่อดูรายละเอียด</div>
+            <div id="wiki-detail-content" class="detail-content" style="display: none;">
+              <!-- filled dynamically by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Combat Log -->

@@ -1,5 +1,5 @@
 // Game UI — HUD, panels, combat log, and all in-game UI
-import { getExpRequired, ITEMS, SHOP_ITEMS } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, SHOP_ITEMS, MONSTERS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats } from '../network/GameSync.js';
 
 export class GameUI {
@@ -23,6 +23,7 @@ export class GameUI {
     this._setupPanels();
     this._setupROInventoryEvents();
     this._setupShopEvents();
+    this._setupWiki();
   }
 
   show() {
@@ -46,6 +47,13 @@ export class GameUI {
       this._refreshLeaderboard();
     });
     document.getElementById('btn-players-list').addEventListener('click', () => this._togglePanel('players-panel'));
+    const btnWiki = document.getElementById('btn-wiki');
+    if (btnWiki) {
+      btnWiki.addEventListener('click', () => {
+        this._togglePanel('wiki-panel');
+        this._renderWiki();
+      });
+    }
 
     // Close buttons
     document.querySelectorAll('.panel-close').forEach(btn => {
@@ -226,6 +234,7 @@ export class GameUI {
       item_type: item.item_type || meta?.type || 'material',
       quantity: item.quantity,
       emoji: meta?.emoji || item.emoji || '📦',
+      rarity: meta?.rarity || 'common',
       desc: meta?.desc || 'ไม่มีข้อมูลรายละเอียดสเตตัสเพิ่มเติมสำหรับไอเทมสไตล์ RO ชิ้นนี้',
       price: meta?.price || 10,
       healHp: meta?.healHp || 0,
@@ -240,12 +249,26 @@ export class GameUI {
       const rawInv = await loadInventory(characterId);
       this.inventory = rawInv.map(i => this._enrichItem(i));
 
-      // Auto equip weapon on load if present in inventory
-      const equippedItem = this.inventory.find(i => i.stats && i.stats.equipped === true);
-      if (equippedItem && this.character) {
-        this.character.equipWeapon(equippedItem.item_name);
+      // Auto equip equipment on load if present in inventory
+      const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
+      if (equippedWeapon && this.character) {
+        this.character.equipWeapon(equippedWeapon.item_name);
       } else if (this.character) {
         this.character.equipWeapon(null);
+      }
+
+      const equippedArmor = this.inventory.find(i => i.item_type === 'armor' && i.stats && i.stats.equipped === true);
+      if (equippedArmor && this.character) {
+        this.character.equippedArmor = equippedArmor.item_name;
+      } else if (this.character) {
+        this.character.equippedArmor = null;
+      }
+
+      const equippedShield = this.inventory.find(i => i.item_type === 'shield' && i.stats && i.stats.equipped === true);
+      if (equippedShield && this.character) {
+        this.character.equippedShield = equippedShield.item_name;
+      } else if (this.character) {
+        this.character.equippedShield = null;
       }
     } catch (e) {
       console.error('Failed to load inventory:', e);
@@ -290,7 +313,7 @@ export class GameUI {
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
     } else if (this.currentTab === 'equip') {
-      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod'].includes(i.item_type));
+      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield'].includes(i.item_type));
     } else if (this.currentTab === 'etc') {
       filtered = this.inventory.filter(i => i.item_type === 'material');
     }
@@ -306,6 +329,9 @@ export class GameUI {
         const isEquipped = item.stats && item.stats.equipped === true;
         if (isEquipped) {
           slot.classList.add('equipped');
+        }
+        if (item.rarity) {
+          slot.classList.add(`rarity-${item.rarity}`);
         }
 
         slot.innerHTML = `
@@ -355,7 +381,12 @@ export class GameUI {
     content.style.display = 'block';
 
     document.getElementById('detail-icon').textContent = item.emoji;
-    document.getElementById('detail-name').textContent = item.item_name;
+    const nameEl = document.getElementById('detail-name');
+    nameEl.textContent = item.item_name;
+    nameEl.className = 'detail-name';
+    if (item.rarity) {
+      nameEl.classList.add(`color-${item.rarity}`);
+    }
 
     let typeStr = 'Etc. Item';
     if (item.item_type === 'consumable') {
@@ -364,6 +395,10 @@ export class GameUI {
       typeStr = 'Weapon';
     } else if (item.item_type === 'fishing_rod') {
       typeStr = 'Fishing Tool';
+    } else if (item.item_type === 'armor') {
+      typeStr = 'Armor';
+    } else if (item.item_type === 'shield') {
+      typeStr = 'Shield';
     }
     document.getElementById('detail-type').textContent = typeStr;
     document.getElementById('detail-desc').textContent = item.desc;
@@ -373,7 +408,7 @@ export class GameUI {
     if (item.item_type === 'consumable') {
       useBtn.style.display = 'block';
       useBtn.textContent = `ใช้งาน (x${item.quantity})`;
-    } else if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
+    } else if (['weapon', 'fishing_rod', 'armor', 'shield'].includes(item.item_type)) {
       useBtn.style.display = 'block';
       const isEquipped = item.stats && item.stats.equipped === true;
       useBtn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
@@ -390,7 +425,7 @@ export class GameUI {
 
     const item = this.inventory[itemIdx];
 
-    if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
+    if (['weapon', 'fishing_rod', 'armor', 'shield'].includes(item.item_type)) {
       await this._toggleEquipItem(item);
       return;
     }
@@ -447,15 +482,27 @@ export class GameUI {
     if (isEquipped) {
       // Unequip
       item.stats.equipped = false;
-      this.character.equipWeapon(null);
+      if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
+        this.character.equipWeapon(null);
+      } else if (item.item_type === 'armor') {
+        this.character.equippedArmor = null;
+      } else if (item.item_type === 'shield') {
+        this.character.equippedShield = null;
+      }
       if (this.characterId) {
         await updateInventoryItemStats(this.characterId, item.item_name, {});
       }
       this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
     } else {
-      // Un-equip any currently equipped weapon
+      // Un-equip any currently equipped item of the SAME slot type
       for (const otherItem of this.inventory) {
-        if ((otherItem.item_type === 'weapon' || otherItem.item_type === 'fishing_rod') && otherItem.stats && otherItem.stats.equipped === true) {
+        let isSameSlot = false;
+        if ((item.item_type === 'weapon' || item.item_type === 'fishing_rod') && (otherItem.item_type === 'weapon' || otherItem.item_type === 'fishing_rod')) {
+          isSameSlot = true;
+        } else if (item.item_type === otherItem.item_type) {
+          isSameSlot = true;
+        }
+        if (isSameSlot && otherItem.stats && otherItem.stats.equipped === true) {
           otherItem.stats.equipped = false;
           if (this.characterId) {
             await updateInventoryItemStats(this.characterId, otherItem.item_name, {});
@@ -463,10 +510,16 @@ export class GameUI {
         }
       }
 
-      // Equip new weapon
+      // Equip new item
       if (!item.stats) item.stats = {};
       item.stats.equipped = true;
-      this.character.equipWeapon(item.item_name);
+      if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
+        this.character.equipWeapon(item.item_name);
+      } else if (item.item_type === 'armor') {
+        this.character.equippedArmor = item.item_name;
+      } else if (item.item_type === 'shield') {
+        this.character.equippedShield = item.item_name;
+      }
 
       if (this.characterId) {
         await updateInventoryItemStats(this.characterId, item.item_name, { equipped: true });
@@ -819,5 +872,205 @@ export class GameUI {
         callback(skillId);
       });
     });
+  }
+
+  // ============ Wiki Panel Control & Render ============
+  _setupWiki() {
+    // Select tabs
+    document.querySelectorAll('.wiki-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.wiki-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.currentWikiTab = tab.getAttribute('data-tab');
+        this.selectedWikiItem = null;
+        this._renderWikiList();
+      });
+    });
+
+    // Search events
+    const searchInput = document.getElementById('wiki-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        this._renderWikiList();
+      });
+    }
+
+    this.currentWikiTab = 'monsters';
+    this.selectedWikiItem = null;
+  }
+
+  _renderWiki() {
+    this._renderWikiList();
+    this._renderWikiDetail();
+  }
+
+  _renderWikiList() {
+    const listContainer = document.getElementById('wiki-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    const query = (document.getElementById('wiki-search-input')?.value || '').toLowerCase().trim();
+
+    if (this.currentWikiTab === 'monsters') {
+      Object.keys(MONSTERS).forEach(key => {
+        const monster = MONSTERS[key];
+        const match = key.toLowerCase().includes(query) || monster.name.toLowerCase().includes(query);
+        if (!match) return;
+
+        const slot = document.createElement('div');
+        slot.className = 'wiki-slot';
+        if (this.selectedWikiItem === key) {
+          slot.classList.add('selected');
+        }
+        slot.innerHTML = `<span>${monster.emoji || '👾'}</span>`;
+        slot.title = monster.name;
+        slot.addEventListener('click', () => {
+          this.selectedWikiItem = key;
+          this._renderWikiList();
+          this._renderWikiDetail();
+        });
+        listContainer.appendChild(slot);
+      });
+    } else {
+      Object.keys(ITEMS).forEach(key => {
+        const item = ITEMS[key];
+        const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+        if (!match) return;
+
+        const slot = document.createElement('div');
+        slot.className = 'wiki-slot';
+        if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
+        if (this.selectedWikiItem === key) {
+          slot.classList.add('selected');
+        }
+        slot.innerHTML = `<span>${item.emoji || '📦'}</span>`;
+        slot.title = key;
+        slot.addEventListener('click', () => {
+          this.selectedWikiItem = key;
+          this._renderWikiList();
+          this._renderWikiDetail();
+        });
+        listContainer.appendChild(slot);
+      });
+    }
+
+    if (!this.selectedWikiItem) {
+      document.getElementById('wiki-detail-placeholder').style.display = 'block';
+      document.getElementById('wiki-detail-content').style.display = 'none';
+    }
+  }
+
+  _renderWikiDetail() {
+    const placeholder = document.getElementById('wiki-detail-placeholder');
+    const content = document.getElementById('wiki-detail-content');
+
+    if (!this.selectedWikiItem) {
+      placeholder.style.display = 'block';
+      content.style.display = 'none';
+      return;
+    }
+
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+
+    const key = this.selectedWikiItem;
+
+    if (this.currentWikiTab === 'monsters') {
+      const monster = MONSTERS[key];
+      if (!monster) return;
+
+      // Find drop items details
+      let dropHtml = '';
+      if (monster.loot && monster.loot.length > 0) {
+        dropHtml = `<div class="wiki-section-title">🎁 Loot Drops / อัตราดรอป:</div><div class="wiki-drops-list">`;
+        monster.loot.forEach(lootInfo => {
+          const itemMeta = ITEMS[lootInfo.item];
+          const emoji = itemMeta?.emoji || '📦';
+          const rarity = itemMeta?.rarity || 'common';
+          const pct = (lootInfo.chance * 100).toFixed(1);
+          dropHtml += `
+            <div class="wiki-drop-item">
+              <span class="color-${rarity}">${emoji} ${lootInfo.item}</span>
+              <span style="color:#20e060">${pct}%</span>
+            </div>
+          `;
+        });
+        dropHtml += `</div>`;
+      } else {
+        dropHtml = `<div class="wiki-section-title">🎁 Loot Drops:</div><div style="font-size:11px;color:var(--text-dim)">No drops</div>`;
+      }
+
+      content.innerHTML = `
+        <div class="detail-row">
+          <span class="detail-icon" style="background:${monster.color}22">${monster.emoji || '👾'}</span>
+          <div class="detail-info-block">
+            <div class="wiki-detail-title">${monster.name}</div>
+            <div class="detail-type" style="color:#ff6080">Monster (Lv.${monster.level})</div>
+          </div>
+        </div>
+        <div class="detail-desc" style="margin-top:8px">
+          HP: ${monster.hp} | ATK: ${monster.atk} | DEF: ${monster.def}<br/>
+          EXP Gain: ${monster.exp} | Zeny: ${monster.gold}<br/>
+          Area: ${monster.waterOnly ? 'Water Zone' : 'Land Area'}
+        </div>
+        ${dropHtml}
+      `;
+    } else {
+      const item = ITEMS[key];
+      if (!item) return;
+
+      // Equip stats details
+      let statsHtml = '';
+      if (item.atkBonus || item.defBonus || item.hpBonus || item.spBonus) {
+        statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div><div class="detail-desc">`;
+        if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br/>`;
+        if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br/>`;
+        if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br/>`;
+        if (item.spBonus) statsHtml += `💙 SP Bonus: +${item.spBonus}<br/>`;
+        statsHtml += `</div>`;
+      }
+
+      // Check who drops this item
+      let droppedByHtml = '';
+      const droppers = [];
+      Object.keys(MONSTERS).forEach(mKey => {
+        const m = MONSTERS[mKey];
+        if (m.loot) {
+          const lootFound = m.loot.find(l => l.item === key);
+          if (lootFound) {
+            droppers.push({ name: m.name, emoji: m.emoji, chance: lootFound.chance });
+          }
+        }
+      });
+
+      if (droppers.length > 0) {
+        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
+        droppers.forEach(d => {
+          droppedByHtml += `
+            <div class="wiki-drop-item">
+              <span>${d.emoji} ${d.name}</span>
+              <span style="color:#60a0ff">${(d.chance * 100).toFixed(1)}%</span>
+            </div>
+          `;
+        });
+        droppedByHtml += `</div>`;
+      }
+
+      content.innerHTML = `
+        <div class="detail-row">
+          <span class="detail-icon">${item.emoji || '📦'}</span>
+          <div class="detail-info-block">
+            <div class="wiki-detail-title color-${item.rarity || 'common'}">${key}</div>
+            <div class="detail-type color-${item.rarity || 'common'}">${item.type.toUpperCase()} (${item.rarity || 'common'})</div>
+          </div>
+        </div>
+        <div class="detail-desc" style="margin-top:8px">
+          ${item.desc}<br/>
+          <span style="color:#d0d040">Zeny Price: ${item.price}z</span>
+        </div>
+        ${statsHtml}
+        ${droppedByHtml}
+      `;
+    }
   }
 }
