@@ -44,6 +44,13 @@ export class SceneManager {
         this.currentMap = 'prontera';
         this.envObjects = [];
 
+        // Setup leaf texture cache
+        this._leafTextureCache = new Map();
+
+        // Setup procedural ground & roof textures
+        this._detailTexture = this._createDetailTexture();
+        this._roofTileTexture = this._createRoofTileTexture();
+
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(MAP_CONFIGS.prontera.fogColor);
@@ -492,6 +499,7 @@ export class SceneManager {
 
         const groundMat = new THREE.MeshLambertMaterial({
             vertexColors: true,
+            map: this._detailTexture
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         this.groundMesh = ground;
@@ -536,14 +544,17 @@ export class SceneManager {
     // ============ Water ============
     _createWater(config) {
         // Large river water plane centered around z = -2, length 80, width 32
-        const waterGeo = new THREE.PlaneGeometry(80, 40, 40, 15);
+        const waterGeo = new THREE.PlaneGeometry(80, 40, 80, 30);
+        const waterTex = this._createWaterTexture();
         const waterMat = new THREE.MeshPhongMaterial({
             color: config.waterColor,
+            map: waterTex,
             transparent: true,
-            opacity: 0.72,
-            shininess: 90,
-            specular: 0xe0f0ff,
+            opacity: 0.68,
+            shininess: 140,
+            specular: 0xc0e8ff,
             side: THREE.DoubleSide,
+            envMapIntensity: 0.4,
         });
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
@@ -765,10 +776,13 @@ export class SceneManager {
                 trunk.castShadow = true;
                 group.add(trunk);
                 // Layered canopy
-                const colors = [0x2a8a2a, 0x3a9a3a, 0x4aaa3a];
+                const baseColors = ['#2a8a2a', '#3a9a3a', '#4aaa3a'];
+                const leafColors = ['#4aaa3a', '#5aba4a', '#6aca5a'];
                 for (let i = 0; i < 3; i++) {
                     const coneGeo = new THREE.ConeGeometry(1.3 - i * 0.3, 1.6, 7);
-                    const coneMat = new THREE.MeshLambertMaterial({ color: colors[i] });
+                    const coneMat = new THREE.MeshLambertMaterial({
+                        map: this._createLeafTexture(baseColors[i], leafColors[i])
+                    });
                     const cone = new THREE.Mesh(coneGeo, coneMat);
                     cone.position.y = 2.5 + i * 0.9;
                     cone.castShadow = true;
@@ -786,7 +800,9 @@ export class SceneManager {
                 group.add(trunk);
                 // Pink spherical canopy
                 const canopyGeo = new THREE.SphereGeometry(1.8, 8, 6);
-                const canopyMat = new THREE.MeshLambertMaterial({ color: 0xffb0c0 });
+                const canopyMat = new THREE.MeshLambertMaterial({
+                    map: this._createLeafTexture('#ffb0c0', '#ffd0db')
+                });
                 const canopy = new THREE.Mesh(canopyGeo, canopyMat);
                 canopy.position.y = 3.8;
                 canopy.scale.set(1, 0.7, 1);
@@ -795,9 +811,10 @@ export class SceneManager {
                 // Extra pink cluster
                 const cluster = new THREE.Mesh(
                     new THREE.SphereGeometry(1.2, 6, 5),
-                    new THREE.MeshLambertMaterial({ color: 0xff90a0 })
+                    new THREE.MeshLambertMaterial({
+                        map: this._createLeafTexture('#ff90a0', '#ffccd5')
+                    })
                 );
-                cluster.position.set(0.5, 4.2, 0.3);
                 cluster.castShadow = true;
                 group.add(cluster);
                 break;
@@ -814,7 +831,9 @@ export class SceneManager {
                 for (let i = 0; i < 5; i++) {
                     const angle = (i / 5) * Math.PI * 2;
                     const droopGeo = new THREE.ConeGeometry(0.4, 2.5, 4);
-                    const droopMat = new THREE.MeshLambertMaterial({ color: 0x5aaa4a });
+                    const droopMat = new THREE.MeshLambertMaterial({
+                        map: this._createLeafTexture('#5aaa4a', '#7aca6a')
+                    });
                     const droop = new THREE.Mesh(droopGeo, droopMat);
                     droop.position.set(
                         Math.cos(angle) * 1.0,
@@ -826,7 +845,9 @@ export class SceneManager {
                 }
                 // Top sphere
                 const topGeo = new THREE.SphereGeometry(1.5, 7, 5);
-                const topMat = new THREE.MeshLambertMaterial({ color: 0x4a9a3a });
+                const topMat = new THREE.MeshLambertMaterial({
+                    map: this._createLeafTexture('#4a9a3a', '#6aca5a')
+                });
                 const top = new THREE.Mesh(topGeo, topMat);
                 top.position.y = 4.0;
                 top.scale.set(1, 0.6, 1);
@@ -836,7 +857,9 @@ export class SceneManager {
             }
             case 'bush': {
                 const bushGeo = new THREE.SphereGeometry(0.8, 6, 5);
-                const bushMat = new THREE.MeshLambertMaterial({ color: 0x3a7a2a });
+                const bushMat = new THREE.MeshLambertMaterial({
+                    map: this._createLeafTexture('#3a7a2a', '#5aba3a')
+                });
                 const bush = new THREE.Mesh(bushGeo, bushMat);
                 bush.position.y = 0.6;
                 bush.scale.set(1.2, 0.8, 1.2);
@@ -851,10 +874,13 @@ export class SceneManager {
                 trunk.position.y = 1.25;
                 trunk.castShadow = true;
                 group.add(trunk);
-                const autumnColors = [0xd4642a, 0xc8841a, 0xb8441a];
+                const autumnColors = ['#d4642a', '#c8841a', '#b8441a'];
+                const autumnLeafColors = ['#f8844a', '#e8a43a', '#d8643a'];
                 for (let i = 0; i < 3; i++) {
                     const coneGeo = new THREE.ConeGeometry(1.2 - i * 0.25, 1.5, 7);
-                    const coneMat = new THREE.MeshLambertMaterial({ color: autumnColors[i] });
+                    const coneMat = new THREE.MeshLambertMaterial({
+                        map: this._createLeafTexture(autumnColors[i], autumnLeafColors[i])
+                    });
                     const cone = new THREE.Mesh(coneGeo, coneMat);
                     cone.position.y = 2.3 + i * 0.85;
                     cone.castShadow = true;
@@ -894,7 +920,9 @@ export class SceneManager {
                 group.add(trunk);
                 for (let i = 0; i < 4; i++) {
                     const coneGeo = new THREE.ConeGeometry(1.0 - i * 0.15, 1.2, 6);
-                    const coneMat = new THREE.MeshLambertMaterial({ color: 0x1a5a2a });
+                    const coneMat = new THREE.MeshLambertMaterial({
+                        map: this._createLeafTexture('#1a5a2a', '#2d7d3d')
+                    });
                     const cone = new THREE.Mesh(coneGeo, coneMat);
                     cone.position.y = 2.2 + i * 0.7;
                     cone.castShadow = true;
@@ -931,22 +959,74 @@ export class SceneManager {
 
     _createFlower(x, z) {
         const group = new THREE.Group();
-        // Stem
-        const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 3);
-        const stemMat = new THREE.MeshLambertMaterial({ color: 0x3a8a3a });
+        const stemH = 0.25 + Math.random() * 0.25;
+
+        // Stem with slight curve
+        const stemGeo = new THREE.CylinderGeometry(0.015, 0.025, stemH, 4);
+        const stemMat = new THREE.MeshLambertMaterial({ color: 0x2a7a2a });
         const stem = new THREE.Mesh(stemGeo, stemMat);
-        stem.position.y = 0.15;
+        stem.position.y = stemH / 2;
+        stem.rotation.z = (Math.random() - 0.5) * 0.15;
         group.add(stem);
-        // Flower head
-        const flowerColors = [0xff6080, 0xffaa40, 0xff4060, 0xffd040, 0xff80ff, 0x60c0ff];
-        const color = flowerColors[Math.floor(Math.random() * flowerColors.length)];
-        const headGeo = new THREE.SphereGeometry(0.08, 5, 4);
-        const headMat = new THREE.MeshLambertMaterial({ color });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 0.32;
-        group.add(head);
+
+        // Small leaf on stem
+        const leafGeo = new THREE.PlaneGeometry(0.1, 0.06);
+        const leafMat = new THREE.MeshLambertMaterial({ color: 0x3a9a3a, side: THREE.DoubleSide });
+        const leaf1 = new THREE.Mesh(leafGeo, leafMat);
+        leaf1.position.set(0.04, stemH * 0.4, 0);
+        leaf1.rotation.z = -0.6;
+        leaf1.rotation.y = Math.random() * Math.PI;
+        group.add(leaf1);
+        if (Math.random() > 0.4) {
+            const leaf2 = new THREE.Mesh(leafGeo.clone(), leafMat);
+            leaf2.position.set(-0.04, stemH * 0.6, 0);
+            leaf2.rotation.z = 0.6;
+            leaf2.rotation.y = Math.random() * Math.PI;
+            group.add(leaf2);
+        }
+
+        // Flower petals (beautiful radial pattern)
+        const petalPalettes = [
+            { petals: 0xff6090, center: 0xffee44 },  // Pink + yellow center
+            { petals: 0xff4060, center: 0xffe830 },  // Red + golden
+            { petals: 0xffaa50, center: 0xffffff },  // Orange + white
+            { petals: 0xff80ff, center: 0xffee60 },  // Purple + yellow
+            { petals: 0x60b0ff, center: 0xffffff },  // Blue + white center
+            { petals: 0xffdd40, center: 0xff8040 },  // Sunflower yellow + orange
+            { petals: 0xffffff, center: 0xffee30 },  // White daisy + yellow
+            { petals: 0xff90b0, center: 0xffccdd },  // Soft pink + light rose
+        ];
+        const palette = petalPalettes[Math.floor(Math.random() * petalPalettes.length)];
+        const petalCount = 5 + Math.floor(Math.random() * 4);
+        const petalSize = 0.06 + Math.random() * 0.04;
+
+        const petalMat = new THREE.MeshLambertMaterial({ color: palette.petals, side: THREE.DoubleSide });
+        for (let i = 0; i < petalCount; i++) {
+            const angle = (i / petalCount) * Math.PI * 2;
+            const petalGeo = new THREE.PlaneGeometry(petalSize, petalSize * 1.6);
+            const petal = new THREE.Mesh(petalGeo, petalMat);
+            const dist = petalSize * 0.7;
+            petal.position.set(
+                Math.cos(angle) * dist,
+                stemH + 0.02,
+                Math.sin(angle) * dist
+            );
+            petal.rotation.x = -Math.PI / 2 + 0.35;
+            petal.rotation.z = angle;
+            group.add(petal);
+        }
+
+        // Center pistil
+        const centerGeo = new THREE.SphereGeometry(petalSize * 0.55, 6, 5);
+        const centerMat = new THREE.MeshLambertMaterial({ color: palette.center });
+        const center = new THREE.Mesh(centerGeo, centerMat);
+        center.position.y = stemH + 0.03;
+        center.scale.y = 0.6;
+        group.add(center);
 
         group.position.set(x, 0, z);
+        const scale = 0.8 + Math.random() * 0.5;
+        group.scale.setScalar(scale);
         this.scene.add(group);
         this.envObjects.push(group);
     }
@@ -1214,7 +1294,11 @@ export class SceneManager {
         const woodDark = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
         const woodLight = new THREE.MeshLambertMaterial({ color: 0x8a6a3a });
         const woodPlank = new THREE.MeshLambertMaterial({ color: 0x9a7a4a });
-        const roofTile = new THREE.MeshLambertMaterial({ color: 0x8b2020 });
+        const roofTile = new THREE.MeshPhongMaterial({
+            map: this._roofTileTexture,
+            shininess: 35,
+            specular: 0x331111
+        });
         const roofTrim = new THREE.MeshLambertMaterial({ color: 0x6a1818 });
         const clothRed = new THREE.MeshLambertMaterial({ color: 0xc03030 });
 
@@ -1833,5 +1917,302 @@ export class SceneManager {
             const points = curve.getPoints(24);
             this._fishingLineMesh.geometry.setFromPoints(points);
         }
+    }
+
+    _createDetailTexture() {
+        const size = 1024;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Base earthy color (will be multiplied with vertex colors)
+        ctx.fillStyle = '#d8d0c0';
+        ctx.fillRect(0, 0, size, size);
+
+        // Layer 1: Coarse earth noise (large patches of light/dark soil)
+        for (let i = 0; i < 2000; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const r = 8 + Math.random() * 20;
+            const brightness = Math.random();
+            if (brightness < 0.4) {
+                ctx.fillStyle = `rgba(90, 75, 55, ${0.06 + Math.random() * 0.1})`;
+            } else if (brightness < 0.7) {
+                ctx.fillStyle = `rgba(140, 125, 95, ${0.05 + Math.random() * 0.08})`;
+            } else {
+                ctx.fillStyle = `rgba(200, 195, 170, ${0.04 + Math.random() * 0.08})`;
+            }
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Layer 2: Fine soil grain (tiny specks)
+        for (let i = 0; i < 80000; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const v = Math.random();
+            if (v < 0.5) {
+                ctx.fillStyle = `rgba(60, 50, 35, ${0.03 + Math.random() * 0.09})`;
+            } else if (v < 0.8) {
+                ctx.fillStyle = `rgba(110, 100, 70, ${0.03 + Math.random() * 0.08})`;
+            } else {
+                ctx.fillStyle = `rgba(245, 240, 225, ${0.04 + Math.random() * 0.1})`;
+            }
+            const s = 1 + Math.random() * 2;
+            ctx.fillRect(x, y, s, s);
+        }
+
+        // Layer 3: Dense grass blades (realistic thin strokes)
+        for (let i = 0; i < 12000; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const length = 6 + Math.random() * 16;
+            const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.7;
+            const green = 50 + Math.floor(Math.random() * 80);
+            const alpha = 0.06 + Math.random() * 0.12;
+            ctx.strokeStyle = `rgba(${20 + Math.floor(Math.random() * 30)}, ${green}, ${15 + Math.floor(Math.random() * 25)}, ${alpha})`;
+            ctx.lineWidth = 0.8 + Math.random() * 1.2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            // Slight curve via quadratic
+            const cx = x + Math.sin(angle) * length * 0.5 + (Math.random() - 0.5) * 3;
+            const cy = y + Math.cos(angle) * length * 0.5;
+            ctx.quadraticCurveTo(cx, cy, x + Math.sin(angle) * length, y - Math.cos(angle) * length);
+            ctx.stroke();
+        }
+
+        // Layer 4: Clover/weed dark spots
+        for (let i = 0; i < 600; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const w = 2 + Math.random() * 5;
+            const h = w * (0.6 + Math.random() * 0.3);
+            const darkGreen = Math.random() > 0.5;
+            ctx.fillStyle = darkGreen
+                ? `rgba(30, 65, 25, ${0.06 + Math.random() * 0.08})`
+                : `rgba(100, 80, 40, ${0.05 + Math.random() * 0.07})`;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(Math.random() * Math.PI);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Layer 5: Mini fallen leaves and organic litter
+        const leafShades = [
+            'rgba(160, 90, 35, 0.1)', 'rgba(130, 70, 25, 0.09)',
+            'rgba(180, 120, 50, 0.08)', 'rgba(70, 95, 45, 0.07)'
+        ];
+        for (let i = 0; i < 500; i++) {
+            const lx = Math.random() * size;
+            const ly = Math.random() * size;
+            const lw = 3 + Math.random() * 5;
+            const lh = lw * (0.4 + Math.random() * 0.3);
+            ctx.fillStyle = leafShades[Math.floor(Math.random() * leafShades.length)];
+            ctx.save();
+            ctx.translate(lx, ly);
+            ctx.rotate(Math.random() * Math.PI * 2);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, lw, lh, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Layer 6: Tiny pebble dots
+        for (let i = 0; i < 1200; i++) {
+            const px = Math.random() * size;
+            const py = Math.random() * size;
+            const pr = 1 + Math.random() * 2.5;
+            const shade = 100 + Math.floor(Math.random() * 80);
+            ctx.fillStyle = `rgba(${shade}, ${shade - 10}, ${shade - 20}, ${0.1 + Math.random() * 0.15})`;
+            ctx.beginPath();
+            ctx.arc(px, py, pr, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(12, 12);
+        return texture;
+    }
+
+    _createWaterTexture() {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Deep water base
+        ctx.fillStyle = '#2a6090';
+        ctx.fillRect(0, 0, size, size);
+
+        // Layered caustic ripple patterns
+        for (let layer = 0; layer < 3; layer++) {
+            const count = 300 + layer * 200;
+            for (let i = 0; i < count; i++) {
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const rx = 4 + Math.random() * 12;
+                const ry = rx * (0.3 + Math.random() * 0.4);
+                const rot = Math.random() * Math.PI;
+                const alpha = 0.03 + Math.random() * 0.06;
+                ctx.fillStyle = layer < 2
+                    ? `rgba(120, 200, 255, ${alpha})`
+                    : `rgba(255, 255, 255, ${alpha * 0.7})`;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rot);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Shimmer streaks (reflected light)
+        for (let i = 0; i < 200; i++) {
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const len = 10 + Math.random() * 30;
+            ctx.strokeStyle = `rgba(200, 240, 255, ${0.04 + Math.random() * 0.06})`;
+            ctx.lineWidth = 1 + Math.random() * 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + len, y + (Math.random() - 0.5) * 6);
+            ctx.stroke();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(6, 4);
+        return texture;
+    }
+
+    _createRoofTileTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#8b2020';
+        ctx.fillRect(0, 0, 512, 512);
+
+        const rows = 16;
+        const cols = 12;
+        const rowH = 512 / rows;
+        const colW = 512 / cols;
+
+        // Draw tiles row by row (clay shingle effect)
+        for (let r = 0; r < rows; r++) {
+            const y = r * rowH;
+            const xOffset = (r % 2) * (colW / 2);
+
+            for (let c = -1; c <= cols; c++) {
+                const x = c * colW + xOffset;
+
+                // Shadow underneath
+                ctx.fillStyle = '#450606';
+                ctx.beginPath();
+                ctx.arc(x + colW / 2, y + rowH, colW / 2 + 1, Math.PI, 0, true);
+                ctx.fill();
+
+                const colorValue = 0.85 + (Math.sin(r * 0.7 + c * 0.9) * 0.1);
+                const redHex = Math.floor(139 * colorValue);
+                const grnHex = Math.floor(32 * colorValue);
+                ctx.fillStyle = `rgb(${redHex}, ${grnHex}, ${grnHex})`;
+
+                ctx.beginPath();
+                ctx.arc(x + colW / 2, y + rowH - 2, colW / 2 - 1, Math.PI, 0, true);
+                ctx.fill();
+
+                // Highlight rim
+                ctx.strokeStyle = 'rgba(255, 120, 120, 0.2)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(x + colW / 2, y + rowH - 4, colW / 3, Math.PI, 0, true);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(0, y + rowH - 2, 512, 3);
+        }
+
+        // Moss & dirt
+        for (let i = 0; i < 80; i++) {
+            const mx = Math.random() * 512;
+            const my = Math.random() * 512;
+            const mr = 4 + Math.random() * 8;
+            ctx.fillStyle = Math.random() > 0.65 ? 'rgba(50, 75, 30, 0.22)' : 'rgba(15, 10, 5, 0.28)';
+            ctx.beginPath();
+            ctx.arc(mx, my, mr, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(2, 2.5);
+        return texture;
+    }
+
+    _createLeafTexture(baseColorHex, leafColorHex) {
+        const cacheKey = `${baseColorHex}-${leafColorHex}`;
+        if (this._leafTextureCache && this._leafTextureCache.has(cacheKey)) {
+            return this._leafTextureCache.get(cacheKey);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = baseColorHex;
+        ctx.fillRect(0, 0, 256, 256);
+
+        ctx.shadowBlur = 1;
+        ctx.shadowColor = 'rgba(0,0,0,0.1)';
+
+        for (let i = 0; i < 800; i++) {
+            const x = Math.random() * 256;
+            const y = Math.random() * 256;
+            const rx = 3 + Math.random() * 5;
+            const ry = rx * (0.5 + Math.random() * 0.2);
+            const rot = Math.random() * Math.PI * 2;
+
+            const rand = Math.random();
+            if (rand < 0.45) {
+                ctx.fillStyle = leafColorHex;
+            } else if (rand < 0.75) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+            } else {
+                ctx.fillStyle = baseColorHex;
+            }
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rot);
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(4, 4);
+
+        if (!this._leafTextureCache) {
+            this._leafTextureCache = new Map();
+        }
+        this._leafTextureCache.set(cacheKey, texture);
+        return texture;
     }
 }

@@ -53,8 +53,9 @@ body {
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(ellipse at 50% 30%, rgba(240, 192, 64, 0.06) 0%, transparent 60%),
-    linear-gradient(135deg, #080c18 0%, #1a0e30 40%, #0c1028 70%, #080c18 100%);
+    linear-gradient(rgba(10, 14, 26, 0.5), rgba(7, 10, 20, 0.85)),
+    url('/src/assets/login_bg.png') no-repeat center center;
+  background-size: cover;
   z-index: 1000;
 }
 
@@ -100,22 +101,23 @@ body {
   z-index: 2;
   text-align: center;
   padding: 40px 48px;
-  background: var(--bg-card);
-  border: 1px solid rgba(240, 192, 64, 0.15);
+  background: rgba(14, 18, 36, 0.78);
+  border: 1px solid rgba(240, 192, 64, 0.35);
   border-radius: 20px;
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(25px);
   box-shadow:
     var(--shadow),
-    0 0 80px rgba(240, 192, 64, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  min-width: 400px;
-  animation: fadeInUp 0.6s ease-out;
+    0 0 80px rgba(100, 140, 255, 0.15),
+    0 0 160px rgba(240, 192, 64, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  min-width: 420px;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateY(40px);
   }
 
   to {
@@ -140,7 +142,7 @@ body {
 .logo-wing {
   font-size: 32px;
   animation: wingFloat 3s ease-in-out infinite;
-  filter: drop-shadow(0 0 8px var(--gold-glow));
+  filter: drop-shadow(0 0 12px var(--primary)) drop-shadow(0 0 24px rgba(240, 192, 64, 0.4));
 }
 
 .logo-wing.left {
@@ -258,23 +260,26 @@ body {
 
 .auth-form input {
   padding: 14px 18px;
-  background: rgba(10, 15, 30, 0.8);
-  border: 1px solid var(--border);
+  background: rgba(8, 12, 24, 0.85);
+  border: 1px solid rgba(100, 140, 255, 0.35);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 14px;
   font-family: var(--font-ui);
   outline: none;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .auth-form input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 20px var(--primary-glow);
+  box-shadow:
+    0 0 25px rgba(240, 192, 64, 0.35),
+    0 0 10px rgba(100, 140, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .auth-form input::placeholder {
-  color: var(--text-dim);
+  color: rgba(128, 144, 176, 0.7);
 }
 
 .btn-primary,
@@ -286,41 +291,48 @@ body {
   font-family: var(--font-pixel);
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   letter-spacing: 1px;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #f0c040, #e09020);
-  color: #1a1000;
-  box-shadow: 0 4px 20px rgba(240, 192, 64, 0.3);
+  background: linear-gradient(135deg, #ffd700, #f0a020);
+  color: #120a02;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(240, 192, 64, 0.4);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 30px rgba(240, 192, 64, 0.5);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 30px rgba(240, 192, 64, 0.6);
 }
 
 .btn-secondary {
-  background: rgba(96, 160, 255, 0.15);
+  background: rgba(96, 160, 255, 0.1);
   color: var(--secondary);
-  border: 1px solid rgba(96, 160, 255, 0.3);
+  border: 1px solid rgba(96, 160, 255, 0.4);
 }
 
 .btn-secondary:hover {
-  background: rgba(96, 160, 255, 0.25);
-  transform: translateY(-2px);
+  background: rgba(96, 160, 255, 0.22);
+  border-color: var(--secondary);
+  box-shadow: 0 4px 15px rgba(96, 160, 255, 0.25);
+  transform: translateY(-2px) scale(1.02);
 }
 
 .btn-guest {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-dim);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 96, 128, 0.08);
+  color: #ff80a0;
+  border: 1px solid rgba(255, 96, 128, 0.3);
 }
 
 .btn-guest:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text);
+  background: rgba(255, 96, 128, 0.18);
+  border-color: #ff80a0;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255, 96, 128, 0.20);
+  transform: translateY(-2px) scale(1.02);
 }
 
 .auth-divider {

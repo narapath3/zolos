@@ -10,10 +10,18 @@ export class AuthUI {
         this._isRegisterMode = false;
         this._sessionData = null;
 
+        // BGM initialization
+        this._bgm = new Audio('/src/login.mp3');
+        this._bgm.loop = true;
+        this._bgm.volume = 0.3;
+        this._bgmPlayed = false;
+        this._autoplayTrigger = null;
+
         this._setupButtons();
         this._createParticles();
         this._subscribeOnlineCount();
         this._checkExistingSession();
+        this._setupBGMAutoplay();
     }
 
     _setupButtons() {
@@ -267,15 +275,75 @@ export class AuthUI {
         });
     }
 
+    _setupBGMAutoplay() {
+        const playAttempt = () => {
+            if (this._bgmPlayed) return;
+            this._bgm.play().then(() => {
+                this._bgmPlayed = true;
+                this._removeAutoplayListeners();
+            }).catch((err) => {
+                console.log('Autoplay blocked. Waiting for interaction to play BGM.', err);
+            });
+        };
+
+        this._autoplayTrigger = playAttempt;
+
+        // Try playing immediately
+        playAttempt();
+
+        // Listen for interaction if it was blocked
+        document.addEventListener('click', this._autoplayTrigger);
+        document.addEventListener('keydown', this._autoplayTrigger);
+        document.addEventListener('touchstart', this._autoplayTrigger);
+    }
+
+    _removeAutoplayListeners() {
+        if (this._autoplayTrigger) {
+            document.removeEventListener('click', this._autoplayTrigger);
+            document.removeEventListener('keydown', this._autoplayTrigger);
+            document.removeEventListener('touchstart', this._autoplayTrigger);
+        }
+    }
+
+    _fadeOutBGM() {
+        if (!this._bgm) return;
+
+        const fadeInterval = 50; // ms
+        const fadeDuration = 500; // ms
+        const steps = fadeDuration / fadeInterval;
+        const volumeStep = this._bgm.volume / steps;
+
+        const fade = setInterval(() => {
+            if (!this._bgm) {
+                clearInterval(fade);
+                return;
+            }
+            if (this._bgm.volume > volumeStep) {
+                this._bgm.volume -= volumeStep;
+            } else {
+                this._bgm.volume = 0;
+                this._bgm.pause();
+                clearInterval(fade);
+            }
+        }, fadeInterval);
+    }
+
     hide() {
         if (this._unsubOnlineCount) {
             this._unsubOnlineCount();
             this._unsubOnlineCount = null;
         }
+        this._removeAutoplayListeners();
+        this._fadeOutBGM();
         this.screen.style.display = 'none';
     }
 
     show() {
         this.screen.style.display = 'flex';
+        if (this._bgm) {
+            this._bgm.volume = 0.3;
+            this._bgmPlayed = false;
+            this._setupBGMAutoplay();
+        }
     }
 }
