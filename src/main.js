@@ -19,6 +19,7 @@ import {
     startAutoSave,
     stopAutoSave,
     broadcastPosition,
+    broadcastChat,
 } from './network/GameSync.js';
 
 // ============ App State ============
@@ -58,6 +59,11 @@ async function initGame() {
 
     // Init UI
     gameUI = new GameUI(character, soundManager);
+
+    // Setup chat send callback to route messages through GameSync network layer
+    gameUI.setupChatSendCallback((message) => {
+        broadcastChat(userId, username, character.stats.level, message);
+    });
 
     // Expose for debugging
     window.sceneManager = sceneManager;
@@ -211,6 +217,8 @@ async function initGame() {
         }
 
         remotePlayer.updateData(posData);
+    }, (senderUsername, message) => {
+        gameUI.receiveChatMessage(senderUsername, message);
     });
 
     // Start auto-save

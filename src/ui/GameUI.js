@@ -1,5 +1,5 @@
 // Game UI — HUD, panels, combat log, and all in-game UI
-import { getExpRequired, ITEMS, SHOP_ITEMS, MONSTERS } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, SHOP_ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats } from '../network/GameSync.js';
 
 export class GameUI {
@@ -24,6 +24,8 @@ export class GameUI {
     this._setupROInventoryEvents();
     this._setupShopEvents();
     this._setupWiki();
+    this._setupFriendSystem();
+    this._setupChat();
   }
 
   show() {
@@ -565,25 +567,216 @@ export class GameUI {
   }
 
   // ============ Online Players ============
+  // ============ Online Players ============
   updateOnlinePlayers(players) {
+    this.onlinePlayers = players || [];
+
     // Update auth screen count
     const authCount = document.getElementById('online-players-auth');
-    if (authCount) authCount.textContent = players.length;
+    if (authCount) authCount.textContent = this.onlinePlayers.length;
 
     // Update panel
     const body = document.getElementById('players-body');
-    if (players.length === 0) {
+    if (!body) return;
+
+    if (this.onlinePlayers.length === 0) {
       body.innerHTML = '<div style="text-align:center;color:var(--text-dim)">No players online</div>';
       return;
     }
 
-    body.innerHTML = players.map(p => `
-      <div class="player-row">
-        <span class="online-dot"></span>
-        <span>${p.username}</span>
-        <span style="color:var(--text-dim);margin-left:auto">Lv.${p.level}</span>
-      </div>
-    `).join('');
+    body.innerHTML = this.onlinePlayers.map(p => {
+      const isFriend = this.friends && this.friends.includes(p.username);
+      const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
+      return `
+        <div class="player-row" data-username="${p.username}">
+          <span class="online-dot"></span>
+          <span>${p.username}${starHtml}</span>
+          <span style="color:var(--text-dim);margin-left:auto">Lv.${p.level}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ============ Friend System Logic ============
+  _setupFriendSystem() {
+    this.friends = [];
+    try {
+      const stored = localStorage.getItem('zolos_friends');
+      if (stored) {
+        this.friends = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('[Zolos] Failed to parse friends list:', e);
+    }
+
+    const popup = document.getElementById('player-popup');
+    const closeBtn = document.getElementById('btn-close-player-popup');
+    const overlay = document.getElementById('player-popup-overlay');
+    const addFriendBtn = document.getElementById('btn-add-friend');
+
+    // Close button
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        if (popup) popup.style.display = 'none';
+      });
+    }
+
+    // Overlay click close
+    if (overlay) {
+      overlay.addEventListener('click', () => {
+        if (popup) popup.style.display = 'none';
+      });
+    }
+
+    // Click handler for player rows inside Online Players list using delegated events
+    const body = document.getElementById('players-body');
+    if (body) {
+      body.addEventListener('click', (e) => {
+        const row = e.target.closest('.player-row');
+        if (!row) return;
+        const targetUsername = row.getAttribute('data-username');
+        if (!this.onlinePlayers) return;
+        const player = this.onlinePlayers.find(p => p.username === targetUsername);
+        if (player) {
+          this._showPlayerPopup(player);
+        }
+      });
+    }
+
+    // Add friend action
+    if (addFriendBtn) {
+      addFriendBtn.addEventListener('click', () => {
+        if (this.selectedProfilePlayer) {
+          this._toggleFriend(this.selectedProfilePlayer.username);
+        }
+      });
+    }
+  }
+
+  _showPlayerPopup(player) {
+    this.selectedProfilePlayer = player;
+    const popup = document.getElementById('player-popup');
+    const popupName = document.getElementById('player-popup-name');
+    const popupLevel = document.getElementById('player-popup-level');
+    const addFriendBtn = document.getElementById('btn-add-friend');
+
+    if (popupName) popupName.textContent = player.username;
+    if (popupLevel) popupLevel.textContent = `Lv.${player.level}`;
+
+    if (addFriendBtn) {
+      // Don't allow friending yourself
+      const myName = this.character && this.character.stats ? this.character.stats.name : '';
+      if (player.username === myName) {
+        addFriendBtn.textContent = '❌ You (Self)';
+        addFriendBtn.style.opacity = '0.5';
+        addFriendBtn.style.pointerEvents = 'none';
+      } else {
+        addFriendBtn.style.opacity = '1';
+        addFriendBtn.style.pointerEvents = 'auto';
+        const isFriend = this.friends.includes(player.username);
+        addFriendBtn.innerHTML = isFriend ? '❌ Remove Friend' : '⭐ Add Friend';
+      }
+    }
+
+    if (popup) popup.style.display = 'flex';
+  }
+
+  _toggleFriend(username) {
+    const idx = this.friends.indexOf(username);
+    if (idx === -1) {
+      this.friends.push(username);
+      this.addCombatLog(`⭐ เพิ่ม ${username} เป็นเพื่อนสำเสร็จ`, 'system');
+    } else {
+      this.friends.splice(idx, 1);
+      this.addCombatLog(`💔 ลบ ${username} ออกจากรายชื่อเพื่อน`, 'system');
+    }
+
+    // Save
+    localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+
+    // Refresh Popup state
+    if (this.selectedProfilePlayer && this.selectedProfilePlayer.username === username) {
+      this._showPlayerPopup(this.selectedProfilePlayer);
+    }
+
+    // Refresh players list
+    if (this.onlinePlayers) {
+      this.updateOnlinePlayers(this.onlinePlayers);
+    }
+  }
+
+  // ============ Chat System Logic ============
+  _setupChat() {
+    const btnToggle = document.getElementById('btn-chat-toggle');
+    const btnClose = document.querySelector('[data-close="chat-panel"]');
+    const chatPanel = document.getElementById('chat-panel');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('btn-send-chat');
+
+    if (btnToggle) {
+      btnToggle.addEventListener('click', () => {
+        this._togglePanel('chat-panel');
+      });
+    }
+
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        if (chatPanel) chatPanel.style.display = 'none';
+      });
+    }
+
+    const sendMessage = () => {
+      if (!chatInput) return;
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      // Request broadcast
+      if (this.chatSendCallback) {
+        this.chatSendCallback(text);
+      }
+      chatInput.value = '';
+      chatInput.focus();
+    };
+
+    if (sendBtn) {
+      sendBtn.addEventListener('click', sendMessage);
+    }
+
+    if (chatInput) {
+      chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+    }
+  }
+
+  setupChatSendCallback(callback) {
+    this.chatSendCallback = callback;
+  }
+
+  receiveChatMessage(username, message) {
+    const chatMessages = document.getElementById('chat-messages');
+    if (!chatMessages) return;
+
+    const row = document.createElement('div');
+    row.className = 'chat-msg-row user';
+    row.innerHTML = `
+      <span class="chat-msg-username">[${username}]:</span>
+      <span class="chat-msg-text">${message}</span>
+    `;
+
+    chatMessages.appendChild(row);
+
+    // Auto scroll
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Also place in combat log if chat panel is closed
+    const chatPanel = document.getElementById('chat-panel');
+    const isClosed = !chatPanel || chatPanel.style.display === 'none';
+    if (isClosed) {
+      this.addCombatLog(`💬 ${username}: ${message}`, 'chat');
+    }
   }
 
   // ============ Combat Log ============
@@ -912,13 +1105,15 @@ export class GameUI {
     const query = (document.getElementById('wiki-search-input')?.value || '').toLowerCase().trim();
 
     if (this.currentWikiTab === 'monsters') {
-      Object.keys(MONSTERS).forEach(key => {
-        const monster = MONSTERS[key];
+      const allMons = getAllMonsters();
+      Object.keys(allMons).forEach(key => {
+        const monster = allMons[key];
         const match = key.toLowerCase().includes(query) || monster.name.toLowerCase().includes(query);
         if (!match) return;
 
         const slot = document.createElement('div');
         slot.className = 'wiki-slot';
+        if (monster.waterOnly) slot.classList.add('water-monster');
         if (this.selectedWikiItem === key) {
           slot.classList.add('selected');
         }
@@ -976,8 +1171,14 @@ export class GameUI {
     const key = this.selectedWikiItem;
 
     if (this.currentWikiTab === 'monsters') {
-      const monster = MONSTERS[key];
+      const allMons = getAllMonsters();
+      const monster = allMons[key];
       if (!monster) return;
+
+      // Determine map area
+      let mapArea = 'Prontera Field';
+      if (PAYON_MONSTERS[key]) mapArea = 'Payon Forest';
+      else if (WATER_MONSTERS[key]) mapArea = 'Water Zone 🌊';
 
       // Find drop items details
       let dropHtml = '';
@@ -1015,7 +1216,7 @@ export class GameUI {
         <div class="detail-desc" style="margin-top:8px">
           HP: ${monster.hp} | ATK: ${monster.atk} | DEF: ${monster.def}<br />
           EXP Gain: ${monster.exp} | Zeny: ${goldText}<br />
-          Area: ${monster.waterOnly ? 'Water Zone' : 'Land Area'}
+          Area: ${mapArea}
         </div>
         ${dropHtml}
       `;
@@ -1037,10 +1238,11 @@ export class GameUI {
       // Check who drops this item
       let droppedByHtml = '';
       const droppers = [];
-      Object.keys(MONSTERS).forEach(mKey => {
-        const m = MONSTERS[mKey];
+      const allMonsForDrops = getAllMonsters();
+      Object.keys(allMonsForDrops).forEach(mKey => {
+        const m = allMonsForDrops[mKey];
         if (m.loot) {
-          const lootFound = m.loot.find(l => l.item === key);
+          const lootFound = m.loot.find(l => l.name === key);
           if (lootFound) {
             droppers.push({ name: m.name, emoji: m.emoji, chance: lootFound.chance });
           }

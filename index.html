@@ -131,6 +131,10 @@
         <span>👥</span>
         <small>Online</small>
       </button>
+      <button class="hud-btn" id="btn-chat-toggle" title="Chat">
+        <span>💬</span>
+        <small>Chat</small>
+      </button>
       <button class="hud-btn" id="btn-wiki" title="Wiki">
         <span>📖</span>
         <small>Wiki</small>
@@ -287,6 +291,38 @@
       <span id="kill-count">0</span>
     </div>
 
+    <!-- Chat Panel -->
+    <div id="chat-panel" class="side-panel chat-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>💬 Chat / แนลแชท</h3>
+        <button class="panel-close" data-close="chat-panel">✕</button>
+      </div>
+      <div class="panel-body chat-panel-body">
+        <div id="chat-messages" class="chat-messages-container"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
+          <button id="btn-send-chat" class="btn-primary">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player Status Popup Modal -->
+    <div id="player-popup" class="modal-popup" style="display: none;">
+      <div class="popup-overlay" id="player-popup-overlay"></div>
+      <div class="popup-content">
+        <div class="popup-header">
+          <span class="popup-title">Player Profile</span>
+          <button class="popup-close" id="btn-close-player-popup">✕</button>
+        </div>
+        <div class="popup-body">
+          <div class="player-avatar">👤</div>
+          <div class="player-detail-name" id="player-popup-name">Adventurer</div>
+          <div class="player-detail-level" id="player-popup-level">Lv.1</div>
+          <div class="player-detail-status" id="player-popup-status">Status: Online</div>
+          <button id="btn-add-friend" class="btn-primary">⭐ Add Friend</button>
+        </div>
+      </div>
+    </div>
 
   </div>
 

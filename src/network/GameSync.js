@@ -7,6 +7,7 @@ let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
 let mockPlayers = [];
 let channelSubscribed = false;
+let chatCallback = null;
 
 // Track active player info for presence updating
 let currentUserId = null;
@@ -235,8 +236,9 @@ export async function fetchLeaderboard() {
 }
 
 // ============ Realtime Presence & Broadcast ============
-export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate) {
+export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
     onlinePlayersCallback = onPlayersUpdate;
+    chatCallback = onChatCallback;
     channelSubscribed = false;
 
     // Store player info for later use in updatePresence/broadcast
@@ -331,6 +333,30 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
             if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
         }, 3000);
 
+        // Simulation for chat messages in offline mode
+        setInterval(() => {
+            if (chatCallback && mockPlayers.length > 1) {
+                const randomReplies = [
+                    'สวัสดีครับทุกคน! 😃',
+                    'ตีตัวอะไรกันอยู่หรอ?',
+                    'มอนในวิกินี้เยอะจัดเลยแฮะ',
+                    'บอส Ghostring โหดมากกก 😱',
+                    'หาตี้แอดเพื่อนกันหน่อย 🤝',
+                    'บอทฟาร์มชิวจัดๆ ⚡',
+                    'มีใครขายดาบ rare ไหม?',
+                    'เก็บเลเวลแป๊บนะค้าบ',
+                    'วันนี้ดวงดีจัง ดรอปการ์ดรึยังนะ 🍀'
+                ];
+                // Select a writer that isn't player_me
+                const candidates = mockPlayers.filter(p => p.userId !== 'player_me');
+                if (candidates.length > 0) {
+                    const sender = candidates[Math.floor(Math.random() * candidates.length)];
+                    const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
+                    chatCallback(sender.username, msg);
+                }
+            }
+        }, 12000 + Math.random() * 8000);
+
         return;
     }
 
@@ -379,6 +405,11 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
                 onPlayerPositionUpdate(payload);
             }
         })
+        .on('broadcast', { event: 'chat' }, ({ payload }) => {
+            if (chatCallback && payload) {
+                chatCallback(payload.username, payload.message);
+            }
+        })
         .subscribe(async (status, err) => {
             console.log('[Zolos] 📡 Channel status:', status, err ? 'Error: ' + err : '');
             if (status === 'SUBSCRIBED') {
@@ -417,6 +448,47 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
         event: 'pos',
         payload: { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state }
     });
+}
+
+export function broadcastChat(userId, username, level, message) {
+    if (isOfflineMode || !supabase) {
+        // Echo back local message
+        if (chatCallback) {
+            chatCallback(username, message);
+        }
+        // Simulation for a quick response
+        setTimeout(() => {
+            if (chatCallback && mockPlayers.length > 1) {
+                const replies = [
+                    'โอเคเลยครับ!',
+                    'สุดยอดฮะ 👍',
+                    'ฮ่าๆๆๆ เก่งมาก',
+                    'สู้ๆ นะ',
+                    'เวลไปยาวๆ',
+                    'แอดเพื่อนผมหน่อยย'
+                ];
+                const candidates = mockPlayers.filter(p => p.userId !== 'player_me');
+                if (candidates.length > 0) {
+                    const sender = candidates[Math.floor(Math.random() * candidates.length)];
+                    const reply = replies[Math.floor(Math.random() * replies.length)];
+                    chatCallback(sender.username, reply);
+                }
+            }
+        }, 1500 + Math.random() * 1500);
+        return;
+    }
+
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'chat',
+            payload: { userId, username, level, message }
+        });
+    }
+    // Echo back local message immediately
+    if (chatCallback) {
+        chatCallback(username, message);
+    }
 }
 
 export function updatePresence(level) {
