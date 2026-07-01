@@ -475,6 +475,12 @@ export class SceneManager {
                 const sandColor = new THREE.Color(0x8a7258);
                 const grassColor = baseColor.clone().lerp(altColor, 0.4);
                 color = sandColor.lerp(grassColor, t);
+            } else if (x < -6 && z < -6) {
+                // Cave Zone: Dark charcoal gray
+                color = new THREE.Color(0x282828).lerp(new THREE.Color(0x1a1a1a), (Math.sin(x) * Math.cos(z) * 0.5 + 0.5));
+            } else if (x > 6 && z > 6) {
+                // Mountain Zone: Stony rocky brown-gray
+                color = new THREE.Color(0x6e655b).lerp(new THREE.Color(0x4f4941), (Math.sin(x) * Math.cos(z) * 0.5 + 0.5));
             } else {
                 // Standard paths and fields color blending
                 if (Math.abs(x) < 2.0 || Math.abs(z) < 2.0) {
@@ -707,6 +713,8 @@ export class SceneManager {
             const z = (Math.random() - 0.5) * 42;
             if (Math.abs(x) < 1.5 && Math.abs(z) < 1.5) continue;
             if (!this._isOnLand(x, z)) continue;
+            if (x < -6 && z < -6) continue; // Skip Cave
+            if (x > 6 && z > 6) continue; // Skip Mountain
             this._createFlower(x, z);
         }
 
@@ -1657,6 +1665,20 @@ export class SceneManager {
 
         // Riverbed cut boundary for wider river
         return distToRiver < 5.5;
+    }
+
+    getEnvironmentAt(position) {
+        if (!position) return 'ground';
+        if (this.isInWater(position)) {
+            return 'water';
+        }
+        if (position.x < -6 && position.z < -6) {
+            return 'cave';
+        }
+        if (position.x > 6 && position.z > 6) {
+            return 'mountain';
+        }
+        return 'ground';
     }
 
     // World to screen position

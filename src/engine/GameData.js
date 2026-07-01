@@ -44,6 +44,7 @@ export const ITEMS = {
     'Novice Cutter': { emoji: '🔪', type: 'weapon', rarity: 'common', desc: 'มีดสั้นสำหรับนักผจญภัยมือใหม่ คล่องตัวสูงมาก (ATK +5)', price: 150, atkBonus: 5 },
     'Wooden Buckler': { emoji: '🛡️', type: 'shield', rarity: 'common', desc: 'โล่ไม้กลมฉลุขอบ ด้ามจับเชือกหนังต้านทานดาเมจพื้นๆ (DEF +3)', price: 120, defBonus: 3 },
     'Trash': { emoji: '👞', type: 'material', rarity: 'common', desc: 'ขยะเปียกหรือรองเท้าเก่าๆ ที่ดึงขึ้นมาได้จากแม่น้ำ สามารถดัดแปลงขายต่อ', price: 2 },
+    'Copper Coin': { emoji: '🪙', type: 'material', rarity: 'common', desc: 'เหรียญทองแดงเก่าสนิมขึ้นเล็กน้อย พบได้ตามท้องแม่น้ำหรือจากสัตว์น้ำ', price: 25 },
 
     // ---- 30 RARE ITEMS ----
     'Wooden Heart': { emoji: '❤️‍🔥', type: 'material', rarity: 'rare', desc: 'แกนกลางหัวใจไม้ที่มีพลังเวทมนตร์แฝงอยู่ นำไปทำเป็นยากลั่นหรือเครื่องรางชั้นดี', price: 80 },
@@ -129,6 +130,7 @@ export const MONSTERS = {
         gold: { min: 2, max: 8 },
         size: 0.6,
         speed: 0.5,
+        environment: 'ground',
         loot: [
             { name: 'Jellopy', emoji: '💎', type: 'material', chance: 0.6 },
             { name: 'Sticky Mucus', emoji: '💧', type: 'material', chance: 0.2 },
@@ -146,6 +148,7 @@ export const MONSTERS = {
         gold: { min: 3, max: 12 },
         size: 0.5,
         speed: 0.8,
+        environment: 'ground',
         loot: [
             { name: 'Clover', emoji: '🍀', type: 'material', chance: 0.5 },
             { name: 'Feather', emoji: '🪶', type: 'material', chance: 0.3 },
@@ -163,6 +166,7 @@ export const MONSTERS = {
         gold: { min: 5, max: 15 },
         size: 0.5,
         speed: 0.3,
+        environment: 'ground',
         loot: [
             { name: 'Worm Peeling', emoji: '🧬', type: 'material', chance: 0.5 },
             { name: 'Green Herb', emoji: '🌿', type: 'consumable', chance: 0.3 },
@@ -180,6 +184,7 @@ export const MONSTERS = {
         gold: { min: 8, max: 20 },
         size: 0.7,
         speed: 0.7,
+        environment: 'ground',
         loot: [
             { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.5 },
             { name: 'Yellow Herb', emoji: '🌾', type: 'consumable', chance: 0.2 },
@@ -197,6 +202,7 @@ export const MONSTERS = {
         gold: { min: 10, max: 30 },
         size: 0.9,
         speed: 0.2,
+        environment: 'ground',
         loot: [
             { name: 'Tree Root', emoji: '🪵', type: 'material', chance: 0.5 },
             { name: 'Wooden Heart', emoji: '❤️‍🔥', type: 'material', chance: 0.1 },
@@ -214,6 +220,7 @@ export const MONSTERS = {
         gold: { min: 15, max: 40 },
         size: 0.65,
         speed: 0.5,
+        environment: 'ground',
         loot: [
             { name: 'Grape', emoji: '🍇', type: 'consumable', chance: 0.4 },
             { name: 'Poison Spore', emoji: '☠️', type: 'material', chance: 0.3 },
@@ -231,6 +238,7 @@ export const MONSTERS = {
         gold: { min: 20, max: 50 },
         size: 0.6,
         speed: 0.6,
+        environment: 'ground',
         loot: [
             { name: 'Orange Juice', emoji: '🧃', type: 'consumable', chance: 0.3 },
             { name: 'Sticky Webfoot', emoji: '🦶', type: 'material', chance: 0.2 },
@@ -248,10 +256,11 @@ export const MONSTERS = {
         gold: { min: 50, max: 120 },
         size: 0.6,
         speed: 0.9,
+        environment: 'cave',
         loot: [
             { name: 'Devil Horn', emoji: '😈', type: 'material', chance: 0.3 },
             { name: 'Coal', emoji: '🖤', type: 'material', chance: 0.4 },
-            { name: 'Silver ring', emoji: '💍', type: 'armor', chance: 0.05 },
+            { name: 'Silver Ring', emoji: '💍', type: 'armor', chance: 0.05 },
             { name: 'Katana', emoji: '⚔️', type: 'weapon', chance: 0.02 }
         ]
     },
@@ -266,6 +275,7 @@ export const MONSTERS = {
         gold: { min: 200, max: 500 },
         size: 0.75,
         speed: 0.4,
+        environment: 'cave',
         loot: [
             { name: 'Ghostly Essence', emoji: '👻', type: 'material', chance: 0.4 },
             { name: 'Pure Emperium', emoji: '🔮', type: 'material', chance: 0.08 },
@@ -289,6 +299,7 @@ export const PAYON_MONSTERS = {
         gold: { min: 12, max: 35 },
         size: 0.7,
         speed: 0.3,
+        environment: 'ground',
         loot: [
             { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.5 },
             { name: 'Single Horn', emoji: '🌵', type: 'material', chance: 0.3 },
@@ -306,6 +317,7 @@ export const PAYON_MONSTERS = {
         gold: { min: 20, max: 50 },
         size: 0.9,
         speed: 0.7,
+        environment: 'ground',
         loot: [
             { name: 'Animal Skin', emoji: '🥩', type: 'material', chance: 0.45 },
             { name: 'Tough Vine', emoji: '🪢', type: 'material', chance: 0.25 },
@@ -323,6 +335,7 @@ export const PAYON_MONSTERS = {
         gold: { min: 15, max: 45 },
         size: 0.6,
         speed: 0.6,
+        environment: 'ground',
         loot: [
             { name: 'Poison Spore', emoji: '☠️', type: 'material', chance: 0.4 },
             { name: 'Snake Scale', emoji: '🐍', type: 'material', chance: 0.3 },
@@ -340,6 +353,7 @@ export const PAYON_MONSTERS = {
         gold: { min: 8, max: 22 },
         size: 0.6,
         speed: 0.4,
+        environment: 'cave',
         loot: [
             { name: 'Poison Spore', emoji: '☠️', type: 'material', chance: 0.5 },
             { name: 'Spore Powder', emoji: '💨', type: 'material', chance: 0.3 },
@@ -357,6 +371,7 @@ export const PAYON_MONSTERS = {
         gold: { min: 30, max: 70 },
         size: 1.1,
         speed: 0.4,
+        environment: 'mountain',
         loot: [
             { name: 'Big Bigfoot Claw', emoji: '🐾', type: 'material', chance: 0.35 },
             { name: 'Royal Jelly', emoji: '🧪', type: 'consumable', chance: 0.1 },
@@ -375,6 +390,7 @@ export const PAYON_MONSTERS = {
         gold: { min: 80, max: 180 },
         size: 0.85,
         speed: 0.9,
+        environment: 'mountain',
         loot: [
             { name: 'Nine Tail Fur', emoji: '🦊', type: 'material', chance: 0.4 },
             { name: 'Gilding Ingot', emoji: '🧱', type: 'material', chance: 0.1 },
@@ -398,6 +414,7 @@ export const WATER_MONSTERS = {
         size: 0.4,
         speed: 0.7,
         waterOnly: true,
+        environment: 'water',
         loot: [
             { name: 'Sticky Mucus', emoji: '💧', type: 'material', chance: 0.5 },
             { name: 'Apple', emoji: '🍎', type: 'consumable', chance: 0.2 },
@@ -415,6 +432,7 @@ export const WATER_MONSTERS = {
         size: 0.45,
         speed: 0.1,
         waterOnly: true,
+        environment: 'water',
         loot: [
             { name: 'Hard Shell', emoji: '🐚', type: 'material', chance: 0.5 },
             { name: 'Crystal Blue', emoji: '🔵', type: 'material', chance: 0.1 },
@@ -432,6 +450,7 @@ export const WATER_MONSTERS = {
         size: 0.5,
         speed: 1.0,
         waterOnly: true,
+        environment: 'water',
         loot: [
             { name: 'Sticky Webfoot', emoji: '🦶', type: 'material', chance: 0.4 },
             { name: 'Carrot', emoji: '🥕', type: 'consumable', chance: 0.2 },
@@ -449,6 +468,7 @@ export const WATER_MONSTERS = {
         size: 0.55,
         speed: 0.4,
         waterOnly: true,
+        environment: 'water',
         loot: [
             { name: 'Scell', emoji: '🪙', type: 'material', chance: 0.4 },
             { name: 'Green Herb', emoji: '🌿', type: 'consumable', chance: 0.25 },
@@ -467,6 +487,7 @@ export const WATER_MONSTERS = {
         size: 0.6,
         speed: 0.8,
         waterOnly: true,
+        environment: 'water',
         loot: [
             { name: 'Squid Ink', emoji: '🖤', type: 'material', chance: 0.45 },
             { name: 'Pointed Scale', emoji: '🦈', type: 'material', chance: 0.3 },
