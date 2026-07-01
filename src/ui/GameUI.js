@@ -26,6 +26,7 @@ export class GameUI {
     this._setupWiki();
     this._setupFriendSystem();
     this._setupChat();
+    this._setupMinimap();
   }
 
   show() {
@@ -1293,4 +1294,247 @@ export class GameUI {
       `;
     }
   }
+
+  _setupMinimap() {
+    this.minimapCanvas = document.getElementById('minimap-canvas');
+    this.minimapCoords = document.getElementById('minimap-coords');
+    if (this.minimapCanvas) {
+      this.minimapCtx = this.minimapCanvas.getContext('2d');
+    }
+  }
+
+  updateMinimap(playerPos, monsters, portals, npc, remotePlayersMap, currentMap) {
+    if (!this.minimapCanvas || !this.minimapCtx || !playerPos) return;
+
+    const canvas = this.minimapCanvas;
+    const ctx = this.minimapCtx;
+    const width = canvas.width;
+    const height = canvas.height;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    // Update coordinate text overlay
+    if (this.minimapCoords) {
+      this.minimapCoords.textContent = `X: ${Math.round(playerPos.x)}, Z: ${Math.round(playerPos.z)}`;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Save state for circular clipping
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, cx - 1, 0, Math.PI * 2);
+    ctx.clip();
+
+    // Map base scales: World size is 70x70 (-35 to +35)
+    // Scale: pixels per game world unit (zoom level)
+    const scale = 2.8;
+    const px = playerPos.x;
+    const pz = playerPos.z;
+
+    // 1. Draw Ground
+    ctx.fillStyle = currentMap === 'payon' ? '#5a4a2a' : '#3a7a3a';
+    ctx.fillRect(0, 0, width, height);
+
+    // 2. Cave Zone (x < -6 && z < -6)
+    // Draw it in world coordinates translated to canvas
+    // Cave zone extends from -35 to -6 on x and z
+    const caveX1 = cx + (-35 - px) * scale;
+    const caveZ1 = cy + (-35 - pz) * scale;
+    const caveX2 = cx + (-6 - px) * scale;
+    const caveZ2 = cy + (-6 - pz) * scale;
+
+    ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
+    ctx.fillRect(caveX1, caveZ1, caveX2 - caveX1, caveZ2 - caveZ1);
+
+    // 3. Mountain Zone (x > 6 && z > 6)
+    // Mountain zone extends from 6 to 35 on x and z
+    const mtX1 = cx + (6 - px) * scale;
+    const mtZ1 = cy + (6 - pz) * scale;
+    const mtX2 = cx + (35 - px) * scale;
+    const mtZ2 = cy + (35 - pz) * scale;
+
+    ctx.fillStyle = 'rgba(100, 95, 90, 0.45)';
+    ctx.fillRect(mtX1, mtZ1, mtX2 - mtX1, mtZ2 - mtZ1);
+
+    // 4. Winding River
+    // Render the river by drawing connected segments in the visible viewport
+    ctx.beginPath();
+    let first = true;
+    const viewWidthUnits = width / scale;
+    const xStart = Math.max(-35, px - viewWidthUnits / 2 - 2);
+    const xEnd = Math.min(35, px + viewWidthUnits / 2 + 2);
+
+    for (let rx = xStart; rx <= xEnd; rx += 1.0) {
+      const rz = Math.sin(rx * 0.08) * 10 - 2;
+      const dx = rx - px;
+      const dz = rz - pz;
+      const tx = cx + dx * scale;
+      const ty = cy + dz * scale;
+
+      if (first) {
+        ctx.moveTo(tx, ty);
+        first = false;
+      } else {
+        ctx.lineTo(tx, ty);
+      }
+    }
+    ctx.strokeStyle = currentMap === 'payon' ? '#254e40' : '#2d6d9d';
+    ctx.lineWidth = 5.5 * scale; // Width represents our 5.5 units riverbed size
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // 5. Wooden Bridge (centered at x = 0, z = -2, x from -1.8 to 1.8, z from -10 to 6)
+    const bridgeX1 = cx + (-1.8 - px) * scale;
+    const bridgeZ1 = cy + (-10 - pz) * scale;
+    const bridgeWidth = 3.6 * scale;
+    const bridgeHeight = 16 * scale;
+
+    ctx.fillStyle = '#7a5a3a'; // Brown wood planks color
+    ctx.fillRect(bridgeX1, bridgeZ1, bridgeWidth, bridgeHeight);
+
+    // Draw bridge lines/borders
+    ctx.strokeStyle = '#5a3d24';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bridgeX1, bridgeZ1, bridgeWidth, bridgeHeight);
+
+    // 6. Draw Portals
+    if (portals && portals.length > 0) {
+      portals.forEach(portal => {
+        const pos = portal.position;
+        if (!pos) return;
+        const dx = pos.x - px;
+        const dz = pos.z - pz;
+        const tx = cx + dx * scale;
+        const ty = cy + dz * scale;
+
+        // Pulsing outer ripple
+        const pulse = 4 + Math.sin(Date.now() * 0.01) * 1.5;
+        ctx.beginPath();
+        ctx.arc(tx, ty, pulse, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 225, 255, 0.3)';
+        ctx.fill();
+
+        // Portal core
+        ctx.beginPath();
+        ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#00e1ff';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+    }
+
+    // 7. Draw NPC
+    if (npc) {
+      const pos = npc.position;
+      if (pos) {
+        const dx = pos.x - px;
+        const dz = pos.z - pz;
+        const tx = cx + dx * scale;
+        const ty = cy + dz * scale;
+
+        ctx.beginPath();
+        ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffe040';
+        ctx.fill();
+        ctx.strokeStyle = '#120a02';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw small shop symbol
+        ctx.fillStyle = '#120a02';
+        ctx.font = 'bold 5px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('$', tx, ty);
+      }
+    }
+
+    // 8. Draw Monsters
+    if (monsters && monsters.length > 0) {
+      monsters.forEach(m => {
+        if (!m.alive) return;
+        const mPos = m.getPosition();
+        if (!mPos) return;
+
+        const dx = mPos.x - px;
+        const dz = mPos.z - pz;
+        const tx = cx + dx * scale;
+        const ty = cy + dz * scale;
+
+        const isBoss = m.type === 'ghostring' || (m.data && m.data.hp >= 500);
+
+        if (isBoss) {
+          // Boss outer glow ring
+          ctx.beginPath();
+          ctx.arc(tx, ty, 5.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 64, 64, 0.25)';
+          ctx.fill();
+          ctx.strokeStyle = '#ff3333';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Boss core dot
+          ctx.beginPath();
+          ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff0030';
+          ctx.fill();
+        } else {
+          // Regular monster dot
+          ctx.beginPath();
+          ctx.arc(tx, ty, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff4d4d'; // bright red
+          ctx.fill();
+          ctx.strokeStyle = '#601010';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      });
+    }
+
+    // 9. Draw Remote Players
+    if (remotePlayersMap) {
+      for (const remotePlayer of remotePlayersMap.values()) {
+        const mesh = remotePlayer.mesh;
+        if (!mesh) continue;
+        const rPos = mesh.position;
+        if (!rPos) continue;
+
+        const dx = rPos.x - px;
+        const dz = rPos.z - pz;
+        const tx = cx + dx * scale;
+        const ty = cy + dz * scale;
+
+        ctx.beginPath();
+        ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#2ecc71'; // bright green
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+
+    // Restore clipping mask
+    ctx.restore();
+
+    // 10. Draw Player Dot AT CENTER (always centered)
+    const pulseFactor = 0.3 + 0.3 * Math.sin(Date.now() * 0.007);
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3.5 + pulseFactor * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#00aeff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
 }
+

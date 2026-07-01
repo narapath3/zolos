@@ -665,6 +665,21 @@ function gameLoop() {
         gameUI.updateStats(character.stats);
     }
 
+    // Update Mini-map every frame
+    if (gameUI && character && character.isAlive()) {
+        const aliveMonsters = monsters ? monsters.getAlive() : [];
+        const portals = sceneManager ? sceneManager.getPortals() : [];
+        const npc = sceneManager ? sceneManager.getNPC() : null;
+        gameUI.updateMinimap(
+            character.getPosition(),
+            aliveMonsters,
+            portals,
+            npc,
+            remotePlayersMap,
+            sceneManager ? sceneManager.currentMap : 'prontera'
+        );
+    }
+
     // Render
     sceneManager.render();
 }

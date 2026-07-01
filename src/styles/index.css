@@ -1135,23 +1135,24 @@ body {
 #kill-counter {
   position: fixed;
   top: 16px;
-  right: 16px;
+  right: 154px;
   z-index: 100;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 10px 16px;
+  padding: 8px 14px;
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--font-pixel);
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .kill-icon {
-  font-size: 18px;
+  font-size: 14px;
 }
+
 
 /* ========== MAP NAME (inside bars container) ========== */
 #map-name {
@@ -1420,6 +1421,11 @@ body {
     right: 8px;
     padding: 6px 10px;
     font-size: 11px;
+  }
+
+  /* Minimap mobile tuning */
+  #minimap-container {
+    display: none;
   }
 }
 
@@ -2330,4 +2336,137 @@ body {
   padding: 0 16px;
   font-family: var(--font-pixel);
   font-size: 10px;
+}
+
+/* ========== MINIMAP HUD ========== */
+#minimap-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: rgba(10, 15, 30, 0.75);
+  border: 1.5px solid rgba(240, 192, 64, 0.35);
+  padding: 6px;
+  border-radius: 50%;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(240, 192, 64, 0.15);
+  width: 122px;
+  height: 122px;
+  box-sizing: border-box;
+  animation: fadeInRight 0.5s ease-out;
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.minimap-header {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 15, 30, 0.85);
+  border: 1px solid rgba(240, 192, 64, 0.3);
+  padding: 3px 8px;
+  border-radius: 10px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+#minimap-coords {
+  color: #f0c040;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 4px rgba(240, 192, 64, 0.4);
+}
+
+.minimap-canvas-wrapper {
+  position: relative;
+  width: 106px;
+  height: 106px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.82);
+  background: rgba(5, 8, 15, 0.95);
+}
+
+#minimap-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.minimap-radar-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, rgba(240, 192, 64, 0.22) 0deg, rgba(240, 192, 64, 0.05) 45deg, rgba(240, 192, 64, 0) 120deg, rgba(240, 192, 64, 0) 360deg);
+  animation: radarRotate 3.5s linear infinite;
+  mix-blend-mode: screen;
+}
+
+@keyframes radarRotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.minimap-direction {
+  position: absolute;
+  color: var(--text-dim);
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  font-weight: bold;
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000;
+  z-index: 105;
+}
+
+.minimap-direction.north {
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ff4060;
+  text-shadow: 0 0 3px rgba(255, 64, 96, 0.6);
+}
+
+.minimap-direction.east {
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.minimap-direction.south {
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.minimap-direction.west {
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
 }
