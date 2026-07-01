@@ -1117,7 +1117,10 @@ export class GameUI {
         if (this.selectedWikiItem === key) {
           slot.classList.add('selected');
         }
-        slot.innerHTML = `<span>${monster.emoji || '👾'}</span>`;
+        slot.innerHTML = `
+          <span class="wiki-slot-emoji">${monster.emoji || '👾'}</span>
+          <span class="wiki-slot-name">${monster.name}</span>
+        `;
         slot.title = monster.name;
         slot.addEventListener('click', () => {
           this.selectedWikiItem = key;
@@ -1138,7 +1141,10 @@ export class GameUI {
         if (this.selectedWikiItem === key) {
           slot.classList.add('selected');
         }
-        slot.innerHTML = `<span>${item.emoji || '📦'}</span>`;
+        slot.innerHTML = `
+          <span class="wiki-slot-emoji">${item.emoji || '📦'}</span>
+          <span class="wiki-slot-name">${key}</span>
+        `;
         slot.title = key;
         slot.addEventListener('click', () => {
           this.selectedWikiItem = key;
@@ -1211,15 +1217,14 @@ export class GameUI {
         cave: 'Cave / ในถ้ำ 🪨',
         mountain: 'Mountain / ภูเขา 🏔️'
       };
-      const envName = envDict[monster.environment] || 'Main Land / พื้นดิน 🏜️';
       content.innerHTML = `
-        < div class="detail-row" >
+        <div class="detail-row">
           <span class="detail-icon" style="background:${monster.color}22">${monster.emoji || '👾'}</span>
           <div class="detail-info-block">
             <div class="wiki-detail-title">${monster.name}</div>
             <div class="detail-type" style="color:#ff6080">Monster (Lv.${approxLevel})</div>
           </div>
-        </div >
+        </div>
         <div class="detail-desc" style="margin-top:8px">
           HP: ${monster.hp} | ATK: ${monster.atk} | DEF: ${monster.def}<br />
           EXP Gain: ${monster.exp} | Zeny: ${goldText}<br />
@@ -1235,7 +1240,7 @@ export class GameUI {
       // Equip stats details
       let statsHtml = '';
       if (item.atkBonus || item.defBonus || item.hpBonus || item.spBonus) {
-        statsHtml = `< div class="wiki-section-title" >📊 Equipment Bonuses / โบนัสสเตตัส:</div > <div class="detail-desc">`;
+        statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div> <div class="detail-desc">`;
         if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br />`;
         if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br />`;
         if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br />`;
@@ -1258,7 +1263,7 @@ export class GameUI {
       });
 
       if (droppers.length > 0) {
-        droppedByHtml = `< div class="wiki-section-title" >👾 Dropped By / ได้จากมอนสเตอร์:</div > <div class="wiki-drops-list">`;
+        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div> <div class="wiki-drops-list">`;
         droppers.forEach(d => {
           droppedByHtml += `
             <div class="wiki-drop-item">
@@ -1271,13 +1276,13 @@ export class GameUI {
       }
 
       content.innerHTML = `
-          < div class="detail-row" >
+        <div class="detail-row">
           <span class="detail-icon">${item.emoji || '📦'}</span>
           <div class="detail-info-block">
             <div class="wiki-detail-title color-${item.rarity || 'common'}">${key}</div>
             <div class="detail-type color-${item.rarity || 'common'}">${item.type.toUpperCase()} (${item.rarity || 'common'})</div>
           </div>
-        </div >
+        </div>
         <div class="detail-desc" style="margin-top:8px">
           ${item.desc}<br />
           <span style="color:#d0d040">Zeny Price: ${item.price}z</span>

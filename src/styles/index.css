@@ -1945,19 +1945,41 @@ body {
 
 /* For list items of Wiki */
 .wiki-slot {
-  aspect-ratio: 1;
   background: rgba(20, 24, 38, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  padding: 6px 4px;
+  min-height: 56px;
   position: relative;
   transition: all 0.15s;
   cursor: pointer;
   user-select: none;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.wiki-slot-emoji {
+  font-size: 20px;
+}
+
+.wiki-slot-name {
+  font-size: 8px;
+  color: var(--text-dim);
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  font-family: var(--font-pixel);
+}
+
+.wiki-slot:hover .wiki-slot-name,
+.wiki-slot.selected .wiki-slot-name {
+  color: var(--primary);
 }
 
 .wiki-slot:hover {
