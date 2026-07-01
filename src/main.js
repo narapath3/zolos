@@ -1,7 +1,7 @@
 // ZOLOS — Idle RPG Online
 // Main Entry Point
 import { SceneManager } from './engine/SceneManager.js';
-import { CharacterManager, RemotePlayer } from './engine/CharacterManager.js';
+import { CharacterManager, RemotePlayer, getCharacterColor } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
 import { CombatSystem } from './engine/CombatSystem.js';
 import { ParticleSystem } from './engine/ParticleSystem.js';
@@ -65,6 +65,65 @@ async function initGame() {
         broadcastChat(userId, username, character.stats.level, message);
     });
 
+    // Setup profile save callback
+    gameUI.setupProfileSaveCallback(async (data) => {
+        const appData = {
+            shirtColor: data.shirtColor,
+            pantsColor: data.pantsColor,
+            hairColor: data.hairColor,
+            hat: data.hat,
+            glasses: data.glasses,
+            weapon: data.weapon
+        };
+
+        // Cache locally for persistence
+        localStorage.setItem(`zolos_appearance_${userId}`, JSON.stringify({
+            name: data.name,
+            ...appData
+        }));
+
+        if (data.name) {
+            character.stats.name = data.name;
+            username = data.name;
+            character.updateNameTag();
+
+            if (character.characterId) {
+                await saveCharacter(character.characterId, { name: data.name });
+            }
+        }
+
+        character.setBodyColor(data.shirtColor);
+        character.setPantsColor(data.pantsColor);
+        character.setHairColor(data.hairColor);
+        character.setHat(data.hat);
+        character.setGlasses(data.glasses);
+
+        // Apply weapon equipment choice
+        if (data.weapon === 'None') {
+            const equippedWeapon = gameUI.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
+            if (equippedWeapon) {
+                await gameUI._toggleEquipItem(equippedWeapon);
+            }
+        } else {
+            const weaponItem = gameUI.inventory.find(i => i.item_name === data.weapon);
+            if (weaponItem) {
+                if (!weaponItem.stats || !weaponItem.stats.equipped) {
+                    await gameUI._toggleEquipItem(weaponItem);
+                }
+            } else {
+                character.equipWeapon(null);
+            }
+        }
+
+        const { updatePresence } = await import('./network/GameSync.js');
+        updatePresence(character.stats.level, username);
+
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, appData);
+
+        gameUI.updateHUD(character.stats);
+        gameUI.updateStats(character.stats);
+    });
+
     // Expose for debugging
     window.sceneManager = sceneManager;
     window.character = character;
@@ -82,6 +141,44 @@ async function initGame() {
     } catch (e) {
         console.warn('Could not load from DB, using defaults:', e.message);
         character.stats.name = username;
+    }
+
+    // Load custom appearance if saved
+    const savedApp = localStorage.getItem(`zolos_appearance_${userId}`);
+    if (savedApp) {
+        try {
+            const data = JSON.parse(savedApp);
+            if (data.name) {
+                character.stats.name = data.name;
+                username = data.name;
+            }
+            if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
+            if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
+            if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
+            if (data.hat !== undefined) character.setHat(data.hat);
+            if (data.glasses !== undefined) character.setGlasses(data.glasses);
+            character.updateNameTag();
+
+            // Equip weapon if stored
+            if (data.weapon) {
+                if (data.weapon === 'None') {
+                    character.equipWeapon(null);
+                } else {
+                    const weaponItem = gameUI.inventory.find(i => i.item_name === data.weapon);
+                    if (weaponItem) {
+                        if (!weaponItem.stats || !weaponItem.stats.equipped) {
+                            await gameUI._toggleEquipItem(weaponItem);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Failed to restore custom appearance:', e);
+            character.setBodyColor(getCharacterColor(username));
+        }
+    } else {
+        // Set consistent body color based on username
+        character.setBodyColor(getCharacterColor(username));
     }
 
     // Init combat system
@@ -199,10 +296,7 @@ async function initGame() {
 
         let remotePlayer = remotePlayersMap.get(posData.userId);
         if (!remotePlayer) {
-            // Pick a consistent color based on username
-            const charCodeSum = posData.username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            const colors = [0x40c060, 0xc0a040, 0x8a40c5, 0x4080c5, 0xc05040, 0xe080a0];
-            const color = colors[charCodeSum % colors.length];
+            const color = getCharacterColor(posData.username);
 
             remotePlayer = new RemotePlayer(
                 sceneManager.scene,
@@ -655,7 +749,15 @@ function gameLoop() {
     // Broadcast own position every 100ms
     const now = performance.now();
     if (now - lastBroadcastTime > 100 && character && userId) {
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state);
+        const appearance = {
+            shirtColor: character.bodyColor,
+            pantsColor: character.pantsColor,
+            hairColor: character.hairColor,
+            hat: character.equippedHat || 'None',
+            glasses: character.equippedGlasses || 'None',
+            weapon: character.equippedWeapon || 'None'
+        };
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, appearance);
         lastBroadcastTime = now;
     }
 

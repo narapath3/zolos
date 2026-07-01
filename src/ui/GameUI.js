@@ -20,6 +20,9 @@ export class GameUI {
     this.shopTab = 'buy';
     this.selectedShopItemName = null;
 
+    // Profile Editor callback
+    this.profileSaveCallback = null;
+
     this._setupPanels();
     this._setupROInventoryEvents();
     this._setupShopEvents();
@@ -27,6 +30,7 @@ export class GameUI {
     this._setupFriendSystem();
     this._setupChat();
     this._setupMinimap();
+    this._setupProfileEditor();
   }
 
   show() {
@@ -800,6 +804,91 @@ export class GameUI {
         setTimeout(() => el.remove(), 500);
       }
     }, 8000);
+  }
+
+  // ============ Profile Editor ============
+  _setupProfileEditor() {
+    const modal = document.getElementById('profile-editor-modal');
+    const overlay = document.getElementById('profile-editor-overlay');
+    const closeBtn = document.getElementById('btn-close-profile-editor');
+    const saveBtn = document.getElementById('btn-save-profile');
+    const cancelBtn = document.getElementById('btn-cancel-profile');
+    const playerInfo = document.querySelector('.player-info');
+
+    if (!modal || !playerInfo) return;
+
+    // Helper: convert int hex to #rrggbb string
+    const hexToStr = (h) => '#' + ('000000' + h.toString(16)).slice(-6);
+    // Helper: convert #rrggbb string to int
+    const strToHex = (s) => parseInt(s.replace('#', ''), 16);
+
+    const openEditor = () => {
+      // Populate current values
+      const nameInput = document.getElementById('profile-edit-name');
+      const shirtInput = document.getElementById('profile-edit-shirt');
+      const pantsInput = document.getElementById('profile-edit-pants');
+      const hairInput = document.getElementById('profile-edit-hair');
+      const weaponSelect = document.getElementById('profile-edit-weapon');
+      const hatSelect = document.getElementById('profile-edit-hat');
+      const glassesSelect = document.getElementById('profile-edit-glasses');
+
+      if (this.character) {
+        if (nameInput) nameInput.value = this.character.stats?.name || '';
+        if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
+        if (pantsInput) pantsInput.value = hexToStr(this.character.pantsColor || 0x3a3a5a);
+        if (hairInput) hairInput.value = hexToStr(this.character.hairColor || 0xc04040);
+        if (hatSelect) hatSelect.value = this.character.equippedHat || 'None';
+        if (glassesSelect) glassesSelect.value = this.character.equippedGlasses || 'None';
+
+        // Set weapon dropdown to currently equipped weapon
+        if (weaponSelect) {
+          const equippedWeapon = this.inventory.find(i =>
+            (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true
+          );
+          weaponSelect.value = equippedWeapon ? equippedWeapon.item_name : 'None';
+        }
+      }
+
+      modal.style.display = 'flex';
+    };
+
+    const closeEditor = () => {
+      modal.style.display = 'none';
+    };
+
+    // Open on player-info click
+    playerInfo.addEventListener('click', openEditor);
+
+    // Close buttons
+    if (closeBtn) closeBtn.addEventListener('click', closeEditor);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeEditor);
+    if (overlay) overlay.addEventListener('click', closeEditor);
+
+    // Save & Apply
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        const data = {
+          name: document.getElementById('profile-edit-name')?.value.trim() || '',
+          shirtColor: strToHex(document.getElementById('profile-edit-shirt')?.value || '#4060c0'),
+          pantsColor: strToHex(document.getElementById('profile-edit-pants')?.value || '#3a3a5a'),
+          hairColor: strToHex(document.getElementById('profile-edit-hair')?.value || '#c04040'),
+          weapon: document.getElementById('profile-edit-weapon')?.value || 'Sword',
+          hat: document.getElementById('profile-edit-hat')?.value || 'None',
+          glasses: document.getElementById('profile-edit-glasses')?.value || 'None',
+        };
+
+        if (this.profileSaveCallback) {
+          this.profileSaveCallback(data);
+        }
+
+        this.addCombatLog('✅ โปรไฟล์บันทึกสำเร็จ!', 'system');
+        closeEditor();
+      });
+    }
+  }
+
+  setupProfileSaveCallback(callback) {
+    this.profileSaveCallback = callback;
   }
 
   // ============ Auto Farm Button ============

@@ -441,12 +441,14 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
         });
 }
 
-export function broadcastPosition(userId, username, level, position, rotationY, state) {
+export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
     if (isOfflineMode || !supabase || !presenceChannel || !channelSubscribed) return;
+    const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
+    if (appearance) payload.appearance = appearance;
     presenceChannel.send({
         type: 'broadcast',
         event: 'pos',
-        payload: { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state }
+        payload
     });
 }
 
@@ -491,12 +493,18 @@ export function broadcastChat(userId, username, level, message) {
     }
 }
 
-export function updatePresence(level) {
+export function updatePresence(level, newUsername = null) {
     currentLevel = level;
+    if (newUsername) {
+        currentUsername = newUsername;
+    }
 
     if (isOfflineMode || !supabase) {
         const me = mockPlayers.find(p => p.userId === 'player_me');
-        if (me) me.level = level;
+        if (me) {
+            me.level = level;
+            if (newUsername) me.username = newUsername;
+        }
         if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
         return;
     }
@@ -504,7 +512,7 @@ export function updatePresence(level) {
     if (presenceChannel && channelSubscribed) {
         presenceChannel.track({
             username: currentUsername,
-            level: level,
+            level: currentLevel,
             online_at: new Date().toISOString()
         });
     }
