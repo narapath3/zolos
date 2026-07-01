@@ -2470,3 +2470,43 @@ body {
   top: 50%;
   transform: translateY(-50%);
 }
+
+/* Media query at the bottom to handle responsive overrides cleanly */
+@media (max-width: 600px) {
+  #hud-top {
+    right: 148px;
+    /* Leave space for the minimap and prevent overlap */
+  }
+
+  #minimap-container {
+    display: flex;
+    /* Show the minimap on mobile as well */
+    width: 100px;
+    /* Slightly smaller minimap for mobile screen space */
+    height: 100px;
+    top: 8px;
+    right: 8px;
+  }
+
+  .minimap-canvas-wrapper {
+    width: 86px;
+    height: 86px;
+  }
+
+  .minimap-header {
+    bottom: -22px;
+    padding: 2px 6px;
+  }
+
+  #minimap-coords {
+    font-size: 6px;
+  }
+
+  #kill-counter {
+    top: 140px;
+    /* Positioned below the minimap coordinates */
+    right: 8px;
+    padding: 5px 8px;
+    font-size: 9px;
+  }
+}
