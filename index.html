@@ -216,7 +216,7 @@
     <!-- Market Panel (P2P) -->
     <div id="market-panel" class="side-panel" style="display: none;">
       <div class="panel-header">
-        <h3>⚖️ ตลาด ซื้อ-ขาย (P2P)</h3>
+        <h3>⚖️ ตลาดผู้เล่น (P2P)</h3>
         <button class="panel-close" data-close="market-panel">✕</button>
       </div>
       <div class="panel-body">
@@ -269,6 +269,43 @@
             </div>
             <button id="btn-market-list-action" class="btn-primary" style="width: 100%; margin-top: 10px;">⚖️
               เริ่มตั้งขาย (List Item)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NPC Shop Panel -->
+    <div id="shop-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>🏪 ร้านค้า NPC (Kafra)</h3>
+        <button class="panel-close" data-close="shop-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="gold-display">💰 <span id="shop-gold-amount">0</span> Zeny</div>
+        
+        <div class="shop-tabs">
+          <button class="shop-tab active" data-tab="all">ทั้งหมด</button>
+          <button class="shop-tab" data-tab="usable">ของใช้</button>
+          <button class="shop-tab" data-tab="equip">อุปกรณ์</button>
+        </div>
+
+        <div class="shop-grid" id="shop-grid"></div>
+
+        <div id="shop-detail-box" class="shop-detail-box">
+          <div id="shop-detail-placeholder" class="shop-detail-placeholder">คลิกไอเทมเพื่อดูรายละเอียดและสั่งซื้อ</div>
+          <div id="shop-detail-content" class="shop-detail-content" style="display: none;">
+            <div class="detail-row">
+              <span id="shop-detail-icon" class="detail-icon">📦</span>
+              <div class="detail-info-block">
+                <div id="shop-detail-name" class="detail-name">Item Name</div>
+                <div id="shop-detail-type" class="detail-type">Type</div>
+              </div>
+            </div>
+            <div id="shop-detail-desc" class="detail-desc">Description.</div>
+            <div class="detail-actions">
+              <span class="detail-price">ราคา: <span id="shop-detail-price-val">0</span> z</span>
+              <button id="btn-buy-npc-item" class="btn-use-item">ซื้อไอเทม</button>
+            </div>
           </div>
         </div>
       </div>
