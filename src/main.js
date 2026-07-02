@@ -212,11 +212,11 @@ async function initGame() {
                 character.targetNPC = null;
                 character.targetDest = null;
                 gameUI.addCombatLog(`🎯 Target lock: ${hit.object.data.name}`, 'system');
-            } else if (hit.type === 'npc') {
+            } else             if (hit.type === 'npc') {
                 character.targetNPC = hit.object;
                 character.targetMonster = null;
                 character.targetDest = null;
-                gameUI.addCombatLog('🚶 เดินทางไปยังตลาด...', 'system');
+                gameUI.addCombatLog('🚶 เดินทางไปยังร้านค้า Kafra...', 'system');
             } else if (hit.type === 'ground') {
                 character.targetDest = hit.point;
                 character.targetMonster = null;
@@ -531,8 +531,10 @@ function gameLoop() {
             } else {
                 character.targetNPC = null;
                 character.state = 'idle';
-                const btnMarket = document.getElementById('btn-market');
-                if (btnMarket) btnMarket.click();
+                if (gameUI) {
+                    gameUI._togglePanel('shop-panel');
+                    gameUI._renderShop();
+                }
             }
         } else if (character.targetDest) {
             const arrived = character.moveToward(character.targetDest, dt);
