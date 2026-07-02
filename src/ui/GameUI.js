@@ -250,6 +250,21 @@ export class GameUI {
     };
   }
 
+  _getItemDroppers(itemName) {
+    const droppers = [];
+    const allMons = getAllMonsters();
+    Object.keys(allMons).forEach(mKey => {
+      const m = allMons[mKey];
+      if (m.loot) {
+        const lootFound = m.loot.find(l => l.name === itemName);
+        if (lootFound) {
+          droppers.push({ name: m.name, emoji: m.emoji, chance: lootFound.chance });
+        }
+      }
+    });
+    return droppers;
+  }
+
   async loadInventoryFromDB(characterId) {
     this.characterId = characterId;
     try {
@@ -408,7 +423,14 @@ export class GameUI {
       typeStr = 'Shield';
     }
     document.getElementById('detail-type').textContent = typeStr;
-    document.getElementById('detail-desc').textContent = item.desc;
+    const droppers = this._getItemDroppers(item.item_name);
+    let droppedByHtml = '';
+    if (droppers.length > 0) {
+      droppedByHtml = `<br/><br/><strong style="color:var(--secondary)">👾 Dropped By / ได้จากมอนสเตอร์:</strong><br/>` + droppers.map(d => `${d.emoji} ${d.name} (${(d.chance * 100).toFixed(1)}%)`).join('<br/>');
+    } else {
+      droppedByHtml = `<br/><br/><strong style="color:var(--text-dim)">👾 Dropped By:</strong> ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)`;
+    }
+    document.getElementById('detail-desc').innerHTML = item.desc + droppedByHtml;
     document.getElementById('detail-price-val').textContent = item.price;
 
     const useBtn = document.getElementById('btn-use-item');
@@ -1079,7 +1101,14 @@ export class GameUI {
     const priceEl = document.getElementById('shop-detail-price');
     priceEl.textContent = `${type === 'buy' ? 'Buy Price' : 'Sell Value'}: ${price} Zeny`;
 
-    document.getElementById('shop-detail-desc').textContent = registryItem.desc || 'No description.';
+    const droppers = this._getItemDroppers(itemName);
+    let droppedByHtml = '';
+    if (droppers.length > 0) {
+      droppedByHtml = `<br/><br/><strong style="color:var(--secondary)">👾 Dropped By / ได้จากมอนสเตอร์:</strong><br/>` + droppers.map(d => `${d.emoji} ${d.name} (${(d.chance * 100).toFixed(1)}%)`).join('<br/>');
+    } else {
+      droppedByHtml = `<br/><br/><strong style="color:var(--text-dim)">👾 Dropped By:</strong> ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)`;
+    }
+    document.getElementById('shop-detail-desc').innerHTML = (registryItem.desc || 'No description.') + droppedByHtml;
 
     const actionBtn = document.getElementById('btn-shop-action');
     actionBtn.textContent = type === 'buy' ? '💸 Buy Item' : '💰 Sell Item';
@@ -1381,17 +1410,7 @@ export class GameUI {
 
       // Check who drops this item
       let droppedByHtml = '';
-      const droppers = [];
-      const allMonsForDrops = getAllMonsters();
-      Object.keys(allMonsForDrops).forEach(mKey => {
-        const m = allMonsForDrops[mKey];
-        if (m.loot) {
-          const lootFound = m.loot.find(l => l.name === key);
-          if (lootFound) {
-            droppers.push({ name: m.name, emoji: m.emoji, chance: lootFound.chance });
-          }
-        }
-      });
+      const droppers = this._getItemDroppers(key);
 
       if (droppers.length > 0) {
         droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
