@@ -1,6 +1,5 @@
-// Game UI — HUD, panels, combat log, and all in-game UI
 import { getExpRequired, ITEMS, SHOP_ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing } from '../network/GameSync.js';
 
 export class GameUI {
   constructor(character = null, soundManager = null) {
@@ -20,12 +19,17 @@ export class GameUI {
     this.shopTab = 'buy';
     this.selectedShopItemName = null;
 
+    // P2P Market state
+    this.marketTab = 'buy';
+    this.selectedMarketItem = null;
+
     // Profile Editor callback
     this.profileSaveCallback = null;
 
     this._setupPanels();
     this._setupROInventoryEvents();
     this._setupShopEvents();
+    this._setupMarketEvents();
     this._setupWiki();
     this._setupFriendSystem();
     this._setupChat();
@@ -49,6 +53,13 @@ export class GameUI {
       this._togglePanel('shop-panel');
       this._renderShop();
     });
+    const btnMarket = document.getElementById('btn-market');
+    if (btnMarket) {
+      btnMarket.addEventListener('click', () => {
+        this._togglePanel('market-panel');
+        this._renderMarket();
+      });
+    }
     document.getElementById('btn-leaderboard').addEventListener('click', () => {
       this._togglePanel('leaderboard-panel');
       this._refreshLeaderboard();
@@ -1201,6 +1212,335 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+  }
+
+  // ============ P2P Marketplace Logic ============
+  _setupMarketEvents() {
+    // Tab switching
+    const tabs = document.querySelectorAll('.market-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.marketTab = tab.getAttribute('data-tab');
+        this.selectedMarketItem = null;
+
+        // Reset form
+        const form = document.getElementById('market-sell-form');
+        if (form) form.style.display = 'none';
+
+        this._renderMarket();
+      });
+    });
+
+    // Search filter
+    const searchInput = document.getElementById('market-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        this._renderMarket();
+      });
+    }
+
+    // List button
+    const listBtn = document.getElementById('btn-market-list-action');
+    if (listBtn) {
+      listBtn.addEventListener('click', () => this._performMarketListAction());
+    }
+  }
+
+  _isItemEquipped(item) {
+    if (!this.character || !item) return false;
+    if (item.stats && item.stats.equipped === true) return true;
+    if (item.item_name === this.character.equippedHat) return true;
+    if (item.item_name === this.character.equippedGlasses) return true;
+    if (item.item_name === this.character.equippedArmor) return true;
+    if (item.item_name === this.character.equippedShield) return true;
+    return false;
+  }
+
+  async _renderMarket() {
+    // Update gold display
+    const goldDisplay = document.getElementById('market-gold-amount');
+    if (goldDisplay && this.character) {
+      goldDisplay.textContent = this.character.stats.gold;
+    }
+
+    if (this.marketTab === 'buy') {
+      document.getElementById('market-buy-container').style.display = 'block';
+      document.getElementById('market-sell-container').style.display = 'none';
+
+      const grid = document.getElementById('market-items-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const query = (document.getElementById('market-search-input')?.value || '').toLowerCase().trim();
+
+      const listings = await fetchMarketListings();
+      const filtered = listings.filter(l =>
+        l.item_name.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;grid-column: span 5;">ไม่มีไอเทมที่วางขายในขณะนี้</div>';
+        return;
+      }
+
+      filtered.forEach(listing => {
+        const itemInfo = ITEMS[listing.item_name] || { emoji: '📦' };
+        const row = document.createElement('div');
+        row.className = 'market-item-row';
+
+        const isMine = listing.seller_id === this.characterId;
+
+        row.innerHTML = `
+          <div class="market-item-name-cell">
+            <span>${itemInfo.emoji}</span>
+            <span class="market-item-name-text" title="${listing.item_name}">${listing.item_name}</span>
+          </div>
+          <div class="market-item-qty-cell">x${listing.quantity}</div>
+          <div class="market-item-price-cell">${listing.price}z</div>
+          <div class="market-item-seller-cell" title="${listing.seller_name}">${listing.seller_name}${isMine ? ' (คุณ)' : ''}</div>
+          <div class="market-item-action-cell">
+            ${isMine ?
+            `<button class="btn-market-cancel" data-id="${listing.id}">ยกเลิก</button>` :
+            `<button class="btn-market-buy" data-id="${listing.id}">ซื้อ</button>`
+          }
+          </div>
+        `;
+
+        // Action click
+        const actionBtn = row.querySelector('button');
+        if (actionBtn) {
+          actionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isMine) {
+              this._performMarketCancelAction(listing);
+            } else {
+              this._performMarketBuyAction(listing);
+            }
+          });
+        }
+
+        grid.appendChild(row);
+      });
+    } else {
+      document.getElementById('market-buy-container').style.display = 'none';
+      document.getElementById('market-sell-container').style.display = 'block';
+
+      this._renderMarketSellInventory();
+    }
+  }
+
+  _renderMarketSellInventory() {
+    const grid = document.getElementById('market-sell-inventory-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    // Filter only non-equipped sellable items
+    const sellable = this.inventory.filter(item => !this._isItemEquipped(item));
+
+    if (sellable.length === 0) {
+      grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
+      return;
+    }
+
+    sellable.forEach(item => {
+      const slot = document.createElement('div');
+      slot.className = 'inventory-slot';
+      if (this.selectedMarketItem && this.selectedMarketItem.item_name === item.item_name) {
+        slot.classList.add('selected');
+      }
+      slot.innerHTML = `
+        <div class="slot-icon">${item.emoji}</div>
+        <div class="slot-quantity">x${item.quantity}</div>
+      `;
+      slot.addEventListener('click', () => {
+        this.selectedMarketItem = item;
+        this._renderMarketSellInventory();
+        this._updateMarketSellForm();
+      });
+      grid.appendChild(slot);
+    });
+  }
+
+  _updateMarketSellForm() {
+    const form = document.getElementById('market-sell-form');
+    if (!form || !this.selectedMarketItem) return;
+
+    form.style.display = 'block';
+    document.getElementById('market-sell-item-icon').textContent = this.selectedMarketItem.emoji;
+    document.getElementById('market-sell-item-name').textContent = this.selectedMarketItem.item_name;
+    document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่มี: ${this.selectedMarketItem.quantity}`;
+
+    // Set defaults
+    const qtyInput = document.getElementById('market-sell-qty-input');
+    const priceInput = document.getElementById('market-sell-price-input');
+    if (qtyInput) {
+      qtyInput.value = 1;
+      qtyInput.max = this.selectedMarketItem.quantity;
+    }
+    if (priceInput) {
+      priceInput.value = '';
+    }
+  }
+
+  async _performMarketListAction() {
+    if (!this.selectedMarketItem || !this.character || !this.characterId) return;
+
+    const item = this.selectedMarketItem;
+    const qtyInput = document.getElementById('market-sell-qty-input');
+    const priceInput = document.getElementById('market-sell-price-input');
+
+    if (!qtyInput || !priceInput) return;
+
+    const qty = parseInt(qtyInput.value);
+    const price = parseInt(priceInput.value);
+
+    if (isNaN(qty) || qty < 1 || qty > item.quantity) {
+      this.addCombatLog('❌ จำนวนที่ตั้งขายไม่ถูกต้อง!', 'system');
+      if (this.soundManager) this.soundManager.playErrorSound?.();
+      return;
+    }
+
+    if (isNaN(price) || price < 0) {
+      this.addCombatLog('❌ ราคา Zeny ไม่ถูกต้อง!', 'system');
+      if (this.soundManager) this.soundManager.playErrorSound?.();
+      return;
+    }
+
+    // Call service to list
+    const listing = await listMarketItem(
+      this.characterId,
+      this.character.stats.name,
+      item.item_name,
+      item.item_type,
+      qty,
+      price,
+      item.stats || {}
+    );
+
+    if (listing) {
+      // Deduct from local inventory
+      const itemIdx = this.inventory.findIndex(i => i.item_name === item.item_name);
+      if (itemIdx >= 0) {
+        this.inventory[itemIdx].quantity -= qty;
+        if (this.inventory[itemIdx].quantity <= 0) {
+          this.inventory.splice(itemIdx, 1);
+        }
+      }
+
+      // Sync inventory DB decrement
+      saveInventoryItem(this.characterId, item.item_name, item.item_type, -qty, item.stats || {}).catch(() => { });
+
+      this.addCombatLog(`⚖️ ตั้งขาย ${item.emoji} ${item.item_name} x${qty} ราคา ${price} Zeny แล้ว`, 'system');
+      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
+
+      // Reset selection and close form
+      this.selectedMarketItem = null;
+      document.getElementById('market-sell-form').style.display = 'none';
+
+      // Refresh displays
+      this._renderMarket();
+      this._renderInventory();
+    }
+  }
+
+  async _performMarketBuyAction(listing) {
+    if (!this.character || !this.characterId) return;
+
+    if (this.character.stats.gold < listing.price) {
+      this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอสำหรับการสั่งซื้อนี้!', 'system');
+      if (this.soundManager) this.soundManager.playErrorSound?.();
+      return;
+    }
+
+    if (confirm(`คุณต้องการซื้อ ${listing.item_name} x${listing.quantity} ในราคา ${listing.price} Zeny หรือไม่?`)) {
+      // Decrease gold
+      this.character.stats.gold -= listing.price;
+
+      // Purchase service call (removes listing and adds gold to seller)
+      const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
+
+      if (boughtResult) {
+        // Add item to local inventory
+        const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
+        const existing = this.inventory.find(i => i.item_name === listing.item_name);
+        if (existing) {
+          existing.quantity += listing.quantity;
+        } else {
+          this.inventory.push({
+            item_name: listing.item_name,
+            item_type: listing.item_type,
+            emoji: itemRegistry.emoji || '📦',
+            desc: itemRegistry.desc || '',
+            price: itemRegistry.price || 10,
+            healHp: itemRegistry.healHp || 0,
+            restoreSp: itemRegistry.restoreSp || 0,
+            quantity: listing.quantity,
+            stats: listing.stats || {}
+          });
+        }
+
+        // Save character stats for gold sync
+        if (this.character.saveStatsToDatabase) {
+          this.character.saveStatsToDatabase().catch(() => { });
+        }
+
+        this.addCombatLog(`🛒 ซื้อ ${listing.item_name} x${listing.quantity} สำเร็จ (-${listing.price} Zeny)`, 'system');
+        if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
+
+        // Refresh displays
+        this._renderMarket();
+        this._renderInventory();
+        this.updateHUD(this.character.stats);
+        this.updateStats(this.character.stats);
+      } else {
+        // Refund gold
+        this.character.stats.gold += listing.price;
+        this.addCombatLog('❌ การซื้อล้มเหลว! ไอเทมอาจถูกผู้เล่นอื่นซื้อไปแล้ว', 'system');
+        if (this.soundManager) this.soundManager.playErrorSound?.();
+        this._renderMarket();
+      }
+    }
+  }
+
+  async _performMarketCancelAction(listing) {
+    if (!this.characterId) return;
+
+    if (confirm(`คุณต้องการยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} หรือไม่?`)) {
+      const canceled = await cancelMarketListing(listing.id, this.characterId);
+      if (canceled) {
+        // Add back to local inventory
+        const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
+        const existing = this.inventory.find(i => i.item_name === listing.item_name);
+        if (existing) {
+          existing.quantity += listing.quantity;
+        } else {
+          this.inventory.push({
+            item_name: listing.item_name,
+            item_type: listing.item_type,
+            emoji: itemRegistry.emoji || '📦',
+            desc: itemRegistry.desc || '',
+            price: itemRegistry.price || 10,
+            healHp: itemRegistry.healHp || 0,
+            restoreSp: itemRegistry.restoreSp || 0,
+            quantity: listing.quantity,
+            stats: listing.stats || {}
+          });
+        }
+
+        this.addCombatLog(`⚖️ ยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} สำเร็จ`, 'system');
+        if (this.soundManager) this.soundManager.playUseItemSound?.();
+
+        // Refresh displays
+        this._renderMarket();
+        this._renderInventory();
+      } else {
+        this.addCombatLog('❌ ยกเลิกไม่สำเร็จ!', 'system');
+        if (this.soundManager) this.soundManager.playErrorSound?.();
+        this._renderMarket();
+      }
+    }
   }
 
   // ============ Skill HUD Updates ============

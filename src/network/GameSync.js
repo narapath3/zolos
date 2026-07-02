@@ -542,11 +542,256 @@ export function startAutoSave(getStateCallback, intervalMs = 15000) {
         }
     }, intervalMs);
 }
-
 export function stopAutoSave() {
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
     }
 }
+
+// ============ P2P MARKETPLACE ============
+const MOCK_MARKET_LISTINGS = [
+    { id: 'mock_m_1', seller_id: 'player_merchantsatoshi', seller_name: 'MerchantSatoshi', item_name: 'Red Potion', item_type: 'potion', quantity: 15, price: 600, stats: {}, created_at: new Date().toISOString() },
+    { id: 'mock_m_2', seller_id: 'player_poringslayer', seller_name: 'PoringsLayer', item_name: 'Apple', item_type: 'potion', quantity: 8, price: 200, stats: {}, created_at: new Date().toISOString() },
+    { id: 'mock_m_3', seller_id: 'player_snipersky', seller_name: 'SniperSky', item_name: 'Sword', item_type: 'weapon', quantity: 1, price: 2500, stats: {}, created_at: new Date().toISOString() },
+    { id: 'mock_m_4', seller_id: 'player_poringhunter', seller_name: 'PoringHunter', item_name: 'Poring Card', item_type: 'card', quantity: 1, price: 12000, stats: {}, created_at: new Date().toISOString() }
+];
+
+// Initialize local marketplace listings if empty
+function initLocalMarketplace() {
+    let listings = localDb.get('marketplace_listings');
+    if (!listings) {
+        localDb.set('marketplace_listings', MOCK_MARKET_LISTINGS);
+        listings = MOCK_MARKET_LISTINGS;
+    }
+    return listings;
+}
+
+export async function fetchMarketListings() {
+    if (isOfflineMode || !supabase) {
+        return initLocalMarketplace();
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('marketplace')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.warn('[Zolos] Supabase marketplace query failed (table might not exist), falling back to Local/Mock:', error.message);
+            return initLocalMarketplace();
+        }
+        return data || [];
+    } catch (err) {
+        console.warn('[Zolos] Catch error on fetching marketplace, falling back:', err.message);
+        return initLocalMarketplace();
+    }
+}
+
+export async function listMarketItem(sellerCharId, sellerName, itemName, itemType, quantity, price, stats = {}) {
+    const listingId = 'listing_' + Math.random().toString(36).substring(2, 10);
+    const listingData = {
+        id: listingId,
+        seller_id: sellerCharId,
+        seller_name: sellerName,
+        item_name: itemName,
+        item_type: itemType,
+        quantity,
+        price,
+        stats,
+        created_at: new Date().toISOString()
+    };
+
+    if (isOfflineMode || !supabase || sellerCharId.startsWith('guest_') || sellerCharId.startsWith('local_')) {
+        const listings = initLocalMarketplace();
+        listings.unshift(listingData);
+        localDb.set('marketplace_listings', listings);
+        return listingData;
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('marketplace')
+            .insert(listingData)
+            .select()
+            .single();
+
+        if (error) {
+            console.warn('[Zolos] Supabase insert listing failed, listing locally:', error.message);
+            const listings = initLocalMarketplace();
+            listings.unshift(listingData);
+            localDb.set('marketplace_listings', listings);
+            return listingData;
+        }
+        return data;
+    } catch (err) {
+        const listings = initLocalMarketplace();
+        listings.unshift(listingData);
+        localDb.set('marketplace_listings', listings);
+        return listingData;
+    }
+}
+
+export async function cancelMarketListing(listingId, characterId) {
+    // 1. Find listing to get its details
+    let listing = null;
+    let isLocalListing = false;
+
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
+        isLocalListing = true;
+    }
+
+    if (isLocalListing) {
+        const listings = initLocalMarketplace();
+        const idx = listings.findIndex(l => l.id === listingId);
+        if (idx >= 0) {
+            listing = listings[idx];
+            // Remove from list
+            listings.splice(idx, 1);
+            localDb.set('marketplace_listings', listings);
+        }
+    } else {
+        try {
+            // Retrieve first
+            const { data, error: fetchErr } = await supabase
+                .from('marketplace')
+                .select('*')
+                .eq('id', listingId)
+                .single();
+
+            if (!fetchErr && data) {
+                listing = data;
+                // Delete
+                const { error: deleteErr } = await supabase
+                    .from('marketplace')
+                    .delete()
+                    .eq('id', listingId);
+
+                if (deleteErr) throw deleteErr;
+            }
+        } catch (err) {
+            console.warn('[Zolos] Supabase cancel failed, retrying locally:', err.message);
+            // Retry locally
+            const listings = initLocalMarketplace();
+            const idx = listings.findIndex(l => l.id === listingId);
+            if (idx >= 0) {
+                listing = listings[idx];
+                listings.splice(idx, 1);
+                localDb.set('marketplace_listings', listings);
+            }
+        }
+    }
+
+    if (listing) {
+        // 2. Return item to seller
+        await saveInventoryItem(characterId, listing.item_name, listing.item_type, listing.quantity, listing.stats);
+        return true;
+    }
+    return false;
+}
+
+export async function buyMarketItem(listingId, buyerCharId, buyerName) {
+    let listing = null;
+    let isLocalListing = false;
+
+    if (isOfflineMode || !supabase || buyerCharId.startsWith('guest_') || buyerCharId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
+        isLocalListing = true;
+    }
+
+    if (isLocalListing) {
+        const listings = initLocalMarketplace();
+        const idx = listings.findIndex(l => l.id === listingId);
+        if (idx >= 0) {
+            listing = listings[idx];
+            listings.splice(idx, 1);
+            localDb.set('marketplace_listings', listings);
+        }
+    } else {
+        try {
+            // Retrieve first
+            const { data, error: fetchErr } = await supabase
+                .from('marketplace')
+                .select('*')
+                .eq('id', listingId)
+                .single();
+
+            if (!fetchErr && data) {
+                listing = data;
+                // Delete
+                const { error: deleteErr } = await supabase
+                    .from('marketplace')
+                    .delete()
+                    .eq('id', listingId);
+
+                if (deleteErr) throw deleteErr;
+            }
+        } catch (err) {
+            console.warn('[Zolos] Supabase buy delete failed, retrying locally:', err.message);
+            const listings = initLocalMarketplace();
+            const idx = listings.findIndex(l => l.id === listingId);
+            if (idx >= 0) {
+                listing = listings[idx];
+                listings.splice(idx, 1);
+                localDb.set('marketplace_listings', listings);
+            }
+        }
+    }
+
+    if (!listing) return false;
+
+    // 1. Add item to buyer
+    await saveInventoryItem(buyerCharId, listing.item_name, listing.item_type, listing.quantity, listing.stats);
+
+    // 2. Give gold to seller
+    const sellerId = listing.seller_id;
+    const price = listing.price;
+
+    if (sellerId.startsWith('guest_') || sellerId.startsWith('local_')) {
+        // Seller is local/guest player (in same browser / offline db)
+        const cachedChar = localDb.get(`char_${sellerId}`);
+        if (cachedChar) {
+            cachedChar.gold = (cachedChar.gold || 0) + price;
+            localDb.set(`char_${sellerId}`, cachedChar);
+            updateLocalLeaderboard(cachedChar);
+        }
+    } else if (!sellerId.startsWith('player_')) { // Not a mock player
+        // Online seller
+        try {
+            // Fetch current seller character
+            const { data: charData } = await supabase
+                .from('characters')
+                .select('gold')
+                .eq('id', sellerId)
+                .single();
+
+            if (charData) {
+                const newGold = (charData.gold || 0) + price;
+                await supabase
+                    .from('characters')
+                    .update({ gold: newGold })
+                    .eq('id', sellerId);
+            }
+        } catch (err) {
+            console.warn('[Zolos] Failed to pay online seller (RLS restriction probably):', err.message);
+        }
+    }
+
+    // 3. Broadcast system message or chat notification in presence if seller is online
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'chat',
+            payload: {
+                userId: 'system',
+                username: '📢 ระบบตลาด',
+                level: 99,
+                message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${listing.item_name}] x${listing.quantity} จาก [${listing.seller_name}] ในราคา ${listing.price} Zeny!`
+            }
+        });
+    }
+
+    return listing;
+}
+
 

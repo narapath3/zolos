@@ -1028,6 +1028,218 @@ body {
   transform: translateY(1px);
 }
 
+/* ========== P2P MARKETPLACE ========== */
+.market-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
+}
+
+.market-tab {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  color: var(--text-dim);
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.market-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.market-tab.active {
+  background: rgba(240, 192, 64, 0.15);
+  border-color: rgba(240, 192, 64, 0.4);
+  color: var(--primary);
+  font-weight: bold;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.market-search {
+  margin-bottom: 10px;
+}
+
+.market-search input {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 11px;
+}
+
+.market-grid-container {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.market-list-header {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1.5fr 2fr 1.7fr;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.market-items-list {
+  max-height: 250px;
+  overflow-y: auto;
+  min-height: 100px;
+}
+
+.market-item-row {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1.5fr 2fr 1.7fr;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+}
+
+.market-item-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.market-item-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-item-qty-cell {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+}
+
+.market-item-price-cell {
+  color: var(--primary);
+  font-weight: bold;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+}
+
+.market-item-seller-cell {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-market-buy {
+  background: linear-gradient(180deg, #40e080 0%, #20a060 100%);
+  border: 1px solid #106030;
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.btn-market-buy:hover {
+  background: linear-gradient(180deg, #60f0a0 0%, #30c080 100%);
+  border-color: #20a060;
+}
+
+.btn-market-cancel {
+  background: linear-gradient(180deg, #ff4040 0%, #c02020 100%);
+  border: 1px solid #801010;
+  border-radius: 4px;
+  color: #fff;
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.btn-market-cancel:hover {
+  background: linear-gradient(180deg, #ff6060 0%, #e03030 100%);
+  border-color: #c02020;
+}
+
+.market-sell-instructions {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.market-sell-form {
+  margin-top: 15px;
+  padding: 12px;
+  background: rgba(15, 20, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+.selected-sell-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+}
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group.flex-1 {
+  flex: 1;
+}
+
+.form-group.flex-2 {
+  flex: 2;
+}
+
+.form-group label {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+
 /* Leaderboard */
 .lb-row {
   display: flex;
@@ -1337,7 +1549,7 @@ body {
     left: 8px;
     right: 8px;
     transform: none;
-    gap: 4px;
+    gap: 2px;
     padding: 6px;
     width: calc(100% - 16px);
     box-sizing: border-box;
@@ -1345,10 +1557,11 @@ body {
   }
 
   .hud-btn {
-    padding: 6px 4px;
+    padding: 6px 2px;
     gap: 0;
     min-width: 0;
     flex: 1;
+    overflow: hidden;
   }
 
   .hud-btn span {
@@ -1356,7 +1569,33 @@ body {
   }
 
   .hud-btn small {
-    font-size: 8px;
+    font-size: 7px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    display: block;
+    text-align: center;
+    letter-spacing: 0;
+  }
+
+  /* Market mobile adjustments */
+  .market-list-header {
+    font-size: 7px;
+    padding: 6px 4px;
+    grid-template-columns: 2fr 0.8fr 1.6fr 1.8fr 1.8fr;
+  }
+
+  .market-item-row {
+    font-size: 9px;
+    padding: 6px 4px;
+    grid-template-columns: 2fr 0.8fr 1.6fr 1.8fr 1.8fr;
+  }
+
+  .btn-market-buy,
+  .btn-market-cancel {
+    font-size: 7px;
+    padding: 3px 4px;
   }
 
   /* Skill bar mobile tuning */
@@ -1389,6 +1628,7 @@ body {
     width: calc(100% - 100px);
     bottom: 136px;
     left: 8px;
+    max-height: 100px;
   }
 
   /* Auto farm / Fishing mobile tuning */
@@ -1648,7 +1888,7 @@ body {
    ============================================ */
 #skill-bar {
   position: fixed;
-  bottom: 85px;
+  bottom: 95px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
