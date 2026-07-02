@@ -669,9 +669,12 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
     }
 
     try {
+        // For Supabase, we let the DB generate the UUID ID
+        const { id, ...supabaseData } = listingData;
+        
         const { data, error } = await supabase
             .from('marketplace')
-            .insert(listingData)
+            .insert(supabaseData)
             .select()
             .single();
 
@@ -684,6 +687,7 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
         }
         return data;
     } catch (err) {
+        console.warn('[Zolos] Catch error on listing, falling back to local:', err.message);
         const listings = initLocalMarketplace();
         listings.unshift(listingData);
         localDb.set('marketplace_listings', listings);
@@ -804,11 +808,15 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
         history.push({ item_name: listing.item_name, quantity: listing.quantity, price: listing.price, sold_at: new Date().toISOString() });
         localDb.set('market_history', history);
     } else {
-        await supabase.from('market_history').insert({
-            item_name: listing.item_name,
-            quantity: listing.quantity,
-            price: listing.price
-        });
+        try {
+            await supabase.from('market_history').insert({
+                item_name: listing.item_name,
+                quantity: listing.quantity,
+                price: listing.price
+            });
+        } catch (e) {
+            console.warn('[Zolos] Failed to save market history:', e.message);
+        }
     }
 
     // 1. Add item to buyer
