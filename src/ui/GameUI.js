@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing } from '../network/GameSync.js';
 
 export class GameUI {
@@ -26,6 +26,10 @@ export class GameUI {
 
     // Profile Editor callback
     this.profileSaveCallback = null;
+
+    // Shop state
+    this.currentShopTab = 'all';
+    this.selectedShopItem = null;
 
     this._setupPanels();
     this._setupROInventoryEvents();
@@ -1060,21 +1064,151 @@ export class GameUI {
     }
   }
 
-  // ============ Kafra Shop Logic (REMOVED - Shop is now disabled) ============
+  // ============ Kafra Shop Logic ============
   _setupShopEvents() {
-    // Shop has been removed; no-op
+    // Tab switching
+    const tabs = document.querySelectorAll('.shop-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.currentShopTab = tab.getAttribute('data-tab');
+        this.selectedShopItem = null;
+        this._updateShopDetailBox();
+        this._renderShop();
+      });
+    });
+
+    // Buy button
+    const buyBtn = document.getElementById('btn-buy-npc-item');
+    if (buyBtn) {
+      buyBtn.addEventListener('click', () => {
+        this._performShopAction();
+      });
+    }
   }
 
   _renderShop() {
-    // Shop has been removed; no-op
+    const grid = document.getElementById('shop-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    // Filter items based on tab
+    const filteredItems = SHOP_ITEMS.filter(item => {
+      const itemData = ITEMS[item.name];
+      if (!itemData) return false;
+
+      if (this.currentShopTab === 'all') return true;
+      if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
+      if (this.currentShopTab === 'equip') return ['weapon', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
+      return false;
+    });
+
+    filteredItems.forEach(item => {
+      const itemData = ITEMS[item.name];
+      const slot = document.createElement('div');
+      slot.className = 'inventory-slot';
+      if (this.selectedShopItem && this.selectedShopItem.name === item.name) {
+        slot.classList.add('selected');
+      }
+
+      slot.innerHTML = `
+        <span class="slot-emoji">${itemData.emoji}</span>
+        <div class="slot-price-tag">${item.price}z</div>
+      `;
+
+      slot.addEventListener('click', () => {
+        this.selectedShopItem = item;
+        this._renderShop();
+        this._updateShopDetailBox();
+      });
+
+      grid.appendChild(slot);
+    });
+
+    // Update gold display
+    const goldDisplay = document.getElementById('shop-gold-amount');
+    if (goldDisplay && this.character) {
+      goldDisplay.textContent = this.character.stats.gold.toLocaleString();
+    }
   }
 
   _updateShopDetailBox() {
-    // Shop has been removed; no-op
+    const placeholder = document.getElementById('shop-detail-placeholder');
+    const content = document.getElementById('shop-detail-content');
+    if (!placeholder || !content) return;
+
+    if (!this.selectedShopItem) {
+      placeholder.style.display = 'block';
+      content.style.display = 'none';
+      return;
+    }
+
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+
+    const itemData = ITEMS[this.selectedShopItem.name];
+    document.getElementById('shop-detail-icon').textContent = itemData.emoji;
+    document.getElementById('shop-detail-name').textContent = this.selectedShopItem.name;
+    document.getElementById('shop-detail-type').textContent = itemData.type.toUpperCase();
+    document.getElementById('shop-detail-desc').textContent = itemData.desc || 'ไม่มีคำอธิบาย';
+    document.getElementById('shop-detail-price-val').textContent = this.selectedShopItem.price;
   }
 
   async _performShopAction() {
-    // Shop has been removed; no-op
+    if (!this.selectedShopItem || !this.character) return;
+
+    const item = this.selectedShopItem;
+    const itemData = ITEMS[item.name];
+
+    if (this.character.stats.gold < item.price) {
+      this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system');
+      if (this.soundManager && this.soundManager.playErrorSound) this.soundManager.playErrorSound();
+      return;
+    }
+
+    // Deduct gold
+    this.character.stats.gold -= item.price;
+    
+    // Add to inventory
+    const existing = this.inventory.find(i => i.item_name === item.name);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      this.inventory.push({
+        item_name: item.name,
+        item_type: itemData.type,
+        emoji: itemData.emoji,
+        desc: itemData.desc,
+        price: itemData.price || item.price,
+        healHp: itemData.healHp || 0,
+        restoreSp: itemData.restoreSp || 0,
+        quantity: 1,
+        stats: itemData.stats || {}
+      });
+    }
+
+    // Save persistence
+    if (this.characterId) {
+      await saveInventoryItem(this.characterId, item.name, 1, itemData.type);
+      if (this.character.saveStatsToDatabase) {
+        await this.character.saveStatsToDatabase();
+      }
+    }
+
+    this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
+    
+    if (this.soundManager) {
+      if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+      else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
+    }
+
+    // Refresh UI
+    this._renderShop();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
   }
 
 
