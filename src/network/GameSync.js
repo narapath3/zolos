@@ -589,21 +589,40 @@ export function stopAutoSave() {
 }
 
 // ============ P2P MARKETPLACE ============
-const MOCK_MARKET_LISTINGS = [
-    { id: 'mock_m_1', seller_id: 'player_merchantsatoshi', seller_name: 'MerchantSatoshi', item_name: 'Red Potion', item_type: 'potion', quantity: 15, price: 600, stats: {}, created_at: new Date().toISOString() },
-    { id: 'mock_m_2', seller_id: 'player_poringslayer', seller_name: 'PoringsLayer', item_name: 'Apple', item_type: 'potion', quantity: 8, price: 200, stats: {}, created_at: new Date().toISOString() },
-    { id: 'mock_m_3', seller_id: 'player_snipersky', seller_name: 'SniperSky', item_name: 'Sword', item_type: 'weapon', quantity: 1, price: 2500, stats: {}, created_at: new Date().toISOString() },
-    { id: 'mock_m_4', seller_id: 'player_poringhunter', seller_name: 'PoringHunter', item_name: 'Poring Card', item_type: 'card', quantity: 1, price: 12000, stats: {}, created_at: new Date().toISOString() }
-];
 
 // Initialize local marketplace listings if empty
 function initLocalMarketplace() {
     let listings = localDb.get('marketplace_listings');
     if (!listings) {
-        localDb.set('marketplace_listings', MOCK_MARKET_LISTINGS);
-        listings = MOCK_MARKET_LISTINGS;
+        localDb.set('marketplace_listings', []);
+        listings = [];
     }
     return listings;
+}
+
+export async function fetchMarketPriceStats(itemName) {
+    if (isOfflineMode || !supabase) {
+        const history = localDb.get('market_history') || [];
+        const itemHistory = history.filter(h => h.item_name === itemName);
+        if (itemHistory.length === 0) return null;
+        const sum = itemHistory.reduce((acc, curr) => acc + (curr.price / curr.quantity), 0);
+        return { avgPrice: Math.round(sum / itemHistory.length) };
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('market_history')
+            .select('price, quantity')
+            .eq('item_name', itemName)
+            .order('sold_at', { ascending: false })
+            .limit(10);
+
+        if (error || !data || data.length === 0) return null;
+        const sum = data.reduce((acc, curr) => acc + (curr.price / curr.quantity), 0);
+        return { avgPrice: Math.round(sum / data.length) };
+    } catch (err) {
+        return null;
+    }
 }
 
 export async function fetchMarketListings() {
@@ -778,6 +797,19 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     }
 
     if (!listing) return false;
+
+    // Record history
+    if (isOfflineMode || !supabase) {
+        const history = localDb.get('market_history') || [];
+        history.push({ item_name: listing.item_name, quantity: listing.quantity, price: listing.price, sold_at: new Date().toISOString() });
+        localDb.set('market_history', history);
+    } else {
+        await supabase.from('market_history').insert({
+            item_name: listing.item_name,
+            quantity: listing.quantity,
+            price: listing.price
+        });
+    }
 
     // 1. Add item to buyer
     await saveInventoryItem(buyerCharId, listing.item_name, listing.item_type, listing.quantity, listing.stats);
