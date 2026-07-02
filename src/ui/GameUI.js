@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats } from '../network/GameSync.js';
 
 export class GameUI {
   constructor(character = null, soundManager = null) {
@@ -1361,7 +1361,7 @@ export class GameUI {
     });
   }
 
-  _updateMarketSellForm() {
+  async _updateMarketSellForm() {
     const form = document.getElementById('market-sell-form');
     if (!form || !this.selectedMarketItem) return;
 
@@ -1369,6 +1369,18 @@ export class GameUI {
     document.getElementById('market-sell-item-icon').textContent = this.selectedMarketItem.emoji;
     document.getElementById('market-sell-item-name').textContent = this.selectedMarketItem.item_name;
     document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่มี: ${this.selectedMarketItem.quantity}`;
+
+    // Load Average Price
+    const priceInfoEl = document.getElementById('market-sell-price-info');
+    if (priceInfoEl) {
+      priceInfoEl.textContent = '⌛ กำลังคำนวณราคากลาง...';
+      const stats = await fetchMarketPriceStats(this.selectedMarketItem.item_name);
+      if (stats && stats.avgPrice) {
+        priceInfoEl.innerHTML = `📈 ราคากลางล่าสุด: <span style="color:var(--zeny-gold); font-weight:bold;">${stats.avgPrice.toLocaleString()} Zeny</span> / ชิ้น`;
+      } else {
+        priceInfoEl.textContent = '📈 ราคากลาง: ยังไม่มีข้อมูลการซื้อขาย';
+      }
+    }
 
     // Set defaults
     const qtyInput = document.getElementById('market-sell-qty-input');
