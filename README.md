@@ -83,6 +83,39 @@ CREATE POLICY "Users can update own characters" ON characters FOR UPDATE USING (
 
 CREATE POLICY "Users can manage own inventory" ON inventory FOR ALL
   USING (character_id IN (SELECT id FROM characters WHERE user_id = auth.uid()));
+
+-- Marketplace table
+CREATE TABLE marketplace (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  seller_id UUID REFERENCES characters(id) ON DELETE CASCADE,
+  seller_name TEXT NOT NULL,
+  item_name TEXT NOT NULL,
+  item_type TEXT NOT NULL,
+  quantity INT DEFAULT 1,
+  price INT NOT NULL,
+  stats JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Market History table (for price calculation)
+CREATE TABLE market_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_name TEXT NOT NULL,
+  quantity INT NOT NULL,
+  price INT NOT NULL,
+  sold_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS for Marketplace
+ALTER TABLE marketplace ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read all listings" ON marketplace FOR SELECT USING (true);
+CREATE POLICY "Users can manage own listings" ON marketplace FOR ALL 
+  USING (seller_id IN (SELECT id FROM characters WHERE user_id = auth.uid()));
+
+-- RLS for Market History
+ALTER TABLE market_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read history" ON market_history FOR SELECT USING (true);
+CREATE POLICY "System can insert history" ON market_history FOR INSERT WITH CHECK (true);
 ```
 
 ### 2. การสร้างไฟล์ Config (.env)
