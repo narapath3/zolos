@@ -49,10 +49,13 @@ export class GameUI {
     // Panel toggle buttons
     document.getElementById('btn-stats').addEventListener('click', () => this._togglePanel('stats-panel'));
     document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
-    document.getElementById('btn-shop').addEventListener('click', () => {
-      this._togglePanel('shop-panel');
-      this._renderShop();
-    });
+    const btnShop = document.getElementById('btn-shop');
+    if (btnShop) {
+      btnShop.addEventListener('click', () => {
+        this._togglePanel('shop-panel');
+        this._renderShop();
+      });
+    }
     const btnMarket = document.getElementById('btn-market');
     if (btnMarket) {
       btnMarket.addEventListener('click', () => {
