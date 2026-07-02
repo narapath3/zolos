@@ -535,24 +535,24 @@ export class CharacterManager {
         }
 
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 512;
+        canvas.height = 128;
         const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 20px "Press Start 2P", monospace';
+        ctx.font = 'bold 36px "Press Start 2P", monospace';
         ctx.fillStyle = '#80e0ff'; // Light-blue player color
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 8;
         ctx.textAlign = 'center';
 
         const labelText = `${this.stats.name || 'Novice'} Lv.${this.stats.level}`;
-        ctx.strokeText(labelText, 128, 40);
-        ctx.fillText(labelText, 128, 40);
+        ctx.strokeText(labelText, 256, 75);
+        ctx.fillText(labelText, 256, 75);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.scale.set(1.8, 0.45, 1);
-        this.nameSprite.position.y = 2.4; // above head
+        this.nameSprite.scale.set(2.0, 0.5, 1);
+        this.nameSprite.position.y = 2.8; // Move higher to avoid overlapping hats
         this.mesh.add(this.nameSprite);
     }
 
@@ -1130,24 +1130,24 @@ export class RemotePlayer {
         }
 
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 512;
+        canvas.height = 128;
         const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 20px "Press Start 2P", monospace';
+        ctx.font = 'bold 36px "Press Start 2P", monospace';
         ctx.fillStyle = '#ffffff'; // White color for other players
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 8;
         ctx.textAlign = 'center';
 
         const labelText = `${this.username} Lv.${this.level}`;
-        ctx.strokeText(labelText, 128, 40);
-        ctx.fillText(labelText, 128, 40);
+        ctx.strokeText(labelText, 256, 75);
+        ctx.fillText(labelText, 256, 75);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.scale.set(1.8, 0.45, 1);
-        this.nameSprite.position.y = 2.4; // above head
+        this.nameSprite.scale.set(2.0, 0.5, 1);
+        this.nameSprite.position.y = 2.8; // Move higher to avoid overlapping hats
         this.mesh.add(this.nameSprite);
     }
 

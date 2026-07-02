@@ -216,7 +216,7 @@ async function initGame() {
                 character.targetNPC = hit.object;
                 character.targetMonster = null;
                 character.targetDest = null;
-                gameUI.addCombatLog('🚶 เดินทางไปยังร้านค้า...', 'system');
+                gameUI.addCombatLog('🚶 เดินทางไปยังตลาด...', 'system');
             } else if (hit.type === 'ground') {
                 character.targetDest = hit.point;
                 character.targetMonster = null;
@@ -531,8 +531,8 @@ function gameLoop() {
             } else {
                 character.targetNPC = null;
                 character.state = 'idle';
-                const btnShop = document.getElementById('btn-shop');
-                if (btnShop) btnShop.click();
+                const btnMarket = document.getElementById('btn-market');
+                if (btnMarket) btnMarket.click();
             }
         } else if (character.targetDest) {
             const arrived = character.moveToward(character.targetDest, dt);
@@ -722,10 +722,10 @@ function gameLoop() {
         if (npc) {
             const pPos = character.getPosition();
             const npcDist = pPos.distanceTo(npc.position);
-            const shopPanel = document.getElementById('shop-panel');
-            if (npcDist > 4.5 && shopPanel && shopPanel.style.display !== 'none') {
-                shopPanel.style.display = 'none';
-                gameUI.addCombatLog('👋 เดินห่างจากร้านค้ามากเกินไป', 'system');
+            const marketPanel = document.getElementById('market-panel');
+            if (npcDist > 4.5 && marketPanel && marketPanel.style.display !== 'none') {
+                marketPanel.style.display = 'none';
+                gameUI.addCombatLog('👋 เดินห่างจากตลาดมากเกินไป', 'system');
             }
         }
     }

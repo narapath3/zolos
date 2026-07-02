@@ -109,6 +109,8 @@ function updateLocalLeaderboard(char) {
         name: char.name,
         level: char.level,
         total_kills: char.total_kills,
+        gold: char.gold || 0,
+        play_time: char.play_time || 0,
         profiles: { username: char.name }
     };
 
@@ -118,9 +120,9 @@ function updateLocalLeaderboard(char) {
         lb.push(entry);
     }
 
-    // Sort and cap
+    // Sort by level default and cap to 20 inside localdb representation
     lb.sort((a, b) => b.level - a.level || b.total_kills - a.total_kills);
-    localDb.set('leaderboard', lb.slice(0, 10));
+    localDb.set('leaderboard', lb.slice(0, 20));
 }
 
 // ============ Inventory ============
@@ -209,29 +211,66 @@ export async function updateInventoryItemStats(characterId, itemName, stats) {
 }
 
 // ============ Leaderboard ============
-export async function fetchLeaderboard() {
+export async function fetchLeaderboard(category = 'level') {
     if (isOfflineMode || !supabase) {
         // Generate some default high scores if leaderboard is empty
         let lb = localDb.get('leaderboard');
         if (!lb || lb.length === 0) {
             lb = [
-                { name: 'Lord_Knight', level: 99, total_kills: 9999, profiles: { username: 'Ragnarok' } },
-                { name: 'Sniper_Alice', level: 85, total_kills: 4521, profiles: { username: 'ArcherGuy' } },
-                { name: 'High_Priest', level: 76, total_kills: 1205, profiles: { username: 'Support' } },
-                { name: 'Assassin_Cross', level: 60, total_kills: 887, profiles: { username: 'Katars' } },
+                { name: 'Lord_Knight', level: 99, total_kills: 9999, gold: 5000000, play_time: 154800, profiles: { username: 'Ragnarok' } },
+                { name: 'Sniper_Alice', level: 85, total_kills: 4521, gold: 1200000, play_time: 75600, profiles: { username: 'ArcherGuy' } },
+                { name: 'High_Priest', level: 76, total_kills: 1205, gold: 850000, play_time: 32400, profiles: { username: 'Support' } },
+                { name: 'Assassin_Cross', level: 60, total_kills: 887, gold: 350000, play_time: 18000, profiles: { username: 'Katars' } },
             ];
             localDb.set('leaderboard', lb);
         }
-        return lb;
+
+        // Sort dynamically based on selected category
+        const sorted = [...lb];
+        if (category === 'gold') {
+            sorted.sort((a, b) => (b.gold ?? 0) - (a.gold ?? 0));
+        } else if (category === 'kills') {
+            sorted.sort((a, b) => (b.total_kills ?? 0) - (a.total_kills ?? 0));
+        } else if (category === 'playtime') {
+            sorted.sort((a, b) => (b.play_time ?? 0) - (a.play_time ?? 0));
+        } else {
+            sorted.sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || (b.total_kills ?? 0) - (a.total_kills ?? 0));
+        }
+        return sorted.slice(0, 20);
     }
 
-    const { data } = await supabase
-        .from('characters')
-        .select('name, level, total_kills, user_id, profiles(username)')
-        .order('level', { ascending: false })
-        .order('total_kills', { ascending: false })
-        .limit(20);
+    let selectStr = 'name, level, total_kills, gold, play_time, user_id, profiles(username)';
+    let query = supabase.from('characters').select(selectStr);
 
+    if (category === 'gold') {
+        query = query.order('gold', { ascending: false });
+    } else if (category === 'kills') {
+        query = query.order('total_kills', { ascending: false });
+    } else if (category === 'playtime') {
+        query = query.order('play_time', { ascending: false });
+    } else {
+        query = query.order('level', { ascending: false }).order('total_kills', { ascending: false });
+    }
+
+    let { data, error } = await query.limit(20);
+    if (error) {
+        console.warn('[Zolos] fetchLeaderboard error with profiles relation, retrying without profiles:', error.message);
+        // Fallback when database has relationship key mapping cache issue
+        let fallbackQuery = supabase
+            .from('characters')
+            .select('name, level, total_kills, gold, play_time, user_id');
+        if (category === 'gold') {
+            fallbackQuery = fallbackQuery.order('gold', { ascending: false });
+        } else if (category === 'kills') {
+            fallbackQuery = fallbackQuery.order('total_kills', { ascending: false });
+        } else if (category === 'playtime') {
+            fallbackQuery = fallbackQuery.order('play_time', { ascending: false });
+        } else {
+            fallbackQuery = fallbackQuery.order('level', { ascending: false }).order('total_kills', { ascending: false });
+        }
+        const res = await fallbackQuery.limit(20);
+        data = res.data;
+    }
     return data || [];
 }
 

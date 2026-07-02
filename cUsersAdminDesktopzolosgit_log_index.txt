@@ -1,0 +1,826 @@
+commit 84c0bbb873ac2e9699e8420c03dacb6653198eb1
+Author: Admin <admin@zolos.dev>
+Date:   Thu Jul 2 16:56:59 2026 +0700
+
+    ui: remove shop button from HUD
+
+diff --git a/index.html b/index.html
+index 32c47ec..121e9aa 100644
+--- a/index.html
++++ b/index.html
+@@ -135,10 +135,6 @@
+         <span>🎒</span>
+         <small>Bag</small>
+       </button>
+-      <button class="hud-btn" id="btn-shop" title="ร้านค้า">
+-        <span>🏪</span>
+-        <small>ร้านค้า</small>
+-      </button>
+       <button class="hud-btn" id="btn-market" title="ตลาด">
+         <span>⚖️</span>
+         <small>ตลาด</small>
+
+commit 55f310fe9ab11e9ac839553579757a3b3d1c2ea9
+Author: Admin <admin@zolos.dev>
+Date:   Thu Jul 2 16:45:53 2026 +0700
+
+    fix(ui): close market-panel div tag properly to fix nested panels layout
+
+diff --git a/index.html b/index.html
+index f27949f..32c47ec 100644
+--- a/index.html
++++ b/index.html
+@@ -308,166 +308,167 @@
+           </div>
+         </div>
+       </div>
++    </div>
+ 
+-      <!-- Leaderboard Panel -->
+-      <div id="leaderboard-panel" class="side-panel" style="display: none;">
+-        <div class="panel-header">
+-          <h3>🏆 Leaderboard</h3>
+-          <button class="panel-close" data-close="leaderboard-panel">✕</button>
+-        </div>
+-        <div class="panel-body" id="leaderboard-body"></div>
++    <!-- Leaderboard Panel -->
++    <div id="leaderboard-panel" class="side-panel" style="display: none;">
++      <div class="panel-header">
++        <h3>🏆 Leaderboard</h3>
++        <button class="panel-close" data-close="leaderboard-panel">✕</button>
+       </div>
++      <div class="panel-body" id="leaderboard-body"></div>
++    </div>
+ 
+-      <!-- Online Players Panel -->
+-      <div id="players-panel" class="side-panel" style="display: none;">
+-        <div class="panel-header">
+-          <h3>👥 Online Players</h3>
+-          <button class="panel-close" data-close="players-panel">✕</button>
+-        </div>
+-        <div class="panel-body" id="players-body"></div>
++    <!-- Online Players Panel -->
++    <div id="players-panel" class="side-panel" style="display: none;">
++      <div class="panel-header">
++        <h3>👥 Online Players</h3>
++        <button class="panel-close" data-close="players-panel">✕</button>
+       </div>
++      <div class="panel-body" id="players-body"></div>
++    </div>
+ 
+-      <!-- Wiki Panel -->
+-      <div id="wiki-panel" class="side-panel" style="display: none;">
+-        <div class="panel-header">
+-          <h3>📖 Game Wiki</h3>
+-          <button class="panel-close" data-close="wiki-panel">✕</button>
++    <!-- Wiki Panel -->
++    <div id="wiki-panel" class="side-panel" style="display: none;">
++      <div class="panel-header">
++        <h3>📖 Game Wiki</h3>
++        <button class="panel-close" data-close="wiki-panel">✕</button>
++      </div>
++      <div class="panel-body">
++        <!-- Tab Selectors -->
++        <div class="wiki-tabs">
++          <button class="wiki-tab active" data-tab="monsters">Monsters</button>
++          <button class="wiki-tab" data-tab="items">Items</button>
+         </div>
+-        <div class="panel-body">
+-          <!-- Tab Selectors -->
+-          <div class="wiki-tabs">
+-            <button class="wiki-tab active" data-tab="monsters">Monsters</button>
+-            <button class="wiki-tab" data-tab="items">Items</button>
+-          </div>
+ 
+-          <!-- Search bar -->
+-          <div class="wiki-search-box">
+-            <input type="text" id="wiki-search-input" placeholder="🔍 ค้นหาอาวุธ มอนสเตอร์..." autocomplete="off">
+-          </div>
++        <!-- Search bar -->
++        <div class="wiki-search-box">
++          <input type="text" id="wiki-search-input" placeholder="🔍 ค้นหาอาวุธ มอนสเตอร์..." autocomplete="off">
++        </div>
+ 
+-          <div class="wiki-main-container">
+-            <!-- List grid -->
+-            <div id="wiki-list" class="wiki-list"></div>
++        <div class="wiki-main-container">
++          <!-- List grid -->
++          <div id="wiki-list" class="wiki-list"></div>
+ 
+-            <!-- Detail box -->
+-            <div id="wiki-detail-box" class="wiki-detail-box">
+-              <div id="wiki-detail-placeholder" class="detail-placeholder">คลิกสิ่งใดเพื่อดูรายละเอียด</div>
+-              <div id="wiki-detail-content" class="detail-content notranslate" style="display: none;">
+-                <!-- filled dynamically by JS -->
+-              </div>
++          <!-- Detail box -->
++          <div id="wiki-detail-box" class="wiki-detail-box">
++            <div id="wiki-detail-placeholder" class="detail-placeholder">คลิกสิ่งใดเพื่อดูรายละเอียด</div>
++            <div id="wiki-detail-content" class="detail-content notranslate" style="display: none;">
++              <!-- filled dynamically by JS -->
+             </div>
+           </div>
+         </div>
+       </div>
++    </div>
+ 
+-      <!-- Combat Log -->
+-      <div id="combat-log">
+-        <div id="combat-log-messages"></div>
+-      </div>
++    <!-- Combat Log -->
++    <div id="combat-log">
++      <div id="combat-log-messages"></div>
++    </div>
+ 
+-      <!-- Kill Counter -->
+-      <div id="kill-counter">
+-        <span class="kill-icon">💀</span>
+-        <span id="kill-count">0</span>
+-      </div>
++    <!-- Kill Counter -->
++    <div id="kill-counter">
++      <span class="kill-icon">💀</span>
++      <span id="kill-count">0</span>
++    </div>
+ 
+-      <!-- Chat Panel -->
+-      <div id="chat-panel" class="side-panel chat-panel" style="display: none;">
+-        <div class="panel-header">
+-          <h3>💬 Chat / แนลแชท</h3>
+-          <button class="panel-close" data-close="chat-panel">✕</button>
+-        </div>
+-        <div class="panel-body chat-panel-body">
+-          <div id="chat-messages" class="chat-messages-container"></div>
+-          <div class="chat-input-row">
+-            <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
+-            <button id="btn-send-chat" class="btn-primary">Send</button>
+-          </div>
++    <!-- Chat Panel -->
++    <div id="chat-panel" class="side-panel chat-panel" style="display: none;">
++      <div class="panel-header">
++        <h3>💬 Chat / แนลแชท</h3>
++        <button class="panel-close" data-close="chat-panel">✕</button>
++      </div>
++      <div class="panel-body chat-panel-body">
++        <div id="chat-messages" class="chat-messages-container"></div>
++        <div class="chat-input-row">
++          <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
++          <button id="btn-send-chat" class="btn-primary">Send</button>
+         </div>
+       </div>
++    </div>
+ 
+-      <!-- Player Status Popup Modal -->
+-      <div id="player-popup" class="modal-popup" style="display: none;">
+-        <div class="popup-overlay" id="player-popup-overlay"></div>
+-        <div class="popup-content">
+-          <div class="popup-header">
+-            <span class="popup-title">Player Profile</span>
+-            <button class="popup-close" id="btn-close-player-popup">✕</button>
+-          </div>
+-          <div class="popup-body">
+-            <div class="player-avatar">👤</div>
+-            <div class="player-detail-name" id="player-popup-name">Adventurer</div>
+-            <div class="player-detail-level" id="player-popup-level">Lv.1</div>
+-            <div class="player-detail-status" id="player-popup-status">Status: Online</div>
+-            <button id="btn-add-friend" class="btn-primary">⭐ Add Friend</button>
+-          </div>
++    <!-- Player Status Popup Modal -->
++    <div id="player-popup" class="modal-popup" style="display: none;">
++      <div class="popup-overlay" id="player-popup-overlay"></div>
++      <div class="popup-content">
++        <div class="popup-header">
++          <span class="popup-title">Player Profile</span>
++          <button class="popup-close" id="btn-close-player-popup">✕</button>
++        </div>
++        <div class="popup-body">
++          <div class="player-avatar">👤</div>
++          <div class="player-detail-name" id="player-popup-name">Adventurer</div>
++          <div class="player-detail-level" id="player-popup-level">Lv.1</div>
++          <div class="player-detail-status" id="player-popup-status">Status: Online</div>
++          <button id="btn-add-friend" class="btn-primary">⭐ Add Friend</button>
+         </div>
+       </div>
++    </div>
+ 
+-      <!-- Profile Editor Popup Modal -->
+-      <div id="profile-editor-modal" class="modal-popup" style="display: none;">
+-        <div class="popup-overlay" id="profile-editor-overlay"></div>
+-        <div class="popup-content profile-editor-content">
+-          <div class="popup-header">
+-            <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
+-            <button class="popup-close" id="btn-close-profile-editor">✕</button>
++    <!-- Profile Editor Popup Modal -->
++    <div id="profile-editor-modal" class="modal-popup" style="display: none;">
++      <div class="popup-overlay" id="profile-editor-overlay"></div>
++      <div class="popup-content profile-editor-content">
++        <div class="popup-header">
++          <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
++          <button class="popup-close" id="btn-close-profile-editor">✕</button>
++        </div>
++        <div class="popup-body">
++          <div class="form-group">
++            <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
++            <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
+           </div>
+-          <div class="popup-body">
+-            <div class="form-group">
+-              <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
+-              <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
+-            </div>
+ 
+-            <div class="form-group appearance-colors">
+-              <label>🎨 Appearance Colors / ปรับแต่งสี</label>
+-              <div class="color-pickers-row">
+-                <div class="color-picker-item">
+-                  <input type="color" id="profile-edit-shirt" value="#4060c0" />
+-                  <span>Shirt (เสื้อ)</span>
+-                </div>
+-                <div class="color-picker-item">
+-                  <input type="color" id="profile-edit-pants" value="#3a3a5a" />
+-                  <span>Pants (กางเกง)</span>
+-                </div>
+-                <div class="color-picker-item">
+-                  <input type="color" id="profile-edit-hair" value="#c04040" />
+-                  <span>Hair (สีผม)</span>
+-                </div>
++          <div class="form-group appearance-colors">
++            <label>🎨 Appearance Colors / ปรับแต่งสี</label>
++            <div class="color-pickers-row">
++              <div class="color-picker-item">
++                <input type="color" id="profile-edit-shirt" value="#4060c0" />
++                <span>Shirt (เสื้อ)</span>
++              </div>
++              <div class="color-picker-item">
++                <input type="color" id="profile-edit-pants" value="#3a3a5a" />
++                <span>Pants (กางเกง)</span>
++              </div>
++              <div class="color-picker-item">
++                <input type="color" id="profile-edit-hair" value="#c04040" />
++                <span>Hair (สีผม)</span>
+               </div>
+             </div>
++          </div>
+ 
+-            <div class="form-group">
+-              <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
+-              <select id="profile-edit-weapon" class="form-select">
+-                <option value="None">👊 None / มือเปล่า</option>
+-              </select>
+-            </div>
++          <div class="form-group">
++            <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
++            <select id="profile-edit-weapon" class="form-select">
++              <option value="None">👊 None / มือเปล่า</option>
++            </select>
++          </div>
+ 
+-            <div class="form-group">
+-              <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
+-              <select id="profile-edit-hat" class="form-select">
+-                <option value="None">❌ None / ไม่ใส่</option>
+-              </select>
+-            </div>
++          <div class="form-group">
++            <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
++            <select id="profile-edit-hat" class="form-select">
++              <option value="None">❌ None / ไม่ใส่</option>
++            </select>
++          </div>
+ 
+-            <div class="form-group">
+-              <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
+-              <select id="profile-edit-glasses" class="form-select">
+-                <option value="None">❌ None / ไม่ใส่</option>
+-              </select>
+-            </div>
++          <div class="form-group">
++            <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
++            <select id="profile-edit-glasses" class="form-select">
++              <option value="None">❌ None / ไม่ใส่</option>
++            </select>
++          </div>
+ 
+-            <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+-              <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
+-              <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
+-            </div>
++          <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
++            <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
++            <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
+           </div>
+         </div>
+       </div>
+-
+     </div>
+ 
+-    <script type="module" src="/src/main.js"></script>
++  </div>
++
++  <script type="module" src="/src/main.js"></script>
+ </body>
+ 
+ </html>
+\ No newline at end of file
+
+commit dd913951a1835075ba1d76a0df0e516b3fa27848
+Author: Admin <admin@zolos.dev>
+Date:   Thu Jul 2 12:56:15 2026 +0700
+
+    Update marketplace UI and sync logic
+
+diff --git a/index.html b/index.html
+index 0fd9c58..f27949f 100644
+--- a/index.html
++++ b/index.html
+@@ -139,6 +139,10 @@
+         <span>🏪</span>
+         <small>ร้านค้า</small>
+       </button>
++      <button class="hud-btn" id="btn-market" title="ตลาด">
++        <span>⚖️</span>
++        <small>ตลาด</small>
++      </button>
+       <button class="hud-btn" id="btn-leaderboard" title="Leaderboard">
+         <span>🏆</span>
+         <small>Rank</small>
+@@ -245,165 +249,225 @@
+       </div>
+     </div>
+ 
+-    <!-- Leaderboard Panel -->
+-    <div id="leaderboard-panel" class="side-panel" style="display: none;">
+-      <div class="panel-header">
+-        <h3>🏆 Leaderboard</h3>
+-        <button class="panel-close" data-close="leaderboard-panel">✕</button>
+-      </div>
+-      <div class="panel-body" id="leaderboard-body"></div>
+-    </div>
+-
+-    <!-- Online Players Panel -->
+-    <div id="players-panel" class="side-panel" style="display: none;">
++    <!-- Market Panel (P2P) -->
++    <div id="market-panel" class="side-panel" style="display: none;">
+       <div class="panel-header">
+-        <h3>👥 Online Players</h3>
+-        <button class="panel-close" data-close="players-panel">✕</button>
+-      </div>
+-      <div class="panel-body" id="players-body"></div>
+-    </div>
+-
+-    <!-- Wiki Panel -->
+-    <div id="wiki-panel" class="side-panel" style="display: none;">
+-      <div class="panel-header">
+-        <h3>📖 Game Wiki</h3>
+-        <button class="panel-close" data-close="wiki-panel">✕</button>
++        <h3>⚖️ ตลาด ซื้อ-ขาย (P2P)</h3>
++        <button class="panel-close" data-close="market-panel">✕</button>
+       </div>
+       <div class="panel-body">
+-        <!-- Tab Selectors -->
+-        <div class="wiki-tabs">
+-          <button class="wiki-tab active" data-tab="monsters">Monsters</button>
+-          <button class="wiki-tab" data-tab="items">Items</button>
++        <div class="gold-display">💰 <span id="market-gold-amount">0</span> Zeny</div>
++
++        <div class="market-tabs">
++          <button class="market-tab active" data-tab="buy">ตลาดซื้อขาย</button>
++          <button class="market-tab" data-tab="sell">ตั้งขายของ</button>
+         </div>
+ 
+-        <!-- Search bar -->
+-        <div class="wiki-search-box">
+-          <input type="text" id="wiki-search-input" placeholder="🔍 ค้นหาอาวุธ มอนสเตอร์..." autocomplete="off">
++        <div id="market-buy-container">
++          <div class="market-search">
++            <input type="text" id="market-search-input" placeholder="🔍 ค้นหาไอเทมตั้งขาย..." autocomplete="off">
++          </div>
++          <div class="market-grid-container">
++            <div class="market-list-header">
++              <span>Item</span>
++              <span>Qty</span>
++              <span>Price</span>
++              <span>Seller</span>
++              <span>Action</span>
++            </div>
++            <div class="market-items-list" id="market-items-grid">
++              <!-- Rendered programmatically -->
++            </div>
++          </div>
+         </div>
+ 
+-        <div class="wiki-main-container">
+-          <!-- List grid -->
+-          <div id="wiki-list" class="wiki-list"></div>
++        <div id="market-sell-container" style="display: none;">
++          <div class="market-sell-instructions">เลือกไอเทมที่คุณมีเพื่อนำไปตั้งราคาขาย (P2P):</div>
++          <div class="inventory-grid" id="market-sell-inventory-grid"></div>
+ 
+-          <!-- Detail box -->
+-          <div id="wiki-detail-box" class="wiki-detail-box">
+-            <div id="wiki-detail-placeholder" class="detail-placeholder">คลิกสิ่งใดเพื่อดูรายละเอียด</div>
+-            <div id="wiki-detail-content" class="detail-content notranslate" style="display: none;">
+-              <!-- filled dynamically by JS -->
++          <div id="market-sell-form" class="market-sell-form" style="display: none;">
++            <div class="selected-sell-item-row">
++              <span id="market-sell-item-icon" class="detail-icon">📦</span>
++              <div class="detail-info-block">
++                <div id="market-sell-item-name" class="detail-name">Item Name</div>
++                <div id="market-sell-item-qty-info" class="detail-type">จำนวนที่มี: 0</div>
++              </div>
++            </div>
++            <div class="form-row">
++              <div class="form-group flex-1">
++                <label for="market-sell-qty-input">จำนวนที่จะขาย:</label>
++                <input type="number" id="market-sell-qty-input" min="1" value="1">
++              </div>
++              <div class="form-group flex-2">
++                <label for="market-sell-price-input">ราคาทั้งหมด (Zeny):</label>
++                <input type="number" id="market-sell-price-input" min="0" placeholder="ตั้งราคา Zeny...">
++              </div>
+             </div>
++            <button id="btn-market-list-action" class="btn-primary" style="width: 100%; margin-top: 10px;">⚖️
++              เริ่มตั้งขาย (List Item)</button>
+           </div>
+         </div>
+       </div>
+-    </div>
+-
+-    <!-- Combat Log -->
+-    <div id="combat-log">
+-      <div id="combat-log-messages"></div>
+-    </div>
+ 
+-    <!-- Kill Counter -->
+-    <div id="kill-counter">
+-      <span class="kill-icon">💀</span>
+-      <span id="kill-count">0</span>
+-    </div>
+-
+-    <!-- Chat Panel -->
+-    <div id="chat-panel" class="side-panel chat-panel" style="display: none;">
+-      <div class="panel-header">
+-        <h3>💬 Chat / แนลแชท</h3>
+-        <button class="panel-close" data-close="chat-panel">✕</button>
+-      </div>
+-      <div class="panel-body chat-panel-body">
+-        <div id="chat-messages" class="chat-messages-container"></div>
+-        <div class="chat-input-row">
+-          <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
+-          <button id="btn-send-chat" class="btn-primary">Send</button>
++      <!-- Leaderboard Panel -->
++      <div id="leaderboard-panel" class="side-panel" style="display: none;">
++        <div class="panel-header">
++          <h3>🏆 Leaderboard</h3>
++          <button class="panel-close" data-close="leaderboard-panel">✕</button>
+         </div>
++        <div class="panel-body" id="leaderboard-body"></div>
+       </div>
+-    </div>
+ 
+-    <!-- Player Status Popup Modal -->
+-    <div id="player-popup" class="modal-popup" style="display: none;">
+-      <div class="popup-overlay" id="player-popup-overlay"></div>
+-      <div class="popup-content">
+-        <div class="popup-header">
+-          <span class="popup-title">Player Profile</span>
+-          <button class="popup-close" id="btn-close-player-popup">✕</button>
+-        </div>
+-        <div class="popup-body">
+-          <div class="player-avatar">👤</div>
+-          <div class="player-detail-name" id="player-popup-name">Adventurer</div>
+-          <div class="player-detail-level" id="player-popup-level">Lv.1</div>
+-          <div class="player-detail-status" id="player-popup-status">Status: Online</div>
+-          <button id="btn-add-friend" class="btn-primary">⭐ Add Friend</button>
++      <!-- Online Players Panel -->
++      <div id="players-panel" class="side-panel" style="display: none;">
++        <div class="panel-header">
++          <h3>👥 Online Players</h3>
++          <button class="panel-close" data-close="players-panel">✕</button>
+         </div>
++        <div class="panel-body" id="players-body"></div>
+       </div>
+-    </div>
+ 
+-    <!-- Profile Editor Popup Modal -->
+-    <div id="profile-editor-modal" class="modal-popup" style="display: none;">
+-      <div class="popup-overlay" id="profile-editor-overlay"></div>
+-      <div class="popup-content profile-editor-content">
+-        <div class="popup-header">
+-          <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
+-          <button class="popup-close" id="btn-close-profile-editor">✕</button>
++      <!-- Wiki Panel -->
++      <div id="wiki-panel" class="side-panel" style="display: none;">
++        <div class="panel-header">
++          <h3>📖 Game Wiki</h3>
++          <button class="panel-close" data-close="wiki-panel">✕</button>
+         </div>
+-        <div class="popup-body">
+-          <div class="form-group">
+-            <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
+-            <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
++        <div class="panel-body">
++          <!-- Tab Selectors -->
++          <div class="wiki-tabs">
++            <button class="wiki-tab active" data-tab="monsters">Monsters</button>
++            <button class="wiki-tab" data-tab="items">Items</button>
+           </div>
+ 
+-          <div class="form-group appearance-colors">
+-            <label>🎨 Appearance Colors / ปรับแต่งสี</label>
+-            <div class="color-pickers-row">
+-              <div class="color-picker-item">
+-                <input type="color" id="profile-edit-shirt" value="#4060c0" />
+-                <span>Shirt (เสื้อ)</span>
+-              </div>
+-              <div class="color-picker-item">
+-                <input type="color" id="profile-edit-pants" value="#3a3a5a" />
+-                <span>Pants (กางเกง)</span>
+-              </div>
+-              <div class="color-picker-item">
+-                <input type="color" id="profile-edit-hair" value="#c04040" />
+-                <span>Hair (สีผม)</span>
++          <!-- Search bar -->
++          <div class="wiki-search-box">
++            <input type="text" id="wiki-search-input" placeholder="🔍 ค้นหาอาวุธ มอนสเตอร์..." autocomplete="off">
++          </div>
++
++          <div class="wiki-main-container">
++            <!-- List grid -->
++            <div id="wiki-list" class="wiki-list"></div>
++
++            <!-- Detail box -->
++            <div id="wiki-detail-box" class="wiki-detail-box">
++              <div id="wiki-detail-placeholder" class="detail-placeholder">คลิกสิ่งใดเพื่อดูรายละเอียด</div>
++              <div id="wiki-detail-content" class="detail-content notranslate" style="display: none;">
++                <!-- filled dynamically by JS -->
+               </div>
+             </div>
+           </div>
++        </div>
++      </div>
++
++      <!-- Combat Log -->
++      <div id="combat-log">
++        <div id="combat-log-messages"></div>
++      </div>
+ 
+-          <div class="form-group">
+-            <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
+-            <select id="profile-edit-weapon" class="form-select">
+-              <option value="None">👊 None / มือเปล่า</option>
+-            </select>
++      <!-- Kill Counter -->
++      <div id="kill-counter">
++        <span class="kill-icon">💀</span>
++        <span id="kill-count">0</span>
++      </div>
++
++      <!-- Chat Panel -->
++      <div id="chat-panel" class="side-panel chat-panel" style="display: none;">
++        <div class="panel-header">
++          <h3>💬 Chat / แนลแชท</h3>
++          <button class="panel-close" data-close="chat-panel">✕</button>
++        </div>
++        <div class="panel-body chat-panel-body">
++          <div id="chat-messages" class="chat-messages-container"></div>
++          <div class="chat-input-row">
++            <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
++            <button id="btn-send-chat" class="btn-primary">Send</button>
+           </div>
++        </div>
++      </div>
+ 
+-          <div class="form-group">
+-            <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
+-            <select id="profile-edit-hat" class="form-select">
+-              <option value="None">❌ None / ไม่ใส่</option>
+-            </select>
++      <!-- Player Status Popup Modal -->
++      <div id="player-popup" class="modal-popup" style="display: none;">
++        <div class="popup-overlay" id="player-popup-overlay"></div>
++        <div class="popup-content">
++          <div class="popup-header">
++            <span class="popup-title">Player Profile</span>
++            <button class="popup-close" id="btn-close-player-popup">✕</button>
++          </div>
++          <div class="popup-body">
++            <div class="player-avatar">👤</div>
++            <div class="player-detail-name" id="player-popup-name">Adventurer</div>
++            <div class="player-detail-level" id="player-popup-level">Lv.1</div>
++            <div class="player-detail-status" id="player-popup-status">Status: Online</div>
++            <button id="btn-add-friend" class="btn-primary">⭐ Add Friend</button>
+           </div>
++        </div>
++      </div>
+ 
+-          <div class="form-group">
+-            <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
+-            <select id="profile-edit-glasses" class="form-select">
+-              <option value="None">❌ None / ไม่ใส่</option>
+-            </select>
++      <!-- Profile Editor Popup Modal -->
++      <div id="profile-editor-modal" class="modal-popup" style="display: none;">
++        <div class="popup-overlay" id="profile-editor-overlay"></div>
++        <div class="popup-content profile-editor-content">
++          <div class="popup-header">
++            <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
++            <button class="popup-close" id="btn-close-profile-editor">✕</button>
+           </div>
++          <div class="popup-body">
++            <div class="form-group">
++              <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
++              <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
++            </div>
++
++            <div class="form-group appearance-colors">
++              <label>🎨 Appearance Colors / ปรับแต่งสี</label>
++              <div class="color-pickers-row">
++                <div class="color-picker-item">
++                  <input type="color" id="profile-edit-shirt" value="#4060c0" />
++                  <span>Shirt (เสื้อ)</span>
++                </div>
++                <div class="color-picker-item">
++                  <input type="color" id="profile-edit-pants" value="#3a3a5a" />
++                  <span>Pants (กางเกง)</span>
++                </div>
++                <div class="color-picker-item">
++                  <input type="color" id="profile-edit-hair" value="#c04040" />
++                  <span>Hair (สีผม)</span>
++                </div>
++              </div>
++            </div>
++
++            <div class="form-group">
++              <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
++              <select id="profile-edit-weapon" class="form-select">
++                <option value="None">👊 None / มือเปล่า</option>
++              </select>
++            </div>
+ 
+-          <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+-            <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
+-            <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
++            <div class="form-group">
++              <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
++              <select id="profile-edit-hat" class="form-select">
++                <option value="None">❌ None / ไม่ใส่</option>
++              </select>
++            </div>
++
++            <div class="form-group">
++              <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
++              <select id="profile-edit-glasses" class="form-select">
++                <option value="None">❌ None / ไม่ใส่</option>
++              </select>
++            </div>
++
++            <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
++              <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
++              <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
++            </div>
+           </div>
+         </div>
+       </div>
+-    </div>
+ 
+-  </div>
++    </div>
+ 
+-  <script type="module" src="/src/main.js"></script>
++    <script type="module" src="/src/main.js"></script>
+ </body>
+ 
+ </html>
+\ No newline at end of file
+
+commit 99fdc9b1fc70e94cf0c6d24cd33cce87aff65f60
+Author: Admin <admin@zolos.dev>
+Date:   Thu Jul 2 06:36:18 2026 +0700
+
+    Update game UI, data, and index
+
+diff --git a/index.html b/index.html
+index 014ce5b..0fd9c58 100644
+--- a/index.html
++++ b/index.html
+@@ -375,10 +375,6 @@
+           <div class="form-group">
+             <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
+             <select id="profile-edit-weapon" class="form-select">
+-              <option value="Sword">⚔️ Sword / ดาบ</option>
+-              <option value="Bow">🏹 Bow / ธนู</option>
+-              <option value="Gun">🔫 Gun / ปืน</option>
+-              <option value="Fishing Rod">🎣 Fishing Rod / เบ็ดตกปลา</option>
+               <option value="None">👊 None / มือเปล่า</option>
+             </select>
+           </div>
+@@ -387,9 +383,6 @@
+             <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
+             <select id="profile-edit-hat" class="form-select">
+               <option value="None">❌ None / ไม่ใส่</option>
+-              <option value="Wizard Hat">🧙‍♂️ Wizard Hat / หมวกพ่อมด</option>
+-              <option value="Crown">👑 Crown / มงกุฎ</option>
+-              <option value="Cowboy Hat">🤠 Cowboy Hat / หมวกคาวบอย</option>
+             </select>
+           </div>
+ 
+@@ -397,8 +390,6 @@
+             <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
+             <select id="profile-edit-glasses" class="form-select">
+               <option value="None">❌ None / ไม่ใส่</option>
+-              <option value="Sunglasses">🕶️ Sunglasses / แว่นกันแดด</option>
+-              <option value="Classic Glasses">👓 Classic Glasses / แว่นตาแดง</option>
+             </select>
+           </div>
+ 
+
+commit 03f2cf229602d0f3c67432caa76f9988aacb967c
+Author: Admin <admin@zolos.dev>
+Date:   Wed Jul 1 22:33:16 2026 +0700
+
+    feat: implement character profile customization, equipment syncing, and presence name update
+
+diff --git a/index.html b/index.html
+index ee71e28..014ce5b 100644
+--- a/index.html
++++ b/index.html
+@@ -340,6 +340,76 @@
+       </div>
+     </div>
+ 
++    <!-- Profile Editor Popup Modal -->
++    <div id="profile-editor-modal" class="modal-popup" style="display: none;">
++      <div class="popup-overlay" id="profile-editor-overlay"></div>
++      <div class="popup-content profile-editor-content">
++        <div class="popup-header">
++          <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
++          <button class="popup-close" id="btn-close-profile-editor">✕</button>
++        </div>
++        <div class="popup-body">
++          <div class="form-group">
++            <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
++            <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
++          </div>
++
++          <div class="form-group appearance-colors">
++            <label>🎨 Appearance Colors / ปรับแต่งสี</label>
++            <div class="color-pickers-row">
++              <div class="color-picker-item">
++                <input type="color" id="profile-edit-shirt" value="#4060c0" />
++                <span>Shirt (เสื้อ)</span>
++              </div>
++              <div class="color-picker-item">
++                <input type="color" id="profile-edit-pants" value="#3a3a5a" />
++                <span>Pants (กางเกง)</span>
++              </div>
++              <div class="color-picker-item">
++                <input type="color" id="profile-edit-hair" value="#c04040" />
++                <span>Hair (สีผม)</span>
++              </div>
++            </div>
++          </div>
++
++          <div class="form-group">
++            <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
++            <select id="profile-edit-weapon" class="form-select">
++              <option value="Sword">⚔️ Sword / ดาบ</option>
++              <option value="Bow">🏹 Bow / ธนู</option>
++              <option value="Gun">🔫 Gun / ปืน</option>
++              <option value="Fishing Rod">🎣 Fishing Rod / เบ็ดตกปลา</option>
++              <option value="None">👊 None / มือเปล่า</option>
++            </select>
++          </div>
++
++          <div class="form-group">
++            <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
++            <select id="profile-edit-hat" class="form-select">
++              <option value="None">❌ None / ไม่ใส่</option>
++              <option value="Wizard Hat">🧙‍♂️ Wizard Hat / หมวกพ่อมด</option>
++              <option value="Crown">👑 Crown / มงกุฎ</option>
++              <option value="Cowboy Hat">🤠 Cowboy Hat / หมวกคาวบอย</option>
++            </select>
++          </div>
++
++          <div class="form-group">
++            <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
++            <select id="profile-edit-glasses" class="form-select">
++              <option value="None">❌ None / ไม่ใส่</option>
++              <option value="Sunglasses">🕶️ Sunglasses / แว่นกันแดด</option>
++              <option value="Classic Glasses">👓 Classic Glasses / แว่นตาแดง</option>
++            </select>
++          </div>
++
++          <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
++            <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
++            <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
++          </div>
++        </div>
++      </div>
++    </div>
++
+   </div>
+ 
+   <script type="module" src="/src/main.js"></script>

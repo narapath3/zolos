@@ -551,19 +551,22 @@ class Monster {
 
         // Name label sprite
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 512;
+        canvas.height = 128;
         const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 24px "Press Start 2P", monospace';
+        ctx.font = 'bold 36px "Press Start 2P", monospace';
         ctx.fillStyle = this.isWaterMonster ? '#80c0ff' : '#ffffff';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
         ctx.textAlign = 'center';
-        ctx.fillText(this.data.name, 128, 40);
+        ctx.strokeText(this.data.name, 256, 75);
+        ctx.fillText(this.data.name, 256, 75);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameSprite = new THREE.Sprite(spriteMat);
-        nameSprite.scale.set(1.5, 0.4, 1);
-        nameSprite.position.y = size + 0.6;
+        nameSprite.scale.set(1.8, 0.45, 1);
+        nameSprite.position.y = size + 0.8;
         this.mesh.add(nameSprite);
 
         // Shadow

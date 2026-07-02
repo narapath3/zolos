@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, SHOP_ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing } from '../network/GameSync.js';
 
 export class GameUI {
@@ -15,9 +15,10 @@ export class GameUI {
     this.currentTab = 'all';
     this.selectedItemName = null;
 
-    // NPC Shop state
-    this.shopTab = 'buy';
-    this.selectedShopItemName = null;
+    // Leaderboard category state
+    this.leaderboardCategory = 'level';
+    // Online panel view state
+    this.onlineView = 'global';
 
     // P2P Market state
     this.marketTab = 'buy';
@@ -35,6 +36,8 @@ export class GameUI {
     this._setupChat();
     this._setupMinimap();
     this._setupProfileEditor();
+    this._setupLeaderboardTabs();
+    this._setupOnlineTabs();
   }
 
   show() {
@@ -49,13 +52,7 @@ export class GameUI {
     // Panel toggle buttons
     document.getElementById('btn-stats').addEventListener('click', () => this._togglePanel('stats-panel'));
     document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
-    const btnShop = document.getElementById('btn-shop');
-    if (btnShop) {
-      btnShop.addEventListener('click', () => {
-        this._togglePanel('shop-panel');
-        this._renderShop();
-      });
-    }
+
     const btnMarket = document.getElementById('btn-market');
     if (btnMarket) {
       btnMarket.addEventListener('click', () => {
@@ -580,35 +577,65 @@ export class GameUI {
   }
 
   // ============ Leaderboard ============
+  _setupLeaderboardTabs() {
+    const tabs = document.querySelectorAll('.lb-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.leaderboardCategory = tab.getAttribute('data-category');
+        this._refreshLeaderboard();
+      });
+    });
+  }
+
   async _refreshLeaderboard() {
     const body = document.getElementById('leaderboard-body');
-    body.innerHTML = '<div style="text-align:center;color:var(--text-dim)">Loading...</div>';
+    if (!body) return;
+    body.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px">Loading...</div>';
 
     try {
-      const data = await fetchLeaderboard();
-      if (data.length === 0) {
-        body.innerHTML = '<div style="text-align:center;color:var(--text-dim)">No data yet</div>';
+      const data = await fetchLeaderboard(this.leaderboardCategory);
+      if (!data || data.length === 0) {
+        body.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px">No data yet</div>';
         return;
       }
 
+      const cat = this.leaderboardCategory;
       body.innerHTML = data.map((entry, i) => {
         const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
-        const username = entry.profiles?.username || 'Unknown';
+        const username = entry.profiles?.username || entry.name || 'Unknown';
+        let valueText = '';
+        if (cat === 'level') valueText = `Lv.${entry.level} | 💀${entry.total_kills ?? 0}`;
+        else if (cat === 'gold') valueText = `💰 ${(entry.gold ?? 0).toLocaleString()} Zeny`;
+        else if (cat === 'kills') valueText = `💀 ${(entry.total_kills ?? 0).toLocaleString()} Kills`;
+        else if (cat === 'playtime') valueText = `⏱️ ${this._formatTime(entry.play_time ?? 0)}`;
         return `
           <div class="lb-row">
             <span class="lb-rank">${rankIcon}</span>
             <span class="lb-name">${entry.name} (${username})</span>
-            <span class="lb-level">Lv.${entry.level} | 💀${entry.total_kills}</span>
+            <span class="lb-level">${valueText}</span>
           </div>
         `;
       }).join('');
     } catch (e) {
-      body.innerHTML = '<div style="text-align:center;color:var(--accent)">Failed to load</div>';
+      body.innerHTML = '<div style="text-align:center;color:var(--accent);padding:20px">Failed to load</div>';
     }
   }
 
   // ============ Online Players ============
-  // ============ Online Players ============
+  _setupOnlineTabs() {
+    const tabs = document.querySelectorAll('.online-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.onlineView = tab.getAttribute('data-view');
+        this._renderOnlinePlayers();
+      });
+    });
+  }
+
   updateOnlinePlayers(players) {
     this.onlinePlayers = players || [];
 
@@ -616,26 +643,44 @@ export class GameUI {
     const authCount = document.getElementById('online-players-auth');
     if (authCount) authCount.textContent = this.onlinePlayers.length;
 
-    // Update panel
+    this._renderOnlinePlayers();
+  }
+
+  _renderOnlinePlayers() {
     const body = document.getElementById('players-body');
     if (!body) return;
 
-    if (this.onlinePlayers.length === 0) {
-      body.innerHTML = '<div style="text-align:center;color:var(--text-dim)">No players online</div>';
+    const friends = this.friends || [];
+    let list = this.onlinePlayers || [];
+
+    if (this.onlineView === 'friends') {
+      list = list.filter(p => friends.includes(p.username));
+    }
+
+    if (list.length === 0) {
+      const emptyMsg = this.onlineView === 'friends'
+        ? 'ยังไม่มีเพื่อนออนไลน์ — แตะชื่อผู้เล่นใน Global เพื่อเพิ่มเพื่อน'
+        : 'No players online';
+      body.innerHTML = `<div style="text-align:center;color:var(--text-dim);padding:20px;font-size:10px">${emptyMsg}</div>`;
       return;
     }
 
-    body.innerHTML = this.onlinePlayers.map(p => {
-      const isFriend = this.friends && this.friends.includes(p.username);
+    // Header
+    let html = `<div class="online-count-badge">${this.onlineView === 'friends' ? '⭐' : '🌐'} ${list.length} ${this.onlineView === 'friends' ? 'friends' : 'players'} online</div>`;
+
+    html += list.map(p => {
+      const isFriend = friends.includes(p.username);
       const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
       return `
         <div class="player-row" data-username="${p.username}">
           <span class="online-dot"></span>
           <span>${p.username}${starHtml}</span>
-          <span style="color:var(--text-dim);margin-left:auto">Lv.${p.level}</span>
+          <span class="player-level-badge">Lv.${p.level}</span>
         </div>
       `;
     }).join('');
+
+    body.innerHTML = html;
   }
 
   // ============ Friend System Logic ============
@@ -1015,207 +1060,23 @@ export class GameUI {
     }
   }
 
-  // ============ Kafra Shop Logic ============
+  // ============ Kafra Shop Logic (REMOVED - Shop is now disabled) ============
   _setupShopEvents() {
-    // Tab switching
-    const tabs = document.querySelectorAll('.shop-tab');
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        this.shopTab = tab.getAttribute('data-tab');
-        this.selectedShopItemName = null;
-        this._renderShop();
-      });
-    });
-
-    // Action button (Buy / Sell)
-    const actionBtn = document.getElementById('btn-shop-action');
-    if (actionBtn) {
-      actionBtn.addEventListener('click', () => this._performShopAction());
-    }
+    // Shop has been removed; no-op
   }
 
   _renderShop() {
-    const grid = document.getElementById('shop-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    // Update gold display
-    const goldDisplay = document.getElementById('shop-gold-amount');
-    if (goldDisplay && this.character) {
-      goldDisplay.textContent = this.character.stats.gold;
-    }
-
-    if (this.shopTab === 'buy') {
-      // Render buyable list
-      SHOP_ITEMS.forEach(shopItem => {
-        const itemInfo = ITEMS[shopItem.name];
-        if (!itemInfo) return;
-
-        const slot = document.createElement('div');
-        slot.className = 'inventory-slot';
-        if (this.selectedShopItemName === shopItem.name) {
-          slot.classList.add('selected');
-        }
-        slot.innerHTML = `
-          <div class="slot-icon">${itemInfo.emoji}</div>
-          <div class="slot-quantity" style="font-size:7px;background:rgba(0,0,0,0.7);">z${shopItem.price}</div>
-        `;
-        slot.addEventListener('click', () => {
-          this.selectedShopItemName = shopItem.name;
-          this._renderShop();
-          this._updateShopDetailBox(shopItem.name, 'buy', shopItem.price);
-        });
-        grid.appendChild(slot);
-      });
-    } else {
-      // Render sellable inventory (Any etc/usable item)
-      if (this.inventory.length === 0) {
-        grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9px;padding:20px 0;">No items to sell</div>';
-      }
-      this.inventory.forEach(item => {
-        const slot = document.createElement('div');
-        slot.className = 'inventory-slot';
-        if (this.selectedShopItemName === item.item_name) {
-          slot.classList.add('selected');
-        }
-        const sellPrice = Math.floor(item.price * 0.5); // Sell at 50% value
-        slot.innerHTML = `
-          <div class="slot-icon">${item.emoji}</div>
-          <div class="slot-quantity">x${item.quantity}</div>
-        `;
-        slot.addEventListener('click', () => {
-          this.selectedShopItemName = item.item_name;
-          this._renderShop();
-          this._updateShopDetailBox(item.item_name, 'sell', sellPrice);
-        });
-        grid.appendChild(slot);
-      });
-    }
-
-    // sync placeholder
-    if (!this.selectedShopItemName) {
-      document.getElementById('shop-detail-placeholder').style.display = 'block';
-      document.getElementById('shop-detail-content').style.display = 'none';
-    }
+    // Shop has been removed; no-op
   }
 
-  _updateShopDetailBox(itemName, type, price) {
-    const registryItem = ITEMS[itemName];
-    if (!registryItem) return;
-
-    document.getElementById('shop-detail-placeholder').style.display = 'none';
-    const content = document.getElementById('shop-detail-content');
-    content.style.display = 'flex';
-
-    document.getElementById('shop-detail-icon').textContent = registryItem.emoji;
-    document.getElementById('shop-detail-name').textContent = itemName;
-
-    const priceEl = document.getElementById('shop-detail-price');
-    priceEl.textContent = `${type === 'buy' ? 'Buy Price' : 'Sell Value'}: ${price} Zeny`;
-
-    const droppers = this._getItemDroppers(itemName);
-    let droppedByHtml = '';
-    if (droppers.length > 0) {
-      droppedByHtml = `<br/><br/><strong style="color:var(--secondary)">👾 Dropped By / ได้จากมอนสเตอร์:</strong><br/>` + droppers.map(d => `${d.emoji} ${d.name} (${(d.chance * 100).toFixed(1)}%)`).join('<br/>');
-    } else {
-      droppedByHtml = `<br/><br/><strong style="color:var(--text-dim)">👾 Dropped By:</strong> ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)`;
-    }
-    document.getElementById('shop-detail-desc').innerHTML = (registryItem.desc || 'No description.') + droppedByHtml;
-
-    const actionBtn = document.getElementById('btn-shop-action');
-    actionBtn.textContent = type === 'buy' ? '💸 Buy Item' : '💰 Sell Item';
+  _updateShopDetailBox() {
+    // Shop has been removed; no-op
   }
 
   async _performShopAction() {
-    if (!this.selectedShopItemName || !this.character) return;
-
-    const itemName = this.selectedShopItemName;
-    const itemRegistry = ITEMS[itemName];
-    if (!itemRegistry) return;
-
-    if (this.shopTab === 'buy') {
-      const shopItem = SHOP_ITEMS.find(i => i.name === itemName);
-      if (!shopItem) return;
-
-      const price = shopItem.price;
-      if (this.character.stats.gold < price) {
-        this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอสำหรับการสั่งซื้อ!', 'system');
-        if (this.soundManager) this.soundManager.playErrorSound?.(); // Fallback to avoid error
-        return;
-      }
-
-      // Deduct gold
-      this.character.stats.gold -= price;
-
-      // Add to local inventory state
-      const existing = this.inventory.find(i => i.item_name === itemName);
-      if (existing) {
-        existing.quantity++;
-      } else {
-        this.inventory.push({
-          item_name: itemName,
-          item_type: itemRegistry.type,
-          emoji: itemRegistry.emoji,
-          desc: itemRegistry.desc,
-          price: itemRegistry.price,
-          healHp: itemRegistry.healHp || 0,
-          restoreSp: itemRegistry.restoreSp || 0,
-          quantity: 1,
-          stats: {}
-        });
-      }
-
-      // Sync and log
-      this.addCombatLog(`🛒 ซื้อ ${itemRegistry.emoji} ${itemName} สำเร็จ (-${price} Zeny)`, 'system');
-      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
-
-      if (this.characterId) {
-        saveInventoryItem(this.characterId, itemName, itemRegistry.type, 1).catch(() => { });
-        // Trigger character database save for gold
-        if (this.character.saveStatsToDatabase) {
-          this.character.saveStatsToDatabase().catch(() => { });
-        }
-      }
-
-    } else {
-      // Sell action
-      const itemIdx = this.inventory.findIndex(i => i.item_name === itemName);
-      if (itemIdx === -1) return;
-
-      const item = this.inventory[itemIdx];
-      if (item.quantity <= 0) return;
-
-      const sellPrice = Math.floor(item.price * 0.5);
-
-      // Add gold
-      this.character.stats.gold += sellPrice;
-
-      // Update quantity
-      item.quantity--;
-      if (item.quantity <= 0) {
-        this.inventory.splice(itemIdx, 1);
-        this.selectedShopItemName = null;
-      }
-
-      this.addCombatLog(`💰 ขาย ${item.emoji} ${itemName} ได้รับ +${sellPrice} Zeny`, 'system');
-      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
-
-      if (this.characterId) {
-        saveInventoryItem(this.characterId, itemName, item.item_type, -1).catch(() => { });
-        if (this.character.saveStatsToDatabase) {
-          this.character.saveStatsToDatabase().catch(() => { });
-        }
-      }
-    }
-
-    // Refresh displays
-    this._renderShop();
-    this._renderInventory();
-    this.updateHUD(this.character.stats);
-    this.updateStats(this.character.stats);
+    // Shop has been removed; no-op
   }
+
 
   // ============ P2P Marketplace Logic ============
   _setupMarketEvents() {

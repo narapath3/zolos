@@ -135,10 +135,7 @@
         <span>🎒</span>
         <small>Bag</small>
       </button>
-      <button class="hud-btn" id="btn-shop" title="ร้านค้า">
-        <span>🏪</span>
-        <small>ร้านค้า</small>
-      </button>
+
       <button class="hud-btn" id="btn-market" title="ตลาด">
         <span>⚖️</span>
         <small>ตลาด</small>
@@ -214,40 +211,7 @@
       </div>
     </div>
 
-    <!-- Shop Panel -->
-    <div id="shop-panel" class="side-panel" style="display: none;">
-      <div class="panel-header">
-        <h3>🏪 ร้านค้า</h3>
-        <button class="panel-close" data-close="shop-panel">✕</button>
-      </div>
-      <div class="panel-body">
-        <div class="gold-display">💰 <span id="shop-gold-amount">0</span> Zeny</div>
 
-        <div class="shop-tabs">
-          <button class="shop-tab active" data-tab="buy">Buy</button>
-          <button class="shop-tab" data-tab="sell">Sell</button>
-        </div>
-
-        <div class="shop-grid" id="shop-grid"></div>
-
-        <div id="shop-detail-box" class="shop-detail-box">
-          <div id="shop-detail-placeholder" class="shop-detail-placeholder">Select an item to buy/sell</div>
-          <div id="shop-detail-content" class="shop-detail-content" style="display: none;">
-            <div class="detail-row">
-              <span id="shop-detail-icon" class="detail-icon">📦</span>
-              <div class="detail-info-block">
-                <div id="shop-detail-name" class="detail-name">Item Name</div>
-                <div id="shop-detail-price" class="detail-type" style="color: var(--primary);">Price: 0 z</div>
-              </div>
-            </div>
-            <div id="shop-detail-desc" class="detail-desc">No description.</div>
-            <div class="shop-actions">
-              <button id="btn-shop-action" class="btn-use-item" style="width: 100%;">Buy</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Market Panel (P2P) -->
     <div id="market-panel" class="side-panel" style="display: none;">
@@ -316,7 +280,15 @@
         <h3>🏆 Leaderboard</h3>
         <button class="panel-close" data-close="leaderboard-panel">✕</button>
       </div>
-      <div class="panel-body" id="leaderboard-body"></div>
+      <div class="panel-body">
+        <div class="leaderboard-tabs">
+          <button class="lb-tab active" data-category="level">⭐ Level</button>
+          <button class="lb-tab" data-category="gold">💰 Gold</button>
+          <button class="lb-tab" data-category="kills">💀 Kills</button>
+          <button class="lb-tab" data-category="playtime">⏱️ เวลาเล่น</button>
+        </div>
+        <div id="leaderboard-body"></div>
+      </div>
     </div>
 
     <!-- Online Players Panel -->
@@ -325,7 +297,13 @@
         <h3>👥 Online Players</h3>
         <button class="panel-close" data-close="players-panel">✕</button>
       </div>
-      <div class="panel-body" id="players-body"></div>
+      <div class="panel-body">
+        <div class="online-tabs">
+          <button class="online-tab active" data-view="global">🌐 Global</button>
+          <button class="online-tab" data-view="friends">⭐ Friends</button>
+        </div>
+        <div id="players-body"></div>
+      </div>
     </div>
 
     <!-- Wiki Panel -->
