@@ -1423,6 +1423,11 @@ export class GameUI {
           `;
         });
         droppedByHtml += `</div>`;
+      } else {
+        droppedByHtml = `
+          <div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div>
+          <div style="font-size:11px;color:var(--text-dim);padding-left:4px;">ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)</div>
+        `;
       }
 
       content.innerHTML = `
