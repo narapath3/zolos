@@ -717,17 +717,7 @@ function gameLoop() {
             }
         }
 
-        // NPC proximity range checks
-        const npc = sceneManager.getNPC();
-        if (npc) {
-            const pPos = character.getPosition();
-            const npcDist = pPos.distanceTo(npc.position);
-            const marketPanel = document.getElementById('market-panel');
-            if (npcDist > 4.5 && marketPanel && marketPanel.style.display !== 'none') {
-                marketPanel.style.display = 'none';
-                gameUI.addCombatLog('👋 เดินห่างจากตลาดมากเกินไป', 'system');
-            }
-        }
+        // NPC proximity range checks (disabled — marketplace is now P2P, accessible from HUD)
     }
 
     // Update skills cooldown overlays in game UI
