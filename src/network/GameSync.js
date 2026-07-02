@@ -661,7 +661,7 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
         created_at: new Date().toISOString()
     };
 
-    if (isOfflineMode || !supabase || sellerCharId.startsWith('guest_') || sellerCharId.startsWith('local_')) {
+    if (isOfflineMode || !supabase) {
         const listings = initLocalMarketplace();
         listings.unshift(listingData);
         localDb.set('marketplace_listings', listings);
@@ -700,7 +700,7 @@ export async function cancelMarketListing(listingId, characterId) {
     let listing = null;
     let isLocalListing = false;
 
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
+    if (isOfflineMode || !supabase || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
         isLocalListing = true;
     }
 
@@ -757,7 +757,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     let listing = null;
     let isLocalListing = false;
 
-    if (isOfflineMode || !supabase || buyerCharId.startsWith('guest_') || buyerCharId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
+    if (isOfflineMode || !supabase || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
         isLocalListing = true;
     }
 
