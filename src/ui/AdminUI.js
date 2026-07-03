@@ -404,7 +404,6 @@ export class AdminUI {
             this.content.innerHTML = '<div style="text-align:center; padding: 50px; color: #888;">No players found</div>';
         }
     }
-}
 
     _renderItemList() {
         const searchDiv = document.createElement('div');
@@ -489,7 +488,6 @@ export class AdminUI {
         this.content.appendChild(table);
         renderItems();
     }
-}
 
     openEditModal(user) {
         this.selectedUser = user;
