@@ -9,6 +9,7 @@ import { SoundManager } from './engine/SoundManager.js';
 import { InputManager } from './engine/InputManager.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { GameUI } from './ui/GameUI.js';
+import { AdminUI } from './ui/AdminUI.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -59,6 +60,11 @@ async function initGame() {
 
     // Init UI
     gameUI = new GameUI(character, soundManager);
+
+    // Init Admin UI
+    const adminUI = new AdminUI();
+    window.adminUI = adminUI;
+    await adminUI.checkAdmin(userId);
 
     // Setup chat send callback to route messages through GameSync network layer
     gameUI.setupChatSendCallback((message) => {
