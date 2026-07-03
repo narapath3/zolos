@@ -22,41 +22,41 @@ export class AdminUI {
         }
 
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('is_admin')
-                .eq('id', userId)
-                .single();
+            console.log('[Admin] Starting delete process for character:', charId);
             
-            if (error) {
-                console.warn('[Admin] Failed to check admin status:', error.message);
-                this.isAdmin = false;
+            // Step 1: Delete market history
+            console.log('[Admin] Deleting market history for:', charId);
+            await supabase.from('market_history').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Market history deletion warning:', e));
+            
+            // Step 2: Delete marketplace listings
+            console.log('[Admin] Deleting marketplace listings for:', charId);
+            await supabase.from('marketplace').delete().eq('seller_id', charId).catch(e => console.warn('[Admin] Marketplace deletion warning:', e));
+
+            // Step 3: Delete inventory items
+            console.log('[Admin] Deleting inventory for:', charId);
+            await supabase.from('inventory').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Inventory deletion warning:', e));
+            
+            // Step 4: Delete character
+            console.log('[Admin] Deleting character:', charId);
+            const { error: charError, data: charData } = await supabase
+                .from('characters')
+                .delete()
+                .eq('id', charId)
+                .select();
+            
+            if (charError) {
+                console.error('[Admin] Character deletion error:', charError);
+                alert('❌ Error: ' + charError.message);
             } else {
-                this.isAdmin = data?.is_admin || false;
+                console.log('[Admin] Player deleted successfully from Database');
+                // Update UI in real-time by removing from local list
+                this.users = this.users.filter(u => u.id !== charId);
+                this._renderContent();
+                alert('✅ Player deleted successfully');
             }
         } catch (e) {
-            this.isAdmin = false;
-        }
-
-        if (this.isAdmin) {
-            const btn = document.getElementById('btn-admin');
-            if (btn) btn.style.display = 'flex';
-        }
-        
-        return this.isAdmin;
-    }
-
-    toggle() {
-        if (!this.isAdmin) {
-            console.warn('[Admin] Access Denied: You are not an administrator.');
-            return;
-        }
-        
-        this.isOpen = !this.isOpen;
-        this.container.style.display = this.isOpen ? 'flex' : 'none';
-        
-        if (this.isOpen) {
-            this.refreshData();
+            console.error('[Admin] Exception during delete:', e);
+            alert('❌ Exception: ' + e.message);
         }
     }
 
