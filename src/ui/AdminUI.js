@@ -376,16 +376,7 @@ export class AdminUI {
             `;
             
             tr.querySelector('.edit-btn').onclick = () => {
-                const newLevel = prompt(`Set new Level for ${user.username}:`, user.level);
-                if (newLevel !== null) {
-                    const newGold = prompt(`Set new Gold for ${user.username}:`, user.gold);
-                    if (newGold !== null) {
-                        this.updatePlayer(user.id, { 
-                            level: parseInt(newLevel),
-                            gold: parseInt(newGold)
-                        });
-                    }
-                }
+                this.openEditModal(user);
             };
 
             tr.querySelector('.give-btn').onclick = () => {
@@ -497,5 +488,117 @@ export class AdminUI {
         
         this.content.appendChild(table);
         renderItems();
+    }
+}
+
+    openEditModal(user) {
+        this.selectedUser = user;
+        this._createEditModal();
+    }
+
+    _createEditModal() {
+        if (!this.selectedUser) return;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('admin-edit-modal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'admin-edit-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center;
+            z-index: 10001; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: rgba(20, 20, 30, 0.98); border: 2px solid #ffd700; border-radius: 10px;
+            padding: 30px; width: 90%; max-width: 500px; color: white;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+        `;
+
+        const title = document.createElement('h2');
+        title.innerText = `Edit Player: ${this.selectedUser.username}`;
+        title.style.cssText = 'margin: 0 0 20px 0; color: #ffd700; font-size: 18px;';
+        content.appendChild(title);
+
+        const fields = [
+            { label: 'Level', key: 'level', type: 'number', min: 1, max: 999 },
+            { label: 'Gold', key: 'gold', type: 'number', min: 0 },
+            { label: 'Total Kills', key: 'total_kills', type: 'number', min: 0 },
+            { label: 'Play Time (seconds)', key: 'play_time', type: 'number', min: 0 }
+        ];
+
+        const formData = {};
+        fields.forEach(field => {
+            const group = document.createElement('div');
+            group.style.cssText = 'margin-bottom: 15px;';
+
+            const label = document.createElement('label');
+            label.innerText = field.label + ':';
+            label.style.cssText = 'display: block; margin-bottom: 5px; color: #ffd700; font-weight: bold;';
+            group.appendChild(label);
+
+            const input = document.createElement('input');
+            input.type = field.type;
+            input.value = this.selectedUser[field.key] || 0;
+            if (field.min !== undefined) input.min = field.min;
+            if (field.max !== undefined) input.max = field.max;
+            input.style.cssText = `
+                width: 100%; padding: 10px; background: rgba(255, 215, 0, 0.1);
+                border: 1px solid #ffd700; color: white; border-radius: 4px;
+                box-sizing: border-box; font-size: 14px;
+            `;
+            input.addEventListener('change', (e) => {
+                formData[field.key] = field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
+            });
+            group.appendChild(input);
+            content.appendChild(group);
+
+            // Initialize formData
+            formData[field.key] = this.selectedUser[field.key] || 0;
+        });
+
+        const buttonGroup = document.createElement('div');
+        buttonGroup.style.cssText = 'display: flex; gap: 10px; margin-top: 25px;';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.innerText = 'Save Changes';
+        saveBtn.style.cssText = `
+            flex: 1; padding: 12px; background: #2a8a4a; border: 1px solid #3aaa5a;
+            color: white; border-radius: 4px; cursor: pointer; font-weight: bold;
+            transition: background 0.2s;
+        `;
+        saveBtn.onmouseover = () => saveBtn.style.background = '#3aaa5a';
+        saveBtn.onmouseout = () => saveBtn.style.background = '#2a8a4a';
+        saveBtn.onclick = async () => {
+            await this.updatePlayer(this.selectedUser.id, formData);
+            modal.remove();
+            await this.refreshData();
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.innerText = 'Cancel';
+        cancelBtn.style.cssText = `
+            flex: 1; padding: 12px; background: #8a5a2a; border: 1px solid #aa7a3a;
+            color: white; border-radius: 4px; cursor: pointer; font-weight: bold;
+            transition: background 0.2s;
+        `;
+        cancelBtn.onmouseover = () => cancelBtn.style.background = '#aa7a3a';
+        cancelBtn.onmouseout = () => cancelBtn.style.background = '#8a5a2a';
+        cancelBtn.onclick = () => modal.remove();
+
+        buttonGroup.appendChild(saveBtn);
+        buttonGroup.appendChild(cancelBtn);
+        content.appendChild(buttonGroup);
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        // Close modal when clicking outside
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
     }
 }
