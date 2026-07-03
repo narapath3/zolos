@@ -236,16 +236,23 @@ export class AdminUI {
         }
 
         try {
-            const { error } = await supabase
+            // Delete inventory items first
+            await supabase
+                .from('inventory')
+                .delete()
+                .eq('character_id', charId);
+            
+            // Delete character
+            const { error: charError } = await supabase
                 .from('characters')
                 .delete()
                 .eq('id', charId);
             
-            if (error) {
-                alert('Error deleting player: ' + error.message);
+            if (charError) {
+                alert('Error deleting player: ' + charError.message);
             } else {
-                alert('✅ Player deleted');
-                this.refreshData();
+                alert('✅ Player deleted successfully');
+                await this.refreshData();
             }
         } catch (e) {
             alert('Exception deleting player: ' + e.message);
