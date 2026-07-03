@@ -1,82 +1,6 @@
 import { supabase, isOfflineMode, localDb } from '../network/SupabaseClient.js';
 import { saveInventoryItem, saveCharacter } from '../network/GameSync.js';
 
-// Diagnostic function to identify delete issues
-async function runDeleteDiagnostic(supabase, charId) {
-    console.log('\n========== DELETE DIAGNOSTIC START ==========');
-    console.log('Character ID:', charId);
-    
-    try {
-        // Test 1: Check if we can read the character
-        console.log('\n[Test 1] Checking if character exists...');
-        const { data: charData, error: readError } = await supabase
-            .from('characters')
-            .select('id, name')
-            .eq('id', charId)
-            .single();
-        
-        if (readError) {
-            console.error('❌ Cannot read character:', readError);
-            return { success: false, reason: 'Cannot read character', error: readError };
-        }
-        console.log('✅ Character exists:', charData);
-        
-        // Test 2: Try to delete with verbose error
-        console.log('\n[Test 2] Attempting to delete character...');
-        const { error: deleteError, data: deleteData, status } = await supabase
-            .from('characters')
-            .delete()
-            .eq('id', charId)
-            .select();
-        
-        console.log('Delete response:', { status, deleteError, deleteData });
-        
-        if (deleteError) {
-            console.error('❌ Delete failed with error:');
-            console.error('  Code:', deleteError.code);
-            console.error('  Message:', deleteError.message);
-            console.error('  Details:', deleteError.details);
-            console.error('  Hint:', deleteError.hint);
-            
-            if (deleteError.code === '42501') {
-                return { 
-                    success: false, 
-                    reason: 'RLS Policy Violation', 
-                    error: deleteError,
-                    suggestion: 'Check Supabase RLS policies - anon user may not have DELETE permission'
-                };
-            }
-            return { success: false, reason: 'Delete error', error: deleteError };
-        }
-        
-        // Test 3: Verify deletion
-        console.log('\n[Test 3] Verifying character was deleted...');
-        const { data: verifyData, error: verifyError } = await supabase
-            .from('characters')
-            .select('id')
-            .eq('id', charId);
-        
-        if (verifyError) {
-            console.error('❌ Verification query failed:', verifyError);
-            return { success: false, reason: 'Verification failed', error: verifyError };
-        }
-        
-        if (verifyData && verifyData.length === 0) {
-            console.log('✅ Character successfully deleted!');
-            return { success: true, reason: 'Character deleted successfully' };
-        } else {
-            console.warn('⚠️ Character still exists after delete:', verifyData);
-            return { success: false, reason: 'Character still exists after delete', data: verifyData };
-        }
-        
-    } catch (err) {
-        console.error('❌ Exception during diagnostic:', err);
-        return { success: false, reason: 'Exception', error: err };
-    } finally {
-        console.log('========== DELETE DIAGNOSTIC END ==========\n');
-    }
-}
-
 export class AdminUI {
     constructor() {
         this.container = null;
@@ -92,101 +16,271 @@ export class AdminUI {
 
     async checkAdmin(userId) {
         if (isOfflineMode || userId.startsWith('guest_') || userId.startsWith('local_')) {
+            // For offline/guest, check if we manually set admin in localStorage
             this.isAdmin = localStorage.getItem('zolos_admin_mode') === 'true';
             return this.isAdmin;
         }
-        // For real users, check if they have admin role
-        if (!supabase) return false;
+
         try {
-            const { data: profile } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('is_admin')
                 .eq('id', userId)
                 .single();
-            this.isAdmin = profile?.role === 'admin';
-            return this.isAdmin;
+            
+            if (error) {
+                console.warn('[Admin] Failed to check admin status:', error.message);
+                this.isAdmin = false;
+            } else {
+                this.isAdmin = data?.is_admin || false;
+            }
         } catch (e) {
-            console.warn('[Admin] Could not verify admin status:', e);
-            return false;
+            this.isAdmin = false;
+        }
+
+        if (this.isAdmin) {
+            const btn = document.getElementById('btn-admin');
+            if (btn) btn.style.display = 'flex';
+        }
+        
+        return this.isAdmin;
+    }
+
+    toggle() {
+        if (!this.isAdmin) {
+            console.warn('[Admin] Access Denied: You are not an administrator.');
+            return;
+        }
+        
+        this.isOpen = !this.isOpen;
+        this.container.style.display = this.isOpen ? 'flex' : 'none';
+        
+        if (this.isOpen) {
+            this.refreshData();
         }
     }
 
-    async toggle() {
-        if (!this.isOpen) {
+    async refreshData() {
+        if (this.currentTab === 'users') {
             await this.loadUsers();
+        } else if (this.currentTab === 'items') {
+            await this.loadItems();
         }
-        this.isOpen = !this.isOpen;
-        this.container.style.display = this.isOpen ? 'flex' : 'none';
+        this._renderContent();
     }
 
     async loadUsers() {
+        if (isOfflineMode) {
+            const users = localDb.get('users') || {};
+            this.users = Object.keys(users).map(username => {
+                const char = localDb.get(`char_${users[username].userId}`) || {};
+                return {
+                    id: users[username].userId,
+                    username: username,
+                    level: char.level || 1,
+                    gold: char.gold || 0,
+                    total_kills: char.total_kills || 0,
+                    play_time: char.play_time || 0
+                };
+            });
+            return;
+        }
+
         try {
-            if (isOfflineMode || !supabase) {
+            const { fetchLeaderboard } = await import('../network/GameSync.js');
+            const data = await fetchLeaderboard('level');
+            
+            if (!data || data.length === 0) {
+                console.warn('[Admin] No players found from leaderboard');
                 this.users = [];
                 return;
             }
-            const { data, error } = await supabase
-                .from('characters')
-                .select('id, name, level, gold, total_kills, play_time, created_at');
-            if (error) throw error;
-            this.users = data || [];
+
+            this.users = data.map(d => ({
+                id: d.id || d.user_id || 'unknown_' + Math.random().toString(36).substring(7),
+                username: d.profiles?.username || d.name || 'Unknown',
+                level: d.level || 1,
+                gold: d.gold || 0,
+                total_kills: d.total_kills || 0,
+                play_time: d.play_time || 0
+            }));
         } catch (e) {
-            console.error('[Admin] Error loading users:', e);
+            console.error('[Admin] Load users exception:', e);
             this.users = [];
         }
     }
 
     async loadItems() {
         try {
-            if (isOfflineMode || !supabase) {
-                this.items = [];
-                return;
-            }
-            const { data, error } = await supabase
-                .from('items')
-                .select('*');
-            if (error) throw error;
-            this.items = data || [];
+            const { ITEMS } = await import('../engine/GameData.js');
+            
+            this.items = Object.entries(ITEMS).map(([name, data]) => ({
+                name: name,
+                emoji: data.emoji || '📦',
+                type: data.type || 'material',
+                rarity: data.rarity || 'common',
+                price: data.price || 0,
+                desc: data.desc || 'No description',
+                healHp: data.healHp || 0,
+                restoreSp: data.restoreSp || 0,
+                atkBonus: data.atkBonus || 0,
+                defBonus: data.defBonus || 0,
+                hpBonus: data.hpBonus || 0
+            }));
         } catch (e) {
-            console.error('[Admin] Error loading items:', e);
+            console.error('[Admin] Load items exception:', e);
             this.items = [];
         }
     }
 
-    async deletePlayer(charId, charName) {
-        if (!confirm(`Are you sure you want to delete ${charName}? This cannot be undone.`)) {
+    async updatePlayer(charId, updates) {
+        if (isOfflineMode) {
+            const char = localDb.get(`char_${charId}`);
+            if (char) {
+                localDb.set(`char_${charId}`, { ...char, ...updates });
+                this.refreshData();
+            }
             return;
         }
 
-        if (!supabase) {
-            alert('Supabase not available');
+        try {
+            const { error } = await supabase
+                .from('characters')
+                .update(updates)
+                .eq('id', charId);
+            
+            if (error) {
+                alert('Error updating player: ' + error.message);
+            } else {
+                this.refreshData();
+            }
+        } catch (e) {
+            alert('Exception updating player: ' + e.message);
+        }
+    }
+
+    async giveItem(charId, itemName, qty) {
+        if (isOfflineMode) {
+            const inv = localDb.get(`inventory_${charId}`) || [];
+            const existing = inv.find(i => i.item_name === itemName);
+            if (existing) {
+                existing.quantity += qty;
+            } else {
+                inv.push({
+                    id: 'inv_' + Math.random().toString(36).substring(2, 10),
+                    character_id: charId,
+                    item_name: itemName,
+                    item_type: 'material',
+                    quantity: qty,
+                    stats: {}
+                });
+            }
+            localDb.set(`inventory_${charId}`, inv);
+            alert(`✅ Gave ${qty}x ${itemName} to player`);
+            this.refreshData();
+            return;
+        }
+
+        try {
+            await saveInventoryItem(charId, itemName, 'material', qty);
+            alert(`✅ Gave ${qty}x ${itemName} to player`);
+            this.refreshData();
+        } catch (e) {
+            alert('Error giving item: ' + e.message);
+        }
+    }
+
+    async resetPlayer(charId) {
+        if (!confirm('Are you sure you want to reset this player? This action cannot be undone.')) {
+            return;
+        }
+
+        const resetData = {
+            level: 1,
+            exp: 0,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            atk: 10,
+            def: 5,
+            gold: 0,
+            total_kills: 0,
+            play_time: 0
+        };
+
+        await this.updatePlayer(charId, resetData);
+        alert('✅ Player reset to level 1');
+    }
+
+    async deletePlayer(charId) {
+        if (!confirm('Are you sure you want to DELETE this player? This action cannot be undone.')) {
+            return;
+        }
+
+        if (isOfflineMode) {
+            // Find and delete from local storage
+            const users = localDb.get('users') || {};
+            for (const username in users) {
+                if (users[username].userId === charId) {
+                    delete users[username];
+                    localDb.set('users', users);
+                    break;
+                }
+            }
+            localDb.set(`char_${charId}`, null);
+            localDb.set(`inventory_${charId}`, null);
+            alert('✅ Player deleted');
+            this.refreshData();
             return;
         }
 
         try {
             console.log('[Admin] Starting delete process for character:', charId);
             
-            // Run diagnostic first to identify issues
-            const diagnostic = await runDeleteDiagnostic(supabase, charId);
+            // Step 1: Delete marketplace listings
+            console.log('[Admin] Deleting marketplace listings for:', charId);
+            const { error: marketError } = await supabase
+                .from('marketplace')
+                .delete()
+                .eq('seller_id', charId);
+            if (marketError) console.warn('[Admin] Marketplace deletion warning:', marketError);
+
+            // Step 2: Delete inventory items
+            console.log('[Admin] Deleting inventory for:', charId);
+            const { error: invError } = await supabase
+                .from('inventory')
+                .delete()
+                .eq('character_id', charId);
+            if (invError) console.warn('[Admin] Inventory deletion warning:', invError);
             
-            if (!diagnostic.success) {
-                console.error('[Admin] Diagnostic failed:', diagnostic);
-                if (diagnostic.suggestion) {
-                    alert('❌ ' + diagnostic.reason + '\n\n' + diagnostic.suggestion);
+            // Step 3: Delete character
+            console.log('[Admin] Deleting character:', charId);
+            const { error: charError, data: charData } = await supabase
+                .from('characters')
+                .delete()
+                .eq('id', charId)
+                .select();
+            
+            if (charError) {
+                console.error('[Admin] Character deletion error:', charError);
+                // If it's a policy error, suggest checking RLS
+                if (charError.code === '42501') {
+                    alert('❌ Database Error (RLS): You do not have permission to delete this record. Please check Supabase Policy.');
                 } else {
-                    alert('❌ ' + diagnostic.reason + '\n\nError: ' + (diagnostic.error?.message || 'Unknown error'));
+                    alert('Error deleting player: ' + charError.message);
                 }
-                return;
+            } else if (!charData || charData.length === 0) {
+                console.warn('[Admin] Delete successful but no rows affected. Record might not exist or RLS blocked it.');
+                alert('⚠️ Delete request sent, but the record was not removed. This usually means the record does not exist or Supabase RLS policy blocked the deletion.');
+            } else {
+                console.log('[Admin] Player deleted successfully from Database');
+                alert('✅ Player deleted successfully');
+                // Force a complete refresh
+                await new Promise(resolve => setTimeout(resolve, 800));
+                await this.loadUsers();
+                this._renderContent();
             }
-            
-            console.log('[Admin] Diagnostic passed, deletion successful');
-            alert('✅ Player deleted successfully');
-            
-            // Refresh the list
-            await new Promise(resolve => setTimeout(resolve, 500));
-            await this.loadUsers();
-            this._renderContent();
-            
         } catch (e) {
             console.error('[Admin] Exception during delete:', e);
             alert('Exception deleting player: ' + e.message);
@@ -215,96 +309,329 @@ export class AdminUI {
         closeBtn.style.cssText = 'background: none; border: none; color: #ffd700; font-size: 24px; cursor: pointer; font-weight: bold;';
         closeBtn.onclick = () => this.toggle();
         header.appendChild(closeBtn);
-        this.container.appendChild(header);
 
         const tabs = document.createElement('div');
-        tabs.style.cssText = 'display: flex; border-bottom: 2px solid #ffd700; background: #222;';
+        tabs.style.cssText = 'display: flex; background: #222; padding: 5px 10px; border-bottom: 1px solid #444;';
         
-        const userTab = document.createElement('button');
-        userTab.innerText = '👥 Players';
-        userTab.style.cssText = 'flex: 1; padding: 10px; background: none; border: none; color: #ffd700; cursor: pointer; font-size: 14px; border-bottom: 3px solid #ffd700;';
-        userTab.onclick = () => {
-            this.currentTab = 'users';
-            this._renderContent();
-        };
+        const userTab = this._createTabBtn('👥 Players', 'users');
+        const itemTab = this._createTabBtn('📦 Items', 'items');
         tabs.appendChild(userTab);
-
-        const itemTab = document.createElement('button');
-        itemTab.innerText = '📦 Items';
-        itemTab.style.cssText = 'flex: 1; padding: 10px; background: none; border: none; color: #888; cursor: pointer; font-size: 14px;';
-        itemTab.onclick = () => {
-            this.currentTab = 'items';
-            this._renderContent();
-        };
         tabs.appendChild(itemTab);
+
+        this.content = document.createElement('div');
+        this.content.style.cssText = 'flex: 1; overflow-y: auto; padding: 20px; background: rgba(10, 10, 20, 0.5);';
+
+        this.container.appendChild(header);
         this.container.appendChild(tabs);
-
-        const content = document.createElement('div');
-        content.id = 'admin-content';
-        content.style.cssText = 'flex: 1; overflow-y: auto; padding: 15px;';
-        this.container.appendChild(content);
-
+        this.container.appendChild(this.content);
         document.body.appendChild(this.container);
     }
 
-    _renderContent() {
-        const content = document.getElementById('admin-content');
-        if (!content) return;
+    _createTabBtn(text, tabId) {
+        const btn = document.createElement('button');
+        btn.innerText = text;
+        btn.style.cssText = 'padding: 10px 20px; background: none; border: none; color: #aaa; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s;';
+        if (this.currentTab === tabId) {
+            btn.style.color = '#ffd700';
+            btn.style.borderBottomColor = '#ffd700';
+        }
+        btn.onmouseover = () => btn.style.color = '#ffed4e';
+        btn.onmouseout = () => {
+            if (this.currentTab !== tabId) btn.style.color = '#aaa';
+        };
+        btn.onclick = () => {
+            this.currentTab = tabId;
+            this._updateTabs();
+            this.refreshData();
+        };
+        return btn;
+    }
 
+    _updateTabs() {
+        const btns = this.container.querySelectorAll('button');
+        btns.forEach(b => {
+            if (b.innerText.includes('Players') || b.innerText.includes('Items')) {
+                const isActive = (b.innerText.includes('Players') && this.currentTab === 'users') || 
+                               (b.innerText.includes('Items') && this.currentTab === 'items');
+                b.style.color = isActive ? '#ffd700' : '#aaa';
+                b.style.borderBottomColor = isActive ? '#ffd700' : 'transparent';
+            }
+        });
+    }
+
+    _renderContent() {
+        this.content.innerHTML = '';
         if (this.currentTab === 'users') {
-            this._renderUserList(content);
-        } else {
-            this._renderItemList(content);
+            this._renderUserList();
+        } else if (this.currentTab === 'items') {
+            this._renderItemList();
         }
     }
 
-    _renderUserList(container) {
-        let html = '<table style="width:100%; border-collapse: collapse; color: #fff;">';
-        html += '<thead><tr style="background: #333; border-bottom: 2px solid #ffd700;">';
-        html += '<th style="padding: 8px; text-align: left;">Player Name</th>';
-        html += '<th style="padding: 8px; text-align: center;">Level</th>';
-        html += '<th style="padding: 8px; text-align: center;">Gold</th>';
-        html += '<th style="padding: 8px; text-align: center;">Kills</th>';
-        html += '<th style="padding: 8px; text-align: center;">Play Time</th>';
-        html += '<th style="padding: 8px; text-align: center;">Actions</th>';
-        html += '</tr></thead><tbody>';
+    _renderUserList() {
+        const table = document.createElement('table');
+        table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;';
+        table.innerHTML = `
+            <thead>
+                <tr style="border-bottom: 2px solid #ffd700; color: #ffd700; background: rgba(255, 215, 0, 0.1);">
+                    <th style="padding: 12px;">Player Name</th>
+                    <th style="padding: 12px;">Level</th>
+                    <th style="padding: 12px;">Gold</th>
+                    <th style="padding: 12px;">Kills</th>
+                    <th style="padding: 12px;">Play Time</th>
+                    <th style="padding: 12px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
 
-        this.users.forEach(user => {
-            const playTime = this._formatPlayTime(user.play_time || 0);
-            html += `<tr style="border-bottom: 1px solid #444; hover: background: #333;">`;
-            html += `<td style="padding: 8px;">${user.name}</td>`;
-            html += `<td style="padding: 8px; text-align: center;">Lv.${user.level}</td>`;
-            html += `<td style="padding: 8px; text-align: center;">${(user.gold || 0).toLocaleString()}</td>`;
-            html += `<td style="padding: 8px; text-align: center;">${user.total_kills || 0}</td>`;
-            html += `<td style="padding: 8px; text-align: center;">${playTime}</td>`;
-            html += `<td style="padding: 8px; text-align: center;">`;
-            html += `<button onclick="window.adminUI.deletePlayer('${user.id}', '${user.name}')" style="background: #d32f2f; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin: 2px;">Delete</button>`;
-            html += `</td></tr>`;
+        const tbody = table.querySelector('tbody');
+        this.users.forEach((user, idx) => {
+            const tr = document.createElement('tr');
+            tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
+            tr.onmouseover = () => tr.style.background = 'rgba(255, 215, 0, 0.1)';
+            tr.onmouseout = () => tr.style.background = idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent';
+            
+            const playTimeHours = Math.floor((user.play_time || 0) / 3600);
+            const playTimeMins = Math.floor(((user.play_time || 0) % 3600) / 60);
+            const playTimeStr = playTimeHours > 0 ? `${playTimeHours}h ${playTimeMins}m` : `${playTimeMins}m`;
+
+            tr.innerHTML = `
+                <td style="padding: 12px; font-weight: 500;">${user.username}</td>
+                <td style="padding: 12px;">Lv.${user.level}</td>
+                <td style="padding: 12px;">${(user.gold || 0).toLocaleString()}</td>
+                <td style="padding: 12px;">${(user.total_kills || 0).toLocaleString()}</td>
+                <td style="padding: 12px;">${playTimeStr}</td>
+                <td style="padding: 12px;">
+                    <button class="edit-btn" style="background: #4a7c9e; border: 1px solid #6a9cbe; color: white; padding: 6px 10px; cursor: pointer; border-radius: 3px; margin-right: 5px; font-size: 11px;">Edit</button>
+                    <button class="give-btn" style="background: #2a8a4a; border: 1px solid #3aaa5a; color: white; padding: 6px 10px; cursor: pointer; border-radius: 3px; margin-right: 5px; font-size: 11px;">Give</button>
+                    <button class="reset-btn" style="background: #8a5a2a; border: 1px solid #aa7a3a; color: white; padding: 6px 10px; cursor: pointer; border-radius: 3px; margin-right: 5px; font-size: 11px;">Reset</button>
+                    <button class="delete-btn" style="background: #8a2a2a; border: 1px solid #aa3a3a; color: white; padding: 6px 10px; cursor: pointer; border-radius: 3px; font-size: 11px;">Delete</button>
+                </td>
+            `;
+            
+            tr.querySelector('.edit-btn').onclick = () => {
+                this.openEditModal(user);
+            };
+
+            tr.querySelector('.give-btn').onclick = () => {
+                const itemName = prompt(`Item name to give to ${user.username}:`, 'Sword');
+                if (itemName) {
+                    const qty = prompt(`Quantity:`, '1');
+                    if (qty) this.giveItem(user.id, itemName, parseInt(qty));
+                }
+            };
+
+            tr.querySelector('.reset-btn').onclick = () => {
+                this.resetPlayer(user.id);
+            };
+
+            tr.querySelector('.delete-btn').onclick = () => {
+                this.deletePlayer(user.id);
+            };
+
+            tbody.appendChild(tr);
         });
 
-        html += '</tbody></table>';
-        container.innerHTML = html;
+        this.content.appendChild(table);
+
+        if (this.users.length === 0) {
+            this.content.innerHTML = '<div style="text-align:center; padding: 50px; color: #888;">No players found</div>';
+        }
     }
 
-    _renderItemList(container) {
-        let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">';
+    _renderItemList() {
+        const searchDiv = document.createElement('div');
+        searchDiv.style.cssText = 'margin-bottom: 15px; display: flex; gap: 10px;';
         
-        this.items.forEach(item => {
-            html += `<div style="background: #333; padding: 10px; border-radius: 5px; border: 1px solid #555;">`;
-            html += `<h4 style="margin: 0 0 5px 0; color: #ffd700;">${item.name}</h4>`;
-            html += `<p style="margin: 3px 0; font-size: 12px; color: #aaa;">Type: ${item.type}</p>`;
-            html += `<p style="margin: 3px 0; font-size: 12px; color: #aaa;">Price: ${item.price}</p>`;
-            html += `</div>`;
-        });
-
-        html += '</div>';
-        container.innerHTML = html;
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'Search items by name...';
+        searchInput.style.cssText = 'flex: 1; padding: 8px 12px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: white; border-radius: 4px;';
+        
+        const rarityFilter = document.createElement('select');
+        rarityFilter.style.cssText = 'padding: 8px 12px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: white; border-radius: 4px;';
+        rarityFilter.innerHTML = '<option value="">All Rarities</option><option value="common">Common</option><option value="rare">Rare</option><option value="epic">Epic</option><option value="legendary">Legendary</option><option value="mythic">Mythic</option>';
+        
+        searchDiv.appendChild(searchInput);
+        searchDiv.appendChild(rarityFilter);
+        this.content.appendChild(searchDiv);
+        
+        const table = document.createElement('table');
+        table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;';
+        table.innerHTML = `
+            <thead>
+                <tr style="border-bottom: 2px solid #ffd700; color: #ffd700; background: rgba(255, 215, 0, 0.1);">
+                    <th style="padding: 10px; width: 5%;">Icon</th>
+                    <th style="padding: 10px; width: 20%;">Name</th>
+                    <th style="padding: 10px; width: 12%;">Type</th>
+                    <th style="padding: 10px; width: 12%;">Rarity</th>
+                    <th style="padding: 10px; width: 10%;">Price</th>
+                    <th style="padding: 10px; width: 41%;">Description</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        
+        const tbody = table.querySelector('tbody');
+        
+        const renderItems = () => {
+            tbody.innerHTML = '';
+            const searchTerm = searchInput.value.toLowerCase();
+            const rarityTerm = rarityFilter.value;
+            
+            const filtered = this.items.filter(item => {
+                const matchSearch = item.name.toLowerCase().includes(searchTerm);
+                const matchRarity = !rarityTerm || item.rarity === rarityTerm;
+                return matchSearch && matchRarity;
+            });
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #888;">No items found</td></tr>';
+                return;
+            }
+            
+            filtered.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
+                tr.onmouseover = () => tr.style.background = 'rgba(255, 215, 0, 0.1)';
+                tr.onmouseout = () => tr.style.background = idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent';
+                
+                const rarityColor = {
+                    'common': '#aaa',
+                    'rare': '#4a9eff',
+                    'epic': '#a335ee',
+                    'legendary': '#ff8000',
+                    'mythic': '#e6cc80'
+                }[item.rarity] || '#aaa';
+                
+                tr.innerHTML = `
+                    <td style="padding: 10px; font-size: 16px;">${item.emoji}</td>
+                    <td style="padding: 10px; font-weight: 500;">${item.name}</td>
+                    <td style="padding: 10px;">${item.type}</td>
+                    <td style="padding: 10px; color: ${rarityColor}; font-weight: bold;">${item.rarity}</td>
+                    <td style="padding: 10px;">${item.price}</td>
+                    <td style="padding: 10px; font-size: 11px; color: #bbb;">${item.desc.substring(0, 50)}...</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+        
+        searchInput.addEventListener('input', renderItems);
+        rarityFilter.addEventListener('change', renderItems);
+        
+        this.content.appendChild(table);
+        renderItems();
     }
 
-    _formatPlayTime(seconds) {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        if (hours > 0) return `${hours}h ${minutes}m`;
-        return `${minutes}m`;
+    openEditModal(user) {
+        this.selectedUser = user;
+        this._createEditModal();
+    }
+
+    _createEditModal() {
+        if (!this.selectedUser) return;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('admin-edit-modal');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'admin-edit-modal';
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center;
+            z-index: 10001; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: rgba(20, 20, 30, 0.98); border: 2px solid #ffd700; border-radius: 10px;
+            padding: 30px; width: 90%; max-width: 500px; color: white;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+        `;
+
+        const title = document.createElement('h2');
+        title.innerText = `Edit Player: ${this.selectedUser.username}`;
+        title.style.cssText = 'margin: 0 0 20px 0; color: #ffd700; font-size: 18px;';
+        content.appendChild(title);
+
+        const fields = [
+            { label: 'Level', key: 'level', type: 'number', min: 1, max: 999 },
+            { label: 'Gold', key: 'gold', type: 'number', min: 0 },
+            { label: 'Total Kills', key: 'total_kills', type: 'number', min: 0 },
+            { label: 'Play Time (seconds)', key: 'play_time', type: 'number', min: 0 }
+        ];
+
+        const formData = {};
+        fields.forEach(field => {
+            const group = document.createElement('div');
+            group.style.cssText = 'margin-bottom: 15px;';
+
+            const label = document.createElement('label');
+            label.innerText = field.label + ':';
+            label.style.cssText = 'display: block; margin-bottom: 5px; color: #ffd700; font-weight: bold;';
+            group.appendChild(label);
+
+            const input = document.createElement('input');
+            input.type = field.type;
+            input.value = this.selectedUser[field.key] || 0;
+            if (field.min !== undefined) input.min = field.min;
+            if (field.max !== undefined) input.max = field.max;
+            input.style.cssText = `
+                width: 100%; padding: 10px; background: rgba(255, 215, 0, 0.1);
+                border: 1px solid #ffd700; color: white; border-radius: 4px;
+                box-sizing: border-box; font-size: 14px;
+            `;
+            input.addEventListener('change', (e) => {
+                formData[field.key] = field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
+            });
+            group.appendChild(input);
+            content.appendChild(group);
+
+            // Initialize formData
+            formData[field.key] = this.selectedUser[field.key] || 0;
+        });
+
+        const buttonGroup = document.createElement('div');
+        buttonGroup.style.cssText = 'display: flex; gap: 10px; margin-top: 25px;';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.innerText = 'Save Changes';
+        saveBtn.style.cssText = `
+            flex: 1; padding: 12px; background: #2a8a4a; border: 1px solid #3aaa5a;
+            color: white; border-radius: 4px; cursor: pointer; font-weight: bold;
+            transition: background 0.2s;
+        `;
+        saveBtn.onmouseover = () => saveBtn.style.background = '#3aaa5a';
+        saveBtn.onmouseout = () => saveBtn.style.background = '#2a8a4a';
+        saveBtn.onclick = async () => {
+            await this.updatePlayer(this.selectedUser.id, formData);
+            modal.remove();
+            await this.refreshData();
+        };
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.innerText = 'Cancel';
+        cancelBtn.style.cssText = `
+            flex: 1; padding: 12px; background: #8a5a2a; border: 1px solid #aa7a3a;
+            color: white; border-radius: 4px; cursor: pointer; font-weight: bold;
+            transition: background 0.2s;
+        `;
+        cancelBtn.onmouseover = () => cancelBtn.style.background = '#aa7a3a';
+        cancelBtn.onmouseout = () => cancelBtn.style.background = '#8a5a2a';
+        cancelBtn.onclick = () => modal.remove();
+
+        buttonGroup.appendChild(saveBtn);
+        buttonGroup.appendChild(cancelBtn);
+        content.appendChild(buttonGroup);
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        // Close modal when clicking outside
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
     }
 }
