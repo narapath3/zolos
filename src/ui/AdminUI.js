@@ -236,25 +236,42 @@ export class AdminUI {
         }
 
         try {
-            // Delete inventory items first
-            await supabase
+            console.log('[Admin] Starting delete process for character:', charId);
+            
+            // Step 1: Delete inventory items
+            const { error: invError } = await supabase
                 .from('inventory')
                 .delete()
                 .eq('character_id', charId);
             
-            // Delete character
-            const { error: charError } = await supabase
+            if (invError) {
+                console.warn('[Admin] Inventory deletion warning:', invError);
+            } else {
+                console.log('[Admin] Inventory items deleted successfully');
+            }
+            
+            // Step 2: Delete character
+            const { error: charError, data: charData } = await supabase
                 .from('characters')
                 .delete()
-                .eq('id', charId);
+                .eq('id', charId)
+                .select();
+            
+            console.log('[Admin] Character deletion result:', { error: charError, data: charData });
             
             if (charError) {
+                console.error('[Admin] Character deletion error:', charError);
                 alert('Error deleting player: ' + charError.message);
             } else {
+                console.log('[Admin] Player deleted successfully');
                 alert('✅ Player deleted successfully');
-                await this.refreshData();
+                // Force a complete refresh
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await this.loadUsers();
+                this._renderContent();
             }
         } catch (e) {
+            console.error('[Admin] Exception during delete:', e);
             alert('Exception deleting player: ' + e.message);
         }
     }
