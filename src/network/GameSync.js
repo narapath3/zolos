@@ -630,6 +630,9 @@ export async function fetchMarketListings() {
         return initLocalMarketplace();
     }
 
+    // Always include local fallback listings (items that failed Supabase insert due to RLS etc.)
+    const localListings = localDb.get('marketplace_listings') || [];
+
     try {
         const { data, error } = await supabase
             .from('marketplace')
@@ -638,19 +641,26 @@ export async function fetchMarketListings() {
 
         if (error) {
             console.warn('[Zolos] Supabase marketplace query failed (table might not exist), falling back to Local/Mock:', error.message);
-            return initLocalMarketplace();
+            return localListings.length > 0 ? localListings : initLocalMarketplace();
         }
-        return data || [];
+        // Merge: Supabase results + local fallback listings (deduped by id)
+        const remoteIds = new Set((data || []).map(d => d.id));
+        const uniqueLocal = localListings.filter(l => !remoteIds.has(l.id));
+        return [...(data || []), ...uniqueLocal];
     } catch (err) {
         console.warn('[Zolos] Catch error on fetching marketplace, falling back:', err.message);
-        return initLocalMarketplace();
+        return localListings.length > 0 ? localListings : initLocalMarketplace();
     }
 }
 
+
+
 export async function listMarketItem(sellerCharId, sellerName, itemName, itemType, quantity, price, stats = {}) {
     const listingId = 'listing_' + Math.random().toString(36).substring(2, 10);
-    const listingDataLocal = {
+    const itemId = 'item_' + Math.random().toString(36).substring(2, 12);
+    const listingData = {
         id: listingId,
+        item_id: itemId,
         seller_id: sellerCharId,
         seller_name: sellerName,
         item_name: itemName,
@@ -661,54 +671,66 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
         created_at: new Date().toISOString()
     };
 
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !supabase || sellerCharId.startsWith('guest_') || sellerCharId.startsWith('local_')) {
         const listings = initLocalMarketplace();
-        listings.unshift(listingDataLocal);
+        listings.unshift(listingData);
         localDb.set('marketplace_listings', listings);
-        return listingDataLocal;
+        return listingData;
     }
 
     try {
-        const listingDataOnline = {
-            seller_id: currentUserId || sellerCharId, // Use user's UUID (currentUserId)
-            seller_name: sellerName,
+        // Get the authenticated user's UUID for seller_id (must match auth.uid() for RLS)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            console.error('[Zolos] No authenticated user — cannot list on marketplace');
+            listingData._failed = true;
+            return listingData;
+        }
+
+        // For Supabase, let DB generate UUID id; use auth.uid() as seller_id
+        const supabaseData = {
+            item_id: itemId,
             item_name: itemName,
             item_type: itemType,
             quantity,
             price,
+            seller_id: user.id,   // auth.uid() UUID
+            seller_name: sellerName,
             stats,
-            created_at: new Date().toISOString()
         };
 
         const { data, error } = await supabase
             .from('marketplace')
-            .insert(listingDataOnline)
+            .insert(supabaseData)
             .select()
             .single();
 
         if (error) {
-            console.warn('[Zolos] Supabase insert listing failed, listing locally:', error.message);
+            console.error('[Zolos] ❌ Supabase marketplace insert FAILED:', error.code, error.message);
+            // Mark as failed so UI knows not to deduct inventory
+            listingData._failed = true;
             const listings = initLocalMarketplace();
-            listings.unshift(listingDataLocal);
+            listings.unshift(listingData);
             localDb.set('marketplace_listings', listings);
-            return listingDataLocal;
+            return listingData;
         }
+        console.log('[Zolos] ✅ Marketplace listing created on Supabase:', data.id);
         return data;
     } catch (err) {
-        console.warn('[Zolos] Catch error on listing, falling back to local:', err.message);
+        console.error('[Zolos] ❌ Catch error on listing:', err.message);
+        listingData._failed = true;
         const listings = initLocalMarketplace();
-        listings.unshift(listingDataLocal);
+        listings.unshift(listingData);
         localDb.set('marketplace_listings', listings);
-        return listingDataLocal;
+        return listingData;
     }
 }
 
 export async function cancelMarketListing(listingId, characterId) {
-    // 1. Find listing to get its details
     let listing = null;
     let isLocalListing = false;
 
-    if (isOfflineMode || !supabase || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
         isLocalListing = true;
     }
 
@@ -717,7 +739,6 @@ export async function cancelMarketListing(listingId, characterId) {
         const idx = listings.findIndex(l => l.id === listingId);
         if (idx >= 0) {
             listing = listings[idx];
-            // Remove from list
             listings.splice(idx, 1);
             localDb.set('marketplace_listings', listings);
         }
@@ -731,18 +752,21 @@ export async function cancelMarketListing(listingId, characterId) {
                 .single();
 
             if (!fetchErr && data) {
-                listing = data;
-                // Delete
-                const { error: deleteErr } = await supabase
+                // Delete with select to verify actual row removal
+                const { data: delData, error: deleteErr } = await supabase
                     .from('marketplace')
                     .delete()
-                    .eq('id', listingId);
+                    .eq('id', listingId)
+                    .select();
 
                 if (deleteErr) throw deleteErr;
+                if (!delData || delData.length === 0) {
+                    throw new Error('Deletion failed (blocked by RLS or already deleted)');
+                }
+                listing = delData[0];
             }
         } catch (err) {
             console.warn('[Zolos] Supabase cancel failed, retrying locally:', err.message);
-            // Retry locally
             const listings = initLocalMarketplace();
             const idx = listings.findIndex(l => l.id === listingId);
             if (idx >= 0) {
@@ -754,7 +778,7 @@ export async function cancelMarketListing(listingId, characterId) {
     }
 
     if (listing) {
-        // 2. Return item to seller
+        // Return item to seller
         await saveInventoryItem(characterId, listing.item_name, listing.item_type, listing.quantity, listing.stats);
         return true;
     }
@@ -765,7 +789,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     let listing = null;
     let isLocalListing = false;
 
-    if (isOfflineMode || !supabase || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
+    if (isOfflineMode || !supabase || buyerCharId.startsWith('guest_') || buyerCharId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
         isLocalListing = true;
     }
 
@@ -787,24 +811,27 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
                 .single();
 
             if (!fetchErr && data) {
-                listing = data;
-                // Delete
-                const { error: deleteErr } = await supabase
+                // Delete with select to verify actual row removal
+                const { data: delData, error: deleteErr } = await supabase
                     .from('marketplace')
                     .delete()
-                    .eq('id', listingId);
+                    .eq('id', listingId)
+                    .select();
 
                 if (deleteErr) throw deleteErr;
+                if (!delData || delData.length === 0) {
+                    // RLS blocked the delete or listing was already bought by someone else
+                    console.error('[Zolos] ❌ Buy failed: listing could not be deleted (RLS or race condition)');
+                    return false;
+                }
+                listing = delData[0];
+                console.log('[Zolos] ✅ Marketplace listing purchased from Supabase:', listing.id);
             }
         } catch (err) {
-            console.warn('[Zolos] Supabase buy delete failed, retrying locally:', err.message);
-            const listings = initLocalMarketplace();
-            const idx = listings.findIndex(l => l.id === listingId);
-            if (idx >= 0) {
-                listing = listings[idx];
-                listings.splice(idx, 1);
-                localDb.set('marketplace_listings', listings);
-            }
+            // Do NOT fall back to local — the listing still exists on the server
+            // Returning false lets the UI refund the buyer's gold
+            console.error('[Zolos] ❌ Supabase buy failed:', err.message);
+            return false;
         }
     }
 

@@ -1170,7 +1170,7 @@ export class GameUI {
 
     // Deduct gold
     this.character.stats.gold -= item.price;
-    
+
     // Add to inventory
     const existing = this.inventory.find(i => i.item_name === item.name);
     if (existing) {
@@ -1198,7 +1198,7 @@ export class GameUI {
     }
 
     this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
-    
+
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
       else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
@@ -1430,7 +1430,24 @@ export class GameUI {
     );
 
     if (listing) {
-      // Deduct from local inventory
+      // Check if listing actually failed on Supabase (RLS error etc.)
+      if (listing._failed) {
+        // Listing only went to localStorage, do NOT deduct from DB inventory
+        this.addCombatLog(`⚠️ ไม่สามารถลงขายบนเซิร์ฟเวอร์ได้ (RLS Policy) — ของยังอยู่ใน inventory`, 'system');
+        this.addCombatLog(`💡 กรุณาตรวจสอบ Supabase RLS policies ของตาราง marketplace`, 'system');
+        if (this.soundManager) this.soundManager.playErrorSound?.();
+
+        // Remove the failed local listing so it doesn't confuse things
+        const localListingsKey = 'marketplace_listings';
+        const stored = JSON.parse(localStorage.getItem(`zolos_db_${localListingsKey}`) || '[]');
+        const cleanedUp = stored.filter(l => l.id !== listing.id);
+        localStorage.setItem(`zolos_db_${localListingsKey}`, JSON.stringify(cleanedUp));
+
+        this._renderMarket();
+        return;
+      }
+
+      // Listing succeeded on Supabase — safe to deduct from inventory
       const itemIdx = this.inventory.findIndex(i => i.item_name === item.item_name);
       if (itemIdx >= 0) {
         this.inventory[itemIdx].quantity -= qty;
