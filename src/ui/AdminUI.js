@@ -22,41 +22,41 @@ export class AdminUI {
         }
 
         try {
-            console.log('[Admin] Starting delete process for character:', charId);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', userId)
+                .single();
             
-            // Step 1: Delete market history
-            console.log('[Admin] Deleting market history for:', charId);
-            await supabase.from('market_history').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Market history deletion warning:', e));
-            
-            // Step 2: Delete marketplace listings
-            console.log('[Admin] Deleting marketplace listings for:', charId);
-            await supabase.from('marketplace').delete().eq('seller_id', charId).catch(e => console.warn('[Admin] Marketplace deletion warning:', e));
-
-            // Step 3: Delete inventory items
-            console.log('[Admin] Deleting inventory for:', charId);
-            await supabase.from('inventory').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Inventory deletion warning:', e));
-            
-            // Step 4: Delete character
-            console.log('[Admin] Deleting character:', charId);
-            const { error: charError, data: charData } = await supabase
-                .from('characters')
-                .delete()
-                .eq('id', charId)
-                .select();
-            
-            if (charError) {
-                console.error('[Admin] Character deletion error:', charError);
-                alert('❌ Error: ' + charError.message);
+            if (error) {
+                console.warn('[Admin] Failed to check admin status:', error.message);
+                this.isAdmin = false;
             } else {
-                console.log('[Admin] Player deleted successfully from Database');
-                // Update UI in real-time by removing from local list
-                this.users = this.users.filter(u => u.id !== charId);
-                this._renderContent();
-                alert('✅ Player deleted successfully');
+                this.isAdmin = data?.is_admin || false;
             }
         } catch (e) {
-            console.error('[Admin] Exception during delete:', e);
-            alert('❌ Exception: ' + e.message);
+            this.isAdmin = false;
+        }
+
+        if (this.isAdmin) {
+            const btn = document.getElementById('btn-admin');
+            if (btn) btn.style.display = 'flex';
+        }
+        
+        return this.isAdmin;
+    }
+
+    toggle() {
+        if (!this.isAdmin) {
+            console.warn('[Admin] Access Denied: You are not an administrator.');
+            return;
+        }
+        
+        this.isOpen = !this.isOpen;
+        this.container.style.display = this.isOpen ? 'flex' : 'none';
+        
+        if (this.isOpen) {
+            this.refreshData();
         }
     }
 
@@ -238,23 +238,19 @@ export class AdminUI {
         try {
             console.log('[Admin] Starting delete process for character:', charId);
             
-            // Step 1: Delete marketplace listings
-            console.log('[Admin] Deleting marketplace listings for:', charId);
-            const { error: marketError } = await supabase
-                .from('marketplace')
-                .delete()
-                .eq('seller_id', charId);
-            if (marketError) console.warn('[Admin] Marketplace deletion warning:', marketError);
-
-            // Step 2: Delete inventory items
-            console.log('[Admin] Deleting inventory for:', charId);
-            const { error: invError } = await supabase
-                .from('inventory')
-                .delete()
-                .eq('character_id', charId);
-            if (invError) console.warn('[Admin] Inventory deletion warning:', invError);
+            // Step 1: Delete market history
+            console.log('[Admin] Deleting market history for:', charId);
+            await supabase.from('market_history').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Market history deletion warning:', e));
             
-            // Step 3: Delete character
+            // Step 2: Delete marketplace listings
+            console.log('[Admin] Deleting marketplace listings for:', charId);
+            await supabase.from('marketplace').delete().eq('seller_id', charId).catch(e => console.warn('[Admin] Marketplace deletion warning:', e));
+
+            // Step 3: Delete inventory items
+            console.log('[Admin] Deleting inventory for:', charId);
+            await supabase.from('inventory').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Inventory deletion warning:', e));
+            
+            // Step 4: Delete character
             console.log('[Admin] Deleting character:', charId);
             const { error: charError, data: charData } = await supabase
                 .from('characters')
@@ -264,26 +260,17 @@ export class AdminUI {
             
             if (charError) {
                 console.error('[Admin] Character deletion error:', charError);
-                // If it's a policy error, suggest checking RLS
-                if (charError.code === '42501') {
-                    alert('❌ Database Error (RLS): You do not have permission to delete this record. Please check Supabase Policy.');
-                } else {
-                    alert('Error deleting player: ' + charError.message);
-                }
-            } else if (!charData || charData.length === 0) {
-                console.warn('[Admin] Delete successful but no rows affected. Record might not exist or RLS blocked it.');
-                alert('⚠️ Delete request sent, but the record was not removed. This usually means the record does not exist or Supabase RLS policy blocked the deletion.');
+                alert('❌ Error: ' + charError.message);
             } else {
                 console.log('[Admin] Player deleted successfully from Database');
-                alert('✅ Player deleted successfully');
-                // Force a complete refresh
-                await new Promise(resolve => setTimeout(resolve, 800));
-                await this.loadUsers();
+                // Update UI in real-time by removing from local list
+                this.users = this.users.filter(u => u.id !== charId);
                 this._renderContent();
+                alert('✅ Player deleted successfully');
             }
         } catch (e) {
             console.error('[Admin] Exception during delete:', e);
-            alert('Exception deleting player: ' + e.message);
+            alert('❌ Exception: ' + e.message);
         }
     }
 
