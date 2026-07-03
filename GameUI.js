@@ -617,7 +617,7 @@ export class GameUI {
         return `
           <div class="lb-row">
             <span class="lb-rank">${rankIcon}</span>
-            <span class="lb-name">${entry.name} (${username})</span>
+            <span class="lb-name">${username}</span>
             <span class="lb-level">${valueText}</span>
           </div>
         `;
