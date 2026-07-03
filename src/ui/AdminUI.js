@@ -238,35 +238,46 @@ export class AdminUI {
         try {
             console.log('[Admin] Starting delete process for character:', charId);
             
-            // Step 1: Delete inventory items
+            // Step 1: Delete marketplace listings
+            console.log('[Admin] Deleting marketplace listings for:', charId);
+            const { error: marketError } = await supabase
+                .from('marketplace')
+                .delete()
+                .eq('seller_id', charId);
+            if (marketError) console.warn('[Admin] Marketplace deletion warning:', marketError);
+
+            // Step 2: Delete inventory items
+            console.log('[Admin] Deleting inventory for:', charId);
             const { error: invError } = await supabase
                 .from('inventory')
                 .delete()
                 .eq('character_id', charId);
+            if (invError) console.warn('[Admin] Inventory deletion warning:', invError);
             
-            if (invError) {
-                console.warn('[Admin] Inventory deletion warning:', invError);
-            } else {
-                console.log('[Admin] Inventory items deleted successfully');
-            }
-            
-            // Step 2: Delete character
+            // Step 3: Delete character
+            console.log('[Admin] Deleting character:', charId);
             const { error: charError, data: charData } = await supabase
                 .from('characters')
                 .delete()
                 .eq('id', charId)
                 .select();
             
-            console.log('[Admin] Character deletion result:', { error: charError, data: charData });
-            
             if (charError) {
                 console.error('[Admin] Character deletion error:', charError);
-                alert('Error deleting player: ' + charError.message);
+                // If it's a policy error, suggest checking RLS
+                if (charError.code === '42501') {
+                    alert('❌ Database Error (RLS): You do not have permission to delete this record. Please check Supabase Policy.');
+                } else {
+                    alert('Error deleting player: ' + charError.message);
+                }
+            } else if (!charData || charData.length === 0) {
+                console.warn('[Admin] Delete successful but no rows affected. Record might not exist or RLS blocked it.');
+                alert('⚠️ Delete request sent, but the record was not removed. This usually means the record does not exist or Supabase RLS policy blocked the deletion.');
             } else {
-                console.log('[Admin] Player deleted successfully');
+                console.log('[Admin] Player deleted successfully from Database');
                 alert('✅ Player deleted successfully');
                 // Force a complete refresh
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 800));
                 await this.loadUsers();
                 this._renderContent();
             }
