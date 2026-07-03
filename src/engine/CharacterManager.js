@@ -558,6 +558,7 @@ export class CharacterManager {
 
     loadStats(dbData) {
         this.characterId = dbData.id;
+        this.userId = dbData.user_id;
         this.stats.name = dbData.name || 'Novice';
         this.stats.level = dbData.level || 1;
         this.stats.exp = dbData.exp || 0;

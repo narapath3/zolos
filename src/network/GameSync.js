@@ -649,7 +649,7 @@ export async function fetchMarketListings() {
 
 export async function listMarketItem(sellerCharId, sellerName, itemName, itemType, quantity, price, stats = {}) {
     const listingId = 'listing_' + Math.random().toString(36).substring(2, 10);
-    const listingData = {
+    const listingDataLocal = {
         id: listingId,
         seller_id: sellerCharId,
         seller_name: sellerName,
@@ -663,35 +663,43 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
 
     if (isOfflineMode || !supabase) {
         const listings = initLocalMarketplace();
-        listings.unshift(listingData);
+        listings.unshift(listingDataLocal);
         localDb.set('marketplace_listings', listings);
-        return listingData;
+        return listingDataLocal;
     }
 
     try {
-        // For Supabase, we let the DB generate the UUID ID
-        const { id, ...supabaseData } = listingData;
-        
+        const listingDataOnline = {
+            seller_id: currentUserId || sellerCharId, // Use user's UUID (currentUserId)
+            seller_name: sellerName,
+            item_name: itemName,
+            item_type: itemType,
+            quantity,
+            price,
+            stats,
+            created_at: new Date().toISOString()
+        };
+
         const { data, error } = await supabase
             .from('marketplace')
-            .insert(supabaseData)
+            .insert(listingDataOnline)
             .select()
             .single();
 
         if (error) {
             console.warn('[Zolos] Supabase insert listing failed, listing locally:', error.message);
             const listings = initLocalMarketplace();
-            listings.unshift(listingData);
+            listings.unshift(listingDataLocal);
             localDb.set('marketplace_listings', listings);
-            return listingData;
+            return listingDataLocal;
         }
         return data;
     } catch (err) {
         console.warn('[Zolos] Catch error on listing, falling back to local:', err.message);
         const listings = initLocalMarketplace();
-        listings.unshift(listingData);
+        listings.unshift(listingDataLocal);
         localDb.set('marketplace_listings', listings);
-        return listingData;
+        return listingDataLocal;
     }
 }
 
@@ -837,11 +845,11 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     } else if (!sellerId.startsWith('player_')) { // Not a mock player
         // Online seller
         try {
-            // Fetch current seller character
+            // Fetch current seller character by user_id since listing.seller_id is now the user's UUID
             const { data: charData } = await supabase
                 .from('characters')
                 .select('gold')
-                .eq('id', sellerId)
+                .eq('user_id', sellerId)
                 .single();
 
             if (charData) {
@@ -849,7 +857,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
                 await supabase
                     .from('characters')
                     .update({ gold: newGold })
-                    .eq('id', sellerId);
+                    .eq('user_id', sellerId);
             }
         } catch (err) {
             console.warn('[Zolos] Failed to pay online seller (RLS restriction probably):', err.message);

@@ -1288,7 +1288,7 @@ export class GameUI {
         const row = document.createElement('div');
         row.className = 'market-item-row';
 
-        const isMine = listing.seller_id === this.characterId;
+        const isMine = listing.seller_id === this.characterId || (this.character && listing.seller_id === this.character.userId);
 
         row.innerHTML = `
           <div class="market-item-name-cell">
