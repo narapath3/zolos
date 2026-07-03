@@ -87,30 +87,50 @@ export class AdminUI {
         }
 
         try {
-            const { data, error } = await supabase
-                .from('characters')
-                .select('id, name, level, gold, total_kills, play_time, user_id, profiles(username)');
+            const { fetchLeaderboard } = await import('../network/GameSync.js');
+            const data = await fetchLeaderboard('level');
             
-            if (error) {
-                console.error('[Admin] Load users error:', error);
+            if (!data || data.length === 0) {
+                console.warn('[Admin] No players found from leaderboard');
+                this.users = [];
                 return;
             }
+
             this.users = data.map(d => ({
-                id: d.id,
-                username: d.profiles?.username || d.name,
-                level: d.level,
-                gold: d.gold,
-                total_kills: d.total_kills,
+                id: d.id || d.user_id || 'unknown_' + Math.random().toString(36).substring(7),
+                username: d.profiles?.username || d.name || 'Unknown',
+                level: d.level || 1,
+                gold: d.gold || 0,
+                total_kills: d.total_kills || 0,
                 play_time: d.play_time || 0
             }));
         } catch (e) {
             console.error('[Admin] Load users exception:', e);
+            this.users = [];
         }
     }
 
     async loadItems() {
-        // Load global items from GameData or inventory summary
-        // For now, this is a placeholder for future global item management
+        try {
+            const { ITEMS } = await import('../engine/GameData.js');
+            
+            this.items = Object.entries(ITEMS).map(([name, data]) => ({
+                name: name,
+                emoji: data.emoji || '📦',
+                type: data.type || 'material',
+                rarity: data.rarity || 'common',
+                price: data.price || 0,
+                desc: data.desc || 'No description',
+                healHp: data.healHp || 0,
+                restoreSp: data.restoreSp || 0,
+                atkBonus: data.atkBonus || 0,
+                defBonus: data.defBonus || 0,
+                hpBonus: data.hpBonus || 0
+            }));
+        } catch (e) {
+            console.error('[Admin] Load items exception:', e);
+            this.items = [];
+        }
     }
 
     async updatePlayer(charId, updates) {
@@ -308,8 +328,8 @@ export class AdminUI {
         this.content.innerHTML = '';
         if (this.currentTab === 'users') {
             this._renderUserList();
-        } else {
-            this.content.innerHTML = '<div style="text-align:center; padding: 50px; color: #888;">📦 Global item management coming soon...</div>';
+        } else if (this.currentTab === 'items') {
+            this._renderItemList();
         }
     }
 
@@ -392,5 +412,90 @@ export class AdminUI {
         if (this.users.length === 0) {
             this.content.innerHTML = '<div style="text-align:center; padding: 50px; color: #888;">No players found</div>';
         }
+    }
+}
+
+    _renderItemList() {
+        const searchDiv = document.createElement('div');
+        searchDiv.style.cssText = 'margin-bottom: 15px; display: flex; gap: 10px;';
+        
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'Search items by name...';
+        searchInput.style.cssText = 'flex: 1; padding: 8px 12px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: white; border-radius: 4px;';
+        
+        const rarityFilter = document.createElement('select');
+        rarityFilter.style.cssText = 'padding: 8px 12px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: white; border-radius: 4px;';
+        rarityFilter.innerHTML = '<option value="">All Rarities</option><option value="common">Common</option><option value="rare">Rare</option><option value="epic">Epic</option><option value="legendary">Legendary</option><option value="mythic">Mythic</option>';
+        
+        searchDiv.appendChild(searchInput);
+        searchDiv.appendChild(rarityFilter);
+        this.content.appendChild(searchDiv);
+        
+        const table = document.createElement('table');
+        table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;';
+        table.innerHTML = `
+            <thead>
+                <tr style="border-bottom: 2px solid #ffd700; color: #ffd700; background: rgba(255, 215, 0, 0.1);">
+                    <th style="padding: 10px; width: 5%;">Icon</th>
+                    <th style="padding: 10px; width: 20%;">Name</th>
+                    <th style="padding: 10px; width: 12%;">Type</th>
+                    <th style="padding: 10px; width: 12%;">Rarity</th>
+                    <th style="padding: 10px; width: 10%;">Price</th>
+                    <th style="padding: 10px; width: 41%;">Description</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        
+        const tbody = table.querySelector('tbody');
+        
+        const renderItems = () => {
+            tbody.innerHTML = '';
+            const searchTerm = searchInput.value.toLowerCase();
+            const rarityTerm = rarityFilter.value;
+            
+            const filtered = this.items.filter(item => {
+                const matchSearch = item.name.toLowerCase().includes(searchTerm);
+                const matchRarity = !rarityTerm || item.rarity === rarityTerm;
+                return matchSearch && matchRarity;
+            });
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #888;">No items found</td></tr>';
+                return;
+            }
+            
+            filtered.forEach((item, idx) => {
+                const tr = document.createElement('tr');
+                tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
+                tr.onmouseover = () => tr.style.background = 'rgba(255, 215, 0, 0.1)';
+                tr.onmouseout = () => tr.style.background = idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent';
+                
+                const rarityColor = {
+                    'common': '#aaa',
+                    'rare': '#4a9eff',
+                    'epic': '#a335ee',
+                    'legendary': '#ff8000',
+                    'mythic': '#e6cc80'
+                }[item.rarity] || '#aaa';
+                
+                tr.innerHTML = `
+                    <td style="padding: 10px; font-size: 16px;">${item.emoji}</td>
+                    <td style="padding: 10px; font-weight: 500;">${item.name}</td>
+                    <td style="padding: 10px;">${item.type}</td>
+                    <td style="padding: 10px; color: ${rarityColor}; font-weight: bold;">${item.rarity}</td>
+                    <td style="padding: 10px;">${item.price}</td>
+                    <td style="padding: 10px; font-size: 11px; color: #bbb;">${item.desc.substring(0, 50)}...</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+        
+        searchInput.addEventListener('input', renderItems);
+        rarityFilter.addEventListener('change', renderItems);
+        
+        this.content.appendChild(table);
+        renderItems();
     }
 }
