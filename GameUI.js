@@ -69,6 +69,13 @@ export class GameUI {
       this._refreshLeaderboard();
     });
     document.getElementById('btn-players-list').addEventListener('click', () => this._togglePanel('players-panel'));
+    
+    const btnAdmin = document.getElementById('btn-admin');
+    if (btnAdmin) {
+      btnAdmin.addEventListener('click', () => {
+        if (window.adminUI) window.adminUI.toggle();
+      });
+    }
     const btnWiki = document.getElementById('btn-wiki');
     if (btnWiki) {
       btnWiki.addEventListener('click', () => {
