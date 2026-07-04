@@ -162,19 +162,22 @@ export class AdminUI {
         }
 
         try {
-            const { data, error } = await supabase
-                .from('characters')
-                .update(updates)
-                .eq('id', charId)
-                .select();
+            // Use RPC function (SECURITY DEFINER) to bypass RLS
+            const { data, error } = await supabase.rpc('admin_update_character', {
+                target_char_id: charId,
+                updates: updates
+            });
 
             if (error) {
+                console.error('[Admin] RPC error:', error);
                 alert('❌ Error updating player: ' + error.message);
-            } else if (!data || data.length === 0) {
-                alert('❌ Update blocked by RLS policy — no rows were updated. Please add admin RLS policies in Supabase Dashboard.');
-            } else {
+            } else if (data && data.success === false) {
+                alert('❌ ' + (data.error || 'Update failed'));
+            } else if (data && data.success === true) {
                 alert('✅ Player updated successfully');
                 this.refreshData();
+            } else {
+                alert('❌ Unexpected response from server');
             }
         } catch (e) {
             alert('❌ Exception updating player: ' + e.message);
@@ -258,43 +261,27 @@ export class AdminUI {
         }
 
         try {
-            console.log('[Admin] Starting delete process for character:', charId);
+            console.log('[Admin] Starting RPC delete for character:', charId);
 
-            // Step 1: Delete market history
-            console.log('[Admin] Deleting market history for:', charId);
-            const { error: mhErr } = await supabase.from('market_history').delete().eq('character_id', charId).select();
-            if (mhErr) console.warn('[Admin] Market history deletion warning:', mhErr.message);
+            // Use RPC function (SECURITY DEFINER) to bypass RLS
+            // The function handles deleting market_history, marketplace, inventory, and characters
+            const { data, error } = await supabase.rpc('admin_delete_character', {
+                target_char_id: charId
+            });
 
-            // Step 2: Delete marketplace listings
-            console.log('[Admin] Deleting marketplace listings for:', charId);
-            const { error: mpErr } = await supabase.from('marketplace').delete().eq('seller_id', charId).select();
-            if (mpErr) console.warn('[Admin] Marketplace deletion warning:', mpErr.message);
-
-            // Step 3: Delete inventory items
-            console.log('[Admin] Deleting inventory for:', charId);
-            const { error: invErr } = await supabase.from('inventory').delete().eq('character_id', charId).select();
-            if (invErr) console.warn('[Admin] Inventory deletion warning:', invErr.message);
-
-            // Step 4: Delete character (verify with .select())
-            console.log('[Admin] Deleting character:', charId);
-            const { data: delData, error: charError } = await supabase
-                .from('characters')
-                .delete()
-                .eq('id', charId)
-                .select();
-
-            if (charError) {
-                console.error('[Admin] Character deletion error:', charError);
-                alert('❌ Error: ' + charError.message);
-            } else if (!delData || delData.length === 0) {
-                console.error('[Admin] Delete returned 0 rows — RLS blocked the operation');
-                alert('❌ Delete blocked by RLS policy — no rows were deleted. Please add admin RLS policies in Supabase Dashboard.');
-            } else {
-                console.log('[Admin] Player deleted successfully from Database:', delData);
-                // Update UI in real-time by removing from local list
+            if (error) {
+                console.error('[Admin] RPC error:', error);
+                alert('❌ Error: ' + error.message + '\n\nถ้ายังไม่ได้รัน SQL ใน Supabase Dashboard กรุณารัน SQL สร้าง function ก่อน');
+            } else if (data && data.success === false) {
+                console.error('[Admin] Delete failed:', data.error);
+                alert('❌ ' + (data.error || 'Delete failed'));
+            } else if (data && data.success === true) {
+                console.log('[Admin] Player deleted successfully:', data.deleted);
                 this.users = this.users.filter(u => u.id !== charId);
                 this._renderContent();
                 alert('✅ Player deleted successfully');
+            } else {
+                alert('❌ Unexpected response from server');
             }
         } catch (e) {
             console.error('[Admin] Exception during delete:', e);

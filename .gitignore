@@ -25,3 +25,7 @@ dist-ssr
 
 .vercel
 .env*
+
+# Ignore Supabase/Zolos authentication & session tokens
+tmp_token.txt
+*tmp_auth.json
