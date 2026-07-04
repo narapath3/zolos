@@ -144,18 +144,22 @@ export class AdminUI {
         }
 
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('characters')
                 .update(updates)
-                .eq('id', charId);
+                .eq('id', charId)
+                .select();
 
             if (error) {
-                alert('Error updating player: ' + error.message);
+                alert('❌ Error updating player: ' + error.message);
+            } else if (!data || data.length === 0) {
+                alert('❌ Update blocked by RLS policy — no rows were updated. Please add admin RLS policies in Supabase Dashboard.');
             } else {
+                alert('✅ Player updated successfully');
                 this.refreshData();
             }
         } catch (e) {
-            alert('Exception updating player: ' + e.message);
+            alert('❌ Exception updating player: ' + e.message);
         }
     }
 
@@ -240,31 +244,35 @@ export class AdminUI {
 
             // Step 1: Delete market history
             console.log('[Admin] Deleting market history for:', charId);
-            const { error: mhErr } = await supabase.from('market_history').delete().eq('character_id', charId);
+            const { error: mhErr } = await supabase.from('market_history').delete().eq('character_id', charId).select();
             if (mhErr) console.warn('[Admin] Market history deletion warning:', mhErr.message);
 
             // Step 2: Delete marketplace listings
             console.log('[Admin] Deleting marketplace listings for:', charId);
-            const { error: mpErr } = await supabase.from('marketplace').delete().eq('seller_id', charId);
+            const { error: mpErr } = await supabase.from('marketplace').delete().eq('seller_id', charId).select();
             if (mpErr) console.warn('[Admin] Marketplace deletion warning:', mpErr.message);
 
             // Step 3: Delete inventory items
             console.log('[Admin] Deleting inventory for:', charId);
-            const { error: invErr } = await supabase.from('inventory').delete().eq('character_id', charId);
+            const { error: invErr } = await supabase.from('inventory').delete().eq('character_id', charId).select();
             if (invErr) console.warn('[Admin] Inventory deletion warning:', invErr.message);
 
-            // Step 4: Delete character
+            // Step 4: Delete character (verify with .select())
             console.log('[Admin] Deleting character:', charId);
-            const { error: charError } = await supabase
+            const { data: delData, error: charError } = await supabase
                 .from('characters')
                 .delete()
-                .eq('id', charId);
+                .eq('id', charId)
+                .select();
 
             if (charError) {
                 console.error('[Admin] Character deletion error:', charError);
                 alert('❌ Error: ' + charError.message);
+            } else if (!delData || delData.length === 0) {
+                console.error('[Admin] Delete returned 0 rows — RLS blocked the operation');
+                alert('❌ Delete blocked by RLS policy — no rows were deleted. Please add admin RLS policies in Supabase Dashboard.');
             } else {
-                console.log('[Admin] Player deleted successfully from Database');
+                console.log('[Admin] Player deleted successfully from Database:', delData);
                 // Update UI in real-time by removing from local list
                 this.users = this.users.filter(u => u.id !== charId);
                 this._renderContent();
