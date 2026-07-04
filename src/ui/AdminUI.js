@@ -11,18 +11,28 @@ export class AdminUI {
         this.currentTab = 'users';
         this.selectedUser = null;
 
+        // Track current logged-in user details for diagnostics
+        this.currentUserId = null;
+        this.isDbAdmin = false;
+        this.currentUsername = 'Unknown';
+
         this._createUI();
     }
 
     async checkAdmin(userId) {
-        if (isOfflineMode || userId.startsWith('guest_') || userId.startsWith('local_')) {
+        this.currentUserId = userId;
+        this.isDbAdmin = false;
+        this.currentUsername = 'Unknown';
+
+        if (isOfflineMode || !userId || userId.startsWith('guest_') || userId.startsWith('local_')) {
             // For offline/guest, check if we manually set admin in localStorage
             this.isAdmin = localStorage.getItem('zolos_admin_mode') === 'true';
+            this.currentUsername = (userId && userId.startsWith('guest_')) ? 'Guest' : 'Local/Offline';
         } else {
             try {
                 const { data, error } = await supabase
                     .from('profiles')
-                    .select('is_admin')
+                    .select('username, is_admin')
                     .eq('id', userId)
                     .single();
 
@@ -30,17 +40,26 @@ export class AdminUI {
                     console.warn('[Admin] Failed to check admin status:', error.message);
                     this.isAdmin = false;
                 } else {
-                    this.isAdmin = data?.is_admin || false;
+                    this.currentUsername = data?.username || 'Unknown';
+                    this.isDbAdmin = data?.is_admin || false;
+                    this.isAdmin = this.isDbAdmin;
                 }
             } catch (e) {
                 this.isAdmin = false;
             }
         }
 
+        // Allow manual override for front-end testing/offline mode
+        if (localStorage.getItem('zolos_admin_mode') === 'true') {
+            this.isAdmin = true;
+        }
+
         if (this.isAdmin) {
             const btn = document.getElementById('btn-admin');
             if (btn) btn.style.display = 'flex';
         }
+
+        this._updateStatusText();
 
         return this.isAdmin;
     }
@@ -298,7 +317,17 @@ export class AdminUI {
 
         const header = document.createElement('div');
         header.style.cssText = 'padding: 15px; background: linear-gradient(90deg, #333 0%, #444 100%); border-bottom: 2px solid #ffd700; display: flex; justify-content: space-between; align-items: center;';
-        header.innerHTML = '<h2 style="margin:0; color: #ffd700; font-size: 20px;">🛡️ Admin Dashboard</h2>';
+
+        const titleContainer = document.createElement('div');
+        titleContainer.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
+        titleContainer.innerHTML = '<h2 style="margin:0; color: #ffd700; font-size: 20px;">🛡️ Admin Dashboard</h2>';
+
+        const statusText = document.createElement('span');
+        statusText.id = 'admin-status-text';
+        statusText.style.cssText = 'font-size: 12px; color: #bbb;';
+        titleContainer.appendChild(statusText);
+
+        header.appendChild(titleContainer);
 
         const closeBtn = document.createElement('button');
         closeBtn.innerText = '✕';
@@ -321,6 +350,16 @@ export class AdminUI {
         this.container.appendChild(tabs);
         this.container.appendChild(this.content);
         document.body.appendChild(this.container);
+
+        this._updateStatusText();
+    }
+
+    _updateStatusText() {
+        const statusEl = document.getElementById('admin-status-text');
+        if (statusEl) {
+            const adminType = this.isDbAdmin ? '<span style="color:#4aef4a;font-weight:bold;">Database Admin</span>' : '<span style="color:#e06060;font-weight:bold;">Local Override (Offline/Non-DB Admin)</span>';
+            statusEl.innerHTML = `Logged in as: <strong style="color: #ffd700;">${this.currentUsername}</strong> (${adminType})`;
+        }
     }
 
     _createTabBtn(text, tabId) {
