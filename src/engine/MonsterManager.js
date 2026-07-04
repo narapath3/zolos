@@ -44,7 +44,7 @@ class Monster {
         this.isWaterMonster = !!this.data.waterOnly;
         
         // AI State Machine
-        this.state = 'WANDER'; // WANDER, CHASE
+        this.state = 'WANDER'; // WANDER, CHASE, IDLE
         this.spawnPoint = position.clone();
         this.chaseTarget = null;
 
@@ -134,11 +134,11 @@ class Monster {
         this.bodyMesh.position.y = (this.data.size * 0.4) + bounce;
         
         if (this.isMoving) {
-            const target = this.state === 'CHASE' ? playerPos : this.wanderTarget;
-            if (target) {
+            const targetPos = this.state === 'CHASE' ? playerPos : this.wanderTarget;
+            if (targetPos) {
                 this.mesh.rotation.y = Math.atan2(
-                    target.x - this.mesh.position.x,
-                    target.z - this.mesh.position.z
+                    targetPos.x - this.mesh.position.x,
+                    targetPos.z - this.mesh.position.z
                 );
             }
         }
@@ -236,9 +236,5 @@ export class MonsterManager {
 
     update(dt, playerPos) {
         this.monsters.forEach(m => m.update(dt, playerPos, this.sceneManager));
-    }
-
-    getMonstersInRange(position, range) {
-        return this.monsters.filter(m => m.alive && m.mesh.position.distanceTo(position) < range);
     }
 }
