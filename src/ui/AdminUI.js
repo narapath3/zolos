@@ -10,7 +10,7 @@ export class AdminUI {
         this.isAdmin = false;
         this.currentTab = 'users';
         this.selectedUser = null;
-        
+
         this._createUI();
     }
 
@@ -27,7 +27,7 @@ export class AdminUI {
                 .select('is_admin')
                 .eq('id', userId)
                 .single();
-            
+
             if (error) {
                 console.warn('[Admin] Failed to check admin status:', error.message);
                 this.isAdmin = false;
@@ -42,7 +42,7 @@ export class AdminUI {
             const btn = document.getElementById('btn-admin');
             if (btn) btn.style.display = 'flex';
         }
-        
+
         return this.isAdmin;
     }
 
@@ -51,10 +51,10 @@ export class AdminUI {
             console.warn('[Admin] Access Denied: You are not an administrator.');
             return;
         }
-        
+
         this.isOpen = !this.isOpen;
         this.container.style.display = this.isOpen ? 'flex' : 'none';
-        
+
         if (this.isOpen) {
             this.refreshData();
         }
@@ -89,7 +89,7 @@ export class AdminUI {
         try {
             const { fetchLeaderboard } = await import('../network/GameSync.js');
             const data = await fetchLeaderboard('level');
-            
+
             if (!data || data.length === 0) {
                 console.warn('[Admin] No players found from leaderboard');
                 this.users = [];
@@ -113,7 +113,7 @@ export class AdminUI {
     async loadItems() {
         try {
             const { ITEMS } = await import('../engine/GameData.js');
-            
+
             this.items = Object.entries(ITEMS).map(([name, data]) => ({
                 name: name,
                 emoji: data.emoji || '📦',
@@ -148,7 +148,7 @@ export class AdminUI {
                 .from('characters')
                 .update(updates)
                 .eq('id', charId);
-            
+
             if (error) {
                 alert('Error updating player: ' + error.message);
             } else {
@@ -237,27 +237,29 @@ export class AdminUI {
 
         try {
             console.log('[Admin] Starting delete process for character:', charId);
-            
+
             // Step 1: Delete market history
             console.log('[Admin] Deleting market history for:', charId);
-            await supabase.from('market_history').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Market history deletion warning:', e));
-            
+            const { error: mhErr } = await supabase.from('market_history').delete().eq('character_id', charId);
+            if (mhErr) console.warn('[Admin] Market history deletion warning:', mhErr.message);
+
             // Step 2: Delete marketplace listings
             console.log('[Admin] Deleting marketplace listings for:', charId);
-            await supabase.from('marketplace').delete().eq('seller_id', charId).catch(e => console.warn('[Admin] Marketplace deletion warning:', e));
+            const { error: mpErr } = await supabase.from('marketplace').delete().eq('seller_id', charId);
+            if (mpErr) console.warn('[Admin] Marketplace deletion warning:', mpErr.message);
 
             // Step 3: Delete inventory items
             console.log('[Admin] Deleting inventory for:', charId);
-            await supabase.from('inventory').delete().eq('character_id', charId).catch(e => console.warn('[Admin] Inventory deletion warning:', e));
-            
+            const { error: invErr } = await supabase.from('inventory').delete().eq('character_id', charId);
+            if (invErr) console.warn('[Admin] Inventory deletion warning:', invErr.message);
+
             // Step 4: Delete character
             console.log('[Admin] Deleting character:', charId);
-            const { error: charError, data: charData } = await supabase
+            const { error: charError } = await supabase
                 .from('characters')
                 .delete()
-                .eq('id', charId)
-                .select();
-            
+                .eq('id', charId);
+
             if (charError) {
                 console.error('[Admin] Character deletion error:', charError);
                 alert('❌ Error: ' + charError.message);
@@ -290,7 +292,7 @@ export class AdminUI {
         const header = document.createElement('div');
         header.style.cssText = 'padding: 15px; background: linear-gradient(90deg, #333 0%, #444 100%); border-bottom: 2px solid #ffd700; display: flex; justify-content: space-between; align-items: center;';
         header.innerHTML = '<h2 style="margin:0; color: #ffd700; font-size: 20px;">🛡️ Admin Dashboard</h2>';
-        
+
         const closeBtn = document.createElement('button');
         closeBtn.innerText = '✕';
         closeBtn.style.cssText = 'background: none; border: none; color: #ffd700; font-size: 24px; cursor: pointer; font-weight: bold;';
@@ -299,7 +301,7 @@ export class AdminUI {
 
         const tabs = document.createElement('div');
         tabs.style.cssText = 'display: flex; background: #222; padding: 5px 10px; border-bottom: 1px solid #444;';
-        
+
         const userTab = this._createTabBtn('👥 Players', 'users');
         const itemTab = this._createTabBtn('📦 Items', 'items');
         tabs.appendChild(userTab);
@@ -338,8 +340,8 @@ export class AdminUI {
         const btns = this.container.querySelectorAll('button');
         btns.forEach(b => {
             if (b.innerText.includes('Players') || b.innerText.includes('Items')) {
-                const isActive = (b.innerText.includes('Players') && this.currentTab === 'users') || 
-                               (b.innerText.includes('Items') && this.currentTab === 'items');
+                const isActive = (b.innerText.includes('Players') && this.currentTab === 'users') ||
+                    (b.innerText.includes('Items') && this.currentTab === 'items');
                 b.style.color = isActive ? '#ffd700' : '#aaa';
                 b.style.borderBottomColor = isActive ? '#ffd700' : 'transparent';
             }
@@ -378,7 +380,7 @@ export class AdminUI {
             tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
             tr.onmouseover = () => tr.style.background = 'rgba(255, 215, 0, 0.1)';
             tr.onmouseout = () => tr.style.background = idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent';
-            
+
             const playTimeHours = Math.floor((user.play_time || 0) / 3600);
             const playTimeMins = Math.floor(((user.play_time || 0) % 3600) / 60);
             const playTimeStr = playTimeHours > 0 ? `${playTimeHours}h ${playTimeMins}m` : `${playTimeMins}m`;
@@ -396,7 +398,7 @@ export class AdminUI {
                     <button class="delete-btn" style="background: #8a2a2a; border: 1px solid #aa3a3a; color: white; padding: 6px 10px; cursor: pointer; border-radius: 3px; font-size: 11px;">Delete</button>
                 </td>
             `;
-            
+
             tr.querySelector('.edit-btn').onclick = () => {
                 this.openEditModal(user);
             };
@@ -430,20 +432,20 @@ export class AdminUI {
     _renderItemList() {
         const searchDiv = document.createElement('div');
         searchDiv.style.cssText = 'margin-bottom: 15px; display: flex; gap: 10px;';
-        
+
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
         searchInput.placeholder = 'Search items by name...';
         searchInput.style.cssText = 'flex: 1; padding: 8px 12px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: white; border-radius: 4px;';
-        
+
         const rarityFilter = document.createElement('select');
         rarityFilter.style.cssText = 'padding: 8px 12px; background: rgba(255, 215, 0, 0.1); border: 1px solid #ffd700; color: white; border-radius: 4px;';
         rarityFilter.innerHTML = '<option value="">All Rarities</option><option value="common">Common</option><option value="rare">Rare</option><option value="epic">Epic</option><option value="legendary">Legendary</option><option value="mythic">Mythic</option>';
-        
+
         searchDiv.appendChild(searchInput);
         searchDiv.appendChild(rarityFilter);
         this.content.appendChild(searchDiv);
-        
+
         const table = document.createElement('table');
         table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;';
         table.innerHTML = `
@@ -459,31 +461,31 @@ export class AdminUI {
             </thead>
             <tbody></tbody>
         `;
-        
+
         const tbody = table.querySelector('tbody');
-        
+
         const renderItems = () => {
             tbody.innerHTML = '';
             const searchTerm = searchInput.value.toLowerCase();
             const rarityTerm = rarityFilter.value;
-            
+
             const filtered = this.items.filter(item => {
                 const matchSearch = item.name.toLowerCase().includes(searchTerm);
                 const matchRarity = !rarityTerm || item.rarity === rarityTerm;
                 return matchSearch && matchRarity;
             });
-            
+
             if (filtered.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #888;">No items found</td></tr>';
                 return;
             }
-            
+
             filtered.forEach((item, idx) => {
                 const tr = document.createElement('tr');
                 tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
                 tr.onmouseover = () => tr.style.background = 'rgba(255, 215, 0, 0.1)';
                 tr.onmouseout = () => tr.style.background = idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent';
-                
+
                 const rarityColor = {
                     'common': '#aaa',
                     'rare': '#4a9eff',
@@ -491,7 +493,7 @@ export class AdminUI {
                     'legendary': '#ff8000',
                     'mythic': '#e6cc80'
                 }[item.rarity] || '#aaa';
-                
+
                 tr.innerHTML = `
                     <td style="padding: 10px; font-size: 16px;">${item.emoji}</td>
                     <td style="padding: 10px; font-weight: 500;">${item.name}</td>
@@ -503,10 +505,10 @@ export class AdminUI {
                 tbody.appendChild(tr);
             });
         };
-        
+
         searchInput.addEventListener('input', renderItems);
         rarityFilter.addEventListener('change', renderItems);
-        
+
         this.content.appendChild(table);
         renderItems();
     }
