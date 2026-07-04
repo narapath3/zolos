@@ -18,24 +18,23 @@ export class AdminUI {
         if (isOfflineMode || userId.startsWith('guest_') || userId.startsWith('local_')) {
             // For offline/guest, check if we manually set admin in localStorage
             this.isAdmin = localStorage.getItem('zolos_admin_mode') === 'true';
-            return this.isAdmin;
-        }
+        } else {
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('is_admin')
+                    .eq('id', userId)
+                    .single();
 
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('is_admin')
-                .eq('id', userId)
-                .single();
-
-            if (error) {
-                console.warn('[Admin] Failed to check admin status:', error.message);
+                if (error) {
+                    console.warn('[Admin] Failed to check admin status:', error.message);
+                    this.isAdmin = false;
+                } else {
+                    this.isAdmin = data?.is_admin || false;
+                }
+            } catch (e) {
                 this.isAdmin = false;
-            } else {
-                this.isAdmin = data?.is_admin || false;
             }
-        } catch (e) {
-            this.isAdmin = false;
         }
 
         if (this.isAdmin) {
@@ -134,7 +133,7 @@ export class AdminUI {
     }
 
     async updatePlayer(charId, updates) {
-        if (isOfflineMode) {
+        if (isOfflineMode || charId.startsWith('guest_') || charId.startsWith('local_')) {
             const char = localDb.get(`char_${charId}`);
             if (char) {
                 localDb.set(`char_${charId}`, { ...char, ...updates });
@@ -222,7 +221,7 @@ export class AdminUI {
             return;
         }
 
-        if (isOfflineMode) {
+        if (isOfflineMode || charId.startsWith('guest_') || charId.startsWith('local_')) {
             // Find and delete from local storage
             const users = localDb.get('users') || {};
             for (const username in users) {
