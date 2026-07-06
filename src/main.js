@@ -327,7 +327,7 @@ function gameLoop(time) {
             }
             
             // FPS Counter
-            const fps = Math.round(1000 / dt);
+            const fps = Math.round(1 / dt);
             const fpsEl = document.getElementById('fps-counter');
             if (fpsEl) fpsEl.textContent = `FPS: ${fps}`;
         }
