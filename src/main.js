@@ -99,7 +99,12 @@ async function initGame(charData) {
     );
 
     // Start auto-save
-    startAutoSave(charData.id, () => character.getSaveData().updates);
+    startAutoSave(() => {
+        return {
+            characterId: charData.id,
+            updates: character.getSaveData()
+        };
+    }, 15000);
 
     // Load Inventory from DB
     await gameUI.loadInventoryFromDB(charData.id);
@@ -265,7 +270,7 @@ function gameLoop(time) {
 
     // 5. Updates
     character.update(dt);
-    monsters.update(dt, character, sceneManager);
+    monsters.update(dt, sceneManager.camera, character.stats.level);
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);
     
