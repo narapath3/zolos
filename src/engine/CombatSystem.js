@@ -160,12 +160,21 @@ export class CombatSystem {
         // Player died?
         if (!this.character.isAlive()) {
             this.onEvent({ type: 'playerDeath' });
+            
+            // Store autoFarm state to resume after respawn
+            const wasAutoFarming = this.autoFarm;
             this.autoFarm = false;
             this.currentTarget = null;
             if (this.character.targetMonster) this.character.targetMonster = null;
+            
             setTimeout(() => {
                 this.character.respawn();
                 this.onEvent({ type: 'playerRespawn' });
+                
+                // Auto-resume if it was active
+                if (wasAutoFarming) {
+                    this.autoFarm = true;
+                }
             }, 3000);
         }
     }

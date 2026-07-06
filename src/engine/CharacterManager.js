@@ -63,10 +63,11 @@ export class CharacterManager {
         Object.defineProperty(this.stats, 'atk', {
             get: () => {
                 const bonus = this.getWeaponAtkBonus(this.equippedWeapon);
-                return this.stats._baseAtk + bonus;
+                const base = isNaN(this.stats._baseAtk) ? 10 : this.stats._baseAtk;
+                return base + bonus;
             },
             set: (val) => {
-                this.stats._baseAtk = val;
+                this.stats._baseAtk = isNaN(val) ? 10 : val;
             },
             configurable: true,
             enumerable: true
@@ -75,10 +76,11 @@ export class CharacterManager {
         Object.defineProperty(this.stats, 'max_sp', {
             get: () => {
                 const bonus = this.getWeaponSpBonus(this.equippedWeapon) + this.getArmorSpBonus(this.equippedArmor);
-                return this.stats._baseMaxSp + bonus;
+                const base = isNaN(this.stats._baseMaxSp) ? 50 : this.stats._baseMaxSp;
+                return base + bonus;
             },
             set: (val) => {
-                this.stats._baseMaxSp = val;
+                this.stats._baseMaxSp = isNaN(val) ? 50 : val;
             },
             configurable: true,
             enumerable: true
@@ -87,10 +89,11 @@ export class CharacterManager {
         Object.defineProperty(this.stats, 'max_hp', {
             get: () => {
                 const bonus = this.getArmorHpBonus(this.equippedArmor);
-                return this.stats._baseMaxHp + bonus;
+                const base = isNaN(this.stats._baseMaxHp) ? 100 : this.stats._baseMaxHp;
+                return base + bonus;
             },
             set: (val) => {
-                this.stats._baseMaxHp = val;
+                this.stats._baseMaxHp = isNaN(val) ? 100 : val;
             },
             configurable: true,
             enumerable: true
@@ -99,10 +102,11 @@ export class CharacterManager {
         Object.defineProperty(this.stats, 'def', {
             get: () => {
                 const bonus = this.getArmorDefBonus(this.equippedArmor) + this.getShieldDefBonus(this.equippedShield);
-                return this.stats._baseDef + bonus;
+                const base = isNaN(this.stats._baseDef) ? 5 : this.stats._baseDef;
+                return base + bonus;
             },
             set: (val) => {
-                this.stats._baseDef = val;
+                this.stats._baseDef = isNaN(val) ? 5 : val;
             },
             configurable: true,
             enumerable: true
@@ -939,17 +943,17 @@ export class CharacterManager {
         if (!data) return;
         this.characterId = data.id;
         this.stats.name = data.name || 'Novice';
-        this.stats.level = data.level || 1;
-        this.stats.exp = data.exp || 0;
-        this.stats.hp = data.hp || 100;
-        this.stats.max_hp = data.max_hp || 100;
-        this.stats.sp = data.sp || 50;
-        this.stats.max_sp = data.max_sp || 50;
-        this.stats.atk = data.atk || 10;
-        this.stats.def = data.def || 5;
-        this.stats.gold = data.gold || 0;
-        this.stats.total_kills = data.total_kills || 0;
-        this.stats.play_time = data.play_time || 0;
+        this.stats.level = isNaN(data.level) ? 1 : data.level;
+        this.stats.exp = isNaN(data.exp) ? 0 : data.exp;
+        this.stats.hp = isNaN(data.hp) ? 100 : data.hp;
+        this.stats.max_hp = isNaN(data.max_hp) ? 100 : data.max_hp;
+        this.stats.sp = isNaN(data.sp) ? 50 : data.sp;
+        this.stats.max_sp = isNaN(data.max_sp) ? 50 : data.max_sp;
+        this.stats.atk = isNaN(data.atk) ? 10 : data.atk;
+        this.stats.def = isNaN(data.def) ? 5 : data.def;
+        this.stats.gold = isNaN(data.gold) ? 0 : data.gold;
+        this.stats.total_kills = isNaN(data.total_kills) ? 0 : data.total_kills;
+        this.stats.play_time = isNaN(data.play_time) ? 0 : data.play_time;
         
         // Load appearance if available
         if (data.body_color) this.setBodyColor(data.body_color);
