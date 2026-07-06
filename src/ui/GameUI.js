@@ -54,7 +54,7 @@ export class GameUI {
           const isAuto = this.combatSystem.toggleAutoFarm();
           autoBtn.classList.toggle('active', isAuto);
           autoBtn.innerHTML = isAuto ? '🤖 Auto: ON' : '🤖 Auto: OFF';
-          this.addCombatMessage(isAuto ? "Auto-Bot system activated!" : "Auto-Bot system deactivated.");
+          this.addCombatLog(isAuto ? "🤖 Auto-Bot system activated!" : "🤖 Auto-Bot system deactivated.", 'system');
         }
       });
     }
@@ -85,14 +85,14 @@ export class GameUI {
       this._refreshLeaderboard();
     });
     document.getElementById('btn-players-list').addEventListener('click', () => this._togglePanel('players-panel'));
-    
+
     const btnAdmin = document.getElementById('btn-admin');
     if (btnAdmin) {
       btnAdmin.addEventListener('click', () => {
         if (window.adminUI) window.adminUI.toggle();
       });
     }
-    
+
     const btnWiki = document.getElementById('btn-wiki');
     if (btnWiki) {
       btnWiki.addEventListener('click', () => {
@@ -1200,7 +1200,7 @@ export class GameUI {
 
     // Deduct gold
     this.character.stats.gold -= item.price;
-    
+
     // Add to inventory
     const existing = this.inventory.find(i => i.item_name === item.name);
     if (existing) {
@@ -1229,7 +1229,7 @@ export class GameUI {
     }
 
     this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
-    
+
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
       else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();

@@ -64,23 +64,56 @@ async function initGame(charData) {
 
     sceneManager = new SceneManager(canvas);
     character = new CharacterManager(sceneManager.scene);
-    
+
     // Load character data
     character.loadStats(charData);
     userId = charData.user_id;
     username = charData.name;
-    
+
     // Setup systems
     particles = new ParticleSystem(sceneManager.scene);
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
-    
+
     // Initialize Combat System
-    combatSystem = new CombatSystem(character, monsters, particles, soundManager);
+    combatSystem = new CombatSystem(character, monsters, (event) => {
+        // Combat event handler — connects CombatSystem to particles, sound, and UI
+        if (!event) return;
+        switch (event.type) {
+            case 'playerAttack':
+                if (particles) particles.createHitBurst(event.targetPos);
+                if (soundManager) soundManager.playAtkSound();
+                if (gameUI) gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
+                break;
+            case 'monsterAttack':
+                if (gameUI) gameUI.addCombatLog(`🩸 ${event.monsterName} hits you for ${event.damage} damage`, 'warning');
+                break;
+            case 'expGain':
+                if (gameUI) gameUI.addCombatLog(`✨ +${event.amount} EXP`, 'exp');
+                break;
+            case 'goldGain':
+                if (gameUI) gameUI.addCombatLog(`💰 +${event.amount} Gold`, 'gold');
+                break;
+            case 'levelUp':
+                if (soundManager) soundManager.playLevelUpSound();
+                if (gameUI) gameUI.addCombatLog(`🎉 LEVEL UP! You are now level ${event.level}!`, 'levelup');
+                break;
+            case 'lootDrop':
+                if (gameUI) gameUI.addCombatLog(`🎁 Dropped: ${event.item.name}`, 'loot');
+                if (gameUI) gameUI.addItem(event.item);
+                break;
+            case 'playerDeath':
+                if (gameUI) gameUI.addCombatLog('💀 You have been defeated! Respawning in 3s...', 'death');
+                break;
+            case 'playerRespawn':
+                if (gameUI) gameUI.addCombatLog('💚 You have respawned!', 'system');
+                break;
+        }
+    });
 
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
-    
+
     // Join multiplayer
     joinPresence(
         userId,
@@ -89,7 +122,7 @@ async function initGame(charData) {
         (players) => {
             // Update online players list
             if (gameUI) gameUI.updateOnlinePlayers(players);
-            
+
             // Clean up players who left
             const currentIds = new Set(players.map(p => p.userId));
             for (const [id, rp] of remotePlayersMap.entries()) {
@@ -109,18 +142,18 @@ async function initGame(charData) {
                 remoteChar.stats.name = p.username || 'Adventurer';
                 remoteChar.stats.level = p.level || 1;
                 remoteChar.updateNameTag();
-                
-                rp = { 
+
+                rp = {
                     character: remoteChar,
-                    mesh: remoteChar.mesh 
+                    mesh: remoteChar.mesh
                 };
                 remotePlayersMap.set(p.userId, rp);
             }
-            
+
             // Update position and appearance
             rp.mesh.position.set(p.x, p.y, p.z);
             rp.mesh.rotation.y = p.rY;
-            
+
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
                 if (p.appearance) {
@@ -154,11 +187,11 @@ async function initGame(charData) {
         gameUI.initHUD(character);
     }
     gameUI.updateStats(character.stats);
-    
+
     isGameStarted = true;
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
-    
+
     // Input listeners
     window.addEventListener('keydown', (e) => {
         keys[e.code] = true;
@@ -168,7 +201,7 @@ async function initGame(charData) {
         keys[e.code] = false;
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = false;
     });
-    
+
     canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
 }
 
@@ -199,10 +232,10 @@ async function showCharacterSelect() {
 // ============ Input Handling ============
 function handleMouseInteraction(event) {
     if (!isGameStarted) return;
-    
+
     const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPC());
     if (!hit) return;
-    
+
     if (hit.type === 'monster') {
         character.targetMonster = hit.object;
         autoPath = hit.point;
@@ -222,10 +255,10 @@ function handleMouseInteraction(event) {
 // ============ Game Loop ============
 function gameLoop(time) {
     if (!isGameStarted) return;
-    
+
     const dt = Math.min(0.1, (time - lastTime) / 1000);
     lastTime = time;
-    
+
     if (portalCooldown > 0) portalCooldown -= dt;
 
     // 1. Movement
@@ -234,7 +267,7 @@ function gameLoop(time) {
     if (keys['ArrowDown'] || keys['KeyS']) dirZ += 1;
     if (keys['ArrowLeft'] || keys['KeyA']) dirX -= 1;
     if (keys['ArrowRight'] || keys['KeyD']) dirX += 1;
-    
+
     if (dirX !== 0 || dirZ !== 0) {
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 7 : 4;
@@ -273,13 +306,14 @@ function gameLoop(time) {
                 character.attackTimer = 0;
                 character.state = 'attacking';
                 character.animTimer = 0;
-                
+
                 if (soundManager) soundManager.playAtkSound();
                 if (particles) particles.createHitBurst(character.targetMonster.mesh.position);
-                
+
                 if (!character.targetMonster.alive) {
-                    const leveledUp = character.addExp(character.targetMonster.expValue);
+                    const leveledUp = character.addExp(character.targetMonster.data.exp);
                     if (leveledUp && soundManager) soundManager.playLevelUpSound();
+                    monsters.queueRespawn(character.targetMonster);
                     character.targetMonster = null;
                 }
             }
@@ -297,12 +331,12 @@ function gameLoop(time) {
                 if (targetMap) {
                     portalCooldown = 2.0;
                     autoPath = null;
-                    
+
                     // Set safe spawn point for new map
                     const spawn = { x: 0, y: 1.2, z: 10 };
                     character.baseY = spawn.y;
                     character.mesh.position.set(spawn.x, spawn.y, spawn.z);
-                    
+
                     sceneManager.loadMap(targetMap);
                     monsters.clearAll();
                     monsters.mapId = targetMap;
@@ -318,16 +352,16 @@ function gameLoop(time) {
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);
     if (combatSystem) combatSystem.update(dt);
-    
+
     // 6. Camera & Networking
     sceneManager.followTarget(character.getPosition());
-    
+
     const now = performance.now();
     if (now - lastBroadcastTime > 100) {
         broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance());
         lastBroadcastTime = now;
     }
-    
+
     if (now - lastHUDTime > 100) {
         if (gameUI) {
             gameUI.updateHUD(character.stats);
@@ -336,7 +370,7 @@ function gameLoop(time) {
             if (statsPanel && statsPanel.style.display !== 'none') {
                 gameUI.updateStats(character.stats);
             }
-            
+
             // FPS Counter
             const fps = Math.round(1 / dt);
             const fpsEl = document.getElementById('fps-counter');
