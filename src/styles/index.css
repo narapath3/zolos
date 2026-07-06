@@ -848,33 +848,60 @@ body {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
   padding: 8px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  max-height: 220px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-height: 180px;
   overflow-y: auto;
 }
 
-.inv-slot {
+.inv-slot, .inventory-slot {
   aspect-ratio: 1;
-  background: rgba(20, 24, 38, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(30, 40, 60, 0.9), rgba(15, 20, 30, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 26px;
   position: relative;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   user-select: none;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: 
+    inset 0 1px 1px rgba(255, 255, 255, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.inv-slot:hover {
-  border-color: rgba(96, 160, 255, 0.6);
-  background: rgba(96, 160, 255, 0.08);
+.inv-slot:hover, .inventory-slot:hover {
+  border-color: rgba(240, 192, 64, 0.5);
+  background: linear-gradient(135deg, rgba(45, 55, 85, 0.9), rgba(25, 30, 50, 0.95));
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 8px rgba(240, 192, 64, 0.2);
+  z-index: 2;
+}
+
+.inv-slot.selected, .inventory-slot.selected {
+  border-color: var(--primary) !important;
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.15), rgba(20, 25, 40, 0.95)) !important;
+  box-shadow: 
+    0 0 12px rgba(240, 192, 64, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.15);
+}
+
+.inv-slot .inv-qty, .inventory-slot .slot-quantity {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  font-family: var(--font-pixel);
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  pointer-events: none;
 }
 
 .inv-slot.selected {
@@ -1099,7 +1126,7 @@ body {
 }
 
 .market-items-list {
-  max-height: 250px;
+  max-height: 220px;
   overflow-y: auto;
   min-height: 100px;
 }
@@ -1124,6 +1151,17 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.market-item-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-item-action-cell {
+  display: flex;
+  justify-content: center;
 }
 
 .market-item-qty-cell {
@@ -1188,26 +1226,27 @@ body {
 }
 
 .market-sell-form {
-  margin-top: 15px;
-  padding: 12px;
-  background: rgba(15, 20, 32, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(15, 20, 32, 0.95);
+  border: 1px solid rgba(240, 192, 64, 0.2);
   border-radius: var(--radius-sm);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 .selected-sell-item-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
-  padding-bottom: 10px;
+  padding-bottom: 6px;
 }
 
 .form-row {
   display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .form-group {
@@ -1231,7 +1270,7 @@ body {
 }
 
 .form-group input {
-  padding: 6px 10px;
+  padding: 5px 8px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--border);
   border-radius: 4px;
