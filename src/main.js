@@ -84,14 +84,43 @@ async function initGame(charData) {
         (players) => {
             // Update online players list
             if (gameUI) gameUI.updateOnlinePlayers(players);
+            
+            // Clean up players who left
+            const currentIds = new Set(players.map(p => p.userId));
+            for (const [id, rp] of remotePlayersMap.entries()) {
+                if (!currentIds.has(id)) {
+                    sceneManager.scene.remove(rp.mesh);
+                    remotePlayersMap.delete(id);
+                }
+            }
         },
         (p) => {
             // Handle remote player position updates
             if (p.userId === userId) return;
             let rp = remotePlayersMap.get(p.userId);
             if (!rp) {
-                // In a real implementation, we'd have a RemotePlayer class
+                // Create a simple visual for other players
+                const group = new THREE.Group();
+                const bodyGeo = new THREE.BoxGeometry(0.8, 1.8, 0.4);
+                const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3498db });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.9;
+                group.add(body);
+                
+                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const headMat = new THREE.MeshLambertMaterial({ color: 0xffdbac });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 2.0;
+                group.add(head);
+                
+                sceneManager.scene.add(group);
+                rp = { mesh: group };
+                remotePlayersMap.set(p.userId, rp);
             }
+            
+            // Smoothly move or snap for now
+            rp.mesh.position.set(p.x, p.y, p.z);
+            rp.mesh.rotation.y = p.rY;
         },
         (chatMsg) => {
             if (gameUI) gameUI.addChatMessage(chatMsg.username, chatMsg.message);
@@ -214,9 +243,14 @@ function gameLoop(time) {
         character.baseY = -0.5; // Partially submerged, visible while swimming
     } else {
         character.baseY = 1.2; // Default ground height
-        // Only reset to 4 if not manually moving (to allow shift-running)
-        if (dirX === 0 && dirZ === 0 && !autoPath) {
-            character.moveSpeed = 4;
+        // Reset to normal speed when not in water
+        if (character.state === 'swimming') {
+            character.state = 'idle';
+        }
+        // Ensure speed is reset to 4 (or higher if shift is pressed)
+        const baseSpeed = isShiftPressed ? 6.5 : 4.0;
+        if (character.moveSpeed < 4.0) {
+            character.moveSpeed = baseSpeed;
         }
     }
 
@@ -291,8 +325,27 @@ function gameLoop(time) {
             if (statsPanel && statsPanel.style.display !== 'none') {
                 gameUI.updateStats(character.stats);
             }
+            
+            // FPS Counter
+            const fps = Math.round(1000 / dt);
+            const fpsEl = document.getElementById('fps-counter');
+            if (fpsEl) fpsEl.textContent = `FPS: ${fps}`;
         }
         lastHUDTime = now;
+    }
+
+    if (now - lastMinimapTime > 150) {
+        if (gameUI) {
+            gameUI.updateMinimap(
+                character.getPosition(),
+                monsters.getAlive(),
+                sceneManager.portals,
+                sceneManager.npcKafra,
+                remotePlayersMap,
+                sceneManager.currentMapId
+            );
+        }
+        lastMinimapTime = now;
     }
 
     sceneManager.render();
