@@ -7,6 +7,8 @@ import { CombatSystem } from './engine/CombatSystem.js';
 import { ParticleSystem } from './engine/ParticleSystem.js';
 import { SoundManager } from './engine/SoundManager.js';
 import { InputManager } from './engine/InputManager.js';
+import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
+import { GPUInstancingSystem } from './engine/GPUInstancingSystem.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { GameUI } from './ui/GameUI.js';
 import { AdminUI } from './ui/AdminUI.js';
@@ -26,6 +28,7 @@ import {
 // ============ App State ============
 let sceneManager, character, monsters, combat, particles, gameUI;
 let soundManager, inputManager;
+let adaptiveRenderer, gpuInstancing;
 let userId = null;
 let username = 'Adventurer';
 let onlinePlayers = [];
@@ -57,6 +60,19 @@ async function initGame() {
     particles = new ParticleSystem(sceneManager.scene);
     soundManager = new SoundManager();
     inputManager = new InputManager();
+
+    // ============ Initialize Extreme Optimization Systems ============
+    // Initialize Adaptive Renderer System
+    adaptiveRenderer = new AdaptiveRendererSystem(sceneManager.renderer, sceneManager.camera, sceneManager.scene);
+    console.log('✅ Adaptive Renderer System initialized');
+    
+    // Initialize GPU Instancing System
+    gpuInstancing = new GPUInstancingSystem(sceneManager.scene);
+    console.log('✅ GPU Instancing System initialized');
+    
+    // Expose for debugging
+    window.adaptiveRenderer = adaptiveRenderer;
+    window.gpuInstancing = gpuInstancing;
 
     // Init UI
     gameUI = new GameUI(character, soundManager);
@@ -130,7 +146,7 @@ async function initGame() {
         gameUI.updateStats(character.stats);
     });
 
-    // Expose for debugging
+    // Expose for debugging (already exposed adaptive systems above)
     window.sceneManager = sceneManager;
     window.character = character;
     window.monsters = monsters;
