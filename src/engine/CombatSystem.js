@@ -201,5 +201,10 @@ export class CombatSystem {
         if (this.character.state === 'attacking') {
             this.character.state = 'idle';
         }
+        
+        // Ensure autoFarm continues if active
+        if (this.autoFarm) {
+            this.currentTarget = this.monsters.findNearest(this.character.getPosition());
+        }
     }
 }

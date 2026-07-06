@@ -350,6 +350,12 @@ export class GameUI {
       } else if (this.character) {
         this.character.setGlasses(null);
       }
+
+      // Also restore weapon if not already handled
+      const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
+      if (equippedWeapon && this.character) {
+        this.character.equipWeapon(equippedWeapon.item_name);
+      }
     } catch (e) {
       console.error('Failed to load inventory:', e);
       this.inventory = [];
@@ -393,7 +399,7 @@ export class GameUI {
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
     } else if (this.currentTab === 'equip') {
-      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield'].includes(i.item_type));
+      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(i.item_type));
     } else if (this.currentTab === 'etc') {
       filtered = this.inventory.filter(i => i.item_type === 'material');
     }
@@ -894,6 +900,10 @@ export class GameUI {
 
   setupChatSendCallback(callback) {
     this.chatSendCallback = callback;
+  }
+
+  setupProfileSaveCallback(callback) {
+    this.profileSaveCallback = callback;
   }
 
   receiveChatMessage(username, message) {

@@ -204,6 +204,101 @@ export class ParticleSystem {
         }
     }
 
+    // ============ Compatibility Methods ============
+    createHitBurst(position) {
+        this.spawnHitEffect(position, false);
+    }
+
+    createCriticalBurst(position) {
+        this.spawnHitEffect(position, true);
+    }
+
+    createExplosion(position, color) {
+        // Simple explosion using hit effect logic with custom color
+        let sparkCount = 30;
+        const particleScale = this.perfMonitor.getParticleCount();
+        sparkCount = Math.floor(sparkCount * particleScale);
+
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : (color || 0xff6600);
+        const segments = this.perfMonitor.getGeometrySegments();
+
+        for (let i = 0; i < sparkCount; i++) {
+            const geo = new THREE.SphereGeometry(0.12, segments, segments);
+            const mat = new THREE.MeshBasicMaterial({
+                color: colorVal,
+                transparent: true,
+                opacity: 1,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(position);
+            mesh.position.y += 0.5;
+
+            const angle = Math.random() * Math.PI * 2;
+            const upAngle = Math.random() * Math.PI;
+            const speed = 4 + Math.random() * 6;
+            const velocity = new THREE.Vector3(
+                Math.cos(angle) * Math.sin(upAngle) * speed,
+                Math.cos(upAngle) * speed,
+                Math.sin(angle) * Math.sin(upAngle) * speed
+            );
+            this.scene.add(mesh);
+            this.hitEffects.push({
+                mesh,
+                velocity,
+                life: 0.8 + Math.random() * 0.4,
+                gravity: 4.0,
+            });
+        }
+    }
+
+    createHealEffect(position) {
+        // Green sparkles rising up
+        let sparkCount = 15;
+        const particleScale = this.perfMonitor.getParticleCount();
+        sparkCount = Math.floor(sparkCount * particleScale);
+
+        const segments = this.perfMonitor.getGeometrySegments();
+
+        for (let i = 0; i < sparkCount; i++) {
+            const geo = new THREE.SphereGeometry(0.06, segments, segments);
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x44ff44,
+                transparent: true,
+                opacity: 0.8,
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(position);
+            mesh.position.x += (Math.random() - 0.5) * 0.6;
+            mesh.position.z += (Math.random() - 0.5) * 0.6;
+            mesh.position.y += Math.random() * 0.5;
+
+            const velocity = new THREE.Vector3(0, 1.5 + Math.random() * 1.5, 0);
+            this.scene.add(mesh);
+            this.hitEffects.push({
+                mesh,
+                velocity,
+                life: 1.0 + Math.random() * 0.5,
+                gravity: -0.5, // Float up
+            });
+        }
+    }
+
+    createClickIndicator(position) {
+        const rippleGeo = new THREE.RingGeometry(0.02, 0.08, 16);
+        const rippleMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide,
+        });
+        const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+        ripple.position.copy(position);
+        ripple.position.y = 0.05;
+        ripple.rotation.x = -Math.PI / 2;
+        this.scene.add(ripple);
+        this.shockwaves.push({ mesh: ripple, life: 0.3, maxLife: 0.3 });
+    }
+
     // ============ Update ============
     update(deltaTime) {
         // Update splash effects

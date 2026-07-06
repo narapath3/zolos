@@ -487,6 +487,43 @@ export class CharacterManager {
             const band = new THREE.Mesh(bandGeo, bandMat);
             band.position.y = 1.95;
             hatGroup.add(band);
+        } else if (this.equippedHat === 'Cowboy Hat') {
+            const leatherMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
+            const capGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 8);
+            const cap = new THREE.Mesh(capGeo, leatherMat);
+            cap.position.y = 2.05;
+            hatGroup.add(cap);
+
+            const brimGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.05, 12);
+            const brim = new THREE.Mesh(brimGeo, leatherMat);
+            brim.position.y = 1.9;
+            brim.rotation.z = 0.1;
+            hatGroup.add(brim);
+        } else if (this.equippedHat === 'Wizard Hat') {
+            const wizardMat = new THREE.MeshLambertMaterial({ color: 0x4b0082 });
+            const coneGeo = new THREE.ConeGeometry(0.4, 0.8, 8);
+            const cone = new THREE.Mesh(coneGeo, wizardMat);
+            cone.position.y = 2.3;
+            hatGroup.add(cone);
+
+            const brimGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.05, 12);
+            const brim = new THREE.Mesh(brimGeo, wizardMat);
+            brim.position.y = 1.9;
+            hatGroup.add(brim);
+        } else if (this.equippedHat === 'Crown') {
+            const goldMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+            const crownGeo = new THREE.CylinderGeometry(0.35, 0.3, 0.2, 8, 1, true);
+            const crown = new THREE.Mesh(crownGeo, goldMat);
+            crown.position.y = 2.0;
+            hatGroup.add(crown);
+
+            for (let i = 0; i < 8; i++) {
+                const spikeGeo = new THREE.ConeGeometry(0.08, 0.2, 4);
+                const spike = new THREE.Mesh(spikeGeo, goldMat);
+                const angle = (i / 8) * Math.PI * 2;
+                spike.position.set(Math.cos(angle) * 0.35, 2.1, Math.sin(angle) * 0.35);
+                hatGroup.add(spike);
+            }
         }
 
         this.hatMesh = hatGroup;
@@ -550,6 +587,28 @@ export class CharacterManager {
             chain.position.set(0.22, 1.55, 0.26);
             chain.rotation.z = 0.2;
             glassesGroup.add(chain);
+        } else if (this.equippedGlasses === 'Classic Glasses') {
+            for (let i = -1; i <= 1; i += 2) {
+                const frameGeo = new THREE.BoxGeometry(0.2, 0.15, 0.05);
+                const frame = new THREE.Mesh(frameGeo, frameMat);
+                frame.position.set(i * 0.12, 1.72, 0.26);
+                glassesGroup.add(frame);
+                
+                const lensGeo = new THREE.BoxGeometry(0.16, 0.11, 0.05);
+                const lens = new THREE.Mesh(lensGeo, lensMat);
+                lens.position.set(i * 0.12, 1.72, 0.27);
+                glassesGroup.add(lens);
+            }
+            const bridgeGeo = new THREE.BoxGeometry(0.08, 0.04, 0.05);
+            const bridge = new THREE.Mesh(bridgeGeo, frameMat);
+            bridge.position.set(0, 1.72, 0.26);
+            glassesGroup.add(bridge);
+        } else if (this.equippedGlasses === 'Sunglasses') {
+            const sunMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+            const frameGeo = new THREE.BoxGeometry(0.5, 0.12, 0.05);
+            const frame = new THREE.Mesh(frameGeo, sunMat);
+            frame.position.set(0, 1.72, 0.26);
+            glassesGroup.add(frame);
         }
 
         this.glassesMesh = glassesGroup;

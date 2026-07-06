@@ -354,6 +354,16 @@ export class SoundManager {
         }
     }
 
+    // ============ Compatibility Aliases ============
+    playAtkSound() {
+        this.playHitSound();
+    }
+
+    playCastSound() {
+        // Alias for skill sound or a generic magic sound
+        this.playUseItemSound();
+    }
+
     // ============ Portal Sound ============
     playPortalSound() {
         if (!this.enabled) return;
