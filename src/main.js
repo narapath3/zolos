@@ -275,7 +275,8 @@ function gameLoop(time) {
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 7 : 4;
         character.manualMove(dirX, dirZ, dt);
-    } else if (autoPath) {
+    } else if (autoPath && !(combatSystem && combatSystem.autoFarm)) {
+        // Skip autoPath movement when auto-farm handles movement via CombatSystem
         if (!character.moveToward(autoPath, dt)) autoPath = null;
     }
 

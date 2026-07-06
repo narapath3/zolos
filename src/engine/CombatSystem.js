@@ -70,7 +70,6 @@ export class CombatSystem {
                 if (this.globalCooldown <= 0) {
                     // Set attacking state only right when we attack
                     this.character.state = 'attacking';
-                    this.character.animTimer = 0;
                     this._performAttack(target);
                     this.globalCooldown = this.character.getAttackCooldown();
                 } else {

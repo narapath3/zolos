@@ -763,7 +763,7 @@ export class MonsterManager {
         this.waterMonsters.forEach(m => {
             if (m.mesh) this.scene.remove(m.mesh);
         });
-        
+
         // Reset arrays
         this.monsters = [];
         this.waterMonsters = [];
@@ -938,13 +938,14 @@ export class MonsterManager {
         });
     }
 
-    // Find nearest alive monster to a position (searches both land and water)
-    findNearest(position, maxRange = 20) {
+    // Find nearest alive monster to a position
+    // landOnly=true (default): only land monsters — prevents auto-farm chasing unreachable water monsters
+    findNearest(position, maxRange = 20, landOnly = true) {
         let nearest = null;
         let nearestDist = maxRange;
 
-        const allMonsters = [...this.monsters, ...this.waterMonsters];
-        for (const m of allMonsters) {
+        const pool = landOnly ? this.monsters : [...this.monsters, ...this.waterMonsters];
+        for (const m of pool) {
             if (!m.alive) continue;
             const d = m.distanceTo(position);
             if (d < nearestDist) {
