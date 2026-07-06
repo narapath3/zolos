@@ -724,8 +724,10 @@ export class CharacterManager {
         const maxHp = isNaN(this.stats.max_hp) ? 100 : this.stats.max_hp;
         const maxSp = isNaN(this.stats.max_sp) ? 50 : this.stats.max_sp;
         
-        this.stats.hp = maxHp;
-        this.stats.sp = maxSp;
+        // Start with 20% HP and 10% SP after death
+        this.stats.hp = Math.floor(maxHp * 0.2);
+        this.stats.sp = Math.floor(maxSp * 0.1);
+        
         this.baseY = 1.2;
         this.mesh.position.set(0, 1.2, 10);
         this.state = 'idle';
@@ -756,6 +758,19 @@ export class CharacterManager {
     update(dt) {
         this.animTimer += dt;
         this.attackTimer += dt;
+
+        // Natural Regeneration (every 3 seconds)
+        if (!this.regenTimer) this.regenTimer = 0;
+        this.regenTimer += dt;
+        if (this.regenTimer >= 3.0) {
+            this.regenTimer = 0;
+            if (this.isAlive()) {
+                const hpRegen = Math.max(1, Math.floor(this.stats.max_hp * 0.02));
+                const spRegen = Math.max(1, Math.floor(this.stats.max_sp * 0.03));
+                this.heal(hpRegen);
+                this.restoreSp(spRegen);
+            }
+        }
 
         // Count down skill cooldowns
         for (const skillId in this.cooldowns) {

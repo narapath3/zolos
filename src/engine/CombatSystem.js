@@ -171,9 +171,14 @@ export class CombatSystem {
                 this.character.respawn();
                 this.onEvent({ type: 'playerRespawn' });
                 
-                // Auto-resume if it was active
+                // Auto-resume if it was active, but wait for at least 50% HP
                 if (wasAutoFarming) {
-                    this.autoFarm = true;
+                    const checkRegen = setInterval(() => {
+                        if (this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
+                            this.autoFarm = true;
+                            clearInterval(checkRegen);
+                        }
+                    }, 1000);
                 }
             }, 3000);
         }
