@@ -54,7 +54,7 @@ export class SceneManager {
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(MAP_CONFIGS.prontera.fogColor);
-        this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.012);
+        this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.008); // Reduced fog density from 0.012 to see further
 
         // Camera (isometric-style)
         const aspect = window.innerWidth / window.innerHeight;
@@ -447,9 +447,9 @@ export class SceneManager {
 
             // Carve riverbed and build river banks
             if (distToRiver < 7.0) {
-                // Smooth valley drop down to -1.45 (slightly deeper for visibility)
+                // Smooth valley drop down to -1.8 (deeper to match lowered water)
                 const t = distToRiver / 7.0; // 0 (center) to 1 (bank)
-                height = -1.45 * (1.0 - t * t);
+                height = -1.8 * (1.0 - t * t);
             } else if (distToRiver < 10.0) {
                 // Raised bank ridge sloping down to ground
                 const t = (distToRiver - 7.0) / 3.0; // 0 to 1
@@ -564,7 +564,7 @@ export class SceneManager {
         });
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
-        water.position.set(0, -0.42, -2); // Lowered from -0.26 to prevent overlapping with ground
+        water.position.set(0, -0.85, -2); // Lowered further from -0.42 to ensure ground visibility
         water.receiveShadow = true;
         this.scene.add(water);
         this.envObjects.push(water);
