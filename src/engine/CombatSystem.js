@@ -28,53 +28,69 @@ export class CombatSystem {
             // Dead — respawn after 3 seconds
             this.character.state = 'idle';
             this.currentTarget = null;
+            if (this.character.targetMonster) this.character.targetMonster = null;
             return;
         }
 
-        if (!this.autoFarm) {
+        // Determine active target (manual target from characterManager takes priority)
+        let target = null;
+        if (this.character.targetMonster) {
+            target = this.character.targetMonster;
+            if (!target.alive) {
+                this.character.targetMonster = null;
+                target = null;
+            }
+        }
+
+        // Only search/move/attack nearest monster automatically if we don't have a manual target & autoFarm is active
+        if (!target && this.autoFarm) {
+            if (!this.currentTarget || !this.currentTarget.alive) {
+                this.currentTarget = this.monsters.findNearest(this.character.getPosition());
+            }
+            target = this.currentTarget;
+        }
+
+        if (target) {
+            const playerPos = this.character.getPosition();
+            const targetPos = target.getPosition();
+            const distance = playerPos.distanceTo(targetPos);
+            const range = this.character.getAttackRange();
+
+            if (distance > range) {
+                // Auto-farm moves toward target automatically
+                if (this.autoFarm) {
+                    this.character.moveToward(targetPos, dt);
+                }
+            } else {
+                // In range — face the target
+                const dx = targetPos.x - playerPos.x;
+                const dz = targetPos.z - playerPos.z;
+                this.character.mesh.rotation.y = Math.atan2(dx, dz);
+
+                if (this.globalCooldown <= 0) {
+                    // Set attacking state only right when we attack
+                    this.character.state = 'attacking';
+                    this.character.animTimer = 0;
+                    this._performAttack(target);
+                    this.globalCooldown = this.character.getAttackCooldown();
+                } else {
+                    // Between attacks — stand idle so animation doesn't freeze
+                    if (this.character.state === 'attacking') {
+                        this.character.state = 'idle';
+                    }
+                }
+            }
+        } else {
+            // Reset Target reference if we had any
+            this.currentTarget = null;
             if (this.character.state === 'attacking' && this.character.animTimer >= 0.5) {
                 this.character.state = 'idle';
-            }
-            return;
-        }
-
-        // Auto-farm logic
-        const playerPos = this.character.getPosition();
-
-        // Find/validate target
-        if (!this.currentTarget || !this.currentTarget.alive) {
-            this.currentTarget = this.monsters.findNearest(playerPos);
-            if (!this.currentTarget) {
-                this.character.state = 'idle';
-                return;
-            }
-        }
-
-        const targetPos = this.currentTarget.getPosition();
-        const distance = playerPos.distanceTo(targetPos);
-        const range = this.character.getAttackRange();
-
-        if (distance > range) {
-            // Move toward target
-            this.character.moveToward(targetPos, dt);
-        } else {
-            // In range — attack!
-            this.character.state = 'attacking';
-
-            // Face target
-            const dx = targetPos.x - playerPos.x;
-            const dz = targetPos.z - playerPos.z;
-            this.character.mesh.rotation.y = Math.atan2(dx, dz);
-
-            if (this.globalCooldown <= 0) {
-                this._performAttack();
-                this.globalCooldown = this.character.getAttackCooldown();
             }
         }
     }
 
-    _performAttack() {
-        const monster = this.currentTarget;
+    _performAttack(target) {
+        const monster = target;
         if (!monster || !monster.alive) return;
 
         // Player attacks monster
@@ -112,6 +128,8 @@ export class CombatSystem {
         if (!this.character.isAlive()) {
             this.onEvent({ type: 'playerDeath' });
             this.autoFarm = false;
+            this.currentTarget = null;
+            if (this.character.targetMonster) this.character.targetMonster = null;
             setTimeout(() => {
                 this.character.respawn();
                 this.onEvent({ type: 'playerRespawn' });
@@ -162,6 +180,13 @@ export class CombatSystem {
 
         // Queue respawn
         this.monsters.queueRespawn(monster);
-        this.currentTarget = null;
+
+        // Clear target references
+        if (this.character.targetMonster === monster) {
+            this.character.targetMonster = null;
+        }
+        if (this.currentTarget === monster) {
+            this.currentTarget = null;
+        }
     }
 }

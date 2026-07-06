@@ -47,13 +47,12 @@ export class GameUI {
   }
 
   _setupAutoBot() {
-    const autoBtn = document.getElementById('btn-auto-bot');
+    const autoBtn = document.getElementById('btn-auto-farm');
     if (autoBtn) {
       autoBtn.addEventListener('click', () => {
         if (this.combatSystem) {
           const isAuto = this.combatSystem.toggleAutoFarm();
-          autoBtn.classList.toggle('active', isAuto);
-          autoBtn.innerHTML = isAuto ? '🤖 Auto: ON' : '🤖 Auto: OFF';
+          this.setAutoFarmState(isAuto);
           this.addCombatLog(isAuto ? "🤖 Auto-Bot system activated!" : "🤖 Auto-Bot system deactivated.", 'system');
         }
       });
@@ -1049,10 +1048,12 @@ export class GameUI {
   // ============ Auto Farm Button ============
   setupAutoFarmButton(callback) {
     const btn = document.getElementById('btn-auto-farm');
-    btn.addEventListener('click', () => {
-      const isActive = callback();
-      btn.classList.toggle('active', isActive);
-    });
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const isActive = callback();
+        this.setAutoFarmState(isActive);
+      });
+    }
   }
 
   setupLogoutButton(callback) {
@@ -1067,7 +1068,14 @@ export class GameUI {
   }
 
   setAutoFarmState(active) {
-    document.getElementById('btn-auto-farm').classList.toggle('active', active);
+    const btn = document.getElementById('btn-auto-farm');
+    if (btn) {
+      btn.classList.toggle('active', active);
+      const textEl = btn.querySelector('.auto-text');
+      if (textEl) {
+        textEl.textContent = active ? 'AUTO: ON' : 'AUTO';
+      }
+    }
   }
 
   // ============ Fishing Button ============

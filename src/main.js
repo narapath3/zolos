@@ -103,7 +103,10 @@ async function initGame(charData) {
                 if (gameUI) gameUI.addItem(event.item);
                 break;
             case 'playerDeath':
-                if (gameUI) gameUI.addCombatLog('💀 You have been defeated! Respawning in 3s...', 'death');
+                if (gameUI) {
+                    gameUI.addCombatLog('💀 You have been defeated! Respawning in 3s...', 'death');
+                    gameUI.setAutoFarmState(false);
+                }
                 break;
             case 'playerRespawn':
                 if (gameUI) gameUI.addCombatLog('💚 You have respawned!', 'system');
@@ -160,7 +163,7 @@ async function initGame(charData) {
                     rp.character.applyAppearance(p.appearance);
                 }
                 // Update animations for remote player
-                rp.character.update(dt);
+                rp.character.update(1 / 60); // dt not available in callback scope; use fixed step
             }
         },
         (chatMsg) => {
@@ -300,23 +303,6 @@ function gameLoop(time) {
         const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
         if (dist <= character.getAttackRange()) {
             autoPath = null;
-            if (character.attackTimer >= character.getAttackCooldown()) {
-                const dmg = Math.floor(character.stats.atk * (0.8 + Math.random() * 0.4));
-                character.targetMonster.takeDamage(dmg);
-                character.attackTimer = 0;
-                character.state = 'attacking';
-                character.animTimer = 0;
-
-                if (soundManager) soundManager.playAtkSound();
-                if (particles) particles.createHitBurst(character.targetMonster.mesh.position);
-
-                if (!character.targetMonster.alive) {
-                    const leveledUp = character.addExp(character.targetMonster.data.exp);
-                    if (leveledUp && soundManager) soundManager.playLevelUpSound();
-                    monsters.queueRespawn(character.targetMonster);
-                    character.targetMonster = null;
-                }
-            }
         } else {
             autoPath = character.targetMonster.mesh.position.clone();
         }
