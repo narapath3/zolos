@@ -114,6 +114,7 @@ async function initGame(charData) {
     gameUI.updateStats(character.stats);
     
     isGameStarted = true;
+    lastTime = performance.now();
     requestAnimationFrame(gameLoop);
     
     // Input listeners
@@ -208,7 +209,10 @@ function gameLoop(time) {
         character.baseY = -0.5; // Partially submerged, visible while swimming
     } else {
         character.baseY = 1.2; // Default ground height
-        character.moveSpeed = 4; // Reset to normal speed when exiting water
+        // Only reset to 4 if not manually moving (to allow shift-running)
+        if (dirX === 0 && dirZ === 0 && !autoPath) {
+            character.moveSpeed = 4;
+        }
     }
 
     // 3. Combat
