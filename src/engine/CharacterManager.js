@@ -919,4 +919,11 @@ export class CharacterManager {
         
         this.updateNameTag();
     }
+
+    async saveStatsToDatabase() {
+        if (!this.characterId) return;
+        const { updates } = this.getSaveData();
+        const { saveCharacter } = await import('../network/GameSync.js');
+        await saveCharacter(this.characterId, updates);
+    }
 }

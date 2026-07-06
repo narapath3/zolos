@@ -1205,7 +1205,8 @@ export class GameUI {
 
     // Save persistence
     if (this.characterId) {
-      await saveInventoryItem(this.characterId, item.name, 1, itemData.type);
+      // Fixed argument order: (characterId, itemName, itemType, quantity)
+      await saveInventoryItem(this.characterId, item.name, itemData.type, 1);
       if (this.character.saveStatsToDatabase) {
         await this.character.saveStatsToDatabase();
       }

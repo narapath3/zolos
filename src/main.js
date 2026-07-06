@@ -101,10 +101,17 @@ async function initGame(charData) {
     // Start auto-save
     startAutoSave(charData.id, () => character.getSaveData().updates);
 
-    // Setup HUD
+    // Load Inventory from DB
+    await gameUI.loadInventoryFromDB(charData.id);
+
+    // Initial Monster Spawn
+    monsters.spawnInitial(character.stats.level);
+
+    // Setup HUD & Initial Stats
     if (gameUI.initHUD) {
         gameUI.initHUD(character);
     }
+    gameUI.updateStats(character.stats);
     
     isGameStarted = true;
     requestAnimationFrame(gameLoop);
@@ -157,6 +164,11 @@ function handleMouseInteraction(event) {
         character.targetMonster = hit.object;
         autoPath = hit.point;
         particles.createClickIndicator(hit.point, 0xff4444);
+    } else if (hit.type === 'npc') {
+        // Open Shop when clicking NPC
+        gameUI._togglePanel('shop-panel');
+        gameUI._renderShop();
+        particles.createClickIndicator(hit.point, 0xffff44);
     } else if (hit.type === 'ground') {
         autoPath = hit.point;
         character.targetMonster = null;
@@ -263,7 +275,14 @@ function gameLoop(time) {
     }
     
     if (now - lastHUDTime > 100) {
-        if (gameUI && gameUI.updateHUD) gameUI.updateHUD(character.stats);
+        if (gameUI) {
+            gameUI.updateHUD(character.stats);
+            // Also update stats panel if visible (throttled)
+            const statsPanel = document.getElementById('stats-panel');
+            if (statsPanel && statsPanel.style.display !== 'none') {
+                gameUI.updateStats(character.stats);
+            }
+        }
         lastHUDTime = now;
     }
 
