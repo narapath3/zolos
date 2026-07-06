@@ -54,7 +54,7 @@ export class SceneManager {
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(MAP_CONFIGS.prontera.fogColor);
-        this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.008); // Reduced fog density from 0.012 to see further
+        // this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.008); // Disabled fog to debug visibility
 
         // Camera (isometric-style)
         const aspect = window.innerWidth / window.innerHeight;
@@ -443,7 +443,7 @@ export class SceneManager {
             const distToRiver = Math.abs(z - riverZ);
 
             // Base noise height
-            let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
+            let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15 + 0.5; // Added 0.5 offset to lift entire ground up
 
             // Carve riverbed and build river banks
             if (distToRiver < 7.0) {
@@ -564,7 +564,7 @@ export class SceneManager {
         });
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
-        water.position.set(0, -0.85, -2); // Lowered further from -0.42 to ensure ground visibility
+        water.position.set(0, -1.5, -2); // Lowered significantly to -1.5 to ensure ground is visible
         water.receiveShadow = true;
         this.scene.add(water);
         this.envObjects.push(water);
