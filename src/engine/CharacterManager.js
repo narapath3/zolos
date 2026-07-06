@@ -688,8 +688,14 @@ export class CharacterManager {
 
     // Take damage
     takeDamage(amount) {
-        const actualDmg = Math.max(1, amount - Math.floor(this.stats.def * 0.3));
-        this.stats.hp = Math.max(0, this.stats.hp - actualDmg);
+        // Ensure amount is a valid number
+        const dmgAmount = isNaN(amount) ? 0 : amount;
+        const currentDef = isNaN(this.stats.def) ? 0 : this.stats.def;
+        
+        const actualDmg = Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
+        const newHp = (isNaN(this.stats.hp) ? this.stats.max_hp : this.stats.hp) - actualDmg;
+        
+        this.stats.hp = Math.max(0, newHp);
         return actualDmg;
     }
 
@@ -710,8 +716,12 @@ export class CharacterManager {
 
     // Respawn
     respawn() {
-        this.stats.hp = this.stats.max_hp;
-        this.stats.sp = this.stats.max_sp;
+        // Ensure max stats are valid before assigning
+        const maxHp = isNaN(this.stats.max_hp) ? 100 : this.stats.max_hp;
+        const maxSp = isNaN(this.stats.max_sp) ? 50 : this.stats.max_sp;
+        
+        this.stats.hp = maxHp;
+        this.stats.sp = maxSp;
         this.baseY = 1.2;
         this.mesh.position.set(0, 1.2, 10);
         this.state = 'idle';

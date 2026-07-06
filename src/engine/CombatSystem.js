@@ -142,7 +142,8 @@ export class CombatSystem {
 
         // Monster counter-attacks (if alive)
         if (monster.alive) {
-            const monsterDmg = this.character.takeDamage(monster.data.atk + Math.floor(Math.random() * 3));
+            const baseAtk = isNaN(monster.data.atk) ? 5 : monster.data.atk;
+            const monsterDmg = this.character.takeDamage(baseAtk + Math.floor(Math.random() * 3));
             this.onEvent({
                 type: 'monsterAttack',
                 damage: monsterDmg,
