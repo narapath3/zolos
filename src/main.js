@@ -6,6 +6,7 @@ import { MonsterManager } from './engine/MonsterManager.js';
 import { ParticleSystem } from './engine/ParticleSystem.js';
 import { SoundManager } from './engine/SoundManager.js';
 import { GameUI } from './ui/GameUI.js';
+import { AuthUI } from './ui/AuthUI.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -20,7 +21,7 @@ import {
 } from './network/GameSync.js';
 
 // ============ App State ============
-let sceneManager, character, monsters, particles, gameUI;
+let sceneManager, character, monsters, particles, gameUI, authUI;
 let soundManager;
 let isGameStarted = false;
 let lastTime = 0;
@@ -42,24 +43,22 @@ let isShiftPressed = false;
 
 // ============ Initialize Auth ============
 async function initAuth() {
-    // Initial UI setup
-    gameUI = new GameUI((action, data) => handleUIAction(action, data));
-    
-    // Check for existing session (simplified for now, using guest or prompt)
-    const storedUser = localStorage.getItem('zolos_user_id');
-    if (storedUser) {
-        userId = storedUser;
-        username = localStorage.getItem('zolos_username') || 'Adventurer';
+    // Initial UI setup - Use AuthUI for login screen
+    authUI = new AuthUI((sessionData) => {
+        userId = sessionData.userId;
+        username = sessionData.username;
         showCharacterSelect();
-    } else {
-        gameUI.showScreen('login');
-    }
+    });
 }
 
 // ============ Initialize Game ============
 async function initGame(charData) {
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return;
+
+    // Show game screen, hide auth
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'block';
 
     sceneManager = new SceneManager(canvas);
     character = new CharacterManager(sceneManager.scene);
@@ -74,6 +73,9 @@ async function initGame(charData) {
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, particles);
     
+    // Initialize Game UI with character
+    gameUI = new GameUI(character, soundManager);
+    
     // Join multiplayer
     joinPresence(
         userId,
@@ -81,7 +83,7 @@ async function initGame(charData) {
         character.stats.level,
         (players) => {
             // Update online players list
-            gameUI.updateOnlinePlayers(players);
+            if (gameUI) gameUI.updateOnlinePlayers(players);
         },
         (p) => {
             // Handle remote player position updates
@@ -89,11 +91,10 @@ async function initGame(charData) {
             let rp = remotePlayersMap.get(p.userId);
             if (!rp) {
                 // In a real implementation, we'd have a RemotePlayer class
-                // For now, we focus on fixing the main game loop and spawn bugs
             }
         },
         (chatMsg) => {
-            gameUI.addChatMessage(chatMsg.username, chatMsg.message);
+            if (gameUI) gameUI.addChatMessage(chatMsg.username, chatMsg.message);
         }
     );
 
@@ -101,8 +102,9 @@ async function initGame(charData) {
     startAutoSave(charData.id, () => character.getSaveData().updates);
 
     // Setup HUD
-    gameUI.initHUD(character);
-    gameUI.showScreen('hud');
+    if (gameUI.initHUD) {
+        gameUI.initHUD(character);
+    }
     
     isGameStarted = true;
     requestAnimationFrame(gameLoop);
@@ -121,26 +123,26 @@ async function initGame(charData) {
 }
 
 async function showCharacterSelect() {
-    // For now, load default character or show create screen
-    const char = await loadCharacter(userId);
-    if (char) {
-        initGame(char);
-    } else {
-        gameUI.showScreen('create-char');
-    }
-}
-
-async function handleUIAction(action, data) {
-    if (action === 'login' || action === 'guest') {
-        userId = action === 'guest' ? 'guest_' + Math.random().toString(36).substring(2, 10) : data.username;
-        username = action === 'guest' ? 'Guest_' + Math.random().toString(36).substring(2, 5).toUpperCase() : data.username;
-        localStorage.setItem('zolos_user_id', userId);
-        localStorage.setItem('zolos_username', username);
-        showCharacterSelect();
-    } else if (action === 'use-skill') {
-        character.useSkill(data.skillId, character.targetMonster, monsters, gameUI, soundManager, particles);
-    } else if (action === 'chat') {
-        broadcastChat(username, data.message);
+    // For now, load default character or create screen
+    try {
+        const char = await loadCharacter(userId);
+        if (char) {
+            initGame(char);
+        } else {
+            // Fallback for new characters if loadCharacter didn't create one
+            const newChar = {
+                user_id: userId,
+                name: username,
+                level: 1,
+                hp: 100,
+                max_hp: 100
+            };
+            initGame(newChar);
+        }
+    } catch (e) {
+        console.error("Failed to load character:", e);
+        // Fallback to start game anyway for testing
+        initGame({ user_id: userId, name: username, level: 1 });
     }
 }
 
@@ -260,7 +262,7 @@ function gameLoop(time) {
     }
     
     if (now - lastHUDTime > 100) {
-        gameUI.updateHUD(character.stats);
+        if (gameUI && gameUI.updateHUD) gameUI.updateHUD(character.stats);
         lastHUDTime = now;
     }
 
