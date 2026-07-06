@@ -9,6 +9,7 @@ import { ParticleSystem } from './engine/ParticleSystem.js';
 import { SoundManager } from './engine/SoundManager.js';
 import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
+import { AdminUI } from './ui/AdminUI.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -116,6 +117,10 @@ async function initGame(charData) {
 
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
+
+    // Initialize Admin UI
+    window.adminUI = new AdminUI();
+    window.adminUI.checkAdmin(charData.user_id);
 
     // Join multiplayer
     joinPresence(
