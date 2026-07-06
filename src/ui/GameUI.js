@@ -1199,6 +1199,9 @@ export class GameUI {
       const itemData = ITEMS[item.name];
       const slot = document.createElement('div');
       slot.className = 'shop-slot';
+      if (itemData.rarity) {
+        slot.classList.add(`rarity-${itemData.rarity}`);
+      }
       if (this.selectedShopItem && this.selectedShopItem.name === item.name) {
         slot.classList.add('selected');
       }
@@ -1436,6 +1439,9 @@ export class GameUI {
     sellable.forEach(item => {
       const slot = document.createElement('div');
       slot.className = 'inventory-slot';
+      if (item.rarity) {
+        slot.classList.add(`rarity-${item.rarity}`);
+      }
       if (this.selectedMarketItem && this.selectedMarketItem.item_name === item.item_name) {
         slot.classList.add('selected');
       }
