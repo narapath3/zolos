@@ -130,7 +130,7 @@ export class CombatSystem {
         let baseDmg = this.character.stats.atk + Math.floor(Math.random() * 5);
         if (isCritical) baseDmg = Math.floor(baseDmg * 1.8);
 
-        const actualDmg = monster.takeDamage(baseDmg);
+        const actualDmg = monster.takeDamage(baseDmg, isCritical);
 
         this.onEvent({
             type: 'playerAttack',
@@ -221,12 +221,9 @@ export class CombatSystem {
             this.currentTarget = null;
         }
 
-        // Fix A: Reset state when monster is killed
         if (this.character.state === 'attacking') {
             this.character.state = 'idle';
         }
-        
-        // Ensure autoFarm continues if active
         if (this.autoFarm) {
             this.currentTarget = this.monsters.findNearest(this.character.getPosition());
         }
@@ -251,14 +248,14 @@ export class CombatSystem {
             }
 
             this.fishingTimer += dt;
-            // Check for bite every 2 seconds
-            if (this.fishingTimer >= 2.0) {
+            // Check for bite every 3 seconds
+            if (this.fishingTimer >= 3.0) {
                 this.fishingTimer = 0;
-                if (Math.random() < 0.15) {
+                if (Math.random() < 0.2) {
                     this.onEvent({ type: 'fishingBite' });
                     // Catch fish!
                     setTimeout(() => {
-                        if (this.isFishing) {
+                        if (this.isFishing && this.character.state === 'fishing') {
                             this.onEvent({
                                 type: 'lootDrop',
                                 item: { name: 'Fish', emoji: '🐟', type: 'consumable', chance: 1.0 }

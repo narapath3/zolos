@@ -856,22 +856,29 @@ body {
   overflow-y: auto;
 }
 
-.inv-slot, .inventory-slot {
+.inv-slot, .inventory-slot, .shop-slot {
   aspect-ratio: 1;
-  background: linear-gradient(135deg, rgba(30, 40, 60, 0.9), rgba(15, 20, 30, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(30, 40, 60, 0.95), rgba(15, 20, 30, 1));
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 28px;
   position: relative;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   user-select: none;
-  box-shadow: 
-    inset 0 1px 1px rgba(255, 255, 255, 0.1),
-    0 2px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 4px 8px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.inv-slot::after, .inventory-slot::after, .shop-slot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
+  pointer-events: none;
 }
 
 .inv-slot:hover, .inventory-slot:hover {
@@ -1232,6 +1239,8 @@ body {
   border: 1px solid rgba(240, 192, 64, 0.2);
   border-radius: var(--radius-sm);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .selected-sell-item-row {
@@ -2118,22 +2127,7 @@ body {
   margin-top: 10px;
 }
 
-.shop-slot {
-  aspect-ratio: 1;
-  background: linear-gradient(135deg, rgba(30, 40, 60, 0.9), rgba(15, 20, 30, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  user-select: none;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.3);
-  padding: 4px;
-}
+/* shop-slot is now handled by shared .inv-slot, .inventory-slot, .shop-slot block */
 
 .shop-slot:hover {
   border-color: rgba(240, 192, 64, 0.5);
@@ -2185,35 +2179,7 @@ body {
   gap: 10px;
 }
 
-/* ========== RARITY COLOR SCHEME & GLOWS ========== */
-.rarity-common {
-  border-color: rgba(255, 255, 255, 0.15) !important;
-}
-
-.rarity-rare {
-  border-color: #3b82f6 !important;
-  background: rgba(59, 130, 246, 0.08) !important;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3) !important;
-}
-
-.rarity-epic {
-  border-color: #a855f7 !important;
-  background: rgba(168, 85, 247, 0.08) !important;
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.4) !important;
-}
-
-.rarity-legendary {
-  border-color: #eab308 !important;
-  background: rgba(234, 179, 8, 0.08) !important;
-  box-shadow: 0 0 14px rgba(234, 179, 8, 0.5) !important;
-}
-
-.rarity-mythic {
-  border-color: #ef4444 !important;
-  background: rgba(239, 68, 68, 0.08) !important;
-  box-shadow: 0 0 18px rgba(239, 68, 68, 0.6) !important;
-  animation: pulseMythic 2.5s infinite;
-}
+/* Rarity classes will be updated in the main rarity section at the end of the file */
 
 @keyframes pulseMythic {
 
@@ -2457,58 +2423,66 @@ body {
 }
 
 /* ========== ITEM RARITIES ========== */
-/* Common */
-/* Common */
 .rarity-common {
   border-color: rgba(180, 180, 180, 0.5) !important;
-  color: #b4b4b4;
 }
 
-.color-common {
-  color: #b4b4b4 !important;
-}
-
-/* Rare */
 .rarity-rare {
   border-color: #60a0ff !important;
   box-shadow: inset 0 0 10px rgba(96, 160, 255, 0.2), 0 0 8px rgba(96, 160, 255, 0.3) !important;
 }
 
-.color-rare {
-  color: #60a0ff !important;
-  text-shadow: 0 0 5px rgba(96, 160, 255, 0.4);
-}
-
-/* Epic */
 .rarity-epic {
   border-color: #d060ff !important;
   background: linear-gradient(135deg, rgba(208, 96, 255, 0.1), rgba(0, 0, 0, 0.4)) !important;
   box-shadow: inset 0 0 12px rgba(208, 96, 255, 0.3), 0 0 12px rgba(208, 96, 255, 0.4) !important;
 }
 
-.color-epic {
-  color: #d060ff !important;
-  text-shadow: 0 0 8px rgba(208, 96, 255, 0.5);
-}
-
-/* Legendary */
 .rarity-legendary {
   border-color: #ffaa00 !important;
   background: linear-gradient(135deg, rgba(255, 170, 0, 0.15), rgba(0, 0, 0, 0.4)) !important;
   box-shadow: inset 0 0 15px rgba(255, 170, 0, 0.4), 0 0 15px rgba(255, 170, 0, 0.5) !important;
 }
 
-.color-legendary {
-  color: #ffaa00 !important;
-  text-shadow: 0 0 10px rgba(255, 170, 0, 0.6);
-}
-
-/* Mythic */
 .rarity-mythic {
   border-color: #ff2040 !important;
   background: linear-gradient(135deg, rgba(255, 32, 64, 0.2), rgba(0, 0, 0, 0.5)) !important;
   box-shadow: inset 0 0 18px rgba(255, 32, 64, 0.5), 0 0 20px rgba(255, 32, 64, 0.6) !important;
   animation: mythicPulse 2s ease-in-out infinite;
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-4px, -2px) rotate(-0.5deg); }
+  20% { transform: translate(4px, 2px) rotate(0.5deg); }
+  30% { transform: translate(-3px, 3px) rotate(-0.3deg); }
+  40% { transform: translate(3px, -3px) rotate(0.3deg); }
+  50% { transform: translate(-2px, 2px) rotate(-0.2deg); }
+  60% { transform: translate(2px, -2px) rotate(0.2deg); }
+  70% { transform: translate(-1px, 1px) rotate(-0.1deg); }
+  80% { transform: translate(1px, -1px) rotate(0.1deg); }
+  90% { transform: translate(-1px, 0px) rotate(0deg); }
+}
+
+@keyframes screenShakeCrit {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-8px, -4px) rotate(-1deg); }
+  20% { transform: translate(8px, 4px) rotate(1deg); }
+  30% { transform: translate(-6px, 6px) rotate(-0.7deg); }
+  40% { transform: translate(6px, -6px) rotate(0.7deg); }
+  50% { transform: translate(-4px, 4px) rotate(-0.5deg); }
+  60% { transform: translate(4px, -4px) rotate(0.5deg); }
+  70% { transform: translate(-2px, 2px) rotate(-0.2deg); }
+  80% { transform: translate(2px, -2px) rotate(0.2deg); }
+  90% { transform: translate(-1px, 0px) rotate(0deg); }
+}
+
+.screen-shake {
+  animation: screenShake 0.35s ease-out;
+}
+
+.screen-shake-crit {
+  animation: screenShakeCrit 0.5s ease-out;
 }
 
 .color-mythic {

@@ -922,10 +922,6 @@ export class GameUI {
     this.chatSendCallback = callback;
   }
 
-  setupProfileSaveCallback(callback) {
-    this.profileSaveCallback = callback;
-  }
-
   receiveChatMessage(username, message) {
     const chatMessages = document.getElementById('chat-messages');
     if (!chatMessages) return;
@@ -1117,6 +1113,16 @@ export class GameUI {
         }
       });
     }
+  }
+
+  triggerScreenShake(isCritical = false) {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+    const cls = isCritical ? 'screen-shake-crit' : 'screen-shake';
+    canvas.classList.remove('screen-shake', 'screen-shake-crit');
+    void canvas.offsetWidth;
+    canvas.classList.add(cls);
+    setTimeout(() => canvas.classList.remove(cls), isCritical ? 500 : 350);
   }
 
   setAutoFarmState(active) {

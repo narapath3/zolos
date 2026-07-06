@@ -219,7 +219,14 @@ export class ParticleSystem {
         const particleScale = this.perfMonitor.getParticleCount();
         sparkCount = Math.floor(sparkCount * particleScale);
 
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : (color || 0xff6600);
+        let colorVal;
+        if (typeof color === 'string') {
+            colorVal = parseInt(color.replace('#', '0x'));
+        } else if (typeof color === 'number') {
+            colorVal = color;
+        } else {
+            colorVal = 0xff6600;
+        }
         const segments = this.perfMonitor.getGeometrySegments();
 
         for (let i = 0; i < sparkCount; i++) {

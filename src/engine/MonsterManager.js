@@ -584,10 +584,11 @@ class Monster {
         this.scene.add(this.mesh);
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, isCritical = false) {
         const actualDmg = Math.max(1, amount - Math.floor(this.data.def * 0.3));
         this.hp = Math.max(0, this.hp - actualDmg);
-        this.hitFlash = 0.15;
+        this.hitFlash = isCritical ? 0.3 : 0.18;
+        this.isCriticalHit = isCritical;
 
         // Update HP bar
         const ratio = this.hp / this.maxHp;
@@ -627,17 +628,47 @@ class Monster {
         this.bodyMesh.scale.x = 1 - bounce * 0.15;
         this.bodyMesh.scale.z = 1 - bounce * 0.15;
 
-        // Recursive hit flash for all bodyMesh children (only update when flash state changes)
-        const flashIntensity = this.hitFlash > 0 ? this.hitFlash * 5 : 0;
-        const flashColor = this.hitFlash > 0 ? 0xff4040 : 0x000000;
-        const wasFlashing = this._wasFlashing || false;
+        // Recursive hit flash for all bodyMesh children
         const isFlashing = this.hitFlash > 0;
+        const wasFlashing = this._wasFlashing || false;
+        
         if (isFlashing || wasFlashing !== isFlashing) {
             this._wasFlashing = isFlashing;
+            
+            // Critical hit double pulse logic
+            let currentFlashIntensity = 0;
+            let currentFlashColor = 0x000000;
+            
+            if (isFlashing) {
+                currentFlashColor = 0xffffff;
+                if (this.isCriticalHit) {
+                    // Double pulse for critical: first pulse 300-150ms, second pulse 150-0ms
+                    const pulseTime = this.hitFlash > 0.15 ? this.hitFlash - 0.15 : this.hitFlash;
+                    currentFlashIntensity = (pulseTime / 0.15);
+                } else {
+                    currentFlashIntensity = this.hitFlash / 0.18;
+                }
+            }
+
             this.bodyMesh.traverse(child => {
-                if (child.isMesh && child.material && child.material.emissive) {
-                    child.material.emissive.setHex(flashColor);
-                    child.material.emissiveIntensity = flashIntensity;
+                if (child.isMesh && child.material) {
+                    if (!child.userData.originalColor) {
+                        child.userData.originalColor = child.material.color.clone();
+                    }
+                    
+                    if (isFlashing) {
+                        child.material.color.setHex(0xffffff);
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0xffffff);
+                            child.material.emissiveIntensity = currentFlashIntensity;
+                        }
+                    } else {
+                        child.material.color.copy(child.userData.originalColor);
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(0x000000);
+                            child.material.emissiveIntensity = 0;
+                        }
+                    }
                 }
             });
         }

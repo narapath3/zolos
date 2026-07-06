@@ -499,32 +499,7 @@ export class CharacterManager {
             brim.position.y = 1.9;
             brim.rotation.z = 0.1;
             hatGroup.add(brim);
-        } else if (this.equippedHat === 'Wizard Hat') {
-            const wizardMat = new THREE.MeshLambertMaterial({ color: 0x4b0082 });
-            const coneGeo = new THREE.ConeGeometry(0.4, 0.8, 8);
-            const cone = new THREE.Mesh(coneGeo, wizardMat);
-            cone.position.y = 2.3;
-            hatGroup.add(cone);
 
-            const brimGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.05, 12);
-            const brim = new THREE.Mesh(brimGeo, wizardMat);
-            brim.position.y = 1.9;
-            hatGroup.add(brim);
-        } else if (this.equippedHat === 'Crown') {
-            const goldMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-            const crownGeo = new THREE.CylinderGeometry(0.35, 0.3, 0.2, 8, 1, true);
-            const crown = new THREE.Mesh(crownGeo, goldMat);
-            crown.position.y = 2.0;
-            hatGroup.add(crown);
-
-            for (let i = 0; i < 8; i++) {
-                const spikeGeo = new THREE.ConeGeometry(0.08, 0.2, 4);
-                const spike = new THREE.Mesh(spikeGeo, goldMat);
-                const angle = (i / 8) * Math.PI * 2;
-                spike.position.set(Math.cos(angle) * 0.35, 2.1, Math.sin(angle) * 0.35);
-                hatGroup.add(spike);
-            }
-        }
 
         this.hatMesh = hatGroup;
         this.mesh.add(this.hatMesh);
@@ -603,12 +578,6 @@ export class CharacterManager {
             const bridge = new THREE.Mesh(bridgeGeo, frameMat);
             bridge.position.set(0, 1.72, 0.26);
             glassesGroup.add(bridge);
-        } else if (this.equippedGlasses === 'Sunglasses') {
-            const sunMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
-            const frameGeo = new THREE.BoxGeometry(0.5, 0.12, 0.05);
-            const frame = new THREE.Mesh(frameGeo, sunMat);
-            frame.position.set(0, 1.72, 0.26);
-            glassesGroup.add(frame);
         }
 
         this.glassesMesh = glassesGroup;

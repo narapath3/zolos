@@ -82,9 +82,12 @@ async function initGame(charData) {
         if (!event) return;
         switch (event.type) {
             case 'playerAttack':
-                if (particles) particles.createHitBurst(event.targetPos);
+                if (particles) particles.spawnHitEffect(event.targetPos, event.critical);
                 if (soundManager) soundManager.playAtkSound();
-                if (gameUI) gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
+                if (gameUI) {
+                    gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
+                    gameUI.triggerScreenShake(event.critical);
+                }
                 break;
             case 'monsterAttack':
                 if (gameUI) gameUI.addCombatLog(`🩸 ${event.monsterName} hits you for ${event.damage} damage`, 'warning');
@@ -113,15 +116,15 @@ async function initGame(charData) {
                 if (gameUI) gameUI.addCombatLog('💚 You have respawned!', 'system');
                 break;
             case 'fishingStart':
-                if (gameUI) gameUI.addCombatLog('🎣 หาที่ว่างริมน้ำเพื่อเริ่มตกปลา...', 'system');
+                if (gameUI) gameUI.addCombatLog('🎣 Walking to water...', 'system');
                 break;
             case 'fishingCast':
                 if (sceneManager && character) sceneManager.createFishingLine(character.getPosition());
-                if (gameUI) gameUI.addCombatLog('🎣 โยนเบ็ดลงน้ำแล้ว... รอปลามาติดเบ็ด', 'system');
+                if (gameUI) gameUI.addCombatLog('🎣 Cast the line into the water...', 'system');
                 break;
             case 'fishingBite':
                 if (sceneManager) sceneManager.animateFishBite();
-                if (gameUI) gameUI.addCombatLog('❗ ปลาติดเบ็ดแล้ว! กำลังดึงขึ้นมา...', 'system');
+                if (gameUI) gameUI.addCombatLog('❗ Fish on the line!', 'system');
                 break;
             case 'fishingStop':
                 if (sceneManager) sceneManager.removeFishingLine();
