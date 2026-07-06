@@ -1198,7 +1198,7 @@ export class GameUI {
     filteredItems.forEach(item => {
       const itemData = ITEMS[item.name];
       const slot = document.createElement('div');
-      slot.className = 'inventory-slot';
+      slot.className = 'shop-slot';
       if (this.selectedShopItem && this.selectedShopItem.name === item.name) {
         slot.classList.add('selected');
       }
