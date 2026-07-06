@@ -2,7 +2,7 @@ import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNI
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats } from '../network/GameSync.js';
 
 export class GameUI {
-  constructor(character = null, soundManager = null) {
+  constructor(character = null, soundManager = null, combatSystem = null) {
     this.gameScreen = document.getElementById('game-screen');
     this.combatLogEl = document.getElementById('combat-log-messages');
     this.maxLogMessages = 20;
@@ -11,6 +11,7 @@ export class GameUI {
 
     this.character = character;
     this.soundManager = soundManager;
+    this.combatSystem = combatSystem;
 
     this.currentTab = 'all';
     this.selectedItemName = null;
@@ -42,6 +43,21 @@ export class GameUI {
     this._setupProfileEditor();
     this._setupLeaderboardTabs();
     this._setupOnlineTabs();
+    this._setupAutoBot();
+  }
+
+  _setupAutoBot() {
+    const autoBtn = document.getElementById('btn-auto-bot');
+    if (autoBtn) {
+      autoBtn.addEventListener('click', () => {
+        if (this.combatSystem) {
+          const isAuto = this.combatSystem.toggleAutoFarm();
+          autoBtn.classList.toggle('active', isAuto);
+          autoBtn.innerHTML = isAuto ? '🤖 Auto: ON' : '🤖 Auto: OFF';
+          this.addCombatMessage(isAuto ? "Auto-Bot system activated!" : "Auto-Bot system deactivated.");
+        }
+      });
+    }
   }
 
   show() {

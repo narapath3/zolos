@@ -755,6 +755,21 @@ export class MonsterManager {
         this.mapId = 'prontera';
     }
 
+    clearAll() {
+        // Remove all monster meshes from scene
+        this.monsters.forEach(m => {
+            if (m.mesh) this.scene.remove(m.mesh);
+        });
+        this.waterMonsters.forEach(m => {
+            if (m.mesh) this.scene.remove(m.mesh);
+        });
+        
+        // Reset arrays
+        this.monsters = [];
+        this.waterMonsters = [];
+        this.deadQueue = [];
+    }
+
     _getRandomPositionForMonster(type, rng) {
         const useRng = rng || Math.random;
         const allMonsters = getAllMonsters();

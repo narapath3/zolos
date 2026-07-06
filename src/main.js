@@ -3,6 +3,8 @@
 import { SceneManager } from './engine/SceneManager.js';
 import { CharacterManager } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
+import { CombatSystem } from './engine/CombatSystem.js';
+import * as THREE from 'three';
 import { ParticleSystem } from './engine/ParticleSystem.js';
 import { SoundManager } from './engine/SoundManager.js';
 import { GameUI } from './ui/GameUI.js';
@@ -22,7 +24,7 @@ import {
 
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
-let soundManager;
+let soundManager, combatSystem;
 let isGameStarted = false;
 let lastTime = 0;
 let portalCooldown = 0;
@@ -73,8 +75,11 @@ async function initGame(charData) {
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
     
+    // Initialize Combat System
+    combatSystem = new CombatSystem(character, monsters, particles, soundManager);
+
     // Initialize Game UI with character
-    gameUI = new GameUI(character, soundManager);
+    gameUI = new GameUI(character, soundManager, combatSystem);
     
     // Join multiplayer
     joinPresence(
@@ -296,6 +301,8 @@ function gameLoop(time) {
                     character.mesh.position.set(spawn.x, spawn.y, spawn.z);
                     
                     sceneManager.loadMap(targetMap);
+                    monsters.clearAll();
+                    monsters.mapId = targetMap;
                     monsters.spawnInitial(character.stats.level);
                 }
             }
@@ -307,6 +314,7 @@ function gameLoop(time) {
     monsters.update(dt, sceneManager.camera, character.stats.level);
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);
+    if (combatSystem) combatSystem.update(dt);
     
     // 6. Camera & Networking
     sceneManager.followTarget(character.getPosition());
