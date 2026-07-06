@@ -673,14 +673,16 @@ export class CharacterManager {
             this.stats.level++;
             leveledUp = true;
 
-            // Apply stat gains
+            // Apply stat gains to base values
             const gains = getStatGains(this.stats.level);
-            this.stats.max_hp += gains.hp;
+            this.stats._baseMaxHp = (Number(this.stats._baseMaxHp) || 100) + gains.hp;
+            this.stats._baseMaxSp = (Number(this.stats._baseMaxSp) || 50) + gains.sp;
+            this.stats._baseAtk = (Number(this.stats._baseAtk) || 10) + gains.atk;
+            this.stats._baseDef = (Number(this.stats._baseDef) || 5) + gains.def;
+            
+            // Fully restore current HP/SP on level up
             this.stats.hp = this.stats.max_hp;
-            this.stats.max_sp += gains.sp;
             this.stats.sp = this.stats.max_sp;
-            this.stats.atk += gains.atk;
-            this.stats.def += gains.def;
         }
 
         if (leveledUp) {
