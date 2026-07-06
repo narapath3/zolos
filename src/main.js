@@ -1,660 +1,342 @@
-// ZOLOS — Idle RPG Online
-// Main Entry Point
+// Main Game Logic — Entry point, state machine, input, and networking
+import * as THREE from 'three';
 import { SceneManager } from './engine/SceneManager.js';
-import { CharacterManager, RemotePlayer, getCharacterColor } from './engine/CharacterManager.js';
+import { CharacterManager } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
-import { CombatSystem } from './engine/CombatSystem.js';
-import { ParticleSystem } from './engine/ParticleSystem.js';
-import { SoundManager } from './engine/SoundManager.js';
-import { InputManager } from './engine/InputManager.js';
-import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
-import { GPUInstancingSystem } from './engine/GPUInstancingSystem.js';
-import { AuthUI } from './ui/AuthUI.js';
 import { GameUI } from './ui/GameUI.js';
-import { AdminUI } from './ui/AdminUI.js';
-import { SKILLS, ITEMS } from './engine/GameData.js';
-import {
-    loadCharacter,
-    saveCharacter,
-    loadInventory,
-    joinPresence,
-    leavePresence,
-    startAutoSave,
-    stopAutoSave,
-    broadcastPosition,
-    broadcastChat,
-} from './network/GameSync.js';
+import { SoundManager } from './engine/SoundManager.js';
+import { ParticleSystem } from './engine/ParticleSystem.js';
+import { SupabaseClient } from './network/SupabaseClient.js';
+import { NetworkManager } from './network/NetworkManager.js';
 
 // ============ App State ============
-let sceneManager, character, monsters, combat, particles, gameUI;
-let soundManager, inputManager;
-let adaptiveRenderer, gpuInstancing;
-let userId = null;
-let username = 'Adventurer';
-let onlinePlayers = [];
-const remotePlayersMap = new Map();
-let lastBroadcastTime = 0;
+let sceneManager, character, monsters, gameUI, soundManager, particleSystem;
+let supabase, network;
+let isGameStarted = false;
+let lastTime = 0;
 let portalCooldown = 0;
-let lastMinimapTime = 0;
-let lastHUDTime = 0;
-let lastStatsTime = 0;
-let fpsFrameCount = 0;
-let fpsLastTime = 0;
-let fpsEl = null;
-// Fishing state machine
-let fishingState = 'idle'; // idle | walking | casting | waiting | catching
-let fishingTimer = 0;
-const FISHING_SPOT = { x: 1.5, y: 0, z: -2 }; // on the bridge edge
-const FISHING_BASE_DELAY = 3.0; // seconds between catches (base)
-let lastFishingBtnVisible = false;
+
+// Input state
+const keys = {};
+let mouseTarget = null;
+let autoPath = null;
 
 // ============ Initialize Auth ============
-const authUI = new AuthUI(async (authData) => {
-    userId = authData.userId;
-    username = authData.username;
-    await initGame();
-});
+async function initAuth() {
+    supabase = new SupabaseClient();
+    const session = await supabase.getSession();
+    
+    // UI will handle login/guest logic
+    gameUI = new GameUI(supabase, (action, data) => handleUIAction(action, data));
+    
+    if (session) {
+        showCharacterSelect();
+    } else {
+        gameUI.showScreen('login');
+    }
+}
 
 // ============ Initialize Game ============
-async function initGame() {
+async function initGame(charData) {
     const canvas = document.getElementById('game-canvas');
-
-    // Init engine
     sceneManager = new SceneManager(canvas);
+    
     character = new CharacterManager(sceneManager.scene);
-    monsters = new MonsterManager(sceneManager.scene, sceneManager);
-    particles = new ParticleSystem(sceneManager.scene);
-    soundManager = new SoundManager();
-    inputManager = new InputManager();
+    character.loadStats(charData);
+    
+    // Load character customizations from DB if available
+    if (charData.body_color) character.setBodyColor(charData.body_color);
+    if (charData.hair_color) character.setHairColor(charData.hair_color);
+    if (charData.pants_color) character.setPantsColor(charData.pants_color);
+    if (charData.equipped_hat) character.setHat(charData.equipped_hat);
+    if (charData.equipped_glasses) character.setGlasses(charData.equipped_glasses);
+    if (charData.equipped_weapon) character.equipWeapon(charData.equipped_weapon);
 
     // ============ Initialize Optimization Systems ============
-    // Initialize Adaptive Renderer System
-    adaptiveRenderer = new AdaptiveRendererSystem(sceneManager.renderer, sceneManager.camera, sceneManager.scene);
+    // Particle system for combat effects
+    particleSystem = new ParticleSystem(sceneManager.scene);
     
-    // Initialize GPU Instancing System
-    gpuInstancing = new GPUInstancingSystem(sceneManager.scene);
+    // Sound manager
+    soundManager = new SoundManager();
     
-    // Expose for debugging
-    window.adaptiveRenderer = adaptiveRenderer;
-    window.gpuInstancing = gpuInstancing;
-
-    // Init UI
-    gameUI = new GameUI(character, soundManager);
-
-    // Init Admin UI
-    const adminUI = new AdminUI();
-    window.adminUI = adminUI;
-    await adminUI.checkAdmin(userId);
-
-    // Setup chat send callback to route messages through GameSync network layer
-    gameUI.setupChatSendCallback((message) => {
-        broadcastChat(userId, username, character.stats.level, message);
-    });
-
-    // Setup profile save callback
-    gameUI.setupProfileSaveCallback(async (data) => {
-        const appData = {
-            shirtColor: data.shirtColor,
-            pantsColor: data.pantsColor,
-            hairColor: data.hairColor,
-            hat: data.hat,
-            glasses: data.glasses,
-            weapon: data.weapon
-        };
-
-        // Cache locally for persistence
-        localStorage.setItem(`zolos_appearance_${userId}`, JSON.stringify({
-            name: data.name,
-            ...appData
-        }));
-
-        if (data.name) {
-            character.stats.name = data.name;
-            username = data.name;
-            character.updateNameTag();
-
-            if (character.characterId) {
-                await saveCharacter(character.characterId, { name: data.name });
-            }
-        }
-
-        character.setBodyColor(data.shirtColor);
-        character.setPantsColor(data.pantsColor);
-        character.setHairColor(data.hairColor);
-        character.setHat(data.hat);
-        character.setGlasses(data.glasses);
-
-        // Apply weapon equipment choice
-        if (data.weapon === 'None') {
-            const equippedWeapon = gameUI.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
-            if (equippedWeapon) {
-                await gameUI._toggleEquipItem(equippedWeapon);
-            }
-        } else {
-            const weaponItem = gameUI.inventory.find(i => i.item_name === data.weapon);
-            if (weaponItem) {
-                if (!weaponItem.stats || !weaponItem.stats.equipped) {
-                    await gameUI._toggleEquipItem(weaponItem);
-                }
-            } else {
-                character.equipWeapon(null);
-            }
-        }
-
-        const { updatePresence } = await import('./network/GameSync.js');
-        updatePresence(character.stats.level, username);
-
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, appData);
-
-        gameUI.updateHUD(character.stats);
-        gameUI.updateStats(character.stats);
-    });
-
-    // Expose for debugging
-    window.sceneManager = sceneManager;
-    // window.adaptiveRenderer = adaptiveRenderer; // Re-expose if needed after debugging
-    // window.gpuInstancing = gpuInstancing; // Re-expose if needed after debugging
-    window.character = character;
-    window.monsters = monsters;
-    window.gameUI = gameUI;
-
-    // Load character from DB
-    try {
-        const charData = await loadCharacter(userId);
-        character.loadStats(charData);
-        character.stats.name = username;
-
-        // Load inventory
-        await gameUI.loadInventoryFromDB(charData.id);
-    } catch (e) {
-        console.warn('Could not load from DB, using defaults:', e.message);
-        character.stats.name = username;
-    }
-
-    // Load custom appearance if saved
-    const savedApp = localStorage.getItem(`zolos_appearance_${userId}`);
-    if (savedApp) {
-        try {
-            const data = JSON.parse(savedApp);
-            if (data.name) {
-                character.stats.name = data.name;
-                username = data.name;
-            }
-            if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
-            if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
-            if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
-            if (data.hat !== undefined) character.setHat(data.hat);
-            if (data.glasses !== undefined) character.setGlasses(data.glasses);
-            character.updateNameTag();
-
-            // Equip weapon if stored
-            if (data.weapon) {
-                if (data.weapon === 'None') {
-                    character.equipWeapon(null);
-                } else {
-                    const weaponItem = gameUI.inventory.find(i => i.item_name === data.weapon);
-                    if (weaponItem) {
-                        if (!weaponItem.stats || !weaponItem.stats.equipped) {
-                            await gameUI._toggleEquipItem(weaponItem);
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.error('Failed to restore custom appearance:', e);
-            character.setBodyColor(getCharacterColor(username));
-        }
-    } else {
-        // Set consistent body color based on username
-        character.setBodyColor(getCharacterColor(username));
-    }
-
-    // Init combat system
-    combat = new CombatSystem(character, monsters, handleCombatEvent);
-
-    // Spawn monsters
+    // Monster manager
+    monsters = new MonsterManager(sceneManager.scene, particleSystem);
     monsters.spawnInitial(character.stats.level);
+    
+    // Network manager for multiplayer
+    network = new NetworkManager(supabase, sceneManager.scene);
+    await network.joinGame(charData.id, character);
 
-    // Setup skill callbacks
-    if (inputManager) {
-        inputManager.setupSkillHotkey((skillId) => {
-            executeActiveSkill(skillId);
-        });
-    }
-    if (gameUI) {
-        gameUI.setupSkillClicks((skillId) => {
-            executeActiveSkill(skillId);
-        });
-    }
+    // Setup HUD
+    gameUI.initHUD(character);
+    gameUI.showScreen('hud');
+    
+    isGameStarted = true;
+    requestAnimationFrame(gameLoop);
+    
+    // Input listeners
+    window.addEventListener('keydown', (e) => keys[e.code] = true);
+    window.addEventListener('keyup', (e) => keys[e.code] = false);
+    
+    canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+}
 
-    // Setup canvas click listener for mouse movement and targeting
-    canvas.addEventListener('click', (event) => {
-        if (!combat || combat.autoFarm) return;
-        if (!character || !character.isAlive()) return;
+async function showCharacterSelect() {
+    const chars = await supabase.getCharacters();
+    gameUI.showCharacterSelect(chars);
+}
 
-        const npc = sceneManager.getNPC();
-        const hit = sceneManager.getMouseIntersection(event, monsters, npc);
-        if (hit) {
-            if (hit.type === 'monster') {
-                character.targetMonster = hit.object;
-                character.targetNPC = null;
-                character.targetDest = null;
-                gameUI.addCombatLog(`🎯 Target lock: ${hit.object.data.name}`, 'system');
-            } else             if (hit.type === 'npc') {
-                character.targetNPC = hit.object;
-                character.targetMonster = null;
-                character.targetDest = null;
-                gameUI.addCombatLog('🚶 เดินทางไปยังร้านค้า Kafra...', 'system');
-            } else if (hit.type === 'ground') {
-                character.targetDest = hit.point;
-                character.targetMonster = null;
-                character.targetNPC = null;
-            }
-        }
-    });
-
-    // Setup auto-farm button
-    gameUI.setupAutoFarmButton(() => {
-        const isActive = combat.toggleAutoFarm();
-        if (isActive) {
-            // Stop fishing if active
-            stopFishing();
-            // Clear mouse targets on auto-farm start
-            character.targetDest = null;
-            character.targetMonster = null;
-            character.targetNPC = null;
-            gameUI.addCombatLog('⚡ Auto-Farm ACTIVATED!', 'system');
+async function handleUIAction(action, data) {
+    if (action === 'login') {
+        const { user, error } = await supabase.signIn(data.email, data.password);
+        if (error) {
+            alert('Login failed: ' + error.message);
         } else {
-            gameUI.addCombatLog('⏸️ Auto-Farm paused', 'system');
+            showCharacterSelect();
         }
-        return isActive;
-    });
-
-    // Setup fishing button
-    gameUI.setupFishingButton(() => {
-        if (fishingState !== 'idle') {
-            stopFishing();
-        } else {
-            startFishing();
-        }
-    });
-
-    // Setup logout button
-    gameUI.setupLogoutButton(async () => {
-        if (combat && combat.autoFarmActive) {
-            combat.toggleAutoFarm();
-            gameUI.setAutoFarmState(false);
-        }
-        if (character && character.characterId) {
-            try {
-                await saveCharacter(character.characterId, character.getSaveData().updates);
-            } catch (e) {
-                console.error('Failed to save character on logout:', e);
+    } else if (action === 'guest') {
+        const guestData = await supabase.createGuestCharacter();
+        initGame(guestData);
+    } else if (action === 'select-char') {
+        initGame(data);
+    } else if (action === 'create-char') {
+        const newChar = await supabase.createCharacter(data.name);
+        showCharacterSelect();
+    } else if (action === 'use-skill') {
+        character.useSkill(data.skillId, character.targetMonster, monsters, gameUI, soundManager, particleSystem, (type, target, val) => {
+            if (type === 'bash' || type === 'magnumBreak') {
+                // Broadcast hit
+                network.broadcastAttack(data.skillId, target.id, val);
             }
-        }
-        leavePresence();
-        stopAutoSave();
-        const { clearActiveSession } = await import('./network/SupabaseClient.js');
-        clearActiveSession();
-        location.reload();
-    });
-
-    // Join presence
-    const activePlayerIds = new Set();
-    joinPresence(userId, username, character.stats.level, (players) => {
-        onlinePlayers = players;
-        gameUI.updateOnlinePlayers(players);
-
-        // Update active player IDs
-        activePlayerIds.clear();
-        players.forEach(p => {
-            if (p.userId !== userId) activePlayerIds.add(p.userId);
         });
+    } else if (action === 'save-game') {
+        const saveData = character.getSaveData();
+        await supabase.saveCharacter(saveData.characterId, saveData.updates);
+        gameUI.addCombatLog('💾 บันทึกข้อมูลตัวละครสำเร็จ', 'system');
+    }
+}
 
-        // Clean up players who are no longer present
-        for (const [rId, remotePlayer] of remotePlayersMap.entries()) {
-            if (!activePlayerIds.has(rId)) {
-                remotePlayer.destroy();
-                remotePlayersMap.delete(rId);
-                gameUI.addCombatLog(`👋 ${remotePlayer.username} left the field`, 'system');
-            }
-        }
-    }, (posData) => {
-        if (posData.userId === userId) return;
-
-        let remotePlayer = remotePlayersMap.get(posData.userId);
-        if (!remotePlayer) {
-            const color = getCharacterColor(posData.username);
-
-            remotePlayer = new RemotePlayer(
-                sceneManager.scene,
-                posData.userId,
-                posData.username,
-                posData.level,
-                { x: posData.x, y: posData.y, z: posData.z },
-                color
-            );
-            remotePlayersMap.set(posData.userId, remotePlayer);
-            gameUI.addCombatLog(`👋 ${posData.username} (Lv.${posData.level}) joined the field!`, 'system');
-        }
-
-        remotePlayer.updateData(posData);
-    }, (senderUsername, message) => {
-        gameUI.receiveChatMessage(senderUsername, message);
-    });
-
-    // Start auto-save
-    startAutoSave(() => character.getSaveData(), 15000);
-
-    // Show game screen
-    gameUI.show();
-    gameUI.addCombatLog(`Welcome to Prontera Field, ${username}!`, 'system');
-    gameUI.addCombatLog('Press AUTO to start farming! ⚔️', 'system');
-    gameUI.addCombatLog('Use W/A/S/D to move, Space+W to sprint 🏃', 'system');
-
-    // Start game loop
-    gameLoop();
+// ============ Input Handling ============
+function handleMouseInteraction(event) {
+    if (!isGameStarted) return;
+    
+    const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPC());
+    
+    if (!hit) return;
+    
+    if (hit.type === 'monster') {
+        character.targetMonster = hit.object;
+        character.targetNPC = null;
+        autoPath = hit.point;
+        
+        // Visual indicator
+        particleSystem.createClickIndicator(hit.point, 0xff4444);
+    } else if (hit.type === 'npc') {
+        character.targetNPC = hit.object;
+        character.targetMonster = null;
+        autoPath = hit.point;
+        
+        particleSystem.createClickIndicator(hit.point, 0xffff44);
+    } else if (hit.type === 'ground') {
+        autoPath = hit.point;
+        character.targetMonster = null;
+        character.targetNPC = null;
+        
+        // Visual indicator
+        particleSystem.createClickIndicator(hit.point, 0x44ff44);
+    }
 }
 
 // ============ Combat Event Handler ============
-function handleCombatEvent(event) {
-    switch (event.type) {
-        case 'playerAttack': {
-            const screen = sceneManager.worldToScreen(event.targetPos);
-            const label = event.critical ? `💥 ${event.damage}` : `${event.damage}`;
-            const type = event.critical ? 'critical' : 'player-dmg';
-            particles.spawnDamageNumber(screen.x, screen.y, label, type);
-
-            // Hit effects
-            particles.spawnHitEffect(event.targetPos, event.critical);
-
-            // Sound effects
-            if (event.critical) {
-                soundManager.playCriticalSound();
-            } else {
-                soundManager.playHitSound();
+function handleCombat(dt) {
+    if (!character.targetMonster) return;
+    
+    const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
+    const range = character.getAttackRange();
+    
+    if (dist <= range) {
+        // In range, stop moving and attack
+        autoPath = null;
+        
+        if (character.attackTimer >= character.getAttackCooldown()) {
+            character.state = 'attacking';
+            character.animTimer = 0;
+            character.attackTimer = 0;
+            
+            // Calculate damage
+            const dmgBase = character.stats.atk;
+            const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
+            
+            // Apply damage
+            const actualDmg = character.targetMonster.takeDamage(finalDmg);
+            
+            // UI log
+            gameUI.addCombatLog(`⚔️ โจมตี ${character.targetMonster.name}! สร้างความเสียหาย ${actualDmg}`, 'atk');
+            
+            // Sound
+            soundManager.playAtkSound();
+            
+            // Particles
+            particleSystem.createHitBurst(character.targetMonster.mesh.position);
+            
+            // Network broadcast
+            network.broadcastAttack('normal', character.targetMonster.id, actualDmg);
+            
+            // Check if killed
+            if (!character.targetMonster.alive) {
+                const exp = character.targetMonster.expValue;
+                const gold = character.targetMonster.goldValue;
+                
+                const leveledUp = character.addExp(exp);
+                character.stats.gold += gold;
+                character.stats.total_kills++;
+                
+                gameUI.addCombatLog(`🏆 กำจัดศัตรูได้! ได้รับ EXP +${exp}, Gold +${gold}`, 'exp');
+                if (leveledUp) {
+                    gameUI.addCombatLog('⭐ เลเวลอัป! พลังพื้นฐานเพิ่มขึ้น', 'system');
+                    soundManager.playLevelUpSound();
+                    particleSystem.createLevelUpEffect(character.mesh.position);
+                }
+                
+                character.targetMonster = null;
             }
-
-            gameUI.addCombatLog(
-                `⚔️ Hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`,
-                'damage'
-            );
-            break;
         }
+    } else {
+        // Move toward monster
+        autoPath = character.targetMonster.mesh.position.clone();
+    }
+}
 
-        case 'monsterAttack': {
-            const screen = sceneManager.worldToScreen(event.targetPos);
-            particles.spawnDamageNumber(screen.x + 30, screen.y, `-${event.damage}`, 'monster-dmg');
-            break;
-        }
-
-        case 'expGain': {
-            const screen = sceneManager.worldToScreen(event.targetPos);
-            particles.spawnDamageNumber(screen.x - 30, screen.y - 20, `+${event.amount} EXP`, 'heal');
-            gameUI.addCombatLog(`✨ +${event.amount} EXP`, 'exp');
-            break;
-        }
-
-        case 'goldGain': {
-            gameUI.addCombatLog(`💰 +${event.amount} Zeny`, 'loot');
-            break;
-        }
-
-        case 'lootDrop': {
-            gameUI.addCombatLog(`📦 Got ${event.item.emoji} ${event.item.name}!`, 'loot');
-            gameUI.addItem(event.item);
-
-            // Death particles + sound
-            const screen = sceneManager.worldToScreen(event.targetPos);
-            particles.spawnDeathEffect(event.targetPos, 0xffd040);
-            soundManager.playDeathSound();
-            break;
-        }
-
-        case 'levelUp': {
-            particles.showLevelUpEffect(event.level);
-            soundManager.playLevelUpSound();
-            gameUI.addCombatLog(`🎉 LEVEL UP! You are now Lv.${event.level}!`, 'levelup');
-
-            // Save to DB immediately on level up
-            if (character.characterId) {
-                saveCharacter(character.characterId, character.getSaveData().updates);
-            }
-            break;
-        }
-
-        case 'playerDeath': {
-            gameUI.addCombatLog('💀 You have been defeated! Respawning in 3s...', 'damage');
-            gameUI.setAutoFarmState(false);
-            break;
-        }
-
-        case 'playerRespawn': {
-            gameUI.addCombatLog('✨ You have respawned!', 'system');
-            break;
+// ============ NPC Interaction ============
+function handleNPC(dt) {
+    if (!character.targetNPC) return;
+    
+    const dist = character.getPosition().distanceTo(character.targetNPC.position);
+    if (dist <= 2.5) {
+        autoPath = null;
+        // Show shop/dialog
+        if (character.targetNPC.userData.npcType === 'shop') {
+            gameUI.showShop();
+            character.targetNPC = null; // Close after opening
         }
     }
 }
 
 // ============ Active Skill Cast Handler ============
-function executeActiveSkill(skillId) {
-    if (!character || !character.isAlive()) return;
-
-    let targetMonster = null;
-    const skill = SKILLS[skillId];
-    if (!skill) return;
-
-    if (skill.target === 'single') {
-        // Find nearest monster within casting range
-        targetMonster = monsters.findNearest(character.getPosition(), 15);
+// Handled by UI callback for now, but could be keyboard-driven here
+function handleSkills() {
+    if (keys['Digit1']) {
+        handleUIAction('use-skill', { skillId: 'bash' });
+        keys['Digit1'] = false; // Prevent rapid fire
     }
-
-    const success = character.useSkill(
-        skillId,
-        targetMonster,
-        monsters,
-        gameUI,
-        soundManager,
-        particles,
-        (type, target, val) => {
-            const screen = sceneManager.worldToScreen(target.getPosition());
-            if (type === 'heal') {
-                particles.spawnDamageNumber(screen.x, screen.y - 40, `+${val}`, 'heal');
-                particles.spawnHitEffect(target.getPosition(), true);
-            } else if (type === 'bash' || type === 'magnumBreak') {
-                const label = `💥 ${val}`;
-                particles.spawnDamageNumber(screen.x, screen.y - 20, label, 'critical');
-                particles.spawnHitEffect(target.getPosition(), true);
-            }
-        }
-    );
-
-    if (success) {
-        if (gameUI) {
-            gameUI.updateHUD(character.stats);
-            gameUI.updateStats(character.stats);
-        }
+    if (keys['Digit2']) {
+        handleUIAction('use-skill', { skillId: 'heal' });
+        keys['Digit2'] = false;
+    }
+    if (keys['Digit3']) {
+        handleUIAction('use-skill', { skillId: 'magnumBreak' });
+        keys['Digit3'] = false;
     }
 }
 
 // ============ Fishing Actions ============
-function startFishing() {
-    if (!character || !character.isAlive()) return;
-    if (combat && combat.autoFarm) {
-        combat.toggleAutoFarm();
-        gameUI.setAutoFarmState(false);
+function handleFishing() {
+    if (keys['KeyF']) {
+        if (character.equippedWeapon === 'Fishing Rod') {
+            const env = sceneManager.getEnvironmentAt(character.getPosition());
+            if (env === 'ground') { // Must be on land to fish
+                // Check if near water
+                const pos = character.getPosition();
+                const riverZ = Math.sin(pos.x * 0.08) * 10 - 2;
+                if (Math.abs(pos.z - riverZ) < 8.0) {
+                    startFishing();
+                }
+            }
+        }
+        keys['KeyF'] = false;
     }
-    character.targetDest = null;
-    character.targetMonster = null;
-    character.targetNPC = null;
-    fishingState = 'walking';
-    gameUI.setFishingState(true);
-    gameUI.addCombatLog('🎣 เริ่มการตกปลาแบบออโต้! เริ่มเดินไปยังสะพาน...', 'system');
 }
 
-function stopFishing() {
-    if (fishingState === 'idle') return;
-    fishingState = 'idle';
-    gameUI.setFishingState(false);
-    if (sceneManager) {
-        sceneManager.removeFishingLine();
-    }
-    gameUI.addCombatLog('⏸️ หยุดการตกปลาแล้ว', 'system');
+function startFishing() {
+    if (character.state === 'fishing') return;
+    
+    character.state = 'fishing';
+    sceneManager.createFishingLine(character.getPosition());
+    gameUI.addCombatLog('🎣 เริ่มตกปลา...', 'system');
+    
+    // Random bite time
+    setTimeout(() => {
+        if (character.state === 'fishing') {
+            sceneManager.animateFishBite();
+            gameUI.addCombatLog('❗ ปลาติดเบ็ดแล้ว! กด F เพื่อดึง!', 'system');
+            character.fishBite = true;
+        }
+    }, 3000 + Math.random() * 5000);
 }
 
 // ============ Game Loop ============
-function gameLoop() {
-    requestAnimationFrame(gameLoop);
+function gameLoop(time) {
+    if (!isGameStarted) return;
+    
+    const dt = Math.min(0.1, (time - lastTime) / 1000);
+    lastTime = time;
+    
+    if (portalCooldown > 0) portalCooldown -= dt;
 
-    const dt = Math.min(sceneManager.getDelta(), 0.05); // Cap dt
-
-    // WASD and Mouse manual movement (only when auto-farm is off)
-    if (inputManager && !combat.autoFarm) {
-        const dir = inputManager.getMovementDirection();
-        if (dir) {
-            // Keyboard active — override and clear click targets
-            character.targetDest = null;
-            character.targetMonster = null;
-            character.targetNPC = null;
-            character.manualMove(dir, inputManager.isRunning(), dt);
-        } else if (character.targetMonster) {
-            const m = character.targetMonster;
-            if (!m.alive) {
-                character.targetMonster = null;
-                if (character.state === 'walking' || character.state === 'running' || character.state === 'attacking') {
-                    character.state = 'idle';
-                }
-            } else {
-                const playerPos = character.getPosition();
-                const targetPos = m.getPosition();
-                const dist = playerPos.distanceTo(targetPos);
-
-                if (dist > combat.attackRange) {
-                    character.moveToward(targetPos, dt);
-                } else {
-                    if (character.state !== 'attacking') {
-                        character.state = 'attacking';
-                        character.animTimer = 0;
-                    }
-                    // Face target
-                    const dx = targetPos.x - playerPos.x;
-                    const dz = targetPos.z - playerPos.z;
-                    character.mesh.rotation.y = Math.atan2(dx, dz);
-
-                    // Perform attack
-                    if (combat.globalCooldown <= 0) {
-                        combat.currentTarget = m;
-                        combat._performAttack();
-                        combat.globalCooldown = character.attackCooldown;
-                    }
-                }
-            }
-        } else if (character.targetNPC) {
-            const npcPos = character.targetNPC.position;
-            const playerPos = character.getPosition();
-            const dist = playerPos.distanceTo(npcPos);
-
-            if (dist > 3.0) {
-                character.moveToward(npcPos, dt);
-            } else {
-                character.targetNPC = null;
-                character.state = 'idle';
-                if (gameUI) {
-                    gameUI._togglePanel('shop-panel');
-                    gameUI._renderShop();
-                }
-            }
-        } else if (character.targetDest) {
-            const arrived = character.moveToward(character.targetDest, dt);
-            if (arrived) {
-                character.targetDest = null;
-                character.state = 'idle';
-            }
-        } else if (character.state === 'walking' || character.state === 'running' || character.state === 'swimming') {
-            character.state = 'idle';
-        }
+    // 1. Input & Movement
+    let moved = false;
+    let dirX = 0, dirZ = 0;
+    
+    if (keys['ArrowUp'] || keys['KeyW']) dirZ -= 1;
+    if (keys['ArrowDown'] || keys['KeyS']) dirZ += 1;
+    if (keys['ArrowLeft'] || keys['KeyA']) dirX -= 1;
+    if (keys['ArrowRight'] || keys['KeyD']) dirX += 1;
+    
+    if (dirX !== 0 || dirZ !== 0) {
+        autoPath = null;
+        character.targetMonster = null;
+        character.targetNPC = null;
+        moved = character.manualMove(dirX, dirZ, dt);
+    } else if (autoPath) {
+        moved = character.moveToward(autoPath, dt);
+        if (!moved) autoPath = null;
     }
 
-    // Swimming state detection: if player is in water, switch to swimming and slow down
-    if (sceneManager && character.isAlive()) {
-        const pPos = character.getPosition();
-        const inWater = sceneManager.isInWater(pPos);
-        if (inWater && (character.state === 'walking' || character.state === 'running')) {
-            character.state = 'swimming';
-            // Slow down in water (reduce position change)
-            character.moveSpeed = 2.4; // 60% of normal 4
-        } else if (!inWater && character.state === 'swimming') {
-            character.state = 'walking';
-            character.moveSpeed = 4; // Restore normal speed
-        } else if (!inWater) {
-            character.moveSpeed = 4;
-        }
+    // 2. World Physics / Environment
+    const env = sceneManager.getEnvironmentAt(character.getPosition());
+    if (env === 'water') {
+        character.state = 'swimming';
+        character.moveSpeed = 2.2;
+        character.baseY = -1.8; // Match water level
+    } else {
+        character.moveSpeed = keys['ShiftLeft'] ? 7 : 4;
+        character.baseY = 1.2; // Default land height
     }
 
-    // Update systems
+    // 3. Systems Update
+    handleCombat(dt);
+    handleNPC(dt);
+    handleSkills();
+    handleFishing();
+    
     character.update(dt);
-    monsters.update(dt, sceneManager.camera, character.stats.level);
-    combat.update(dt);
-    particles.update(dt);
-
-    // Trigger water splash particles when characters traverse the winding river
-    if (sceneManager && particles) {
-        // Local player splash
-        const pPos = character.getPosition();
-        if ((character.state === 'walking' || character.state === 'running' || character.state === 'swimming') && sceneManager.isInWater(pPos)) {
-            particles.spawnWaterSplash(pPos);
-        }
-
-        // Remote players splash
-        for (const remotePlayer of remotePlayersMap.values()) {
-            const rPos = remotePlayer.mesh.position;
-            if ((remotePlayer.state === 'walking' || remotePlayer.state === 'running') && sceneManager.isInWater(rPos)) {
-                particles.spawnWaterSplash(rPos);
-            }
-        }
-
-        // Monsters splash
-        if (monsters && monsters.monsters) {
-            for (const m of [...monsters.monsters, ...monsters.waterMonsters]) {
-                if (m.alive && m.isMoving && sceneManager.isInWater(m.mesh.position)) {
-                    particles.spawnWaterSplash(m.mesh.position);
-                }
-            }
-        }
-    }
-
-    if (sceneManager) {
-        sceneManager.updateAnimations(dt);
-
-        // Map Portals transition check
-        if (portalCooldown > 0) {
-            portalCooldown -= dt;
-        } else {
-            const portals = sceneManager.getPortals();
-            const playerPos = character.getPosition();
-            for (const portal of portals) {
-                const dist = playerPos.distanceTo(portal.position);
-                if (dist <= 1.8) {
-                    const targetMap = portal.userData.targetMap;
-                    const MAP_NAMES = {
-                        prontera: 'Prontera Field',
-                        payon: 'Payon Forest',
-                        glast_heim: 'Glast Heim',
-                        mjolnir: 'Mjolnir Mountains',
-                        abyss_lake: 'Abyss Lake',
-                    };
-                    const destName = MAP_NAMES[targetMap] || targetMap;
-                    gameUI.addCombatLog(`🌀 Entering Portal... Transitioning to ${destName}`, 'system');
-
-                    // Set portal cooldown to prevent re-trigger
+    monsters.update(dt, character, sceneManager);
+    sceneManager.updateAnimations(dt);
+    particleSystem.update(dt);
+    
+    // 4. Portal Check
+    if (portalCooldown <= 0) {
+        const portals = sceneManager.getPortals();
+        portals.forEach(portal => {
+            const dist = character.getPosition().distanceTo(portal.position);
+            if (dist < 1.8) {
+                const targetMap = portal.userData.targetMap;
+                if (targetMap) {
                     portalCooldown = 2.0;
-
-                    // Stop any combat / auto-farm during transition
-                    if (combat.autoFarm) {
-                        combat.toggleAutoFarm();
-                        gameUI.setAutoFarmState(false);
-                    }
-                    character.targetDest = null;
+                    
+                    // Cleanup current state
+                    autoPath = null;
                     character.targetMonster = null;
                     character.targetNPC = null;
                     character.state = 'idle';
@@ -667,15 +349,17 @@ function gameLoop() {
                     monsters.deadQueue = [];
 
                     // Move player to safe spawn BEFORE loading new map
+                    // Sync baseY with new position
                     const SPAWN_POSITIONS = {
-                        prontera:   { x: 5, z: 0 },
-                        payon:      { x: -5, z: 0 },
-                        glast_heim: { x: 5, z: 0 },
-                        mjolnir:    { x: -5, z: 0 },
-                        abyss_lake: { x: 0, z: 5 },
+                        prontera:   { x: 0, y: 1.2, z: 10 },
+                        payon:      { x: -5, y: 1.2, z: 10 },
+                        glast_heim: { x: 5, y: 1.2, z: 0 },
+                        mjolnir:    { x: -5, y: 1.2, z: 0 },
+                        abyss_lake: { x: 0, y: 1.2, z: 5 },
                     };
-                    const spawnPos = SPAWN_POSITIONS[targetMap] || { x: 0, z: 0 };
-                    character.mesh.position.set(spawnPos.x, 0, spawnPos.z);
+                    const spawn = SPAWN_POSITIONS[targetMap] || { x: 0, y: 1.2, z: 0 };
+                    character.baseY = spawn.y;
+                    character.mesh.position.set(spawn.x, spawn.y, spawn.z);
 
                     // Swap map visual
                     sceneManager.loadMap(targetMap);
@@ -686,167 +370,27 @@ function gameLoop() {
                     // Set monster manager map details
                     monsters.mapId = targetMap;
                     monsters.spawnInitial(character.stats.level);
-
-                    // Sound Effect
-                    if (soundManager) {
-                        if (soundManager.playPortalSound) {
-                            soundManager.playPortalSound();
-                        } else {
-                            soundManager.playLevelUpSound();
-                        }
-                    }
-
-                    break;
                 }
             }
-        }
-
-        // ============ Manual Fishing State Machine ============
-        if (fishingState === 'walking') {
-            const arrived = character.moveToward(FISHING_SPOT, dt);
-            if (arrived) {
-                fishingState = 'casting';
-                fishingTimer = 0;
-                // Face toward water (right side)
-                character.mesh.rotation.y = Math.PI / 2;
-                character.state = 'idle';
-                sceneManager.createFishingLine(character.getPosition());
-                gameUI.addCombatLog('🎣 เบ็ดลงน้ำแล้ว... รอปลามากินเบ็ด', 'system');
-            }
-        } else if (fishingState === 'casting') {
-            fishingTimer += dt;
-            if (fishingTimer >= 1.0) {
-                fishingState = 'waiting';
-                fishingTimer = 0;
-            }
-        } else if (fishingState === 'waiting') {
-            fishingTimer += dt;
-            if (fishingTimer >= FISHING_BASE_DELAY) {
-                fishingState = 'catching';
-                fishingTimer = 0;
-                sceneManager.animateFishBite();
-                if (particles) {
-                    const bp = { x: 2.8, y: 0, z: -2 };
-                    particles.spawnWaterSplash(bp);
-                }
-            }
-        } else if (fishingState === 'catching') {
-            fishingTimer += dt;
-            if (fishingTimer >= 1.0) {
-                // Determine catch
-                const roll = Math.random();
-                const catchName = roll < 0.65 ? 'Fish' : 'Trash';
-                const catchItem = ITEMS[catchName];
-
-                if (catchItem && gameUI) {
-                    gameUI.addItem({ name: catchName, emoji: catchItem.emoji, type: catchItem.type });
-                    gameUI.addCombatLog(`🎣 ตกได้ ${catchItem.emoji} ${catchName}!`, 'system');
-                }
-                if (soundManager && soundManager.playUseItemSound) {
-                    soundManager.playUseItemSound();
-                }
-
-                // Loop back to waiting
-                fishingState = 'waiting';
-                fishingTimer = 0;
-            }
-        }
-
-        // Show/hide fishing button based on rod equipped
-        const hasFishingRod = character.equippedWeapon === 'Fishing Rod';
-        if (hasFishingRod !== lastFishingBtnVisible) {
-            lastFishingBtnVisible = hasFishingRod;
-            gameUI.setFishingButtonVisible(hasFishingRod);
-            if (!hasFishingRod && fishingState !== 'idle') {
-                stopFishing();
-            }
-        }
-
-        // NPC proximity range checks (disabled — marketplace is now P2P, accessible from HUD)
+        });
     }
 
-    // Update skills cooldown overlays in game UI
-    for (const skillId in character.cooldowns) {
-        const skill = SKILLS[skillId];
-        if (skill && gameUI) {
-            gameUI.updateSkillCooldown(skillId, character.cooldowns[skillId], skill.cooldown);
-        }
-    }
-
-    // Update remote players
-    for (const remotePlayer of remotePlayersMap.values()) {
-        remotePlayer.update(dt);
-    }
-
-    // Camera follow player
+    // 5. Multiplayer Sync
+    network.update(dt, character);
+    
+    // 6. Camera & Render
     sceneManager.followTarget(character.getPosition());
-
-    // Broadcast own position every 100ms
-    const now = performance.now();
-    if (now - lastBroadcastTime > 100 && character && userId) {
-        const appearance = {
-            shirtColor: character.bodyColor,
-            pantsColor: character.pantsColor,
-            hairColor: character.hairColor,
-            hat: character.equippedHat || 'None',
-            glasses: character.equippedGlasses || 'None',
-            weapon: character.equippedWeapon || 'None'
-        };
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, appearance);
-        lastBroadcastTime = now;
-    }
-
-    // Update HUD every 100ms (not every frame)
-    if (now - lastHUDTime > 100) {
-        gameUI.updateHUD(character.stats);
-        lastHUDTime = now;
-    }
-
-    // Update Stats panel every 500ms (only if stats panel is open)
-    const statsPanel = document.getElementById('stats-panel');
-    if (now - lastStatsTime > 500 && statsPanel && statsPanel.style.display !== 'none') {
-        gameUI.updateStats(character.stats);
-        lastStatsTime = now;
-    }
-
-    // Update Mini-map every 80ms (not every frame)
-    if (now - lastMinimapTime > 80 && gameUI && character && character.isAlive()) {
-        const aliveMonsters = monsters ? monsters.getAlive() : [];
-        const portals = sceneManager ? sceneManager.getPortals() : [];
-        const npc = sceneManager ? sceneManager.getNPC() : null;
-        gameUI.updateMinimap(
-            character.getPosition(),
-            aliveMonsters,
-            portals,
-            npc,
-            remotePlayersMap,
-            sceneManager ? sceneManager.currentMap : 'prontera'
-        );
-        lastMinimapTime = now;
-    }
-
-    // FPS Counter
-    fpsFrameCount++;
-    if (now - fpsLastTime >= 1000) {
-        if (!fpsEl) fpsEl = document.getElementById('fps-counter');
-        if (fpsEl) fpsEl.textContent = `FPS: ${fpsFrameCount}`;
-        fpsFrameCount = 0;
-        fpsLastTime = now;
-    }
-
-    // Render
     sceneManager.render();
+    
+    requestAnimationFrame(gameLoop);
 }
 
 // ============ Cleanup on unload ============
 window.addEventListener('beforeunload', async () => {
     if (character && character.characterId) {
-        await saveCharacter(character.characterId, character.getSaveData().updates);
+        const saveData = character.getSaveData();
+        // Use navigator.sendBeacon or a synchronous-like call if possible, 
+        // but Supabase is async. Best effort save.
+        await supabase.saveCharacter(saveData.characterId, saveData.updates);
     }
-    leavePresence();
-    stopAutoSave();
 });
-
-// Remove default Vite content
-const defaultApp = document.getElementById('app');
-if (defaultApp) defaultApp.remove();

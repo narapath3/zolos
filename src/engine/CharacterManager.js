@@ -23,6 +23,9 @@ export class CharacterManager {
         this.attackCooldown = 1.0; // seconds between attacks
         this.target = null;
         this.moveSpeed = 4;
+        
+        // Base Y position to support animation offsets without losing ground level
+        this.baseY = 1.2; 
 
         // Skill cooldown state
         this.cooldowns = {
@@ -359,7 +362,8 @@ export class CharacterManager {
         shadow.position.y = 0.02;
         this.mesh.add(shadow);
 
-        this.mesh.position.set(0, 0, 0);
+        // Safe spawn point: Prontera field (0, 1.2, 10)
+        this.mesh.position.set(0, 1.2, 10);
         this.scene.add(this.mesh);
 
         this.updateNameTag();
@@ -413,59 +417,76 @@ export class CharacterManager {
         const hatGroup = new THREE.Group();
 
         if (this.equippedHat === 'Wizard Hat') {
-            const wizardMat = new THREE.MeshLambertMaterial({ color: 0x332266 }); // Dark purple
-
-            // Brim
-            const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.04, 12);
-            const brim = new THREE.Mesh(brimGeo, wizardMat);
-            brim.position.y = 2.05;
-            brim.castShadow = true;
-            hatGroup.add(brim);
-
-            // Top cone
-            const coneGeo = new THREE.ConeGeometry(0.3, 0.6, 12);
+            const wizardMat = new THREE.MeshLambertMaterial({ color: 0x332266 });
+            const coneGeo = new THREE.ConeGeometry(0.4, 0.7, 8);
             const cone = new THREE.Mesh(coneGeo, wizardMat);
-            cone.position.set(0, 2.35, -0.05);
-            cone.rotation.x = -0.1;
-            cone.castShadow = true;
+            cone.position.y = 2.2;
             hatGroup.add(cone);
 
-            // Ribbon
-            const ribbonGeo = new THREE.CylinderGeometry(0.31, 0.32, 0.08, 12);
-            const ribbonMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-            const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
-            ribbon.position.set(0, 2.11, -0.01);
-            hatGroup.add(ribbon);
+            const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.05, 8);
+            const brim = new THREE.Mesh(brimGeo, wizardMat);
+            brim.position.y = 1.9;
+            hatGroup.add(brim);
+        } else if (this.equippedHat === 'Cap') {
+            const capMat = new THREE.MeshLambertMaterial({ color: 0xcc3333 });
+            const capGeo = new THREE.SphereGeometry(0.3, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+            const cap = new THREE.Mesh(capGeo, capMat);
+            cap.position.y = 1.95;
+            hatGroup.add(cap);
+
+            const visorGeo = new THREE.BoxGeometry(0.4, 0.05, 0.3);
+            const visor = new THREE.Mesh(visorGeo, capMat);
+            visor.position.set(0, 1.95, 0.25);
+            hatGroup.add(visor);
         } else if (this.equippedHat === 'Crown') {
             const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-            const baseGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.12, 8, 1);
-            const base = new THREE.Mesh(baseGeo, crownMat);
-            base.position.y = 2.15;
-            base.castShadow = true;
-            hatGroup.add(base);
+            const crownGeo = new THREE.CylinderGeometry(0.35, 0.3, 0.25, 8, 1, true);
+            const crown = new THREE.Mesh(crownGeo, crownMat);
+            crown.position.y = 2.05;
+            hatGroup.add(crown);
 
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const spikeGeo = new THREE.ConeGeometry(0.06, 0.12, 4);
-                const spike = new THREE.Mesh(spikeGeo, crownMat);
-                spike.position.set(Math.cos(angle) * 0.25, 2.22, Math.sin(angle) * 0.25);
-                spike.castShadow = true;
-                hatGroup.add(spike);
+            // Points
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const pointGeo = new THREE.ConeGeometry(0.08, 0.15, 4);
+                const point = new THREE.Mesh(pointGeo, crownMat);
+                point.position.set(Math.cos(angle) * 0.32, 2.2, Math.sin(angle) * 0.32);
+                hatGroup.add(point);
             }
-        } else if (this.equippedHat === 'Cowboy Hat') {
-            const cowboyMat = new THREE.MeshLambertMaterial({ color: 0x5c4033 });
+        } else if (this.equippedHat === 'Cat Ears') {
+            const earMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+            const innerMat = new THREE.MeshLambertMaterial({ color: 0xffaaaa });
+            
+            for (let i = -1; i <= 1; i += 2) {
+                const earGeo = new THREE.ConeGeometry(0.12, 0.25, 4);
+                const ear = new THREE.Mesh(earGeo, earMat);
+                ear.position.set(i * 0.2, 2.05, 0);
+                ear.rotation.z = -i * 0.3;
+                hatGroup.add(ear);
 
-            const brimGeo = new THREE.BoxGeometry(0.85, 0.04, 0.95);
-            const brim = new THREE.Mesh(brimGeo, cowboyMat);
-            brim.position.y = 2.05;
-            brim.castShadow = true;
+                const innerGeo = new THREE.ConeGeometry(0.08, 0.15, 4);
+                const inner = new THREE.Mesh(innerGeo, innerMat);
+                inner.position.set(i * 0.2, 2.05, 0.05);
+                inner.rotation.z = -i * 0.3;
+                hatGroup.add(inner);
+            }
+        } else if (this.equippedHat === 'Straw Hat') {
+            const strawMat = new THREE.MeshLambertMaterial({ color: 0xe3c16f });
+            const capGeo = new THREE.CylinderGeometry(0.3, 0.32, 0.2, 8);
+            const cap = new THREE.Mesh(capGeo, strawMat);
+            cap.position.y = 2.0;
+            hatGroup.add(cap);
+
+            const brimGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.05, 12);
+            const brim = new THREE.Mesh(brimGeo, strawMat);
+            brim.position.y = 1.9;
             hatGroup.add(brim);
 
-            const crownGeo = new THREE.BoxGeometry(0.48, 0.26, 0.48);
-            const crown = new THREE.Mesh(crownGeo, cowboyMat);
-            crown.position.set(0, 2.18, -0.02);
-            crown.castShadow = true;
-            hatGroup.add(crown);
+            const bandMat = new THREE.MeshLambertMaterial({ color: 0xcc3333 });
+            const bandGeo = new THREE.CylinderGeometry(0.31, 0.31, 0.06, 8);
+            const band = new THREE.Mesh(bandGeo, bandMat);
+            band.position.y = 1.95;
+            hatGroup.add(band);
         }
 
         this.hatMesh = hatGroup;
@@ -482,47 +503,53 @@ export class CharacterManager {
         if (this.equippedGlasses === 'None') return;
 
         const glassesGroup = new THREE.Group();
+        const frameMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+        const lensMat = new THREE.MeshPhongMaterial({ color: 0x88ccff, transparent: true, opacity: 0.6, shininess: 100 });
 
         if (this.equippedGlasses === 'Sunglasses') {
-            const frameMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-
-            const lensGeo = new THREE.BoxGeometry(0.18, 0.12, 0.02);
-            const lensL = new THREE.Mesh(lensGeo, frameMat);
-            lensL.position.set(-0.12, 1.72, 0.262);
-            glassesGroup.add(lensL);
-
-            const lensR = new THREE.Mesh(lensGeo, frameMat);
-            lensR.position.set(0.12, 1.72, 0.262);
-            glassesGroup.add(lensR);
-
-            const bridgeGeo = new THREE.BoxGeometry(0.08, 0.03, 0.02);
+            const darkLensMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+            for (let i = -1; i <= 1; i += 2) {
+                const lensGeo = new THREE.BoxGeometry(0.18, 0.15, 0.05);
+                const lens = new THREE.Mesh(lensGeo, darkLensMat);
+                lens.position.set(i * 0.12, 1.72, 0.26);
+                glassesGroup.add(lens);
+            }
+            const bridgeGeo = new THREE.BoxGeometry(0.1, 0.04, 0.05);
             const bridge = new THREE.Mesh(bridgeGeo, frameMat);
-            bridge.position.set(0, 1.74, 0.262);
+            bridge.position.set(0, 1.75, 0.26);
             glassesGroup.add(bridge);
-        } else if (this.equippedGlasses === 'Classic Glasses') {
-            const frameMat = new THREE.MeshBasicMaterial({ color: 0xe63946 });
-            const lensMat = new THREE.MeshBasicMaterial({ color: 0xa8dadc, transparent: true, opacity: 0.4 });
+        } else if (this.equippedGlasses === 'Reading Glasses') {
+            for (let i = -1; i <= 1; i += 2) {
+                const lensGeo = new THREE.CircleGeometry(0.1, 12);
+                const lens = new THREE.Mesh(lensGeo, lensMat);
+                lens.position.set(i * 0.12, 1.72, 0.26);
+                glassesGroup.add(lens);
 
-            const frameLGeo = new THREE.BoxGeometry(0.18, 0.16, 0.02);
-            const frameL = new THREE.Mesh(frameLGeo, frameMat);
-            frameL.position.set(-0.12, 1.72, 0.262);
-            glassesGroup.add(frameL);
-
-            const innerL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.022), lensMat);
-            innerL.position.set(-0.12, 1.72, 0.262);
-            glassesGroup.add(innerL);
-
-            const frameR = new THREE.Mesh(frameLGeo, frameMat);
-            frameR.position.set(0.12, 1.72, 0.262);
-            glassesGroup.add(frameR);
-
-            const innerR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.022), lensMat);
-            innerR.position.set(0.12, 1.72, 0.262);
-            glassesGroup.add(innerR);
-
-            const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.02), frameMat);
-            bridge.position.set(0, 1.72, 0.262);
+                const frameGeo = new THREE.TorusGeometry(0.1, 0.02, 8, 16);
+                const frame = new THREE.Mesh(frameGeo, frameMat);
+                frame.position.set(i * 0.12, 1.72, 0.26);
+                glassesGroup.add(frame);
+            }
+            const bridgeGeo = new THREE.BoxGeometry(0.08, 0.02, 0.05);
+            const bridge = new THREE.Mesh(bridgeGeo, frameMat);
+            bridge.position.set(0, 1.72, 0.26);
             glassesGroup.add(bridge);
+        } else if (this.equippedGlasses === 'Monocle') {
+            const lensGeo = new THREE.CircleGeometry(0.1, 12);
+            const lens = new THREE.Mesh(lensGeo, lensMat);
+            lens.position.set(0.12, 1.72, 0.26);
+            glassesGroup.add(lens);
+
+            const frameGeo = new THREE.TorusGeometry(0.1, 0.02, 8, 16);
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.position.set(0.12, 1.72, 0.26);
+            glassesGroup.add(frame);
+
+            const chainGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.4, 4);
+            const chain = new THREE.Mesh(chainGeo, frameMat);
+            chain.position.set(0.22, 1.55, 0.26);
+            chain.rotation.z = 0.2;
+            glassesGroup.add(chain);
         }
 
         this.glassesMesh = glassesGroup;
@@ -535,67 +562,93 @@ export class CharacterManager {
         }
 
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
+        canvas.width = 256;
+        canvas.height = 64;
         const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 36px "Press Start 2P", monospace';
-        ctx.fillStyle = '#80e0ff'; // Light-blue player color
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 8;
-        ctx.textAlign = 'center';
 
-        const labelText = `${this.stats.name || 'Novice'} Lv.${this.stats.level}`;
-        ctx.strokeText(labelText, 256, 75);
-        ctx.fillText(labelText, 256, 75);
+        // Shadow/Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(0, 16, 256, 32);
+
+        // Text
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(`${this.stats.name} Lv.${this.stats.level}`, 128, 40);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.scale.set(2.0, 0.5, 1);
-        this.nameSprite.position.y = 2.8; // Move higher to avoid overlapping hats
+        this.nameSprite.position.y = 2.4;
+        this.nameSprite.scale.set(2, 0.5, 1);
         this.mesh.add(this.nameSprite);
     }
 
-    loadStats(dbData) {
-        this.characterId = dbData.id;
-        this.userId = dbData.user_id;
-        this.stats.name = dbData.name || 'Novice';
-        this.stats.level = dbData.level || 1;
-        this.stats.exp = dbData.exp || 0;
-        this.stats.hp = dbData.hp || 100;
-        this.stats.max_hp = dbData.max_hp || 100;
-        this.stats.sp = dbData.sp || 50;
-        this.stats.max_sp = dbData.max_sp || 50;
-        this.stats.atk = dbData.atk || 10;
-        this.stats.def = dbData.def || 5;
-        this.stats.gold = dbData.gold || 0;
-        this.stats.total_kills = dbData.total_kills || 0;
-        this.stats.play_time = dbData.play_time || 0;
+    // Move to a target position
+    moveToward(targetPoint, dt) {
+        if (!this.mesh) return;
 
-        this.updateNameTag();
+        const dir = new THREE.Vector3().subVectors(targetPoint, this.mesh.position);
+        dir.y = 0; // Keep horizontal movement
+
+        if (dir.length() > 0.1) {
+            dir.normalize();
+            this.mesh.position.add(dir.multiplyScalar(this.moveSpeed * dt));
+
+            // Rotate to face movement direction
+            const targetRotation = Math.atan2(dir.x, dir.z);
+            this.mesh.rotation.y = targetRotation;
+
+            // Set walking state
+            this.state = this.moveSpeed > 5 ? 'running' : 'walking';
+            return true;
+        } else {
+            this.state = 'idle';
+            return false;
+        }
+    }
+
+    // Manual movement (keyboard)
+    manualMove(dirX, dirZ, dt) {
+        if (!this.mesh) return;
+
+        if (dirX !== 0 || dirZ !== 0) {
+            const moveVec = new THREE.Vector3(dirX, 0, dirZ).normalize();
+            this.mesh.position.add(moveVec.multiplyScalar(this.moveSpeed * dt));
+
+            const targetRotation = Math.atan2(dirX, dirZ);
+            this.mesh.rotation.y = targetRotation;
+
+            this.state = this.moveSpeed > 5 ? 'running' : 'walking';
+            return true;
+        } else {
+            this.state = 'idle';
+            return false;
+        }
     }
 
     getPosition() {
-        return this.mesh.position.clone();
+        return this.mesh ? this.mesh.position : new THREE.Vector3();
     }
 
-    // Add EXP and check level-up
+    // Gain experience
     addExp(amount) {
         this.stats.exp += amount;
-        const required = getExpRequired(this.stats.level);
         let leveledUp = false;
 
-        while (this.stats.exp >= required) {
+        while (this.stats.exp >= getExpRequired(this.stats.level)) {
             this.stats.exp -= getExpRequired(this.stats.level);
             this.stats.level++;
+            leveledUp = true;
+
+            // Apply stat gains
             const gains = getStatGains(this.stats.level);
-            this.stats.max_hp += gains.max_hp;
-            this.stats.max_sp += gains.max_sp;
+            this.stats.max_hp += gains.hp;
+            this.stats.hp = this.stats.max_hp;
+            this.stats.max_sp += gains.sp;
+            this.stats.sp = this.stats.max_sp;
             this.stats.atk += gains.atk;
             this.stats.def += gains.def;
-            this.stats.hp = this.stats.max_hp; // Full heal on level up
-            this.stats.sp = this.stats.max_sp;
-            leveledUp = true;
         }
 
         if (leveledUp) {
@@ -631,7 +684,8 @@ export class CharacterManager {
     respawn() {
         this.stats.hp = this.stats.max_hp;
         this.stats.sp = this.stats.max_sp;
-        this.mesh.position.set(0, 0, 0);
+        this.baseY = 1.2;
+        this.mesh.position.set(0, 1.2, 10);
         this.state = 'idle';
         this.target = null;
     }
@@ -670,7 +724,7 @@ export class CharacterManager {
 
         // Idle bobbing
         if (this.state === 'idle') {
-            this.mesh.position.y = Math.sin(this.animTimer * 2) * 0.05;
+            this.mesh.position.y = this.baseY + Math.sin(this.animTimer * 2) * 0.05;
             this.leftArm.rotation.x = Math.sin(this.animTimer * 1.5) * 0.1;
             this.rightArm.rotation.x = Math.sin(this.animTimer * 1.5 + Math.PI) * 0.1;
             this.leftLeg.rotation.x = 0;
@@ -679,7 +733,7 @@ export class CharacterManager {
 
         // Walking animation
         if (this.state === 'walking') {
-            this.mesh.position.y = Math.abs(Math.sin(this.animTimer * 8)) * 0.08;
+            this.mesh.position.y = this.baseY + Math.abs(Math.sin(this.animTimer * 8)) * 0.08;
             this.leftLeg.rotation.x = Math.sin(this.animTimer * 8) * 0.5;
             this.rightLeg.rotation.x = Math.sin(this.animTimer * 8 + Math.PI) * 0.5;
             this.leftArm.rotation.x = Math.sin(this.animTimer * 8 + Math.PI) * 0.3;
@@ -688,7 +742,7 @@ export class CharacterManager {
 
         // Running animation (faster legs, more bounce)
         if (this.state === 'running') {
-            this.mesh.position.y = Math.abs(Math.sin(this.animTimer * 14)) * 0.12;
+            this.mesh.position.y = this.baseY + Math.abs(Math.sin(this.animTimer * 14)) * 0.12;
             this.leftLeg.rotation.x = Math.sin(this.animTimer * 14) * 0.8;
             this.rightLeg.rotation.x = Math.sin(this.animTimer * 14 + Math.PI) * 0.8;
             this.leftArm.rotation.x = Math.sin(this.animTimer * 14 + Math.PI) * 0.5;
@@ -697,7 +751,7 @@ export class CharacterManager {
 
         // Swimming animation (sink lower, breaststroke arms, kicking legs)
         if (this.state === 'swimming') {
-            this.mesh.position.y = -0.6 + Math.sin(this.animTimer * 3) * 0.08;
+            this.mesh.position.y = this.baseY - 1.8 + Math.sin(this.animTimer * 3) * 0.08;
             this.leftArm.rotation.x = Math.sin(this.animTimer * 4) * 0.8;
             this.rightArm.rotation.x = Math.sin(this.animTimer * 4 + Math.PI) * 0.8;
             this.leftArm.rotation.z = Math.sin(this.animTimer * 4) * 0.3;
@@ -798,624 +852,71 @@ export class CharacterManager {
             this.heal(healVal);
 
             if (gameUI) {
-                gameUI.addCombatLog(`💚 ใช้ [Heal] ฟื้นฟูวิญญาณศักดิ์สิทธิ์! พลังชีวิตเพิ่มขึ้น +${healVal}`, 'heal');
+                gameUI.addCombatLog(`✨ ใช้ [Heal] ฟื้นฟู HP +${healVal}!`, 'heal');
             }
 
-            // Spawn green healing sparkles
-            if (particleSystem) {
-                if (particleSystem.createLevelUpShimmer) {
-                    particleSystem.createLevelUpShimmer(this.mesh.position, 0x40ff60);
-                }
+            // Particles
+            if (particleSystem && particleSystem.createHealEffect) {
+                particleSystem.createHealEffect(this.mesh.position);
             }
 
             if (effectCallback) effectCallback('heal', this, healVal);
 
         } else if (skillId === 'magnumBreak') {
-            // AoE Shockwave
+            // AOE Damage
+            const dmgBase = this.stats.atk * skill.damageMultiplier;
+            const radius = skill.radius;
+
             if (gameUI) {
-                gameUI.addCombatLog('🔥 ระเบิดพลังงาน [Magnum Break]!', 'atk');
+                gameUI.addCombatLog(`🔥 ใช้ [Magnum Break] ระเบิดพลังรอบตัว!`, 'atk');
             }
 
-            const origin = this.mesh.position;
-            let hits = 0;
+            // Particles
+            if (particleSystem && particleSystem.createExplosion) {
+                particleSystem.createExplosion(this.mesh.position, 0xff6600);
+            }
 
+            // Hit all nearby monsters
+            let hits = 0;
             if (monsterManager && monsterManager.monsters) {
                 monsterManager.monsters.forEach(m => {
-                    const dist = origin.distanceTo(m.mesh.position);
-                    if (dist <= skill.aoeRange && m.isAlive()) {
-                        const dmgBase = this.stats.atk * skill.damageMultiplier;
+                    if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
                         const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
                         const actualDmg = m.takeDamage(finalDmg);
                         hits++;
-
-                        if (gameUI) {
-                            gameUI.addCombatLog(`🔥 Magnum Break โดน ${m.name}! แดมเมจ ${actualDmg}`, 'atk');
-                        }
-
-                        if (particleSystem) {
-                            if (particleSystem.createHitBurst) {
-                                particleSystem.createHitBurst(m.mesh.position);
-                            }
-                        }
-
                         if (effectCallback) effectCallback('magnumBreak', m, actualDmg);
                     }
                 });
             }
 
-            if (particleSystem) {
-                // Fire ring sweep effect
-                if (particleSystem.createCriticalBurst) {
-                    particleSystem.createCriticalBurst(origin);
-                }
-                if (particleSystem.createLevelUpShimmer) {
-                    particleSystem.createLevelUpShimmer(origin, 0xff4000);
-                }
+            if (hits === 0 && gameUI) {
+                gameUI.addCombatLog('...แต่ไม่มีศัตรูอยู่ในระยะ', 'system');
             }
         }
 
-        // Save Stats
-        if (this.characterId && this.saveStatsToDatabase) {
-            this.saveStatsToDatabase().catch(() => { });
-        }
-
         return true;
     }
 
-    // Move toward a position
-    moveToward(targetPos, dt) {
-        const dx = targetPos.x - this.mesh.position.x;
-        const dz = targetPos.z - this.mesh.position.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
-
-        if (dist > 0.1) {
-            this.state = 'walking';
-            const speed = this.moveSpeed * dt;
-            this.mesh.position.x += (dx / dist) * speed;
-            this.mesh.position.z += (dz / dist) * speed;
-
-            // Face the direction
-            this.mesh.rotation.y = Math.atan2(dx, dz);
-            return false;
-        }
-        return true;
-    }
-
-    // Manual WASD movement
-    manualMove(direction, isRunning, dt) {
-        const speed = this.moveSpeed * (isRunning ? 2.2 : 1.0) * dt;
-        this.mesh.position.x += direction.x * speed;
-        this.mesh.position.z += direction.z * speed;
-
-        // Clamp to map bounds
-        this.mesh.position.x = Math.max(-28, Math.min(28, this.mesh.position.x));
-        this.mesh.position.z = Math.max(-28, Math.min(28, this.mesh.position.z));
-
-        // Face the direction of movement
-        this.mesh.rotation.y = Math.atan2(direction.x, direction.z);
-
-        // Set state
-        this.state = isRunning ? 'running' : 'walking';
-    }
-}
-
-export class RemotePlayer {
-    constructor(scene, userId, username, level, initialPos, bodyColor = 0x40c060) {
-        this.scene = scene;
-        this.userId = userId;
-        this.username = username;
-        this.level = level;
-        this.bodyColor = bodyColor;
-        this.hairColor = 0xc04040;
-        this.pantsColor = 0x3a3a5a;
-        this.equippedHat = 'None';
-        this.equippedGlasses = 'None';
-        this.equippedWeapon = 'Sword';
-        this.hatMesh = null;
-        this.glassesMesh = null;
-
-        this.state = 'idle';
-        this.animTimer = Math.random() * Math.PI;
-
-        this.mesh = new THREE.Group();
-        this._createModel();
-
-        if (initialPos) {
-            this.mesh.position.set(initialPos.x, initialPos.y, initialPos.z);
-        }
-
-        this.scene.add(this.mesh);
-    }
-
-    _createModel() {
-        // Body
-        const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.4);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: this.bodyColor });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 1.0;
-        body.castShadow = true;
-        this.mesh.add(body);
-
-        // Head
-        const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        const headMat = new THREE.MeshLambertMaterial({ color: 0xffccaa });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = 1.7;
-        head.castShadow = true;
-        this.mesh.add(head);
-
-        // Hair (random colors for other players)
-        const hairGeo = new THREE.BoxGeometry(0.55, 0.3, 0.55);
-        this.hairColor = [0x503020, 0xc0b050, 0xc04040, 0x4080c5, 0x8a40c5][Math.floor(Math.random() * 5)];
-        const hairMat = new THREE.MeshLambertMaterial({ color: this.hairColor });
-        this.hair = new THREE.Mesh(hairGeo, hairMat);
-        this.hair.position.y = 1.95;
-        this.mesh.add(this.hair);
-
-        // Eyes
-        const eyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.05);
-        const eyeBlackMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        const eyeL = new THREE.Mesh(eyeGeo, eyeBlackMat);
-        eyeL.position.set(-0.12, 1.72, 0.26);
-        this.mesh.add(eyeL);
-        const eyeR = new THREE.Mesh(eyeGeo, eyeBlackMat);
-        eyeR.position.set(0.12, 1.72, 0.26);
-        this.mesh.add(eyeR);
-
-        // Arms
-        const armGeo = new THREE.BoxGeometry(0.2, 0.6, 0.2);
-        const armMat = new THREE.MeshLambertMaterial({ color: this.bodyColor });
-
-        this.leftArm = new THREE.Mesh(armGeo, armMat);
-        this.leftArm.position.set(-0.45, 1.0, 0);
-        this.leftArm.castShadow = true;
-        this.mesh.add(this.leftArm);
-
-        this.rightArm = new THREE.Mesh(armGeo, armMat);
-        this.rightArm.position.set(0.45, 1.0, 0);
-        this.rightArm.castShadow = true;
-        this.mesh.add(this.rightArm);
-
-        // Weapon
-        this.updateWeaponVisuals('Sword');
-
-        // Legs
-        const legGeo = new THREE.BoxGeometry(0.22, 0.5, 0.25);
-        const legMat = new THREE.MeshLambertMaterial({ color: this.pantsColor });
-
-        this.leftLeg = new THREE.Mesh(legGeo, legMat);
-        this.leftLeg.position.set(-0.15, 0.35, 0);
-        this.leftLeg.castShadow = true;
-        this.mesh.add(this.leftLeg);
-
-        this.rightLeg = new THREE.Mesh(legGeo, legMat);
-        this.rightLeg.position.set(0.15, 0.35, 0);
-        this.rightLeg.castShadow = true;
-        this.mesh.add(this.rightLeg);
-
-        // Shadow disc
-        const shadowGeo = new THREE.CircleGeometry(0.5, 16);
-        const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
-        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
-        shadow.rotation.x = -Math.PI / 2;
-        shadow.position.y = 0.02;
-        this.mesh.add(shadow);
-
+    loadStats(data) {
+        if (!data) return;
+        this.characterId = data.id;
+        this.stats.name = data.name || 'Novice';
+        this.stats.level = data.level || 1;
+        this.stats.exp = data.exp || 0;
+        this.stats.hp = data.hp || 100;
+        this.stats.max_hp = data.max_hp || 100;
+        this.stats.sp = data.sp || 50;
+        this.stats.max_sp = data.max_sp || 50;
+        this.stats.atk = data.atk || 10;
+        this.stats.def = data.def || 5;
+        this.stats.gold = data.gold || 0;
+        this.stats.total_kills = data.total_kills || 0;
+        this.stats.play_time = data.play_time || 0;
+        
+        // Ensure starting position is safe
+        this.baseY = 1.2;
+        this.mesh.position.set(0, 1.2, 10);
+        
         this.updateNameTag();
     }
-
-    updateWeaponVisuals(itemName) {
-        if (this.weaponMesh) {
-            this.rightArm.remove(this.weaponMesh);
-            this.weaponMesh = null;
-        }
-
-        if (!itemName || itemName === 'None') {
-            return;
-        }
-
-        if (itemName === 'Sword') {
-            const group = new THREE.Group();
-
-            const bladeGeo = new THREE.BoxGeometry(0.08, 1.0, 0.04);
-            const bladeMat = new THREE.MeshLambertMaterial({ color: 0xc0c0d0 });
-            const blade = new THREE.Mesh(bladeGeo, bladeMat);
-            blade.position.set(0, 0.3, 0);
-            blade.castShadow = true;
-            group.add(blade);
-
-            const guardGeo = new THREE.BoxGeometry(0.24, 0.06, 0.1);
-            const guardMat = new THREE.MeshLambertMaterial({ color: 0xffd040 });
-            const guard = new THREE.Mesh(guardGeo, guardMat);
-            guard.position.set(0, -0.2, 0);
-            guard.castShadow = true;
-            group.add(guard);
-
-            const handleGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 6);
-            const handleMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
-            const handle = new THREE.Mesh(handleGeo, handleMat);
-            handle.position.set(0, -0.35, 0);
-            handle.castShadow = true;
-            group.add(handle);
-
-            group.position.set(0, -0.2, 0.15);
-            group.rotation.x = 0;
-
-            this.weaponMesh = group;
-            this.rightArm.add(this.weaponMesh);
-        } else if (itemName === 'Bow') {
-            const group = new THREE.Group();
-
-            const riserGeo = new THREE.BoxGeometry(0.05, 0.3, 0.05);
-            const woodMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
-            const riser = new THREE.Mesh(riserGeo, woodMat);
-            riser.castShadow = true;
-            group.add(riser);
-
-            const limbGeo = new THREE.BoxGeometry(0.04, 0.4, 0.04);
-            const limbUpper = new THREE.Mesh(limbGeo, woodMat);
-            limbUpper.position.set(0, 0.32, -0.08);
-            limbUpper.rotation.x = -0.4;
-            limbUpper.castShadow = true;
-            group.add(limbUpper);
-
-            const limbLower = new THREE.Mesh(limbGeo, woodMat);
-            limbLower.position.set(0, -0.32, -0.08);
-            limbLower.rotation.x = 0.4;
-            limbLower.castShadow = true;
-            group.add(limbLower);
-
-            const stringGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.96, 4);
-            const stringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-            const bowString = new THREE.Mesh(stringGeo, stringMat);
-            bowString.position.set(0, 0, -0.2);
-            group.add(bowString);
-
-            group.position.set(0, -0.1, 0.15);
-            group.rotation.x = Math.PI / 2;
-
-            this.weaponMesh = group;
-            this.rightArm.add(this.weaponMesh);
-        } else if (itemName === 'Gun') {
-            const group = new THREE.Group();
-
-            const barrelGeo = new THREE.BoxGeometry(0.08, 0.45, 0.08);
-            const metalMat = new THREE.MeshLambertMaterial({ color: 0x4a4a4a });
-            const barrel = new THREE.Mesh(barrelGeo, metalMat);
-            barrel.position.set(0, 0.1, 0.05);
-            barrel.rotation.x = Math.PI / 2;
-            barrel.castShadow = true;
-            group.add(barrel);
-
-            const gripGeo = new THREE.BoxGeometry(0.07, 0.22, 0.07);
-            const gripMat = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
-            const grip = new THREE.Mesh(gripGeo, gripMat);
-            grip.position.set(0, -0.1, 0);
-            grip.rotation.x = 0.2;
-            grip.castShadow = true;
-            group.add(grip);
-
-            group.position.set(0, -0.2, 0.15);
-
-            this.weaponMesh = group;
-            this.rightArm.add(this.weaponMesh);
-        } else if (itemName === 'Fishing Rod') {
-            const group = new THREE.Group();
-
-            const shaftGeo = new THREE.CylinderGeometry(0.02, 0.03, 1.4, 6);
-            const rodMat = new THREE.MeshLambertMaterial({ color: 0xd9b38c });
-            const shaft = new THREE.Mesh(shaftGeo, rodMat);
-            shaft.position.set(0, 0.4, 0.3);
-            shaft.rotation.x = -Math.PI / 4;
-            shaft.castShadow = true;
-            group.add(shaft);
-
-            const lineGeo = new THREE.CylinderGeometry(0.005, 0.005, 1.2, 4);
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
-            const line = new THREE.Mesh(lineGeo, lineMat);
-            const tipY = 0.4 + 0.7 * Math.cos(-Math.PI / 4);
-            const tipZ = 0.3 + 0.7 * Math.sin(-Math.PI / 4);
-            line.position.set(0, tipY - 0.6, tipZ);
-            group.add(line);
-
-            group.position.set(0, -0.2, 0.15);
-
-            this.weaponMesh = group;
-            this.rightArm.add(this.weaponMesh);
-        }
-    }
-
-    updateNameTag() {
-        if (this.nameSprite) {
-            this.mesh.remove(this.nameSprite);
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        ctx.font = 'bold 36px "Press Start 2P", monospace';
-        ctx.fillStyle = '#ffffff'; // White color for other players
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 8;
-        ctx.textAlign = 'center';
-
-        const labelText = `${this.username} Lv.${this.level}`;
-        ctx.strokeText(labelText, 256, 75);
-        ctx.fillText(labelText, 256, 75);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.scale.set(2.0, 0.5, 1);
-        this.nameSprite.position.y = 2.8; // Move higher to avoid overlapping hats
-        this.mesh.add(this.nameSprite);
-    }
-
-    updateData(data) {
-        if (data.level && data.level !== this.level) {
-            this.level = data.level;
-            this.updateNameTag();
-        }
-        if (data.username && data.username !== this.username) {
-            this.username = data.username;
-            this.updateNameTag();
-        }
-
-        if (data.x !== undefined && data.z !== undefined) {
-            this.targetX = data.x;
-            this.targetZ = data.z;
-        }
-
-        if (data.rY !== undefined) {
-            this.targetRotationY = data.rY;
-        }
-
-        if (data.state !== undefined) {
-            this.state = data.state;
-        }
-
-        // Apply appearance replication
-        if (data.appearance) {
-            const app = data.appearance;
-            if (app.shirtColor !== undefined && app.shirtColor !== this.bodyColor) {
-                this.setBodyColor(app.shirtColor);
-            }
-            if (app.pantsColor !== undefined && app.pantsColor !== this.pantsColor) {
-                this.setPantsColor(app.pantsColor);
-            }
-            if (app.hairColor !== undefined && app.hairColor !== this.hairColor) {
-                this.setHairColor(app.hairColor);
-            }
-            if (app.hat !== undefined && app.hat !== this.equippedHat) {
-                this.setHat(app.hat);
-            }
-            if (app.glasses !== undefined && app.glasses !== this.equippedGlasses) {
-                this.setGlasses(app.glasses);
-            }
-            if (app.weapon !== undefined && app.weapon !== this.equippedWeapon) {
-                this.equippedWeapon = app.weapon;
-                this.updateWeaponVisuals(app.weapon);
-            }
-        }
-    }
-
-    setBodyColor(color) {
-        const oldColor = this.bodyColor;
-        this.bodyColor = color;
-        if (!this.mesh) return;
-        this.mesh.children.forEach(child => {
-            if (child.material && child.material.color) {
-                const hex = child.material.color.getHex();
-                if (hex === 0x40c060 || hex === oldColor) {
-                    child.material.color.setHex(color);
-                }
-            }
-        });
-    }
-
-    setHairColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : color;
-        this.hairColor = colorVal;
-        if (this.hair && this.hair.material) {
-            this.hair.material.color.setHex(colorVal);
-        }
-    }
-
-    setPantsColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : color;
-        this.pantsColor = colorVal;
-        if (this.leftLeg && this.leftLeg.material) {
-            this.leftLeg.material.color.setHex(colorVal);
-        }
-        if (this.rightLeg && this.rightLeg.material) {
-            this.rightLeg.material.color.setHex(colorVal);
-        }
-    }
-
-    setHat(hatName) {
-        this.equippedHat = hatName || 'None';
-        if (this.hatMesh) {
-            this.mesh.remove(this.hatMesh);
-            this.hatMesh = null;
-        }
-
-        if (this.equippedHat === 'None') return;
-
-        const hatGroup = new THREE.Group();
-
-        if (this.equippedHat === 'Wizard Hat') {
-            const wizardMat = new THREE.MeshLambertMaterial({ color: 0x332266 });
-
-            const brimGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.04, 12);
-            const brim = new THREE.Mesh(brimGeo, wizardMat);
-            brim.position.y = 2.05;
-            brim.castShadow = true;
-            hatGroup.add(brim);
-
-            const coneGeo = new THREE.ConeGeometry(0.3, 0.6, 12);
-            const cone = new THREE.Mesh(coneGeo, wizardMat);
-            cone.position.set(0, 2.35, -0.05);
-            cone.rotation.x = -0.1;
-            cone.castShadow = true;
-            hatGroup.add(cone);
-
-            const ribbonGeo = new THREE.CylinderGeometry(0.31, 0.32, 0.08, 12);
-            const ribbonMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-            const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
-            ribbon.position.set(0, 2.11, -0.01);
-            hatGroup.add(ribbon);
-        } else if (this.equippedHat === 'Crown') {
-            const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
-            const baseGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.12, 8, 1);
-            const base = new THREE.Mesh(baseGeo, crownMat);
-            base.position.y = 2.15;
-            base.castShadow = true;
-            hatGroup.add(base);
-
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const spikeGeo = new THREE.ConeGeometry(0.06, 0.12, 4);
-                const spike = new THREE.Mesh(spikeGeo, crownMat);
-                spike.position.set(Math.cos(angle) * 0.25, 2.22, Math.sin(angle) * 0.25);
-                spike.castShadow = true;
-                hatGroup.add(spike);
-            }
-        } else if (this.equippedHat === 'Cowboy Hat') {
-            const cowboyMat = new THREE.MeshLambertMaterial({ color: 0x5c4033 });
-
-            const brimGeo = new THREE.BoxGeometry(0.85, 0.04, 0.95);
-            const brim = new THREE.Mesh(brimGeo, cowboyMat);
-            brim.position.y = 2.05;
-            brim.castShadow = true;
-            hatGroup.add(brim);
-
-            const crownGeo = new THREE.BoxGeometry(0.48, 0.26, 0.48);
-            const crown = new THREE.Mesh(crownGeo, cowboyMat);
-            crown.position.set(0, 2.18, -0.02);
-            crown.castShadow = true;
-            hatGroup.add(crown);
-        }
-
-        this.hatMesh = hatGroup;
-        this.mesh.add(this.hatMesh);
-    }
-
-    setGlasses(glassesName) {
-        this.equippedGlasses = glassesName || 'None';
-        if (this.glassesMesh) {
-            this.mesh.remove(this.glassesMesh);
-            this.glassesMesh = null;
-        }
-
-        if (this.equippedGlasses === 'None') return;
-
-        const glassesGroup = new THREE.Group();
-
-        if (this.equippedGlasses === 'Sunglasses') {
-            const frameMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-
-            const lensGeo = new THREE.BoxGeometry(0.18, 0.12, 0.02);
-            const lensL = new THREE.Mesh(lensGeo, frameMat);
-            lensL.position.set(-0.12, 1.72, 0.262);
-            glassesGroup.add(lensL);
-
-            const lensR = new THREE.Mesh(lensGeo, frameMat);
-            lensR.position.set(0.12, 1.72, 0.262);
-            glassesGroup.add(lensR);
-
-            const bridgeGeo = new THREE.BoxGeometry(0.08, 0.03, 0.02);
-            const bridge = new THREE.Mesh(bridgeGeo, frameMat);
-            bridge.position.set(0, 1.74, 0.262);
-            glassesGroup.add(bridge);
-        } else if (this.equippedGlasses === 'Classic Glasses') {
-            const frameMat = new THREE.MeshBasicMaterial({ color: 0xe63946 });
-            const lensMat = new THREE.MeshBasicMaterial({ color: 0xa8dadc, transparent: true, opacity: 0.4 });
-
-            const frameLGeo = new THREE.BoxGeometry(0.18, 0.16, 0.02);
-            const frameL = new THREE.Mesh(frameLGeo, frameMat);
-            frameL.position.set(-0.12, 1.72, 0.262);
-            glassesGroup.add(frameL);
-
-            const innerL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.022), lensMat);
-            innerL.position.set(-0.12, 1.72, 0.262);
-            glassesGroup.add(innerL);
-
-            const frameR = new THREE.Mesh(frameLGeo, frameMat);
-            frameR.position.set(0.12, 1.72, 0.262);
-            glassesGroup.add(frameR);
-
-            const innerR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.022), lensMat);
-            innerR.position.set(0.12, 1.72, 0.262);
-            glassesGroup.add(innerR);
-
-            const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.02), frameMat);
-            bridge.position.set(0, 1.72, 0.262);
-            glassesGroup.add(bridge);
-        }
-
-        this.glassesMesh = glassesGroup;
-        this.mesh.add(this.glassesMesh);
-    }
-
-    update(dt) {
-        this.animTimer += dt;
-
-        // Smoothly interpolate position
-        if (this.targetX !== undefined && this.targetZ !== undefined) {
-            this.mesh.position.x += (this.targetX - this.mesh.position.x) * 0.15;
-            this.mesh.position.z += (this.targetZ - this.mesh.position.z) * 0.15;
-        }
-
-        // Smoothly interpolate rotation
-        if (this.targetRotationY !== undefined) {
-            let diff = this.targetRotationY - this.mesh.rotation.y;
-            diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-            this.mesh.rotation.y += diff * 0.15;
-        }
-
-        // Idle animation
-        if (this.state === 'idle') {
-            this.mesh.position.y = Math.sin(this.animTimer * 2) * 0.05;
-            this.leftArm.rotation.x = Math.sin(this.animTimer * 1.5) * 0.1;
-            this.rightArm.rotation.x = Math.sin(this.animTimer * 1.5 + Math.PI) * 0.1;
-            this.leftLeg.rotation.x = 0;
-            this.rightLeg.rotation.x = 0;
-        }
-
-        // Walking animation
-        if (this.state === 'walking') {
-            this.mesh.position.y = Math.abs(Math.sin(this.animTimer * 8)) * 0.08;
-            this.leftLeg.rotation.x = Math.sin(this.animTimer * 8) * 0.5;
-            this.rightLeg.rotation.x = Math.sin(this.animTimer * 8 + Math.PI) * 0.5;
-            this.leftArm.rotation.x = Math.sin(this.animTimer * 8 + Math.PI) * 0.3;
-            this.rightArm.rotation.x = Math.sin(this.animTimer * 8) * 0.3;
-        }
-
-        // Attack animation
-        if (this.state === 'attacking') {
-            const t = (this.animTimer % 0.5) / 0.5;
-            if (t < 0.3) {
-                this.rightArm.rotation.x = -t * 5;
-                this.rightArm.rotation.z = -t * 2;
-            } else if (t < 0.6) {
-                this.rightArm.rotation.x = -1.5 + (t - 0.3) * 8;
-                this.rightArm.rotation.z = -0.6 + (t - 0.3) * 3;
-            } else {
-                this.rightArm.rotation.x = 0.9 - (t - 0.6) * 2.25;
-                this.rightArm.rotation.z = 0.3 - (t - 0.6) * 0.75;
-            }
-        }
-    }
-
-    destroy() {
-        this.scene.remove(this.mesh);
-    }
-}
-
-export function getCharacterColor(username) {
-    if (!username) return 0x4060c0;
-    const charCodeSum = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const colors = [0x40c060, 0xc0a040, 0x8a40c5, 0x4080c5, 0xc05040, 0xe080a0];
-    return colors[charCodeSum % colors.length];
 }
