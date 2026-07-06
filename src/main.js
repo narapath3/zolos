@@ -71,7 +71,7 @@ async function initGame(charData) {
     // Setup systems
     particles = new ParticleSystem(sceneManager.scene);
     soundManager = new SoundManager();
-    monsters = new MonsterManager(sceneManager.scene, particles);
+    monsters = new MonsterManager(sceneManager.scene, sceneManager);
     
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager);
@@ -193,9 +193,10 @@ function gameLoop(time) {
     if (env === 'water') {
         character.state = 'swimming';
         character.moveSpeed = 2.2;
-        character.baseY = -1.8; // Sink to water level
+        character.baseY = -0.5; // Partially submerged, visible while swimming
     } else {
         character.baseY = 1.2; // Default ground height
+        character.moveSpeed = 4; // Reset to normal speed when exiting water
     }
 
     // 3. Combat
