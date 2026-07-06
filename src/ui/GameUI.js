@@ -319,6 +319,9 @@ export class GameUI {
       const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
       if (equippedWeapon && this.character) {
         this.character.equipWeapon(equippedWeapon.item_name);
+        if (equippedWeapon.item_type === 'fishing_rod') {
+          this.setFishingButtonVisible(true);
+        }
       } else if (this.character) {
         this.character.equipWeapon(null);
       }
@@ -573,6 +576,9 @@ export class GameUI {
       item.stats.equipped = false;
       if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
         this.character.equipWeapon(null);
+        if (item.item_type === 'fishing_rod') {
+          this.setFishingButtonVisible(false);
+        }
       } else if (item.item_type === 'armor') {
         this.character.equippedArmor = null;
       } else if (item.item_type === 'shield') {
@@ -608,6 +614,11 @@ export class GameUI {
       item.stats.equipped = true;
       if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
         this.character.equipWeapon(item.item_name);
+        if (item.item_type === 'fishing_rod') {
+          this.setFishingButtonVisible(true);
+        } else {
+          this.setFishingButtonVisible(false);
+        }
       } else if (item.item_type === 'armor') {
         this.character.equippedArmor = item.item_name;
       } else if (item.item_type === 'shield') {
