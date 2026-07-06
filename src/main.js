@@ -636,7 +636,15 @@ function gameLoop() {
                 const dist = playerPos.distanceTo(portal.position);
                 if (dist <= 1.8) {
                     const targetMap = portal.userData.targetMap;
-                    gameUI.addCombatLog(`🌀 Entering Portal... Transitioning to ${targetMap === 'payon' ? 'Payon Forest' : 'Prontera Field'}`, 'system');
+                    const MAP_NAMES = {
+                        prontera: 'Prontera Field',
+                        payon: 'Payon Forest',
+                        glast_heim: 'Glast Heim',
+                        mjolnir: 'Mjolnir Mountains',
+                        abyss_lake: 'Abyss Lake',
+                    };
+                    const destName = MAP_NAMES[targetMap] || targetMap;
+                    gameUI.addCombatLog(`🌀 Entering Portal... Transitioning to ${destName}`, 'system');
 
                     // Set portal cooldown to prevent re-trigger
                     portalCooldown = 2.0;
@@ -659,14 +667,21 @@ function gameLoop() {
                     monsters.deadQueue = [];
 
                     // Move player to safe spawn BEFORE loading new map
-                    if (targetMap === 'payon') {
-                        character.mesh.position.set(-5, 0, 0);
-                    } else {
-                        character.mesh.position.set(5, 0, 0);
-                    }
+                    const SPAWN_POSITIONS = {
+                        prontera:   { x: 5, z: 0 },
+                        payon:      { x: -5, z: 0 },
+                        glast_heim: { x: 5, z: 0 },
+                        mjolnir:    { x: -5, z: 0 },
+                        abyss_lake: { x: 0, z: 5 },
+                    };
+                    const spawnPos = SPAWN_POSITIONS[targetMap] || { x: 0, z: 0 };
+                    character.mesh.position.set(spawnPos.x, 0, spawnPos.z);
 
                     // Swap map visual
                     sceneManager.loadMap(targetMap);
+
+                    // Update map name in HUD
+                    if (gameUI) gameUI.setMapName(sceneManager.getCurrentMapName());
 
                     // Set monster manager map details
                     monsters.mapId = targetMap;

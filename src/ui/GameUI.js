@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats } from '../network/GameSync.js';
 
 export class GameUI {
@@ -122,6 +122,12 @@ export class GameUI {
       if (p.id !== panelId) p.style.display = 'none';
     });
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // ============ Map Name Update ============
+  setMapName(mapName) {
+    const el = document.getElementById('map-name');
+    if (el) el.textContent = mapName;
   }
 
   // ============ HUD Updates ============
@@ -1708,7 +1714,10 @@ export class GameUI {
 
       // Determine map area
       let mapArea = 'Prontera Field';
-      if (PAYON_MONSTERS[key]) mapArea = 'Payon Forest';
+      if (PAYON_MONSTERS[key]) mapArea = 'Payon Forest 🌲';
+      else if (GLAST_MONSTERS[key]) mapArea = 'Glast Heim 🏰';
+      else if (MJOLNIR_MONSTERS[key]) mapArea = 'Mjolnir Mountains ⛰️';
+      else if (ABYSS_MONSTERS[key]) mapArea = 'Abyss Lake 🌊';
       else if (WATER_MONSTERS[key]) mapArea = 'Water Zone 🌊';
 
       // Find drop items details
@@ -1851,8 +1860,15 @@ export class GameUI {
     const px = playerPos.x;
     const pz = playerPos.z;
 
-    // 1. Draw Ground
-    ctx.fillStyle = currentMap === 'payon' ? '#5a4a2a' : '#3a7a3a';
+    // 1. Draw Ground (color based on current map)
+    const MAP_GROUND_COLORS = {
+      prontera: '#3a7a3a',
+      payon: '#5a4a2a',
+      glast_heim: '#2a2035',
+      mjolnir: '#7a7060',
+      abyss_lake: '#0a1020',
+    };
+    ctx.fillStyle = MAP_GROUND_COLORS[currentMap] || '#3a7a3a';
     ctx.fillRect(0, 0, width, height);
 
     // 2. Cave Zone (x < -6 && z < -6)
@@ -1898,7 +1914,14 @@ export class GameUI {
         ctx.lineTo(tx, ty);
       }
     }
-    ctx.strokeStyle = currentMap === 'payon' ? '#254e40' : '#2d6d9d';
+    const MAP_RIVER_COLORS = {
+      prontera: '#2d6d9d',
+      payon: '#254e40',
+      glast_heim: '#1a0a2a',
+      mjolnir: '#5080a0',
+      abyss_lake: '#0a1a40',
+    };
+    ctx.strokeStyle = MAP_RIVER_COLORS[currentMap] || '#2d6d9d';
     ctx.lineWidth = 5.5 * scale; // Width represents our 5.5 units riverbed size
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';

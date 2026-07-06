@@ -413,6 +413,349 @@ export const PAYON_MONSTERS = {
     }
 };
 
+// ============ GLAST HEIM MONSTERS ============
+export const GLAST_MONSTERS = {
+    skeleton: {
+        name: 'Skeleton',
+        emoji: '💀',
+        color: 0xe0e0c0,
+        hp: 650,
+        atk: 78,
+        def: 35,
+        exp: 420,
+        gold: { min: 60, max: 150 },
+        size: 0.8,
+        speed: 0.5,
+        environment: 'cave',
+        loot: [
+            { name: 'Decay Tooth', emoji: '🦷', type: 'material', chance: 0.5 },
+            { name: 'Rusty Screw', emoji: '🔩', type: 'material', chance: 0.3 },
+            { name: 'Red Potion', emoji: '🧪', type: 'consumable', chance: 0.15 },
+            { name: 'Iron Helm', emoji: '🪖', type: 'armor', chance: 0.05 },
+        ]
+    },
+    zombie: {
+        name: 'Zombie',
+        emoji: '🧟',
+        color: 0x607050,
+        hp: 800,
+        atk: 88,
+        def: 40,
+        exp: 520,
+        gold: { min: 70, max: 180 },
+        size: 0.85,
+        speed: 0.3,
+        environment: 'cave',
+        loot: [
+            { name: 'Animal Skin', emoji: '🥩', type: 'material', chance: 0.4 },
+            { name: 'Decay Tooth', emoji: '🦷', type: 'material', chance: 0.35 },
+            { name: 'Red Potion', emoji: '🧪', type: 'consumable', chance: 0.12 },
+            { name: 'Elunium Stone', emoji: '🌫️', type: 'material', chance: 0.06 },
+        ]
+    },
+    archer_skeleton: {
+        name: 'Archer Skeleton',
+        emoji: '🏹',
+        color: 0xd0c8a0,
+        hp: 900,
+        atk: 105,
+        def: 30,
+        exp: 680,
+        gold: { min: 90, max: 220 },
+        size: 0.8,
+        speed: 0.6,
+        environment: 'cave',
+        loot: [
+            { name: 'Decay Tooth', emoji: '🦷', type: 'material', chance: 0.45 },
+            { name: 'Oridecon Stone', emoji: '🧱', type: 'material', chance: 0.12 },
+            { name: 'Crossbow', emoji: '🏹', type: 'weapon', chance: 0.03 },
+            { name: 'Silver Dagger', emoji: '🗡️', type: 'weapon', chance: 0.02 },
+        ]
+    },
+    raydric: {
+        name: 'Raydric',
+        emoji: '🗡️',
+        color: 0x3a2050,
+        hp: 1400,
+        atk: 140,
+        def: 65,
+        exp: 1100,
+        gold: { min: 150, max: 380 },
+        size: 1.0,
+        speed: 0.7,
+        environment: 'cave',
+        loot: [
+            { name: 'Zargon', emoji: '💎', type: 'material', chance: 0.4 },
+            { name: 'Phracon', emoji: '⚒️', type: 'material', chance: 0.2 },
+            { name: 'Steel Plate Mail', emoji: '🛡️', type: 'armor', chance: 0.04 },
+            { name: 'Shadow Garment', emoji: '🧥', type: 'armor', chance: 0.03 },
+            { name: 'Katana', emoji: '⚔️', type: 'weapon', chance: 0.02 },
+        ]
+    },
+    hunter_fly: {
+        name: 'Hunter Fly',
+        emoji: '🪰',
+        color: 0x204020,
+        hp: 1100,
+        atk: 125,
+        def: 50,
+        exp: 880,
+        gold: { min: 120, max: 300 },
+        size: 0.6,
+        speed: 1.2,
+        environment: 'cave',
+        loot: [
+            { name: 'Monster Claw', emoji: '🎯', type: 'material', chance: 0.45 },
+            { name: 'Zargon', emoji: '💎', type: 'material', chance: 0.25 },
+            { name: 'Wind Element Stone', emoji: '🌀', type: 'material', chance: 0.08 },
+            { name: 'Crossbow', emoji: '🏹', type: 'weapon', chance: 0.02 },
+        ]
+    },
+    dullahan: {
+        name: 'Dullahan',
+        emoji: '🎃',
+        color: 0x1a0a2a,
+        hp: 4500,
+        atk: 220,
+        def: 110,
+        exp: 4800,
+        gold: { min: 500, max: 1200 },
+        size: 1.2,
+        speed: 0.5,
+        environment: 'cave',
+        loot: [
+            { name: 'Pure Emperium', emoji: '🔮', type: 'material', chance: 0.15 },
+            { name: 'Ghostly Essence', emoji: '👻', type: 'material', chance: 0.2 },
+            { name: 'Yggdrasil Berry', emoji: '🍇', type: 'consumable', chance: 0.08 },
+            { name: 'Excalibur', emoji: '🗡️', type: 'weapon', chance: 0.02 },
+            { name: 'Dragon Scale Mail', emoji: '🥋', type: 'armor', chance: 0.01 },
+            { name: 'Ragnarok Blade', emoji: '🔱', type: 'weapon', chance: 0.003 },
+        ]
+    }
+};
+
+// ============ MJOLNIR MONSTERS ============
+export const MJOLNIR_MONSTERS = {
+    golem: {
+        name: 'Golem',
+        emoji: '🪨',
+        color: 0x808070,
+        hp: 1200,
+        atk: 130,
+        def: 80,
+        exp: 900,
+        gold: { min: 100, max: 260 },
+        size: 1.1,
+        speed: 0.3,
+        environment: 'mountain',
+        loot: [
+            { name: 'Iron Ore', emoji: '🪨', type: 'material', chance: 0.5 },
+            { name: 'Oridecon Stone', emoji: '🧱', type: 'material', chance: 0.2 },
+            { name: 'Elunium Stone', emoji: '🌫️', type: 'material', chance: 0.1 },
+            { name: 'Iron Shield', emoji: '🛡️', type: 'shield', chance: 0.05 },
+        ]
+    },
+    stone_golem: {
+        name: 'Stone Golem',
+        emoji: '🗿',
+        color: 0x606060,
+        hp: 1600,
+        atk: 155,
+        def: 100,
+        exp: 1200,
+        gold: { min: 140, max: 340 },
+        size: 1.2,
+        speed: 0.25,
+        environment: 'mountain',
+        loot: [
+            { name: 'Iron Ore', emoji: '🪨', type: 'material', chance: 0.5 },
+            { name: 'Phracon', emoji: '⚒️', type: 'material', chance: 0.25 },
+            { name: 'Gilding Ingot', emoji: '🧱', type: 'material', chance: 0.1 },
+            { name: 'Tear Shield', emoji: '🛡️', type: 'shield', chance: 0.04 },
+        ]
+    },
+    harpy: {
+        name: 'Harpy',
+        emoji: '🦅',
+        color: 0xa08040,
+        hp: 1350,
+        atk: 160,
+        def: 60,
+        exp: 1100,
+        gold: { min: 130, max: 320 },
+        size: 0.9,
+        speed: 1.1,
+        environment: 'mountain',
+        loot: [
+            { name: 'Feather', emoji: '🪶', type: 'material', chance: 0.5 },
+            { name: 'Wind Element Stone', emoji: '🌀', type: 'material', chance: 0.15 },
+            { name: 'Ranger Hood', emoji: '🦹', type: 'armor', chance: 0.04 },
+            { name: 'Rudra Bow', emoji: '🏹', type: 'weapon', chance: 0.02 },
+        ]
+    },
+    gargoyle: {
+        name: 'Gargoyle',
+        emoji: '🦇',
+        color: 0x504060,
+        hp: 1800,
+        atk: 180,
+        def: 75,
+        exp: 1500,
+        gold: { min: 180, max: 450 },
+        size: 1.0,
+        speed: 0.9,
+        environment: 'mountain',
+        loot: [
+            { name: 'Monster Claw', emoji: '🎯', type: 'material', chance: 0.4 },
+            { name: 'Zargon', emoji: '💎', type: 'material', chance: 0.3 },
+            { name: 'Fire Element Stone', emoji: '🔥', type: 'material', chance: 0.1 },
+            { name: 'Gorgon Ring', emoji: '💍', type: 'armor', chance: 0.03 },
+        ]
+    },
+    iron_golem: {
+        name: 'Iron Golem',
+        emoji: '🤖',
+        color: 0x405060,
+        hp: 2200,
+        atk: 200,
+        def: 120,
+        exp: 1900,
+        gold: { min: 220, max: 550 },
+        size: 1.3,
+        speed: 0.2,
+        environment: 'mountain',
+        loot: [
+            { name: 'Iron Ore', emoji: '🪨', type: 'material', chance: 0.5 },
+            { name: 'Phracon', emoji: '⚒️', type: 'material', chance: 0.3 },
+            { name: 'Gilding Ingot', emoji: '🧱', type: 'material', chance: 0.15 },
+            { name: 'Steel Plate Mail', emoji: '🛡️', type: 'armor', chance: 0.04 },
+            { name: 'Heavy Warhammer', emoji: '🔨', type: 'weapon', chance: 0.02 },
+        ]
+    },
+    storm_dragon: {
+        name: 'Storm Dragon',
+        emoji: '🐉',
+        color: 0x2040a0,
+        hp: 6000,
+        atk: 280,
+        def: 150,
+        exp: 7500,
+        gold: { min: 800, max: 2000 },
+        size: 1.5,
+        speed: 0.6,
+        environment: 'mountain',
+        loot: [
+            { name: 'Pure Emperium', emoji: '🔮', type: 'material', chance: 0.2 },
+            { name: 'Wind Element Stone', emoji: '🌀', type: 'material', chance: 0.3 },
+            { name: 'Fire Element Stone', emoji: '🔥', type: 'material', chance: 0.25 },
+            { name: 'Dragon Scale Mail', emoji: '🥋', type: 'armor', chance: 0.02 },
+            { name: 'Odin Garment', emoji: '🧥', type: 'armor', chance: 0.01 },
+            { name: 'Ragnarok Blade', emoji: '🔱', type: 'weapon', chance: 0.005 },
+        ]
+    }
+};
+
+// ============ ABYSS LAKE MONSTERS ============
+export const ABYSS_MONSTERS = {
+    dragon_egg: {
+        name: 'Dragon Egg',
+        emoji: '🥚',
+        color: 0x4060a0,
+        hp: 1800,
+        atk: 160,
+        def: 90,
+        exp: 1400,
+        gold: { min: 160, max: 400 },
+        size: 0.7,
+        speed: 0.2,
+        environment: 'water',
+        loot: [
+            { name: 'Crystal Blue', emoji: '🔵', type: 'material', chance: 0.4 },
+            { name: 'Hard Shell', emoji: '🐚', type: 'material', chance: 0.35 },
+            { name: 'Yggdrasil Seed', emoji: '🌱', type: 'consumable', chance: 0.08 },
+        ]
+    },
+    sea_dragon: {
+        name: 'Sea Dragon',
+        emoji: '🐲',
+        color: 0x1a4080,
+        hp: 2500,
+        atk: 210,
+        def: 100,
+        exp: 2200,
+        gold: { min: 250, max: 620 },
+        size: 1.2,
+        speed: 0.7,
+        environment: 'water',
+        loot: [
+            { name: 'Pointed Scale', emoji: '🦈', type: 'material', chance: 0.45 },
+            { name: 'Crystal Blue', emoji: '🔵', type: 'material', chance: 0.2 },
+            { name: 'Fire Element Stone', emoji: '🔥', type: 'material', chance: 0.1 },
+            { name: 'Golden Shield', emoji: '🛡️', type: 'shield', chance: 0.02 },
+        ]
+    },
+    leib_olmai: {
+        name: 'Leib Olmai',
+        emoji: '🐻',
+        color: 0x203050,
+        hp: 3000,
+        atk: 240,
+        def: 130,
+        exp: 2800,
+        gold: { min: 320, max: 800 },
+        size: 1.3,
+        speed: 0.5,
+        environment: 'cave',
+        loot: [
+            { name: 'Animal Skin', emoji: '🥩', type: 'material', chance: 0.4 },
+            { name: 'Gilding Ingot', emoji: '🧱', type: 'material', chance: 0.2 },
+            { name: 'Lord Potion', emoji: '🧪', type: 'consumable', chance: 0.06 },
+            { name: 'Odin Garment', emoji: '🧥', type: 'armor', chance: 0.02 },
+        ]
+    },
+    dark_illusion: {
+        name: 'Dark Illusion',
+        emoji: '🌑',
+        color: 0x0a0a20,
+        hp: 3500,
+        atk: 270,
+        def: 140,
+        exp: 3500,
+        gold: { min: 400, max: 1000 },
+        size: 0.9,
+        speed: 1.0,
+        environment: 'cave',
+        loot: [
+            { name: 'Ghostly Essence', emoji: '👻', type: 'material', chance: 0.3 },
+            { name: 'Pure Emperium', emoji: '🔮', type: 'material', chance: 0.15 },
+            { name: 'Yggdrasil Berry', emoji: '🍇', type: 'consumable', chance: 0.06 },
+            { name: 'Glow Ring', emoji: '💍', type: 'armor', chance: 0.02 },
+            { name: 'Aegis of Olympus', emoji: '🌌', type: 'shield', chance: 0.005 },
+        ]
+    },
+    abyss_knight: {
+        name: 'Abyss Knight',
+        emoji: '⚔️',
+        color: 0x102040,
+        hp: 8000,
+        atk: 350,
+        def: 200,
+        exp: 12000,
+        gold: { min: 1200, max: 3000 },
+        size: 1.4,
+        speed: 0.6,
+        environment: 'cave',
+        loot: [
+            { name: 'Pure Emperium', emoji: '🔮', type: 'material', chance: 0.25 },
+            { name: 'Ghostly Essence', emoji: '👻', type: 'material', chance: 0.2 },
+            { name: 'Yggdrasil Berry', emoji: '🍇', type: 'consumable', chance: 0.1 },
+            { name: 'Valkyrie Armor', emoji: '👑', type: 'armor', chance: 0.01 },
+            { name: 'Aegis of Olympus', emoji: '🌌', type: 'shield', chance: 0.008 },
+            { name: 'Ragnarok Blade', emoji: '🔱', type: 'weapon', chance: 0.005 },
+        ]
+    }
+};
+
 // ============ WATER MONSTERS ============
 export const WATER_MONSTERS = {
     shrimp: {
@@ -512,6 +855,29 @@ export const WATER_MONSTERS = {
     }
 };
 
+// ============ NEW MAP ITEMS (added for Glast Heim, Mjolnir, Abyss Lake) ============
+// These items are referenced in loot tables above and need to be in ITEMS for shop/wiki
+Object.assign(ITEMS, {
+    'Wind Element Stone': { emoji: '🌀', type: 'material', rarity: 'rare', desc: 'หินธาตุลมบริสุทธิ์ สั่นสะเทือนด้วยพลังพายุ ใช้อัพเกรดอาวุธธาตุลม', price: 350 },
+    'Fire Element Stone': { emoji: '🔥', type: 'material', rarity: 'rare', desc: 'หินธาตุไฟลุกโชน อุณหภูมิสูงกว่าเตาหลอมทั่วไป ใช้อัพเกรดอาวุธธาตุไฟ', price: 350 },
+    'Gilding Ingot': { emoji: '🧱', type: 'material', rarity: 'rare', desc: 'แท่งโลหะชุบทองคำบริสุทธิ์ ใช้สำหรับตีบวกอาวุธและชุดเกราะระดับสูง', price: 500 },
+    'Iron Helm': { emoji: '🪖', type: 'armor', rarity: 'rare', desc: 'หมวกเหล็กกล้าหนาแน่น ป้องกันหัวได้ยอดเยี่ยม (DEF +12, HP +80)', price: 600, defBonus: 12, hpBonus: 80 },
+    'Steel Plate Mail': { emoji: '🛡️', type: 'armor', rarity: 'epic', desc: 'ชุดเกราะเหล็กกล้าเต็มตัว ทนทานสุดขีดสำหรับนักรบระดับสูง (DEF +28, HP +200)', price: 2500, defBonus: 28, hpBonus: 200 },
+    'Shadow Garment': { emoji: '🧥', type: 'armor', rarity: 'epic', desc: 'เสื้อคลุมเงาจากผ้าพิเศษ เพิ่มความเร็วและลดการตรวจจับ (DEF +15, HP +120)', price: 1800, defBonus: 15, hpBonus: 120 },
+    'Crossbow': { emoji: '🏹', type: 'weapon', rarity: 'rare', desc: 'หน้าไม้แม่นยำสูง ยิงได้ไกลและแรงกว่าธนูทั่วไป (ATK +35)', price: 1200, atkBonus: 35 },
+    'Silver Dagger': { emoji: '🗡️', type: 'weapon', rarity: 'rare', desc: 'มีดสั้นเงินบริสุทธิ์ มีประสิทธิภาพพิเศษต่อสัตว์ผีและอสูร (ATK +28)', price: 900, atkBonus: 28 },
+    'Gorgon Ring': { emoji: '💍', type: 'armor', rarity: 'epic', desc: 'แหวนหินกอร์กอน เพิ่มพลังป้องกันและต้านทานสถานะ (DEF +10, HP +150)', price: 2000, defBonus: 10, hpBonus: 150 },
+    'Heavy Warhammer': { emoji: '🔨', type: 'weapon', rarity: 'epic', desc: 'ค้อนสงครามหนักมหึมา ทำลายล้างสูงสุดสำหรับนักรบแนวหน้า (ATK +60)', price: 3000, atkBonus: 60 },
+    'Glow Ring': { emoji: '💍', type: 'armor', rarity: 'epic', desc: 'แหวนเรืองแสงจากความมืด เพิ่มพลังเวทมนตร์และ SP สูงสุด (DEF +8, HP +100)', price: 2200, defBonus: 8, hpBonus: 100 },
+    'Dragon Scale Mail': { emoji: '🦎', type: 'armor', rarity: 'legendary', desc: 'ชุดเกราะเกล็ดมังกรแท้ ป้องกันสูงสุดในโลก (DEF +45, HP +400)', price: 8000, defBonus: 45, hpBonus: 400 },
+    'Odin Garment': { emoji: '🧥', type: 'armor', rarity: 'legendary', desc: 'เสื้อคลุมของโอดิน เทพแห่งสงคราม เพิ่มทุก stat อย่างมหาศาล (DEF +35, HP +300)', price: 6000, defBonus: 35, hpBonus: 300 },
+    'Valkyrie Armor': { emoji: '👑', type: 'armor', rarity: 'legendary', desc: 'ชุดเกราะวาลคีรีจากสวรรค์ ป้องกันสูงสุดและเพิ่มพลังชีวิตมหาศาล (DEF +50, HP +500)', price: 10000, defBonus: 50, hpBonus: 500 },
+    'Aegis of Olympus': { emoji: '🌌', type: 'shield', rarity: 'mythic', desc: 'โล่ศักดิ์สิทธิ์แห่งโอลิมปัส ป้องกันทุกอย่างได้ (DEF +60)', price: 15000, defBonus: 60 },
+    'Golden Shield': { emoji: '🛡️', type: 'shield', rarity: 'legendary', desc: 'โล่ทองคำบริสุทธิ์จากใต้ทะเล ป้องกันสูงมาก (DEF +40)', price: 5000, defBonus: 40 },
+    'Lord Potion': { emoji: '🧪', type: 'consumable', rarity: 'legendary', desc: 'ยาโพชั่นระดับ Lord ฟื้นฟู HP +1500 และ SP +200 ทันที', price: 3000, healHp: 1500, restoreSp: 200 },
+    'Yggdrasil Seed': { emoji: '🌱', type: 'consumable', rarity: 'epic', desc: 'เมล็ดพันธุ์แห่งต้นยักษ์ Yggdrasil ฟื้นฟู HP +800 ทันที', price: 1500, healHp: 800 },
+});
+
 // ============ SKILLS ============
 export const SKILLS = {
     bash: {
@@ -607,6 +973,35 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
         return table;
     }
 
+    if (mapId === 'glast_heim') {
+        table.push({ type: 'skeleton', weight: 35 });
+        table.push({ type: 'zombie', weight: 30 });
+        if (playerLevel >= 22) table.push({ type: 'archer_skeleton', weight: 25 });
+        if (playerLevel >= 28) table.push({ type: 'hunter_fly', weight: 20 });
+        if (playerLevel >= 32) table.push({ type: 'raydric', weight: 12 });
+        if (playerLevel >= 38) table.push({ type: 'dullahan', weight: 3 }); // Boss rare spawn
+        return table;
+    }
+
+    if (mapId === 'mjolnir') {
+        table.push({ type: 'golem', weight: 35 });
+        table.push({ type: 'stone_golem', weight: 28 });
+        if (playerLevel >= 32) table.push({ type: 'harpy', weight: 25 });
+        if (playerLevel >= 38) table.push({ type: 'gargoyle', weight: 18 });
+        if (playerLevel >= 44) table.push({ type: 'iron_golem', weight: 12 });
+        if (playerLevel >= 50) table.push({ type: 'storm_dragon', weight: 3 }); // Boss rare spawn
+        return table;
+    }
+
+    if (mapId === 'abyss_lake') {
+        table.push({ type: 'dragon_egg', weight: 30 });
+        table.push({ type: 'sea_dragon', weight: 25 });
+        if (playerLevel >= 48) table.push({ type: 'leib_olmai', weight: 20 });
+        if (playerLevel >= 55) table.push({ type: 'dark_illusion', weight: 15 });
+        if (playerLevel >= 62) table.push({ type: 'abyss_knight', weight: 3 }); // Boss rare spawn
+        return table;
+    }
+
     // Prontera Field
     table.push({ type: 'poring', weight: Math.max(10, 45 - playerLevel * 3) });
     if (playerLevel >= 1) table.push({ type: 'lunatic', weight: 30 });
@@ -658,5 +1053,5 @@ export function pickRandomWaterMonster(playerLevel) {
 
 // All monsters combined (for lookup)
 export function getAllMonsters() {
-    return { ...MONSTERS, ...PAYON_MONSTERS, ...WATER_MONSTERS };
+    return { ...MONSTERS, ...PAYON_MONSTERS, ...GLAST_MONSTERS, ...MJOLNIR_MONSTERS, ...ABYSS_MONSTERS, ...WATER_MONSTERS };
 }

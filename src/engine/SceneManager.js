@@ -35,6 +35,54 @@ const MAP_CONFIGS = {
         waterColor: 0x2a5a4a,
         treeTypes: ['autumn', 'dead', 'pine', 'bush'],
         decorDensity: 1.3,
+    },
+    glast_heim: {
+        name: 'Glast Heim',
+        groundColor: 0x2a2035,
+        groundColor2: 0x1a1528,
+        pathColor: 0x4a3a5a,
+        fogColor: 0x1a1530,
+        skyTop: new THREE.Color(0x0d0a1a),
+        skyBottom: new THREE.Color(0x2a1a3a),
+        skyHorizon: new THREE.Color(0x5a2a6a),
+        ambientColor: 0x2a1a3a,
+        sunColor: 0x8060a0,
+        sunIntensity: 0.5,
+        waterColor: 0x1a0a2a,
+        treeTypes: ['dead', 'dead', 'dead'],
+        decorDensity: 0.6,
+    },
+    mjolnir: {
+        name: 'Mjolnir Mountains',
+        groundColor: 0x7a7060,
+        groundColor2: 0x5a5248,
+        pathColor: 0x8a8070,
+        fogColor: 0x8090a0,
+        skyTop: new THREE.Color(0x4a6080),
+        skyBottom: new THREE.Color(0xc0d0e0),
+        skyHorizon: new THREE.Color(0xe8eef5),
+        ambientColor: 0x607080,
+        sunColor: 0xfff0e0,
+        sunIntensity: 1.2,
+        waterColor: 0x5080a0,
+        treeTypes: ['pine', 'dead', 'pine'],
+        decorDensity: 0.5,
+    },
+    abyss_lake: {
+        name: 'Abyss Lake',
+        groundColor: 0x0a1020,
+        groundColor2: 0x050810,
+        pathColor: 0x1a2030,
+        fogColor: 0x050a18,
+        skyTop: new THREE.Color(0x020408),
+        skyBottom: new THREE.Color(0x0a1828),
+        skyHorizon: new THREE.Color(0x0a2040),
+        ambientColor: 0x0a1828,
+        sunColor: 0x2040a0,
+        sunIntensity: 0.3,
+        waterColor: 0x0a1a40,
+        treeTypes: ['dead', 'dead'],
+        decorDensity: 0.3,
     }
 };
 
@@ -154,7 +202,18 @@ export class SceneManager {
         this._createSkyDome(config);
         this._createGround(config);
         this._createWater(config);
-        this._createEnvironment(config);
+
+        // Map-specific environment
+        if (mapId === 'glast_heim') {
+            this._createGlastHeimEnvironment(config);
+        } else if (mapId === 'mjolnir') {
+            this._createMjolnirEnvironment(config);
+        } else if (mapId === 'abyss_lake') {
+            this._createAbyssLakeEnvironment(config);
+        } else {
+            this._createEnvironment(config);
+        }
+
         this._createPortals(mapId);
         this._createBirds();
 
@@ -1240,19 +1299,293 @@ export class SceneManager {
         this.envObjects.push(group);
     }
 
+    // ============ Glast Heim Environment ============
+    _createGlastHeimEnvironment(config) {
+        // --- Ruined stone pillars ---
+        const pillarPositions = [
+            [-8, -8], [-8, 8], [8, -8], [8, 8],
+            [-14, 0], [14, 0], [0, -14], [0, 14],
+            [-10, -4], [10, 4], [-4, 10], [4, -10],
+            [-16, -10], [16, 10], [-12, 12], [12, -12],
+        ];
+        pillarPositions.forEach(([x, z]) => {
+            if (!this._isOnLand(x, z)) return;
+            const height = 2 + Math.random() * 4;
+            const geo = new THREE.CylinderGeometry(
+                0.3 + Math.random() * 0.2,
+                0.4 + Math.random() * 0.2,
+                height, 6
+            );
+            const mat = new THREE.MeshLambertMaterial({
+                color: new THREE.Color(0x2a2035).lerp(new THREE.Color(0x1a1528), Math.random())
+            });
+            const pillar = new THREE.Mesh(geo, mat);
+            pillar.position.set(x, height / 2, z);
+            pillar.castShadow = true;
+            pillar.receiveShadow = true;
+            // Crack/tilt effect
+            pillar.rotation.z = (Math.random() - 0.5) * 0.15;
+            pillar.rotation.x = (Math.random() - 0.5) * 0.1;
+            this.scene.add(pillar);
+            this.envObjects.push(pillar);
+        });
+
+        // --- Ruined walls ---
+        const wallPositions = [
+            [-18, -5, 8, 0.5, 3], [18, 5, 8, 0.5, 3],
+            [-5, -18, 0.5, 8, 3], [5, 18, 0.5, 8, 3],
+            [-12, -12, 5, 0.5, 2.5], [12, 12, 5, 0.5, 2.5],
+        ];
+        wallPositions.forEach(([x, z, w, d, h]) => {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshLambertMaterial({ color: 0x1e1830 });
+            const wall = new THREE.Mesh(geo, mat);
+            wall.position.set(x, h / 2, z);
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            this.scene.add(wall);
+            this.envObjects.push(wall);
+        });
+
+        // --- Dead trees ---
+        const deadTreePositions = [
+            [-12, -10], [-15, 2], [10, -12], [13, 7],
+            [16, -6], [-17, -4], [-10, -16], [14, 13],
+            [-17, 10], [7, -17], [-5, -14], [17, -14],
+        ];
+        deadTreePositions.forEach(([x, z]) => {
+            if (this._isOnLand(x, z)) this._createTree(x, z, 'dead');
+        });
+
+        // --- Glowing purple mushrooms ---
+        for (let i = 0; i < 30; i++) {
+            const x = (Math.random() - 0.5) * 40;
+            const z = (Math.random() - 0.5) * 40;
+            if (!this._isOnLand(x, z)) continue;
+            this._createGlowMushroom(x, z, 0xaa40ff);
+        }
+
+        // --- Scattered bones/debris ---
+        for (let i = 0; i < 50; i++) {
+            const x = (Math.random() - 0.5) * 44;
+            const z = (Math.random() - 0.5) * 44;
+            if (!this._isOnLand(x, z)) continue;
+            this._createPebble(x, z);
+        }
+
+        // --- Eerie fog lights ---
+        const fogLightPositions = [
+            [-10, -10], [10, 10], [-10, 10], [10, -10], [0, 0]
+        ];
+        fogLightPositions.forEach(([x, z]) => {
+            const light = new THREE.PointLight(0x6020a0, 0.6, 12);
+            light.position.set(x, 1.5, z);
+            this.scene.add(light);
+            this.envObjects.push(light);
+        });
+    }
+
+    // ============ Mjolnir Mountains Environment ============
+    _createMjolnirEnvironment(config) {
+        // --- Large mountain boulders ---
+        const boulderPositions = [
+            [-10, -8, 2.5], [-6, -14, 2.0], [8, -10, 3.0], [12, -6, 1.8],
+            [-14, 4, 2.2], [14, 6, 2.8], [-8, 12, 2.0], [6, 14, 2.5],
+            [-16, -2, 3.5], [16, 2, 3.0], [0, -16, 2.0], [0, 16, 2.2],
+            [-12, 8, 1.5], [10, -14, 1.8], [-4, -18, 2.0], [4, 18, 1.6],
+        ];
+        boulderPositions.forEach(([x, z, scale]) => {
+            if (!this._isOnLand(x, z)) return;
+            const geo = new THREE.DodecahedronGeometry(scale, 0);
+            const shade = 0x60 + Math.floor(Math.random() * 0x20);
+            const mat = new THREE.MeshLambertMaterial({
+                color: new THREE.Color(shade / 255, (shade - 0x08) / 255, (shade - 0x10) / 255)
+            });
+            const boulder = new THREE.Mesh(geo, mat);
+            boulder.position.set(x, scale * 0.5, z);
+            boulder.rotation.set(Math.random(), Math.random(), Math.random());
+            boulder.castShadow = true;
+            boulder.receiveShadow = true;
+            this.scene.add(boulder);
+            this.envObjects.push(boulder);
+        });
+
+        // --- Pine trees ---
+        const pinePositions = [
+            [-12, -10], [-15, 2], [10, -12], [13, 7], [-8, 14],
+            [16, -6], [-17, -4], [6, 16], [-10, -16], [14, 13],
+        ];
+        pinePositions.forEach(([x, z]) => {
+            if (this._isOnLand(x, z)) this._createTree(x, z, 'pine');
+        });
+
+        // --- Snow patches ---
+        for (let i = 0; i < 60; i++) {
+            const x = (Math.random() - 0.5) * 44;
+            const z = (Math.random() - 0.5) * 44;
+            if (!this._isOnLand(x, z)) continue;
+            const snowGeo = new THREE.CircleGeometry(0.3 + Math.random() * 0.5, 6);
+            const snowMat = new THREE.MeshLambertMaterial({
+                color: 0xe8f0ff,
+                transparent: true,
+                opacity: 0.7,
+            });
+            const snow = new THREE.Mesh(snowGeo, snowMat);
+            snow.rotation.x = -Math.PI / 2;
+            snow.position.set(x, 0.02, z);
+            this.scene.add(snow);
+            this.envObjects.push(snow);
+        }
+
+        // --- Rocky debris ---
+        for (let i = 0; i < 80; i++) {
+            const x = (Math.random() - 0.5) * 46;
+            const z = (Math.random() - 0.5) * 46;
+            if (!this._isOnLand(x, z)) continue;
+            this._createPebble(x, z);
+        }
+
+        // --- Mountain atmosphere lights ---
+        const atmLights = [
+            [-15, -15], [15, 15], [-15, 15], [15, -15]
+        ];
+        atmLights.forEach(([x, z]) => {
+            const light = new THREE.PointLight(0xc0d0ff, 0.4, 20);
+            light.position.set(x, 5, z);
+            this.scene.add(light);
+            this.envObjects.push(light);
+        });
+    }
+
+    // ============ Abyss Lake Environment ============
+    _createAbyssLakeEnvironment(config) {
+        // --- Ancient stone formations ---
+        const stonePositions = [
+            [-8, -8], [-8, 8], [8, -8], [8, 8],
+            [-14, 0], [14, 0], [0, -14], [0, 14],
+            [-10, -4], [10, 4], [-4, 10], [4, -10],
+        ];
+        stonePositions.forEach(([x, z]) => {
+            if (!this._isOnLand(x, z)) return;
+            const height = 1.5 + Math.random() * 3;
+            const geo = new THREE.CylinderGeometry(
+                0.2 + Math.random() * 0.3,
+                0.5 + Math.random() * 0.3,
+                height, 5
+            );
+            const mat = new THREE.MeshLambertMaterial({ color: 0x0a1020 });
+            const stone = new THREE.Mesh(geo, mat);
+            stone.position.set(x, height / 2, z);
+            stone.castShadow = true;
+            this.scene.add(stone);
+            this.envObjects.push(stone);
+        });
+
+        // --- Glowing blue crystals ---
+        for (let i = 0; i < 40; i++) {
+            const x = (Math.random() - 0.5) * 42;
+            const z = (Math.random() - 0.5) * 42;
+            if (!this._isOnLand(x, z)) continue;
+            this._createGlowMushroom(x, z, 0x2060ff);
+        }
+
+        // --- Abyss coral/kelp formations ---
+        for (let i = 0; i < 25; i++) {
+            const x = (Math.random() - 0.5) * 38;
+            const z = (Math.random() - 0.5) * 38;
+            if (!this._isOnLand(x, z)) continue;
+            const h = 0.5 + Math.random() * 1.5;
+            const geo = new THREE.CylinderGeometry(0.05, 0.1, h, 4);
+            const mat = new THREE.MeshLambertMaterial({ color: 0x102040 });
+            const coral = new THREE.Mesh(geo, mat);
+            coral.position.set(x, h / 2, z);
+            coral.rotation.z = (Math.random() - 0.5) * 0.5;
+            this.scene.add(coral);
+            this.envObjects.push(coral);
+        }
+
+        // --- Scattered debris ---
+        for (let i = 0; i < 60; i++) {
+            const x = (Math.random() - 0.5) * 44;
+            const z = (Math.random() - 0.5) * 44;
+            if (!this._isOnLand(x, z)) continue;
+            this._createPebble(x, z);
+        }
+
+        // --- Deep abyss glow lights ---
+        const abyssLights = [
+            [0, 0, 0x1030a0],
+            [-12, -12, 0x0020a0],
+            [12, 12, 0x0020a0],
+            [-12, 12, 0x102080],
+            [12, -12, 0x102080],
+        ];
+        abyssLights.forEach(([x, z, color]) => {
+            const light = new THREE.PointLight(color, 0.8, 15);
+            light.position.set(x, 0.5, z);
+            this.scene.add(light);
+            this.envObjects.push(light);
+        });
+    }
+
+    // ============ Glow Mushroom Helper ============
+    _createGlowMushroom(x, z, color = 0xaa40ff) {
+        const group = new THREE.Group();
+        const stemGeo = new THREE.CylinderGeometry(0.05, 0.08, 0.3, 5);
+        const stemMat = new THREE.MeshLambertMaterial({ color: 0x201828 });
+        const stem = new THREE.Mesh(stemGeo, stemMat);
+        stem.position.y = 0.15;
+        group.add(stem);
+
+        const capGeo = new THREE.SphereGeometry(0.18, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+        const capMat = new THREE.MeshBasicMaterial({ color });
+        const cap = new THREE.Mesh(capGeo, capMat);
+        cap.position.y = 0.3;
+        group.add(cap);
+
+        // Glow light
+        const glowLight = new THREE.PointLight(color, 0.4, 3);
+        glowLight.position.set(0, 0.4, 0);
+        group.add(glowLight);
+
+        group.position.set(x, 0, z);
+        const scale = 0.7 + Math.random() * 0.8;
+        group.scale.setScalar(scale);
+        this.scene.add(group);
+        this.envObjects.push(group);
+    }
+
     // ============ Portals ============
     _createPortals(mapId) {
-        const portalPositions = mapId === 'prontera'
-            ? [{ x: 25, z: -5, target: 'payon' }]
-            : [{ x: -25, z: 0, target: 'prontera' }];
+        // Portal color by destination tier
+        const PORTAL_COLORS = {
+            prontera: 0x40c0ff,   // Cyan — starter
+            payon:    0x60ff80,   // Green — forest
+            glast_heim: 0xc040ff, // Purple — ruins
+            mjolnir:  0xffa040,   // Orange — mountains
+            abyss_lake: 0x2060ff, // Deep Blue — abyss
+        };
+
+        const PORTAL_MAP = {
+            prontera:   [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }],
+            payon:      [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
+            glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
+            mjolnir:    [{ x: -25, z: 0, target: 'payon' }, { x: 25, z: 0, target: 'abyss_lake' }],
+            abyss_lake: [{ x: 25, z: 0, target: 'glast_heim' }, { x: -25, z: 0, target: 'mjolnir' }],
+        };
+
+        const portalPositions = PORTAL_MAP[mapId] || [{ x: 25, z: 0, target: 'prontera' }];
 
         portalPositions.forEach(p => {
             const group = new THREE.Group();
             group.userData.targetMap = p.target;
 
+            // Portal color based on destination
+            const portalColor = PORTAL_COLORS[p.target] || 0x40c0ff;
+
             // Portal ring
             const ringGeo = new THREE.TorusGeometry(1.5, 0.15, 8, 20);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0x40c0ff });
+            const ringMat = new THREE.MeshBasicMaterial({ color: portalColor });
             const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.rotation.x = Math.PI / 2;
             ring.position.y = 1.8;
@@ -1261,7 +1594,7 @@ export class SceneManager {
             // Inner glow
             const glowGeo = new THREE.CircleGeometry(1.3, 16);
             const glowMat = new THREE.MeshBasicMaterial({
-                color: 0x60d0ff,
+                color: portalColor,
                 transparent: true,
                 opacity: 0.4,
                 side: THREE.DoubleSide,
@@ -1270,6 +1603,10 @@ export class SceneManager {
             glow.rotation.x = -Math.PI / 2;
             glow.position.y = 1.8;
             group.add(glow);
+
+            // Portal label (destination name)
+            const destConfig = MAP_CONFIGS[p.target];
+            group.userData.destName = destConfig ? destConfig.name : p.target;
 
             // Base pillars
             [-1.2, 1.2].forEach(xOff => {
@@ -1282,7 +1619,7 @@ export class SceneManager {
             });
 
             // Floating particles (point light)
-            const particleLight = new THREE.PointLight(0x40c0ff, 0.8, 8);
+            const particleLight = new THREE.PointLight(portalColor, 0.8, 8);
             particleLight.position.set(0, 2, 0);
             group.add(particleLight);
 
