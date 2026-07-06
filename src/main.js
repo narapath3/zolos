@@ -280,9 +280,13 @@ function gameLoop(time) {
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 7 : 4;
         character.manualMove(dirX, dirZ, dt);
-    } else if (autoPath && !(combatSystem && combatSystem.autoFarm)) {
-        // Skip autoPath movement when auto-farm handles movement via CombatSystem
-        if (!character.moveToward(autoPath, dt)) autoPath = null;
+    } else if (autoPath) {
+        // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
+        if (combatSystem && combatSystem.autoFarm) {
+            autoPath = null;
+        } else {
+            if (!character.moveToward(autoPath, dt)) autoPath = null;
+        }
     }
 
     // 2. Environment Check (Water)

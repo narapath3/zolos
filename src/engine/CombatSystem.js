@@ -82,7 +82,9 @@ export class CombatSystem {
         } else {
             // Reset Target reference if we had any
             this.currentTarget = null;
-            if (this.character.state === 'attacking' && this.character.animTimer >= 0.5) {
+            // Ensure character returns to idle state when no target is found, 
+            // especially during autoFarm to prevent getting stuck in 'walking' or 'attacking' state
+            if (this.character.state === 'attacking' || this.character.state === 'walking' || this.character.state === 'running') {
                 this.character.state = 'idle';
             }
         }
