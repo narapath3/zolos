@@ -82,11 +82,18 @@ export class CombatSystem {
         } else {
             // Reset Target reference if we had any
             this.currentTarget = null;
+            
+            // Fix C: Handle case where AUTO finds no monster target
             // Ensure character returns to idle state when no target is found, 
             // especially during autoFarm to prevent getting stuck in 'walking' or 'attacking' state
             if (this.character.state === 'attacking' || this.character.state === 'walking' || this.character.state === 'running') {
                 this.character.state = 'idle';
             }
+        }
+
+        // Fix B: Ensure globalCooldown reset always returns character to idle
+        if (this.globalCooldown <= 0 && this.character.state === 'attacking' && !target) {
+            this.character.state = 'idle';
         }
     }
 
@@ -188,6 +195,11 @@ export class CombatSystem {
         }
         if (this.currentTarget === monster) {
             this.currentTarget = null;
+        }
+
+        // Fix A: Reset state when monster is killed
+        if (this.character.state === 'attacking') {
+            this.character.state = 'idle';
         }
     }
 }

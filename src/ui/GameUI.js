@@ -336,6 +336,20 @@ export class GameUI {
       } else if (this.character) {
         this.character.equippedShield = null;
       }
+
+      const equippedHat = this.inventory.find(i => i.item_type === 'hat' && i.stats && i.stats.equipped === true);
+      if (equippedHat && this.character) {
+        this.character.setHat(equippedHat.item_name);
+      } else if (this.character) {
+        this.character.setHat(null);
+      }
+
+      const equippedGlasses = this.inventory.find(i => i.item_type === 'glasses' && i.stats && i.stats.equipped === true);
+      if (equippedGlasses && this.character) {
+        this.character.setGlasses(equippedGlasses.item_name);
+      } else if (this.character) {
+        this.character.setGlasses(null);
+      }
     } catch (e) {
       console.error('Failed to load inventory:', e);
       this.inventory = [];
@@ -481,7 +495,7 @@ export class GameUI {
     if (item.item_type === 'consumable') {
       useBtn.style.display = 'block';
       useBtn.textContent = `ใช้งาน (x${item.quantity})`;
-    } else if (['weapon', 'fishing_rod', 'armor', 'shield'].includes(item.item_type)) {
+    } else if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(item.item_type)) {
       useBtn.style.display = 'block';
       const isEquipped = item.stats && item.stats.equipped === true;
       useBtn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
@@ -498,7 +512,7 @@ export class GameUI {
 
     const item = this.inventory[itemIdx];
 
-    if (['weapon', 'fishing_rod', 'armor', 'shield'].includes(item.item_type)) {
+    if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(item.item_type)) {
       await this._toggleEquipItem(item);
       return;
     }
@@ -561,6 +575,10 @@ export class GameUI {
         this.character.equippedArmor = null;
       } else if (item.item_type === 'shield') {
         this.character.equippedShield = null;
+      } else if (item.item_type === 'hat') {
+        this.character.setHat(null);
+      } else if (item.item_type === 'glasses') {
+        this.character.setGlasses(null);
       }
       if (this.characterId) {
         await updateInventoryItemStats(this.characterId, item.item_name, {});
@@ -592,6 +610,10 @@ export class GameUI {
         this.character.equippedArmor = item.item_name;
       } else if (item.item_type === 'shield') {
         this.character.equippedShield = item.item_name;
+      } else if (item.item_type === 'hat') {
+        this.character.setHat(item.item_name);
+      } else if (item.item_type === 'glasses') {
+        this.character.setGlasses(item.item_name);
       }
 
       if (this.characterId) {

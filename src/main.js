@@ -118,9 +118,36 @@ async function initGame(charData) {
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
 
+    // Fix D: Clear conflicting autoPath on AUTO activation
+    const autoBtn = document.getElementById('btn-auto-farm');
+    if (autoBtn) {
+        autoBtn.addEventListener('click', () => {
+            if (combatSystem && combatSystem.autoFarm) {
+                autoPath = null;
+            }
+        });
+    }
+
     // Initialize Admin UI
     window.adminUI = new AdminUI();
     window.adminUI.checkAdmin(charData.user_id);
+
+    // Fix C: Wire profileSaveCallback in main.js
+    if (gameUI) {
+        gameUI.setupProfileSaveCallback((data) => {
+            if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
+            if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
+            if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
+            if (data.hat !== undefined) character.setHat(data.hat);
+            if (data.glasses !== undefined) character.setGlasses(data.glasses);
+            if (data.weapon !== undefined) character.equipWeapon(data.weapon);
+
+            // Persist changes
+            character.saveStatsToDatabase();
+            // Refresh UI
+            gameUI.updateStats(character.stats);
+        });
+    }
 
     // Join multiplayer
     joinPresence(
