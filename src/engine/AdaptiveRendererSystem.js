@@ -66,7 +66,7 @@ export class AdaptiveRendererSystem {
       isHighEnd: !isMobile || (cores >= 8 && memory >= 8),
     };
     
-    console.log('📱 Device Type:', this.deviceType);
+    // console.log('📱 Device Type:', this.deviceType);
     
     // ตั้งค่าคุณภาพเบื้องต้นตามประเภทอุปกรณ์
     if (this.deviceType.isLowEnd) {
@@ -112,7 +112,7 @@ export class AdaptiveRendererSystem {
     // ตั้งค่า Precision สำหรับ Shader
     this.renderer.precision = this.deviceType.isLowEnd ? 'lowp' : 'mediump';
     
-    console.log(`✅ Renderer configured for ${this.qualityLevel} quality`);
+    // console.log(`✅ Renderer configured for ${this.qualityLevel} quality`);
   }
 
   /**
@@ -122,7 +122,7 @@ export class AdaptiveRendererSystem {
     this.performanceInterval = setInterval(() => {
       this.updatePerformanceMetrics();
       this.adaptQualityBasedOnPerformance();
-    }, 1000); // ตรวจสอบทุก 1 วินาที
+    }, 2000); // ตรวจสอบทุก 2 วินาที (reduced frequency)
   }
 
   /**
@@ -147,7 +147,7 @@ export class AdaptiveRendererSystem {
     
     this.lastTime = now;
     
-    console.log(`📊 FPS: ${this.fps}, Frame Time: ${this.frameTime.toFixed(2)}ms`);
+    // console.log(`📊 FPS: ${this.fps}, Frame Time: ${this.frameTime.toFixed(2)}ms`);
   }
 
   /**
@@ -169,7 +169,7 @@ export class AdaptiveRendererSystem {
     // ถ้าคุณภาพเปลี่ยน ให้ปรับการตั้งค่า
     if (previousQuality !== this.qualityLevel) {
       this.applyQualitySettings();
-      console.log(`🔄 Quality changed: ${previousQuality} → ${this.qualityLevel}`);
+      // Quality changed silently
     }
   }
 
@@ -250,7 +250,7 @@ export class AdaptiveRendererSystem {
    */
   updateParticleQuality() {
     // ส่วนนี้จะถูกเรียกจาก ParticleSystem
-    console.log(`🎨 Particle Quality: ${(this.particleQuality * 100).toFixed(0)}%`);
+    // console.log(`🎨 Particle Quality: ${(this.particleQuality * 100).toFixed(0)}%`);
   }
 
   /**

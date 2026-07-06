@@ -209,7 +209,10 @@ export class ParticleSystem {
         // Update splash effects
         for (let i = this.splashEffects.length - 1; i >= 0; i--) {
             const effect = this.splashEffects[i];
-            effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+            // Avoid velocity.clone() allocation every frame
+            effect.mesh.position.x += effect.velocity.x * deltaTime;
+            effect.mesh.position.y += effect.velocity.y * deltaTime;
+            effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.velocity.y -= 9.8 * deltaTime;
             effect.life -= deltaTime;
             effect.mesh.material.opacity = Math.max(0, effect.life / (0.6 + 0.2));
@@ -238,7 +241,10 @@ export class ParticleSystem {
         for (let i = this.hitEffects.length - 1; i >= 0; i--) {
             const effect = this.hitEffects[i];
             effect.velocity.y -= effect.gravity * deltaTime;
-            effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+            // Avoid velocity.clone() allocation every frame
+            effect.mesh.position.x += effect.velocity.x * deltaTime;
+            effect.mesh.position.y += effect.velocity.y * deltaTime;
+            effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.life -= deltaTime;
             effect.mesh.material.opacity = Math.max(0, effect.life / 0.8);
 
@@ -252,7 +258,10 @@ export class ParticleSystem {
         for (let i = this.deathEffects.length - 1; i >= 0; i--) {
             const effect = this.deathEffects[i];
             effect.velocity.y -= effect.gravity * deltaTime;
-            effect.mesh.position.add(effect.velocity.clone().multiplyScalar(deltaTime));
+            // Avoid velocity.clone() allocation every frame
+            effect.mesh.position.x += effect.velocity.x * deltaTime;
+            effect.mesh.position.y += effect.velocity.y * deltaTime;
+            effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.life -= deltaTime;
             effect.mesh.material.opacity = Math.max(0, effect.life / 1.5);
 

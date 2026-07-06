@@ -104,7 +104,7 @@ export class SceneManager {
         this.sunLight = new THREE.DirectionalLight(0xffe8c0, 1.4);
         this.sunLight.position.set(12, 25, 10);
         this.sunLight.castShadow = true;
-        this.sunLight.shadow.mapSize.set(2048, 2048);
+        this.sunLight.shadow.mapSize.set(1024, 1024); // Reduced from 2048 for performance
         this.sunLight.shadow.camera.near = 0.5;
         this.sunLight.shadow.camera.far = 80;
         this.sunLight.shadow.camera.left = -25;
@@ -268,7 +268,7 @@ export class SceneManager {
         alignGroup.name = "sunbeams";
         const sunDir = new THREE.Vector3(-12, -25, -10).normalize();
 
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 2; i++) { // Reduced from 4 for performance
             const beam = new THREE.Mesh(rayGeo.clone(), rayMat.clone());
             const offset = new THREE.Vector3(
                 (Math.random() - 0.5) * 20,
@@ -297,7 +297,7 @@ export class SceneManager {
 
     _createBirds() {
         this.birds = [];
-        const birdCount = 6;
+        const birdCount = 4; // Reduced from 6 for performance
 
         const bodyGeo = new THREE.BoxGeometry(0.16, 0.08, 0.38);
         const bodyMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // pure white stylized look
@@ -364,7 +364,7 @@ export class SceneManager {
             flatShading: true,
         });
 
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 8; i++) { // Reduced from 14 for performance
             const cloudGroup = new THREE.Group();
 
             // Build fluffy overlapping box modules (voxel style!)
@@ -424,7 +424,7 @@ export class SceneManager {
     _createGround(config) {
         // Main textured ground with vertex colors
         const size = 70;
-        const segments = 60; // Higher density for smooth river curves
+        const segments = 40; // Reduced from 60 for better performance
         const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
 
         // Add vertex colors for terrain variation
@@ -550,7 +550,7 @@ export class SceneManager {
     // ============ Water ============
     _createWater(config) {
         // Large river water plane centered around z = -2, length 80, width 32
-        const waterGeo = new THREE.PlaneGeometry(80, 40, 80, 30);
+        const waterGeo = new THREE.PlaneGeometry(80, 40, 40, 16); // Reduced segments for performance
         const waterTex = this._createWaterTexture();
         const waterMat = new THREE.MeshPhongMaterial({
             color: config.waterColor,
@@ -707,8 +707,8 @@ export class SceneManager {
 
         const density = config.decorDensity;
 
-        // --- Flowers (doubled) ---
-        for (let i = 0; i < Math.floor(110 * density); i++) {
+        // --- Flowers (reduced for performance) ---
+        for (let i = 0; i < Math.floor(55 * density); i++) {
             const x = (Math.random() - 0.5) * 42;
             const z = (Math.random() - 0.5) * 42;
             if (Math.abs(x) < 1.5 && Math.abs(z) < 1.5) continue;
@@ -718,8 +718,8 @@ export class SceneManager {
             this._createFlower(x, z);
         }
 
-        // --- Grass tufts (tripled) ---
-        for (let i = 0; i < Math.floor(260 * density); i++) {
+        // --- Grass tufts (reduced for performance) ---
+        for (let i = 0; i < Math.floor(100 * density); i++) {
             const x = (Math.random() - 0.5) * 48;
             const z = (Math.random() - 0.5) * 48;
             if (!this._isOnLand(x, z)) continue;
@@ -735,16 +735,16 @@ export class SceneManager {
             this._createMushroom(x, z);
         }
 
-        // --- Pebbles / small stones ---
-        for (let i = 0; i < Math.floor(120 * density); i++) {
+        // --- Pebbles / small stones (reduced for performance) ---
+        for (let i = 0; i < Math.floor(50 * density); i++) {
             const x = (Math.random() - 0.5) * 46;
             const z = (Math.random() - 0.5) * 46;
             if (!this._isOnLand(x, z)) continue;
             this._createPebble(x, z);
         }
 
-        // --- Clover / ground cover patches ---
-        for (let i = 0; i < Math.floor(55 * density); i++) {
+        // --- Clover / ground cover patches (reduced for performance) ---
+        for (let i = 0; i < Math.floor(25 * density); i++) {
             const x = (Math.random() - 0.5) * 40;
             const z = (Math.random() - 0.5) * 40;
             if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
@@ -752,8 +752,8 @@ export class SceneManager {
             this._createCloverPatch(x, z);
         }
 
-        // --- Fallen leaf piles ---
-        for (let i = 0; i < Math.floor(35 * density); i++) {
+        // --- Fallen leaf piles (reduced for performance) ---
+        for (let i = 0; i < Math.floor(15 * density); i++) {
             const x = (Math.random() - 0.5) * 38;
             const z = (Math.random() - 0.5) * 38;
             if (!this._isOnLand(x, z)) continue;
@@ -1695,17 +1695,21 @@ export class SceneManager {
     updateAnimations(dt) {
         this.time += dt;
 
-        // Animate water waves
+        // Animate water waves (throttled: update every other frame)
+        if (this.waterMesh && this._waterFrameSkip === undefined) this._waterFrameSkip = 0;
         if (this.waterMesh) {
-            const positions = this.waterMesh.geometry.attributes.position;
-            for (let i = 0; i < positions.count; i++) {
-                const x = positions.getX(i);
-                const y = positions.getY(i);
-                const wave = Math.sin(x * 2 + this.time * 2) * 0.04 +
-                    Math.cos(y * 3 + this.time * 1.5) * 0.03;
-                positions.setZ(i, wave);
+            this._waterFrameSkip = (this._waterFrameSkip + 1) % 2;
+            if (this._waterFrameSkip === 0) {
+                const positions = this.waterMesh.geometry.attributes.position;
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const y = positions.getY(i);
+                    const wave = Math.sin(x * 2 + this.time * 2) * 0.04 +
+                        Math.cos(y * 3 + this.time * 1.5) * 0.03;
+                    positions.setZ(i, wave);
+                }
+                positions.needsUpdate = true;
             }
-            positions.needsUpdate = true;
         }
 
         // Animate voxel clouds
@@ -1923,8 +1927,9 @@ export class SceneManager {
             }
         }
 
-        // Update the fishing line curve dynamically
-        if (this._fishingLineMesh && this._fishingPlayerPos) {
+        // Update the fishing line curve dynamically (throttled: every 2nd frame)
+        this._fishingLineFrame = ((this._fishingLineFrame || 0) + 1) % 2;
+        if (this._fishingLineFrame === 0 && this._fishingLineMesh && this._fishingPlayerPos) {
             const pp = this._fishingPlayerPos;
             const bp = this._fishingBobber.position;
             const curve = new THREE.QuadraticBezierCurve3(
@@ -1942,7 +1947,7 @@ export class SceneManager {
     }
 
     _createDetailTexture() {
-        const size = 1024;
+        const size = 512; // Reduced from 1024 for faster startup
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
@@ -1971,7 +1976,7 @@ export class SceneManager {
         }
 
         // Layer 2: Fine soil grain (tiny specks)
-        for (let i = 0; i < 80000; i++) {
+        for (let i = 0; i < 20000; i++) { // Reduced from 80000 for faster startup
             const x = Math.random() * size;
             const y = Math.random() * size;
             const v = Math.random();

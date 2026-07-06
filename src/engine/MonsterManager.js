@@ -627,15 +627,20 @@ class Monster {
         this.bodyMesh.scale.x = 1 - bounce * 0.15;
         this.bodyMesh.scale.z = 1 - bounce * 0.15;
 
-        // Recursive hit flash for all bodyMesh children
+        // Recursive hit flash for all bodyMesh children (only update when flash state changes)
         const flashIntensity = this.hitFlash > 0 ? this.hitFlash * 5 : 0;
         const flashColor = this.hitFlash > 0 ? 0xff4040 : 0x000000;
-        this.bodyMesh.traverse(child => {
-            if (child.isMesh && child.material && child.material.emissive) {
-                child.material.emissive.setHex(flashColor);
-                child.material.emissiveIntensity = flashIntensity;
-            }
-        });
+        const wasFlashing = this._wasFlashing || false;
+        const isFlashing = this.hitFlash > 0;
+        if (isFlashing || wasFlashing !== isFlashing) {
+            this._wasFlashing = isFlashing;
+            this.bodyMesh.traverse(child => {
+                if (child.isMesh && child.material && child.material.emissive) {
+                    child.material.emissive.setHex(flashColor);
+                    child.material.emissiveIntensity = flashIntensity;
+                }
+            });
+        }
 
         // Wander AI
         this.wanderTimer -= dt;
@@ -709,14 +714,17 @@ class Monster {
             this.isMoving = false;
         }
 
-        // Billboard HP bar to camera
+        // Billboard HP bar to camera (throttled: update every 3rd frame)
         if (camera) {
-            this.hpBarFill.lookAt(camera.position);
-            this.hpBarFill.parent.children.forEach(child => {
-                if (child.geometry && child.geometry.type === 'PlaneGeometry') {
-                    child.lookAt(camera.position);
-                }
-            });
+            this._billboardFrame = ((this._billboardFrame || 0) + 1) % 3;
+            if (this._billboardFrame === 0) {
+                this.hpBarFill.lookAt(camera.position);
+                this.hpBarFill.parent.children.forEach(child => {
+                    if (child.geometry && child.geometry.type === 'PlaneGeometry') {
+                        child.lookAt(camera.position);
+                    }
+                });
+            }
         }
     }
 

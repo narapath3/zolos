@@ -35,6 +35,12 @@ let onlinePlayers = [];
 const remotePlayersMap = new Map();
 let lastBroadcastTime = 0;
 let portalCooldown = 0;
+let lastMinimapTime = 0;
+let lastHUDTime = 0;
+let lastStatsTime = 0;
+let fpsFrameCount = 0;
+let fpsLastTime = 0;
+let fpsEl = null;
 // Fishing state machine
 let fishingState = 'idle'; // idle | walking | casting | waiting | catching
 let fishingTimer = 0;
@@ -61,18 +67,16 @@ async function initGame() {
     soundManager = new SoundManager();
     inputManager = new InputManager();
 
-    // ============ Initialize Extreme Optimization Systems (Temporarily Disabled for Debugging) ============
-    // // Initialize Adaptive Renderer System
-    // adaptiveRenderer = new AdaptiveRendererSystem(sceneManager.renderer, sceneManager.camera, sceneManager.scene);
-    // // console.log('✅ Adaptive Renderer System initialized');
+    // ============ Initialize Optimization Systems ============
+    // Initialize Adaptive Renderer System
+    adaptiveRenderer = new AdaptiveRendererSystem(sceneManager.renderer, sceneManager.camera, sceneManager.scene);
     
-    // // Initialize GPU Instancing System
-    // gpuInstancing = new GPUInstancingSystem(sceneManager.scene);
-    // // console.log('✅ GPU Instancing System initialized');
+    // Initialize GPU Instancing System
+    gpuInstancing = new GPUInstancingSystem(sceneManager.scene);
     
-    // // Expose for debugging
-    // // window.adaptiveRenderer = adaptiveRenderer;
-    // // window.gpuInstancing = gpuInstancing;
+    // Expose for debugging
+    window.adaptiveRenderer = adaptiveRenderer;
+    window.gpuInstancing = gpuInstancing;
 
     // Init UI
     gameUI = new GameUI(character, soundManager);
@@ -777,14 +781,21 @@ function gameLoop() {
         lastBroadcastTime = now;
     }
 
-    // Update UI every few frames
-    if (Math.random() < 0.3) {
+    // Update HUD every 100ms (not every frame)
+    if (now - lastHUDTime > 100) {
         gameUI.updateHUD(character.stats);
-        gameUI.updateStats(character.stats);
+        lastHUDTime = now;
     }
 
-    // Update Mini-map every frame
-    if (gameUI && character && character.isAlive()) {
+    // Update Stats panel every 500ms (only if stats panel is open)
+    const statsPanel = document.getElementById('stats-panel');
+    if (now - lastStatsTime > 500 && statsPanel && statsPanel.style.display !== 'none') {
+        gameUI.updateStats(character.stats);
+        lastStatsTime = now;
+    }
+
+    // Update Mini-map every 80ms (not every frame)
+    if (now - lastMinimapTime > 80 && gameUI && character && character.isAlive()) {
         const aliveMonsters = monsters ? monsters.getAlive() : [];
         const portals = sceneManager ? sceneManager.getPortals() : [];
         const npc = sceneManager ? sceneManager.getNPC() : null;
@@ -796,6 +807,16 @@ function gameLoop() {
             remotePlayersMap,
             sceneManager ? sceneManager.currentMap : 'prontera'
         );
+        lastMinimapTime = now;
+    }
+
+    // FPS Counter
+    fpsFrameCount++;
+    if (now - fpsLastTime >= 1000) {
+        if (!fpsEl) fpsEl = document.getElementById('fps-counter');
+        if (fpsEl) fpsEl.textContent = `FPS: ${fpsFrameCount}`;
+        fpsFrameCount = 0;
+        fpsLastTime = now;
     }
 
     // Render
