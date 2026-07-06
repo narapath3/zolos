@@ -61,18 +61,18 @@ async function initGame() {
     soundManager = new SoundManager();
     inputManager = new InputManager();
 
-    // ============ Initialize Extreme Optimization Systems ============
-    // Initialize Adaptive Renderer System
-    adaptiveRenderer = new AdaptiveRendererSystem(sceneManager.renderer, sceneManager.camera, sceneManager.scene);
-    console.log('✅ Adaptive Renderer System initialized');
+    // ============ Initialize Extreme Optimization Systems (Temporarily Disabled for Debugging) ============
+    // // Initialize Adaptive Renderer System
+    // adaptiveRenderer = new AdaptiveRendererSystem(sceneManager.renderer, sceneManager.camera, sceneManager.scene);
+    // // console.log('✅ Adaptive Renderer System initialized');
     
-    // Initialize GPU Instancing System
-    gpuInstancing = new GPUInstancingSystem(sceneManager.scene);
-    console.log('✅ GPU Instancing System initialized');
+    // // Initialize GPU Instancing System
+    // gpuInstancing = new GPUInstancingSystem(sceneManager.scene);
+    // // console.log('✅ GPU Instancing System initialized');
     
-    // Expose for debugging
-    window.adaptiveRenderer = adaptiveRenderer;
-    window.gpuInstancing = gpuInstancing;
+    // // Expose for debugging
+    // // window.adaptiveRenderer = adaptiveRenderer;
+    // // window.gpuInstancing = gpuInstancing;
 
     // Init UI
     gameUI = new GameUI(character, soundManager);
@@ -146,8 +146,10 @@ async function initGame() {
         gameUI.updateStats(character.stats);
     });
 
-    // Expose for debugging (already exposed adaptive systems above)
+    // Expose for debugging
     window.sceneManager = sceneManager;
+    // window.adaptiveRenderer = adaptiveRenderer; // Re-expose if needed after debugging
+    // window.gpuInstancing = gpuInstancing; // Re-expose if needed after debugging
     window.character = character;
     window.monsters = monsters;
     window.gameUI = gameUI;
