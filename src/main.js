@@ -86,7 +86,9 @@ async function initGame(charData) {
                 if (soundManager) soundManager.playAtkSound();
                 if (gameUI) {
                     gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
-                    gameUI.triggerScreenShake(event.critical);
+                    if (event.critical) {
+                        gameUI.triggerScreenShake(true);
+                    }
                 }
                 break;
             case 'monsterAttack':
