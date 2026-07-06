@@ -913,11 +913,40 @@ export class CharacterManager {
         this.stats.total_kills = data.total_kills || 0;
         this.stats.play_time = data.play_time || 0;
         
+        // Load appearance if available
+        if (data.body_color) this.setBodyColor(data.body_color);
+        if (data.hair_color) this.setHairColor(data.hair_color);
+        if (data.pants_color) this.setPantsColor(data.pants_color);
+        if (data.hat) this.setHat(data.hat);
+        if (data.glasses) this.setGlasses(data.glasses);
+        if (data.weapon) this.equipWeapon(data.weapon);
+
         // Ensure starting position is safe
         this.baseY = 1.2;
         this.mesh.position.set(0, 1.2, 10);
         
         this.updateNameTag();
+    }
+
+    getAppearance() {
+        return {
+            bodyColor: this.bodyColor,
+            hairColor: this.hairColor,
+            pantsColor: this.pantsColor,
+            hat: this.equippedHat,
+            glasses: this.equippedGlasses,
+            weapon: this.equippedWeapon
+        };
+    }
+
+    applyAppearance(app) {
+        if (!app) return;
+        if (app.bodyColor !== undefined) this.setBodyColor(app.bodyColor);
+        if (app.hairColor !== undefined) this.setHairColor(app.hairColor);
+        if (app.pantsColor !== undefined) this.setPantsColor(app.pantsColor);
+        if (app.hat !== undefined) this.setHat(app.hat);
+        if (app.glasses !== undefined) this.setGlasses(app.glasses);
+        if (app.weapon !== undefined) this.equipWeapon(app.weapon);
     }
 
     async saveStatsToDatabase() {

@@ -104,28 +104,31 @@ async function initGame(charData) {
             if (p.userId === userId) return;
             let rp = remotePlayersMap.get(p.userId);
             if (!rp) {
-                // Create a simple visual for other players
-                const group = new THREE.Group();
-                const bodyGeo = new THREE.BoxGeometry(0.8, 1.8, 0.4);
-                const bodyMat = new THREE.MeshLambertMaterial({ color: 0x3498db });
-                const body = new THREE.Mesh(bodyGeo, bodyMat);
-                body.position.y = 0.9;
-                group.add(body);
+                // Create a real hero model for the remote player
+                const remoteChar = new CharacterManager(sceneManager.scene);
+                remoteChar.stats.name = p.username || 'Adventurer';
+                remoteChar.stats.level = p.level || 1;
+                remoteChar.updateNameTag();
                 
-                const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-                const headMat = new THREE.MeshLambertMaterial({ color: 0xffdbac });
-                const head = new THREE.Mesh(headGeo, headMat);
-                head.position.y = 2.0;
-                group.add(head);
-                
-                sceneManager.scene.add(group);
-                rp = { mesh: group };
+                rp = { 
+                    character: remoteChar,
+                    mesh: remoteChar.mesh 
+                };
                 remotePlayersMap.set(p.userId, rp);
             }
             
-            // Smoothly move or snap for now
+            // Update position and appearance
             rp.mesh.position.set(p.x, p.y, p.z);
             rp.mesh.rotation.y = p.rY;
+            
+            if (rp.character) {
+                rp.character.state = p.state || 'idle';
+                if (p.appearance) {
+                    rp.character.applyAppearance(p.appearance);
+                }
+                // Update animations for remote player
+                rp.character.update(dt);
+            }
         },
         (chatMsg) => {
             if (gameUI) gameUI.addChatMessage(chatMsg.username, chatMsg.message);
@@ -321,7 +324,7 @@ function gameLoop(time) {
     
     const now = performance.now();
     if (now - lastBroadcastTime > 100) {
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, {});
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance());
         lastBroadcastTime = now;
     }
     
