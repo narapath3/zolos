@@ -351,11 +351,7 @@ export class GameUI {
         this.character.setGlasses(null);
       }
 
-      // Also restore weapon if not already handled
-      const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
-      if (equippedWeapon && this.character) {
-        this.character.equipWeapon(equippedWeapon.item_name);
-      }
+      // Already handled weapon restoration above
     } catch (e) {
       console.error('Failed to load inventory:', e);
       this.inventory = [];
