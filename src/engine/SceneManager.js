@@ -424,7 +424,7 @@ export class SceneManager {
     _createGround(config) {
         // Main textured ground with vertex colors
         const size = 70;
-        const segments = 40; // Reduced from 60 for better performance
+        const segments = 60; // Restored to 60 to fix terrain calculation bugs
         const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
 
         // Add vertex colors for terrain variation
@@ -447,9 +447,9 @@ export class SceneManager {
 
             // Carve riverbed and build river banks
             if (distToRiver < 7.0) {
-                // Smooth valley drop down to -1.3
+                // Smooth valley drop down to -1.45 (slightly deeper for visibility)
                 const t = distToRiver / 7.0; // 0 (center) to 1 (bank)
-                height = -1.3 * (1.0 - t * t);
+                height = -1.45 * (1.0 - t * t);
             } else if (distToRiver < 10.0) {
                 // Raised bank ridge sloping down to ground
                 const t = (distToRiver - 7.0) / 3.0; // 0 to 1
@@ -564,7 +564,7 @@ export class SceneManager {
         });
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
-        water.position.set(0, -0.26, -2);
+        water.position.set(0, -0.42, -2); // Lowered from -0.26 to prevent overlapping with ground
         water.receiveShadow = true;
         this.scene.add(water);
         this.envObjects.push(water);
