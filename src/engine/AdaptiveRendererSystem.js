@@ -71,13 +71,13 @@ export class AdaptiveRendererSystem {
     // ตั้งค่าคุณภาพเบื้องต้นตามประเภทอุปกรณ์
     if (this.deviceType.isLowEnd) {
       this.qualityLevel = 'ultra-low';
-      this.pixelRatio = 0.5;
+      this.pixelRatio = 0.75; // Set minimum pixel ratio to 0.75 for better visual quality
     } else if (this.deviceType.isMidRange) {
       this.qualityLevel = 'medium';
       this.pixelRatio = 0.75;
     } else {
       this.qualityLevel = 'high';
-      this.pixelRatio = Math.min(window.devicePixelRatio, 2);
+      this.pixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 0.75); // Ensure pixel ratio is at least 0.75
     }
   }
 
@@ -133,7 +133,15 @@ export class AdaptiveRendererSystem {
     const deltaTime = now - this.lastTime;
     
     if (deltaTime > 0) {
-      this.fps = Math.round(1000 / deltaTime);
+      // Calculate FPS over a longer period for stability
+      this.frameCount++;
+      if (this.frameCount >= 60) { // Average over 60 frames
+        this.fps = Math.round(60000 / (performance.now() - this.lastTime));
+        this.lastTime = performance.now();
+        this.frameCount = 0;
+      } else {
+        this.fps = Math.round(1000 / deltaTime);
+      }
       this.frameTime = deltaTime;
     }
     
@@ -171,7 +179,7 @@ export class AdaptiveRendererSystem {
   applyQualitySettings() {
     switch (this.qualityLevel) {
       case 'ultra-low':
-        this.pixelRatio = 0.5;
+        this.pixelRatio = 0.75; // Set minimum pixel ratio to 0.75 for better visual quality
         this.shadowMapSize = 256;
         this.shadowQuality = 'none';
         this.antialiasing = false;
@@ -203,7 +211,7 @@ export class AdaptiveRendererSystem {
         break;
         
       case 'high':
-        this.pixelRatio = Math.min(window.devicePixelRatio, 2);
+        this.pixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 0.75);
         this.shadowMapSize = 2048;
         this.shadowQuality = 'pcf';
         this.antialiasing = true;
