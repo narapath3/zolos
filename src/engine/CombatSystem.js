@@ -1,4 +1,5 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
+import * as THREE from 'three';
 import { MONSTERS } from './GameData.js';
 
 export class CombatSystem {
@@ -235,7 +236,7 @@ export class CombatSystem {
         // Fishing spot position
         const fishingSpot = { x: 0, y: 1.2, z: 2 };
         const playerPos = this.character.getPosition();
-        const dist = playerPos.distanceTo(new THREE.Vector3(fishingSpot.x, fishingSpot.y, fishingSpot.z));
+        const dist = playerPos.distanceTo(new THREE.Vector3(fishingSpot.x, playerPos.y, fishingSpot.z));
 
         if (dist > 1.0) {
             // Walk to fishing spot
