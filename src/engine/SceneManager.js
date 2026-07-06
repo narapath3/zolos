@@ -54,7 +54,7 @@ export class SceneManager {
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(MAP_CONFIGS.prontera.fogColor);
-        // this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.008); // Disabled fog to debug visibility
+        this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.012);
 
         // Camera (isometric-style)
         const aspect = window.innerWidth / window.innerHeight;
@@ -424,7 +424,7 @@ export class SceneManager {
     _createGround(config) {
         // Main textured ground with vertex colors
         const size = 70;
-        const segments = 60; // Restored to 60 to fix terrain calculation bugs
+        const segments = 60;
         const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
 
         // Add vertex colors for terrain variation
@@ -443,13 +443,13 @@ export class SceneManager {
             const distToRiver = Math.abs(z - riverZ);
 
             // Base noise height
-            let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15 + 0.5; // Added 0.5 offset to lift entire ground up
+            let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
 
             // Carve riverbed and build river banks
             if (distToRiver < 7.0) {
-                // Smooth valley drop down to -1.8 (deeper to match lowered water)
+                // Smooth valley drop down to -1.3
                 const t = distToRiver / 7.0; // 0 (center) to 1 (bank)
-                height = -1.8 * (1.0 - t * t);
+                height = -1.3 * (1.0 - t * t);
             } else if (distToRiver < 10.0) {
                 // Raised bank ridge sloping down to ground
                 const t = (distToRiver - 7.0) / 3.0; // 0 to 1
@@ -550,7 +550,7 @@ export class SceneManager {
     // ============ Water ============
     _createWater(config) {
         // Large river water plane centered around z = -2, length 80, width 32
-        const waterGeo = new THREE.PlaneGeometry(80, 40, 40, 16); // Reduced segments for performance
+        const waterGeo = new THREE.PlaneGeometry(80, 40, 80, 30);
         const waterTex = this._createWaterTexture();
         const waterMat = new THREE.MeshPhongMaterial({
             color: config.waterColor,
@@ -564,7 +564,7 @@ export class SceneManager {
         });
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
-        water.position.set(0, -1.5, -2); // Lowered significantly to -1.5 to ensure ground is visible
+        water.position.set(0, -0.26, -2);
         water.receiveShadow = true;
         this.scene.add(water);
         this.envObjects.push(water);
@@ -1695,7 +1695,8 @@ export class SceneManager {
     updateAnimations(dt) {
         this.time += dt;
 
-        // Animate water waves (throttled: update every other frame)
+        // Animate water waves (disabled temporarily to fix blue screen issue)
+        /*
         if (this.waterMesh && this._waterFrameSkip === undefined) this._waterFrameSkip = 0;
         if (this.waterMesh) {
             this._waterFrameSkip = (this._waterFrameSkip + 1) % 2;
@@ -1711,6 +1712,7 @@ export class SceneManager {
                 positions.needsUpdate = true;
             }
         }
+        */
 
         // Animate voxel clouds
         this.cloudSprites.forEach(cloud => {
