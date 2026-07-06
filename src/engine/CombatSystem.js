@@ -7,12 +7,16 @@ export class CombatSystem {
         this.monsters = monsterManager;
         this.onEvent = onCombatEvent; // callback for UI events
         this.autoFarm = false;
+        this.isFishing = false;
+        this.fishingTimer = 0;
+        this.fishingBiteChance = 0.05;
         this.currentTarget = null;
         this.attackRange = 1.8;
         this.globalCooldown = 0;
     }
 
     toggleAutoFarm() {
+        if (this.isFishing) this.toggleFishing();
         this.autoFarm = !this.autoFarm;
         if (!this.autoFarm) {
             this.currentTarget = null;
@@ -21,8 +25,27 @@ export class CombatSystem {
         return this.autoFarm;
     }
 
+    toggleFishing() {
+        this.isFishing = !this.isFishing;
+        if (this.isFishing) {
+            this.autoFarm = false;
+            this.currentTarget = null;
+            this.fishingTimer = 0;
+            this.onEvent({ type: 'fishingStart' });
+        } else {
+            this.character.state = 'idle';
+            this.onEvent({ type: 'fishingStop' });
+        }
+        return this.isFishing;
+    }
+
     update(dt) {
         this.globalCooldown = Math.max(0, this.globalCooldown - dt);
+
+        if (this.isFishing) {
+            this._updateFishing(dt);
+            return;
+        }
 
         if (!this.character.isAlive()) {
             // Dead — respawn after 3 seconds
@@ -205,6 +228,44 @@ export class CombatSystem {
         // Ensure autoFarm continues if active
         if (this.autoFarm) {
             this.currentTarget = this.monsters.findNearest(this.character.getPosition());
+        }
+    }
+
+    _updateFishing(dt) {
+        // Fishing spot position
+        const fishingSpot = { x: 0, y: 1.2, z: 2 };
+        const playerPos = this.character.getPosition();
+        const dist = playerPos.distanceTo(new THREE.Vector3(fishingSpot.x, fishingSpot.y, fishingSpot.z));
+
+        if (dist > 1.0) {
+            // Walk to fishing spot
+            this.character.moveToward(fishingSpot, dt);
+        } else {
+            // At fishing spot — face the water (+X direction)
+            this.character.mesh.rotation.y = Math.PI / 2;
+
+            if (this.character.state !== 'fishing') {
+                this.character.state = 'fishing';
+                this.onEvent({ type: 'fishingCast' });
+            }
+
+            this.fishingTimer += dt;
+            // Check for bite every 2 seconds
+            if (this.fishingTimer >= 2.0) {
+                this.fishingTimer = 0;
+                if (Math.random() < 0.15) {
+                    this.onEvent({ type: 'fishingBite' });
+                    // Catch fish!
+                    setTimeout(() => {
+                        if (this.isFishing) {
+                            this.onEvent({
+                                type: 'lootDrop',
+                                item: { name: 'Fish', emoji: '🐟', type: 'consumable', chance: 1.0 }
+                            });
+                        }
+                    }, 1000);
+                }
+            }
         }
     }
 }

@@ -53,7 +53,20 @@ export class GameUI {
         if (this.combatSystem) {
           const isAuto = this.combatSystem.toggleAutoFarm();
           this.setAutoFarmState(isAuto);
+          this.setFishingState(false);
           this.addCombatLog(isAuto ? "🤖 Auto-Bot system activated!" : "🤖 Auto-Bot system deactivated.", 'system');
+        }
+      });
+    }
+
+    const fishingBtn = document.getElementById('btn-fishing');
+    if (fishingBtn) {
+      fishingBtn.addEventListener('click', () => {
+        if (this.combatSystem) {
+          const isFishing = this.combatSystem.toggleFishing();
+          this.setFishingState(isFishing);
+          this.setAutoFarmState(false);
+          this.addCombatLog(isFishing ? "🎣 Fishing mode activated!" : "🎣 Fishing mode deactivated.", 'system');
         }
       });
     }

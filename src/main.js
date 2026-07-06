@@ -112,6 +112,20 @@ async function initGame(charData) {
             case 'playerRespawn':
                 if (gameUI) gameUI.addCombatLog('💚 You have respawned!', 'system');
                 break;
+            case 'fishingStart':
+                if (gameUI) gameUI.addCombatLog('🎣 หาที่ว่างริมน้ำเพื่อเริ่มตกปลา...', 'system');
+                break;
+            case 'fishingCast':
+                if (sceneManager && character) sceneManager.createFishingLine(character.getPosition());
+                if (gameUI) gameUI.addCombatLog('🎣 โยนเบ็ดลงน้ำแล้ว... รอปลามาติดเบ็ด', 'system');
+                break;
+            case 'fishingBite':
+                if (sceneManager) sceneManager.animateFishBite();
+                if (gameUI) gameUI.addCombatLog('❗ ปลาติดเบ็ดแล้ว! กำลังดึงขึ้นมา...', 'system');
+                break;
+            case 'fishingStop':
+                if (sceneManager) sceneManager.removeFishingLine();
+                break;
         }
     });
 
