@@ -499,7 +499,7 @@ export class CharacterManager {
             brim.position.y = 1.9;
             brim.rotation.z = 0.1;
             hatGroup.add(brim);
-
+        }
 
         this.hatMesh = hatGroup;
         this.mesh.add(this.hatMesh);
