@@ -173,10 +173,12 @@ export class CombatSystem {
                 
                 // Auto-resume if it was active, but wait for at least 50% HP
                 if (wasAutoFarming) {
-                    const checkRegen = setInterval(() => {
-                        if (this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
+                    this._autoResumeTimer = setInterval(() => {
+                        // Check if character is alive and has enough HP
+                        if (this.character.isAlive() && this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
                             this.autoFarm = true;
-                            clearInterval(checkRegen);
+                            clearInterval(this._autoResumeTimer);
+                            this._autoResumeTimer = null;
                         }
                     }, 1000);
                 }

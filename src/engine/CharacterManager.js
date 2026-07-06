@@ -692,14 +692,17 @@ export class CharacterManager {
 
     // Take damage
     takeDamage(amount) {
-        // Ensure amount is a valid number
-        const dmgAmount = isNaN(amount) ? 0 : amount;
-        const currentDef = isNaN(this.stats.def) ? 0 : this.stats.def;
+        const dmgAmount = Number(amount) || 0;
+        const currentDef = Number(this.stats.def) || 0;
         
         const actualDmg = Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
-        const newHp = (isNaN(this.stats.hp) ? this.stats.max_hp : this.stats.hp) - actualDmg;
         
-        this.stats.hp = Math.max(0, newHp);
+        // Ensure hp is a number before subtracting
+        if (isNaN(this.stats.hp)) {
+            this.stats.hp = this.stats.max_hp || 100;
+        }
+        
+        this.stats.hp = Math.max(0, this.stats.hp - actualDmg);
         return actualDmg;
     }
 
