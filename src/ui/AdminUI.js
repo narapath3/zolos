@@ -76,6 +76,10 @@ export class AdminUI {
         if (this.isOpen) {
             this.refreshData();
         }
+
+        if (window.gameUI) {
+            window.gameUI.updateMobileControlsVisibility();
+        }
     }
 
     async refreshData() {

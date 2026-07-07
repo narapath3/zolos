@@ -3253,7 +3253,7 @@ body {
 
 #joystick-container {
   position: absolute;
-  bottom: 100px;
+  bottom: calc(140px + env(safe-area-inset-bottom));
   left: 24px;
   width: 130px;
   height: 130px;
@@ -3288,7 +3288,7 @@ body {
 
 #mobile-actions {
   position: absolute;
-  bottom: 90px;
+  bottom: calc(130px + env(safe-area-inset-bottom));
   right: 20px;
   width: 220px;
   height: 220px;
@@ -3445,17 +3445,20 @@ body {
     z-index: 1600;
   }
 
-  .btn-auto {
+  .btn-auto,
+  .btn-fishing {
     width: 48px;
     height: 48px;
     padding: 0;
   }
 
-  .btn-auto .auto-icon {
+  .btn-auto .auto-icon,
+  .btn-fishing .fishing-icon {
     font-size: 16px;
   }
 
-  .btn-auto .auto-text {
+  .btn-auto .auto-text,
+  .btn-fishing .fishing-text {
     font-size: 7px;
   }
 
@@ -3471,4 +3474,13 @@ body {
   #fps-counter {
     display: none !important;
   }
+}
+
+/* Hide mobile overlay controls when menu panels are open */
+.panels-open #mobile-pad {
+  display: none !important;
+}
+
+.panels-open #auto-farm-container {
+  display: none !important;
 }

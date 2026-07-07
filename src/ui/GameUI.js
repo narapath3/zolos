@@ -47,6 +47,7 @@ export class GameUI {
     this._setupAutoBot();
     this._setupTargetIndicator();
     this._setupMobileControls();
+    window.gameUI = this;
   }
 
   _setupTargetIndicator() {
@@ -147,7 +148,10 @@ export class GameUI {
     const btnAdmin = document.getElementById('btn-admin');
     if (btnAdmin) {
       btnAdmin.addEventListener('click', () => {
-        if (window.adminUI) window.adminUI.toggle();
+        if (window.adminUI) {
+          window.adminUI.toggle();
+          this.updateMobileControlsVisibility();
+        }
       });
     }
 
@@ -164,6 +168,7 @@ export class GameUI {
       btn.addEventListener('click', () => {
         const panelId = btn.getAttribute('data-close');
         document.getElementById(panelId).style.display = 'none';
+        this.updateMobileControlsVisibility();
       });
     });
   }
@@ -196,6 +201,42 @@ export class GameUI {
       if (p.id !== panelId) p.style.display = 'none';
     });
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    this.updateMobileControlsVisibility();
+  }
+
+  updateMobileControlsVisibility() {
+    let anyPanelOpen = false;
+
+    // Check side panels
+    document.querySelectorAll('.side-panel').forEach(p => {
+      const display = p.style.display || window.getComputedStyle(p).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    });
+
+    // Check modal popups (profile editor, player profile popup, etc.)
+    document.querySelectorAll('.modal-popup').forEach(m => {
+      const display = m.style.display || window.getComputedStyle(m).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    });
+
+    // Check admin panel
+    const adminPanel = document.getElementById('admin-panel');
+    if (adminPanel) {
+      const display = adminPanel.style.display || window.getComputedStyle(adminPanel).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
+    if (anyPanelOpen) {
+      document.body.classList.add('panels-open');
+    } else {
+      document.body.classList.remove('panels-open');
+    }
   }
 
   // ============ Map Name Update ============
@@ -834,6 +875,7 @@ export class GameUI {
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
         if (popup) popup.style.display = 'none';
+        this.updateMobileControlsVisibility();
       });
     }
 
@@ -841,6 +883,7 @@ export class GameUI {
     if (overlay) {
       overlay.addEventListener('click', () => {
         if (popup) popup.style.display = 'none';
+        this.updateMobileControlsVisibility();
       });
     }
 
@@ -894,7 +937,10 @@ export class GameUI {
       }
     }
 
-    if (popup) popup.style.display = 'flex';
+    if (popup) {
+      popup.style.display = 'flex';
+      this.updateMobileControlsVisibility();
+    }
   }
 
   _toggleFriend(username) {
@@ -938,6 +984,7 @@ export class GameUI {
     if (btnClose) {
       btnClose.addEventListener('click', () => {
         if (chatPanel) chatPanel.style.display = 'none';
+        this.updateMobileControlsVisibility();
       });
     }
 
@@ -1109,10 +1156,12 @@ export class GameUI {
       }
 
       modal.style.display = 'flex';
+      this.updateMobileControlsVisibility();
     };
 
     const closeEditor = () => {
       modal.style.display = 'none';
+      this.updateMobileControlsVisibility();
     };
 
     // Open on player-info click
