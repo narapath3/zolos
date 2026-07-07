@@ -3398,6 +3398,10 @@ body {
     display: block;
   }
 
+  #skill-bar {
+    display: none !important;
+  }
+
   /* Make HUD responsive and scale down */
   #hud-bottom {
     max-width: calc(100vw - 20px);
