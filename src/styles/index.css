@@ -2181,12 +2181,6 @@ body {
 
 
 
-  50% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-}
-
 /* ========== WIKI PANEL STYLES ========== */
 .wiki-tabs {
   display: flex;
