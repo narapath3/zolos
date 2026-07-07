@@ -3437,9 +3437,9 @@ body {
 
   #auto-farm-container {
     bottom: auto;
-    top: 10px;
-    right: 10px;
-    left: auto;
+    top: 80px;
+    left: 10px;
+    right: auto;
     flex-direction: row;
     gap: 8px;
     z-index: 1600;
