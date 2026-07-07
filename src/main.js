@@ -219,6 +219,14 @@ async function initGame(charData) {
 
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
+                
+                // Fix: Sync baseY for swimming players to avoid floating
+                if (rp.character.state === 'swimming') {
+                    rp.character.baseY = -0.5;
+                } else {
+                    rp.character.baseY = 1.2;
+                }
+
                 if (p.appearance) {
                     rp.character.applyAppearance(p.appearance);
                 }
