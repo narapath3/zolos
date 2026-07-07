@@ -220,9 +220,14 @@ async function initGame(charData) {
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
                 
-                // Fix: Sync baseY for swimming players to avoid floating
-                if (rp.character.state === 'swimming') {
+                // Fix: Robust water detection for remote players.
+                // Re-run environment check based on received X/Z to ensure correct baseY.
+                const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
+                if (remoteEnv === 'water') {
                     rp.character.baseY = -0.5;
+                    // Force swimming state if the position is in water, 
+                    // regardless of the broadcast state (which might be 'walking' due to AUTO mode)
+                    rp.character.state = 'swimming';
                 } else {
                     rp.character.baseY = 1.2;
                 }
