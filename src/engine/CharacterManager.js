@@ -411,12 +411,13 @@ export class CharacterManager {
 
     setHat(hatName) {
         this.equippedHat = hatName || 'None';
+        // Step 3: Remove existing hatMesh from scene/mesh before building new one
         if (this.hatMesh) {
             this.mesh.remove(this.hatMesh);
             this.hatMesh = null;
         }
 
-        if (this.equippedHat === 'None') return;
+        if (this.equippedHat === 'None' || this.equippedHat === 'none') return;
 
         const hatGroup = new THREE.Group();
 
@@ -511,12 +512,13 @@ export class CharacterManager {
 
     setGlasses(glassesName) {
         this.equippedGlasses = glassesName || 'None';
+        // Step 3: Remove existing glassesMesh before building new one
         if (this.glassesMesh) {
             this.mesh.remove(this.glassesMesh);
             this.glassesMesh = null;
         }
 
-        if (this.equippedGlasses === 'None') return;
+        if (this.equippedGlasses === 'None' || this.equippedGlasses === 'none') return;
 
         const glassesGroup = new THREE.Group();
         const frameMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
@@ -726,13 +728,12 @@ export class CharacterManager {
 
     // Respawn
     respawn() {
-        // Ensure max stats are valid before assigning
-        const maxHp = isNaN(this.stats.max_hp) ? 100 : this.stats.max_hp;
-        const maxSp = isNaN(this.stats.max_sp) ? 50 : this.stats.max_sp;
+        // Step 4 & 7: Set hp/sp to 20% on respawn, ensure no NaN
+        const maxHp = Number(this.stats.max_hp || 100);
+        const maxSp = Number(this.stats.max_sp || 50);
         
-        // Start with 20% HP and 10% SP after death
         this.stats.hp = Math.floor(maxHp * 0.2);
-        this.stats.sp = Math.floor(maxSp * 0.1);
+        this.stats.sp = Math.floor(maxSp * 0.2);
         
         this.baseY = 1.2;
         this.mesh.position.set(0, 1.2, 10);
@@ -765,15 +766,18 @@ export class CharacterManager {
         this.animTimer += dt;
         this.attackTimer += dt;
 
-        // Natural Regeneration (every 3 seconds)
+        // Step 7: Natural Regeneration (1% of max_hp per second)
+        if (this.isAlive() && this.stats.hp < this.stats.max_hp) {
+            this.stats.hp = Math.min(this.stats.max_hp, this.stats.hp + (this.stats.max_hp * 0.01 * dt));
+        }
+
+        // Periodic SP Regeneration (every 3 seconds)
         if (!this.regenTimer) this.regenTimer = 0;
         this.regenTimer += dt;
         if (this.regenTimer >= 3.0) {
             this.regenTimer = 0;
             if (this.isAlive()) {
-                const hpRegen = Math.max(1, Math.floor(this.stats.max_hp * 0.02));
                 const spRegen = Math.max(1, Math.floor(this.stats.max_sp * 0.03));
-                this.heal(hpRegen);
                 this.restoreSp(spRegen);
             }
         }
@@ -838,10 +842,7 @@ export class CharacterManager {
             }
         }
 
-        // HP regen
-        if (this.isAlive() && this.stats.hp < this.stats.max_hp) {
-            this.stats.hp = Math.min(this.stats.max_hp, this.stats.hp + dt * 1.5);
-        }
+        // Removed old HP regen in favor of Step 7 logic above
 
         // Play time tracker
         this.stats.play_time += dt;

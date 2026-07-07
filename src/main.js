@@ -117,6 +117,12 @@ async function initGame(charData) {
             case 'playerRespawn':
                 if (gameUI) gameUI.addCombatLog('💚 You have respawned!', 'system');
                 break;
+            case 'autoResume':
+                if (gameUI) {
+                    gameUI.addCombatLog('🤖 HP recovered! Resuming AUTO mode...', 'system');
+                    gameUI.setAutoFarmState(true);
+                }
+                break;
             case 'fishingStart':
                 if (gameUI) gameUI.addCombatLog('🎣 Walking to water...', 'system');
                 break;
@@ -154,12 +160,15 @@ async function initGame(charData) {
     // Fix C: Wire profileSaveCallback in main.js
     if (gameUI) {
         gameUI.setupProfileSaveCallback((data) => {
+            // Step 3: Ensure all equipment and appearance updates are called
             if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
             if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
             if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
             if (data.hat !== undefined) character.setHat(data.hat);
             if (data.glasses !== undefined) character.setGlasses(data.glasses);
             if (data.weapon !== undefined) character.equipWeapon(data.weapon);
+            if (data.armor !== undefined) character.equippedArmor = data.armor;
+            if (data.shield !== undefined) character.equippedShield = data.shield;
 
             // Persist changes
             character.saveStatsToDatabase();
@@ -217,8 +226,9 @@ async function initGame(charData) {
                 rp.character.update(1 / 60); // dt not available in callback scope; use fixed step
             }
         },
+        // Step 9: Use consistent object format for chat messages
         (chatMsg) => {
-            if (gameUI) gameUI.addChatMessage(chatMsg.username, chatMsg.message);
+            if (gameUI) gameUI.receiveChatMessage(chatMsg.username, chatMsg.message);
         }
     );
 
@@ -235,6 +245,13 @@ async function initGame(charData) {
 
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);
+
+    // Step 9: Wire up chat send callback
+    if (gameUI) {
+        gameUI.setupChatSendCallback((message) => {
+            broadcastChat(userId, username, character.stats.level, message);
+        });
+    }
 
     // Setup HUD & Initial Stats
     if (gameUI.initHUD) {

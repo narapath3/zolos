@@ -41,10 +41,12 @@ export class CombatSystem {
     }
 
     update(dt) {
-        this.globalCooldown = Math.max(0, this.globalCooldown - dt);
+        // Step 2: Clamp deltaTime to prevent spiral-of-death
+        const clampedDt = Math.min(0.1, dt);
+        this.globalCooldown = Math.max(0, this.globalCooldown - clampedDt);
 
         if (this.isFishing) {
-            this._updateFishing(dt);
+            this._updateFishing(clampedDt);
             return;
         }
 
@@ -74,7 +76,7 @@ export class CombatSystem {
             target = this.currentTarget;
         }
 
-        if (target) {
+        if (target && target.alive) {
             const playerPos = this.character.getPosition();
             const targetPos = target.getPosition();
             const distance = playerPos.distanceTo(targetPos);
@@ -83,7 +85,7 @@ export class CombatSystem {
             if (distance > range) {
                 // Auto-farm moves toward target automatically
                 if (this.autoFarm) {
-                    this.character.moveToward(targetPos, dt);
+                    this.character.moveToward(targetPos, clampedDt);
                 }
             } else {
                 // In range — face the target
@@ -104,6 +106,12 @@ export class CombatSystem {
                 }
             }
         } else {
+            // Step 2: Dead-state guard - if target died mid-frame
+            if (target && !target.alive) {
+                if (this.character.targetMonster === target) this.character.targetMonster = null;
+                if (this.currentTarget === target) this.currentTarget = null;
+                if (this.character.state === 'attacking') this.character.state = 'idle';
+            }
             // Reset Target reference if we had any
             this.currentTarget = null;
             
@@ -161,7 +169,7 @@ export class CombatSystem {
         if (!this.character.isAlive()) {
             this.onEvent({ type: 'playerDeath' });
             
-            // Store autoFarm state to resume after respawn
+            // Step 7: Store autoFarm state to resume after respawn
             const wasAutoFarming = this.autoFarm;
             this.autoFarm = false;
             this.currentTarget = null;
@@ -171,12 +179,14 @@ export class CombatSystem {
                 this.character.respawn();
                 this.onEvent({ type: 'playerRespawn' });
                 
-                // Auto-resume if it was active, but wait for at least 50% HP
+                // Step 7: Auto-resume if it was active, but wait for at least 50% HP
                 if (wasAutoFarming) {
+                    if (this._autoResumeTimer) clearInterval(this._autoResumeTimer);
                     this._autoResumeTimer = setInterval(() => {
                         // Check if character is alive and has enough HP
                         if (this.character.isAlive() && this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
                             this.autoFarm = true;
+                            if (this.onEvent) this.onEvent({ type: 'autoResume' });
                             clearInterval(this._autoResumeTimer);
                             this._autoResumeTimer = null;
                         }
@@ -247,7 +257,7 @@ export class CombatSystem {
     }
 
     _updateFishing(dt) {
-        // Fishing spot position
+        // Step 5: Fishing spot position
         const fishingSpot = { x: 0, y: 1.2, z: 2 };
         const playerPos = this.character.getPosition();
         const dist = playerPos.distanceTo(new THREE.Vector3(fishingSpot.x, playerPos.y, fishingSpot.z));

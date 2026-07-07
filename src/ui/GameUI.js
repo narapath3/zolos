@@ -66,6 +66,9 @@ export class GameUI {
           const isFishing = this.combatSystem.toggleFishing();
           this.setFishingState(isFishing);
           this.setAutoFarmState(false);
+          // Step 5: Update fishing button label
+          const textEl = fishingBtn.querySelector('.fishing-text');
+          if (textEl) textEl.textContent = isFishing ? 'STOP' : 'FISH';
           this.addCombatLog(isFishing ? "🎣 Fishing mode activated!" : "🎣 Fishing mode deactivated.", 'system');
         }
       });
@@ -590,7 +593,8 @@ export class GameUI {
       item.stats.equipped = false;
       if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
         this.character.equipWeapon(null);
-        if (item.item_type === 'fishing_rod') {
+        // Step 5: Fishing rod unequipped
+        if (item.item_name === 'Fishing Rod') {
           this.setFishingButtonVisible(false);
         }
       } else if (item.item_type === 'armor') {
@@ -628,7 +632,8 @@ export class GameUI {
       item.stats.equipped = true;
       if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
         this.character.equipWeapon(item.item_name);
-        if (item.item_type === 'fishing_rod') {
+        // Step 5: Fishing rod equipped
+        if (item.item_name === 'Fishing Rod') {
           this.setFishingButtonVisible(true);
         } else {
           this.setFishingButtonVisible(false);
@@ -996,6 +1001,11 @@ export class GameUI {
       const glassesSelect = document.getElementById('profile-edit-glasses');
 
       if (this.character) {
+        // Step 8: Display UID in profile editor
+        const uidDisplay = document.getElementById('profile-uid-display');
+        if (uidDisplay && this.characterId) {
+          uidDisplay.textContent = `UID: #${this.characterId.split('_').pop().substring(0, 8).toUpperCase()}`;
+        }
         if (nameInput) nameInput.value = this.character.stats?.name || '';
         if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
         if (pantsInput) pantsInput.value = hexToStr(this.character.pantsColor || 0x3a3a5a);
@@ -1117,13 +1127,15 @@ export class GameUI {
   }
 
   triggerScreenShake(isCritical = false) {
+    // Step 6: Screen shake on critical hit only
+    if (!isCritical) return;
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return;
-    const cls = isCritical ? 'screen-shake-crit' : 'screen-shake';
+    const cls = 'screen-shake-crit';
     canvas.classList.remove('screen-shake', 'screen-shake-crit');
     void canvas.offsetWidth;
     canvas.classList.add(cls);
-    setTimeout(() => canvas.classList.remove(cls), isCritical ? 500 : 350);
+    setTimeout(() => canvas.classList.remove(cls), 500);
   }
 
   setAutoFarmState(active) {
@@ -1391,8 +1403,10 @@ export class GameUI {
 
         const isMine = listing.seller_id === this.characterId;
 
+        // Step 8: Apply rarity class to market row
+        const rarityClass = itemInfo.rarity ? `rarity-${itemInfo.rarity}` : '';
         row.innerHTML = `
-          <div class="market-item-name-cell">
+          <div class="market-item-name-cell ${rarityClass}">
             <span>${itemInfo.emoji}</span>
             <span class="market-item-name-text" title="${listing.item_name}">${listing.item_name}</span>
           </div>
@@ -1470,6 +1484,8 @@ export class GameUI {
     if (!form || !this.selectedMarketItem) return;
 
     form.style.display = 'block';
+    // Step 8: Ensure the form is visible without scrolling
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     document.getElementById('market-sell-item-icon').textContent = this.selectedMarketItem.emoji;
     document.getElementById('market-sell-item-name').textContent = this.selectedMarketItem.item_name;
     document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่มี: ${this.selectedMarketItem.quantity}`;

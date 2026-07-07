@@ -587,7 +587,8 @@ class Monster {
     takeDamage(amount, isCritical = false) {
         const actualDmg = Math.max(1, amount - Math.floor(this.data.def * 0.3));
         this.hp = Math.max(0, this.hp - actualDmg);
-        this.hitFlash = isCritical ? 0.3 : 0.18;
+        // Step 6: Enhanced monster impact flash durations
+        this.hitFlash = isCritical ? 0.35 : 0.18;
         this.isCriticalHit = isCritical;
 
         // Update HP bar

@@ -391,7 +391,8 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
                 if (candidates.length > 0) {
                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
                     const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
-                    chatCallback(sender.username, msg);
+                    // Step 9: Use object format
+                    chatCallback({ username: sender.username, message: msg });
                 }
             }
         }, 12000 + Math.random() * 8000);
@@ -445,8 +446,9 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
             }
         })
         .on('broadcast', { event: 'chat' }, ({ payload }) => {
+            // Step 9: Use object format
             if (chatCallback && payload) {
-                chatCallback(payload.username, payload.message);
+                chatCallback({ username: payload.username, message: payload.message });
             }
         })
         .subscribe(async (status, err) => {
@@ -493,9 +495,9 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
 
 export function broadcastChat(userId, username, level, message) {
     if (isOfflineMode || !supabase) {
-        // Echo back local message
+        // Step 9: Echo back local message using object format
         if (chatCallback) {
-            chatCallback(username, message);
+            chatCallback({ username, message });
         }
         // Simulation for a quick response
         setTimeout(() => {
@@ -512,7 +514,8 @@ export function broadcastChat(userId, username, level, message) {
                 if (candidates.length > 0) {
                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
                     const reply = replies[Math.floor(Math.random() * replies.length)];
-                    chatCallback(sender.username, reply);
+                    // Step 9: Use object format
+                    chatCallback({ username: sender.username, message: reply });
                 }
             }
         }, 1500 + Math.random() * 1500);
@@ -526,9 +529,9 @@ export function broadcastChat(userId, username, level, message) {
             payload: { userId, username, level, message }
         });
     }
-    // Echo back local message immediately
+    // Step 9: Echo back local message immediately using object format
     if (chatCallback) {
-        chatCallback(username, message);
+        chatCallback({ username, message });
     }
 }
 
