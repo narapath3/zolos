@@ -607,9 +607,7 @@ export class CharacterManager {
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
         
-        // Get short UID from characterId
-        const shortId = this.characterId ? this.characterId.split('_').pop().substring(0, 5).toUpperCase() : 'NEW';
-        ctx.fillText(`${this.stats.name} Lv.${this.stats.level} [#${shortId}]`, 128, 40);
+        ctx.fillText(`${this.stats.name} Lv.${this.stats.level}`, 128, 40);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });

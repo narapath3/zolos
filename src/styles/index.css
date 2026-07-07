@@ -2179,55 +2179,7 @@ body {
   gap: 10px;
 }
 
-/* Rarity classes will be updated in the main rarity section at the end of the file */
 
-@keyframes pulseMythic {
-
-  0%,
-  100% {
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
-  }
-
-  50% {
-    box-shadow: 0 0 25px rgba(239, 68, 68, 0.8), inset 0 0 4px rgba(239, 68, 68, 0.3);
-  }
-}
-
-.color-common {
-  color: #9ca3af;
-}
-
-.color-rare {
-  color: #3b82f6;
-  text-shadow: 0 0 6px rgba(59, 130, 246, 0.3);
-  font-weight: bold;
-}
-
-.color-epic {
-  color: #a855f7;
-  text-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
-  font-weight: bold;
-}
-
-.color-legendary {
-  color: #eab308;
-  text-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
-  font-weight: bold;
-}
-
-.color-mythic {
-  color: #ef4444;
-  text-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
-  font-weight: bold;
-  animation: textMythic 2s infinite;
-}
-
-@keyframes textMythic {
-
-  0%,
-  100% {
-    opacity: 0.9;
-  }
 
   50% {
     opacity: 1;

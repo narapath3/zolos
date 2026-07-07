@@ -204,6 +204,7 @@ export class GameUI {
         </div>
         <div class="stats-meta">
           <div class="stats-meta-name">${stats.name}</div>
+          <div class="stats-meta-uid" style="font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">UID: #${this.characterId ? this.characterId.split('_').pop().substring(0, 8).toUpperCase() : 'N/A'}</div>
           <div class="stats-meta-time">⏱️ Play Time: ${this._formatTime(stats.play_time)}</div>
         </div>
       </div>
