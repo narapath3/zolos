@@ -47,6 +47,7 @@ export class ParticleSystem {
         this.hitEffects = [];
         this.shockwaves = [];
         this.splashEffects = [];
+        this.projectiles = [];
         this.splashCooldown = 0;
         
         // Performance monitoring
@@ -353,8 +354,85 @@ export class ParticleSystem {
         });
     }
 
+    // ============ Projectile System ============
+    spawnArrow(startPos, targetMonster, onHit) {
+        // Create arrow mesh
+        const arrowGroup = new THREE.Group();
+        
+        // Arrow shaft
+        const shaftGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.6, 5);
+        const shaftMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+        const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+        shaft.rotation.x = Math.PI / 2;
+        arrowGroup.add(shaft);
+        
+        // Arrow head
+        const headGeo = new THREE.ConeGeometry(0.04, 0.12, 5);
+        const headMat = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.z = 0.3;
+        head.rotation.x = Math.PI / 2;
+        arrowGroup.add(head);
+        
+        // Fletching (feathers)
+        const featherGeo = new THREE.PlaneGeometry(0.1, 0.15);
+        const featherMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+        
+        const f1 = new THREE.Mesh(featherGeo, featherMat);
+        f1.position.z = -0.25;
+        f1.position.y = 0.05;
+        arrowGroup.add(f1);
+        
+        const f2 = f1.clone();
+        f2.rotation.z = Math.PI / 2;
+        f2.position.y = 0;
+        f2.position.x = 0.05;
+        arrowGroup.add(f2);
+
+        arrowGroup.position.copy(startPos);
+        arrowGroup.position.y += 1.0; // Shoot from chest height
+        this.scene.add(arrowGroup);
+
+        this.projectiles.push({
+            mesh: arrowGroup,
+            target: targetMonster,
+            speed: 25,
+            onHit: onHit,
+            life: 2.0 // Max life in seconds
+        });
+    }
+
     // ============ Update ============
     update(deltaTime) {
+        // Update projectiles
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const p = this.projectiles[i];
+            p.life -= deltaTime;
+
+            if (p.life <= 0 || !p.target || !p.target.alive) {
+                this.scene.remove(p.mesh);
+                this.projectiles.splice(i, 1);
+                continue;
+            }
+
+            const targetPos = p.target.getPosition();
+            targetPos.y += 0.8; // Aim for center of monster
+            
+            const direction = new THREE.Vector3().subVectors(targetPos, p.mesh.position).normalize();
+            const distance = p.mesh.position.distanceTo(targetPos);
+            const moveStep = p.speed * deltaTime;
+
+            if (distance <= moveStep) {
+                // Hit!
+                if (p.onHit) p.onHit();
+                this.scene.remove(p.mesh);
+                this.projectiles.splice(i, 1);
+            } else {
+                p.mesh.position.add(direction.multiplyScalar(moveStep));
+                p.mesh.lookAt(targetPos);
+            }
+        }
+
         // Update splash effects
         for (let i = this.splashEffects.length - 1; i >= 0; i--) {
             const effect = this.splashEffects[i];

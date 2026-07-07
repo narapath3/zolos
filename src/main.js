@@ -92,6 +92,13 @@ async function initGame(charData) {
         // Combat event handler — connects CombatSystem to particles, sound, and UI
         if (!event) return;
         switch (event.type) {
+            case 'playerRangedAttack':
+                if (particles) {
+                    particles.spawnArrow(event.startPos, event.target, () => {
+                        if (combatSystem) combatSystem._resolveDamage(event.target);
+                    });
+                }
+                break;
             case 'playerAttack':
                 if (particles) particles.spawnHitEffect(event.targetPos, event.critical);
                 if (soundManager) soundManager.playAtkSound();

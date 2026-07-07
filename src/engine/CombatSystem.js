@@ -99,7 +99,8 @@ export class CombatSystem {
             
             const playerPos = this.character.getPosition();
             const targetPos = target.getPosition();
-            const distance = playerPos.distanceTo(targetPos);
+            // Use 2D distance (XZ plane) for range checks to avoid issues with submerged monsters
+            const distance = new THREE.Vector2(playerPos.x, playerPos.z).distanceTo(new THREE.Vector2(targetPos.x, targetPos.z));
             const range = this.character.getAttackRange();
 
             if (distance > range) {
@@ -153,6 +154,22 @@ export class CombatSystem {
         const monster = target;
         if (!monster || !monster.alive) return;
 
+        if (this.character.isRanged()) {
+            // Ranged attack: Spawn projectile first
+            this.onEvent({
+                type: 'playerRangedAttack',
+                target: monster,
+                startPos: this.character.getPosition()
+            });
+        } else {
+            // Melee attack: Immediate damage
+            this._resolveDamage(monster);
+        }
+    }
+
+    _resolveDamage(monster) {
+        if (!monster || !monster.alive) return;
+
         // Player attacks monster
         const isCritical = Math.random() < 0.1;
         let baseDmg = this.character.stats.atk + Math.floor(Math.random() * 5);
@@ -168,16 +185,23 @@ export class CombatSystem {
             monsterName: monster.data.name,
         });
 
-        // Monster counter-attacks (if alive)
+        // Monster counter-attacks (if alive and within range)
         if (monster.alive) {
-            const baseAtk = isNaN(monster.data.atk) ? 5 : monster.data.atk;
-            const monsterDmg = this.character.takeDamage(baseAtk + Math.floor(Math.random() * 3));
-            this.onEvent({
-                type: 'monsterAttack',
-                damage: monsterDmg,
-                targetPos: this.character.getPosition(),
-                monsterName: monster.data.name,
-            });
+            const playerPos = this.character.getPosition();
+            const monsterPos = monster.getPosition();
+            const dist = playerPos.distanceTo(monsterPos);
+            
+            // Monsters have a limited counter-attack range (usually melee or slightly more)
+            if (dist < 4.0) {
+                const baseAtk = isNaN(monster.data.atk) ? 5 : monster.data.atk;
+                const monsterDmg = this.character.takeDamage(baseAtk + Math.floor(Math.random() * 3));
+                this.onEvent({
+                    type: 'monsterAttack',
+                    damage: monsterDmg,
+                    targetPos: this.character.getPosition(),
+                    monsterName: monster.data.name,
+                });
+            }
         }
 
         // Monster killed?

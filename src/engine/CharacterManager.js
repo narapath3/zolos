@@ -148,17 +148,24 @@ export class CharacterManager {
     }
 
     getAttackRange() {
+        if (this.isRanged()) return 10.0;
         const weapon = this.equippedWeapon;
-        if (weapon === 'Bow') return 6.0;
         if (weapon === 'Gun') return 7.0;
         return 1.8; // Default range
+    }
+
+    isRanged() {
+        const weapon = this.equippedWeapon;
+        return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow';
     }
 
     getAttackCooldown() {
         const weapon = this.equippedWeapon;
         if (weapon === 'Sword') return 0.9;
         if (weapon === 'Bow') return 1.2;
-        if (weapon === 'Gun') return 1.5;
+        if (weapon === 'Crossbow') return 1.5;
+        if (weapon === 'Great Bow') return 1.8;
+        if (weapon === 'Gun') return 0.6;
         if (weapon === 'Fishing Rod') return 1.2;
         return 1.0; // Default cooldown
     }
