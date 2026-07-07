@@ -379,6 +379,11 @@ function gameLoop(time) {
         }
     }
 
+    // Fix: Force swimming state if in water, regardless of what CombatSystem or moveToward says
+    if (env === 'water') {
+        character.state = 'swimming';
+    }
+
     // 3. Combat
     if (character.targetMonster) {
         const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
