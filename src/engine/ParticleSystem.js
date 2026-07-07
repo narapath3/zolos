@@ -290,10 +290,13 @@ export class ParticleSystem {
         }
     }
 
-    createClickIndicator(position) {
+    createClickIndicator(position, color = 0xffffff) {
+        // Step 11: Three layered effects for click-to-move indicator
+
+        // Effect 1 — Expanding Ripple
         const rippleGeo = new THREE.RingGeometry(0.02, 0.08, 16);
         const rippleMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+            color: color,
             transparent: true,
             opacity: 0.8,
             side: THREE.DoubleSide,
@@ -303,7 +306,51 @@ export class ParticleSystem {
         ripple.position.y = 0.05;
         ripple.rotation.x = -Math.PI / 2;
         this.scene.add(ripple);
-        this.shockwaves.push({ mesh: ripple, life: 0.3, maxLife: 0.3 });
+        this.shockwaves.push({ 
+            mesh: ripple, 
+            life: 0.4, 
+            maxLife: 0.4,
+            type: 'ripple'
+        });
+
+        // Effect 2 — Glowing Column (CylinderGeometry used as an open-ended cone)
+        const columnGeo = new THREE.CylinderGeometry(0.01, 0.15, 0.4, 8, 1, true);
+        const columnMat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide,
+        });
+        const column = new THREE.Mesh(columnGeo, columnMat);
+        column.position.copy(position);
+        column.position.y = 0.25;
+        this.scene.add(column);
+        this.shockwaves.push({ 
+            mesh: column, 
+            life: 0.6, 
+            maxLife: 0.6,
+            type: 'column'
+        });
+
+        // Effect 3 — Central Dot
+        const dotGeo = new THREE.CircleGeometry(0.05, 8);
+        const dotMat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 1.0,
+            side: THREE.DoubleSide,
+        });
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        dot.position.copy(position);
+        dot.position.y = 0.06;
+        dot.rotation.x = -Math.PI / 2;
+        this.scene.add(dot);
+        this.shockwaves.push({ 
+            mesh: dot, 
+            life: 0.8, 
+            maxLife: 0.8,
+            type: 'dot'
+        });
     }
 
     // ============ Update ============
@@ -325,12 +372,25 @@ export class ParticleSystem {
             }
         }
 
-        // Update shockwaves
+        // Update shockwaves (and layered click indicators)
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
             const wave = this.shockwaves[i];
             const progress = 1 - wave.life / wave.maxLife;
-            wave.mesh.scale.set(1 + progress * 2, 1, 1 + progress * 2);
-            wave.mesh.material.opacity = 0.6 * (1 - progress);
+            
+            if (wave.type === 'ripple') {
+                wave.mesh.scale.set(1 + progress * 3, 1, 1 + progress * 3);
+                wave.mesh.material.opacity = 0.8 * (1 - progress);
+            } else if (wave.type === 'column') {
+                wave.mesh.scale.set(1 + progress * 0.5, 1, 1 + progress * 0.5);
+                wave.mesh.material.opacity = 0.5 * (1 - progress);
+            } else if (wave.type === 'dot') {
+                wave.mesh.material.opacity = 1.0 * (1 - progress);
+            } else {
+                // Generic shockwave behavior
+                wave.mesh.scale.set(1 + progress * 2, 1, 1 + progress * 2);
+                wave.mesh.material.opacity = 0.6 * (1 - progress);
+            }
+            
             wave.life -= deltaTime;
 
             if (wave.life <= 0) {

@@ -1001,10 +1001,13 @@ export class GameUI {
       const glassesSelect = document.getElementById('profile-edit-glasses');
 
       if (this.character) {
-        // Step 8: Display UID in profile editor
+        // Step 9: Display UID in profile editor
         const uidDisplay = document.getElementById('profile-uid-display');
         if (uidDisplay && this.characterId) {
-          uidDisplay.textContent = `UID: #${this.characterId.split('_').pop().substring(0, 8).toUpperCase()}`;
+          // Format: UID: #XXXXXXXX (first 8 characters of the ID, uppercase)
+          const rawId = this.characterId.includes('_') ? this.characterId.split('_').pop() : this.characterId;
+          const uid = rawId.substring(0, 8).toUpperCase();
+          uidDisplay.textContent = `UID: #${uid}`;
         }
         if (nameInput) nameInput.value = this.character.stats?.name || '';
         if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
@@ -1126,16 +1129,24 @@ export class GameUI {
     }
   }
 
-  triggerScreenShake(isCritical = false) {
-    // Step 6: Screen shake on critical hit only
-    if (!isCritical) return;
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return;
-    const cls = 'screen-shake-crit';
-    canvas.classList.remove('screen-shake', 'screen-shake-crit');
-    void canvas.offsetWidth;
-    canvas.classList.add(cls);
-    setTimeout(() => canvas.classList.remove(cls), 500);
+  triggerScreenShake(intensity = 4, duration = 300) {
+    // Step 7: Screen shake on critical hit only
+    const container = document.getElementById('game-screen');
+    if (!container) return;
+    
+    const startTime = performance.now();
+    const shake = () => {
+      const elapsed = performance.now() - startTime;
+      if (elapsed < duration) {
+        const x = (Math.random() - 0.5) * intensity;
+        const y = (Math.random() - 0.5) * intensity;
+        container.style.transform = `translate(${x}px, ${y}px)`;
+        requestAnimationFrame(shake);
+      } else {
+        container.style.transform = '';
+      }
+    };
+    shake();
   }
 
   setAutoFarmState(active) {

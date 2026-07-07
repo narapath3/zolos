@@ -1233,14 +1233,15 @@ body {
 }
 
 .market-sell-form {
-  margin-top: 10px;
+  margin-top: auto;
   padding: 10px;
-  background: rgba(15, 20, 32, 0.95);
+  background: rgba(15, 20, 32, 0.98);
   border: 1px solid rgba(240, 192, 64, 0.2);
   border-radius: var(--radius-sm);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-  max-height: 200px;
-  overflow-y: auto;
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.4);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .selected-sell-item-row {
@@ -2370,25 +2371,30 @@ body {
 
 /* ========== ITEM RARITIES ========== */
 .rarity-common {
-  border: 2px solid #aaaaaa !important;
-  box-shadow: inset 0 0 5px #aaaaaa !important;
+  border: 2px solid #888888 !important;
+  box-shadow: inset 0 0 5px rgba(136, 136, 136, 0.3) !important;
+}
+
+.rarity-uncommon {
+  border: 2px solid #4caf50 !important;
+  box-shadow: inset 0 0 5px rgba(76, 175, 80, 0.3) !important;
 }
 
 .rarity-rare {
-  border: 2px solid #4444ff !important;
-  box-shadow: inset 0 0 10px rgba(96, 160, 255, 0.2), 0 0 8px rgba(96, 160, 255, 0.3) !important;
+  border: 2px solid #2196f3 !important;
+  box-shadow: inset 0 0 10px rgba(33, 150, 243, 0.2), 0 0 8px rgba(33, 150, 243, 0.3) !important;
 }
 
 .rarity-epic {
-  border: 2px solid #aa00ff !important;
-  background: linear-gradient(135deg, rgba(208, 96, 255, 0.1), rgba(0, 0, 0, 0.4)) !important;
-  box-shadow: inset 0 0 12px rgba(208, 96, 255, 0.3), 0 0 12px rgba(208, 96, 255, 0.4) !important;
+  border: 2px solid #9c27b0 !important;
+  background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(0, 0, 0, 0.4)) !important;
+  box-shadow: inset 0 0 12px rgba(156, 39, 176, 0.3), 0 0 12px rgba(156, 39, 176, 0.4) !important;
 }
 
 .rarity-legendary {
-  border: 2px solid #ffaa00 !important;
-  background: linear-gradient(135deg, rgba(255, 170, 0, 0.15), rgba(0, 0, 0, 0.4)) !important;
-  box-shadow: inset 0 0 15px rgba(255, 170, 0, 0.4), 0 0 15px rgba(255, 170, 0, 0.5) !important;
+  border: 2px solid #ff9800 !important;
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(0, 0, 0, 0.4)) !important;
+  box-shadow: inset 0 0 15px rgba(255, 152, 0, 0.4), 0 0 15px rgba(255, 152, 0, 0.5) !important;
 }
 
 .rarity-mythic {

@@ -169,7 +169,7 @@ export class CharacterManager {
     }
 
     updateWeaponVisuals(itemName) {
-        // Remove existing weapon mesh from right arm
+        // Step 3: Remove existing weapon mesh from right arm
         if (this.weaponMesh) {
             this.rightArm.remove(this.weaponMesh);
             this.weaponMesh = null;
@@ -668,7 +668,8 @@ export class CharacterManager {
 
     // Gain experience
     addExp(amount) {
-        this.stats.exp += amount;
+        const expGain = Number(amount) || 0;
+        this.stats.exp += expGain;
         let leveledUp = false;
 
         while (this.stats.exp >= getExpRequired(this.stats.level)) {
@@ -678,10 +679,10 @@ export class CharacterManager {
 
             // Apply stat gains to base values
             const gains = getStatGains(this.stats.level);
-            this.stats._baseMaxHp = (Number(this.stats._baseMaxHp) || 100) + gains.hp;
-            this.stats._baseMaxSp = (Number(this.stats._baseMaxSp) || 50) + gains.sp;
-            this.stats._baseAtk = (Number(this.stats._baseAtk) || 10) + gains.atk;
-            this.stats._baseDef = (Number(this.stats._baseDef) || 5) + gains.def;
+            this.stats._baseMaxHp = (Number(this.stats._baseMaxHp) || 100) + (Number(gains.hp) || 0);
+            this.stats._baseMaxSp = (Number(this.stats._baseMaxSp) || 50) + (Number(gains.sp) || 0);
+            this.stats._baseAtk = (Number(this.stats._baseAtk) || 10) + (Number(gains.atk) || 0);
+            this.stats._baseDef = (Number(this.stats._baseDef) || 5) + (Number(gains.def) || 0);
             
             // Fully restore current HP/SP on level up
             this.stats.hp = this.stats.max_hp;
@@ -702,12 +703,13 @@ export class CharacterManager {
         
         const actualDmg = Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
         
-        // Ensure hp is a number before subtracting
-        if (isNaN(this.stats.hp)) {
-            this.stats.hp = this.stats.max_hp || 100;
+        // Step 4: Ensure hp is a number before subtracting
+        const currentHp = Number(this.stats.hp);
+        if (isNaN(currentHp)) {
+            this.stats.hp = Number(this.stats.max_hp) || 100;
         }
         
-        this.stats.hp = Math.max(0, this.stats.hp - actualDmg);
+        this.stats.hp = Math.max(0, (Number(this.stats.hp) || 0) - actualDmg);
         return actualDmg;
     }
 
@@ -728,7 +730,7 @@ export class CharacterManager {
 
     // Respawn
     respawn() {
-        // Step 4 & 7: Set hp/sp to 20% on respawn, ensure no NaN
+        // Step 8: Set hp/sp to 20% on respawn, ensure no NaN
         const maxHp = Number(this.stats.max_hp || 100);
         const maxSp = Number(this.stats.max_sp || 50);
         
@@ -739,6 +741,9 @@ export class CharacterManager {
         this.mesh.position.set(0, 1.2, 10);
         this.state = 'idle';
         this.target = null;
+        
+        // Step 8: Flag for CombatSystem to check for auto-resume
+        this.justRespawned = true;
     }
 
     // Get save data
@@ -965,17 +970,19 @@ export class CharacterManager {
         if (!data) return;
         this.characterId = data.id;
         this.stats.name = data.name || 'Novice';
-        this.stats.level = isNaN(data.level) ? 1 : data.level;
-        this.stats.exp = isNaN(data.exp) ? 0 : data.exp;
-        this.stats.hp = isNaN(data.hp) ? 100 : data.hp;
-        this.stats.max_hp = isNaN(data.max_hp) ? 100 : data.max_hp;
-        this.stats.sp = isNaN(data.sp) ? 50 : data.sp;
-        this.stats.max_sp = isNaN(data.max_sp) ? 50 : data.max_sp;
-        this.stats.atk = isNaN(data.atk) ? 10 : data.atk;
-        this.stats.def = isNaN(data.def) ? 5 : data.def;
-        this.stats.gold = isNaN(data.gold) ? 0 : data.gold;
-        this.stats.total_kills = isNaN(data.total_kills) ? 0 : data.total_kills;
-        this.stats.play_time = isNaN(data.play_time) ? 0 : data.play_time;
+        
+        // Step 4: Robust numeric field loading with isNaN() guards and Number() casts
+        this.stats.level = isNaN(Number(data.level)) ? 1 : Number(data.level);
+        this.stats.exp = isNaN(Number(data.exp)) ? 0 : Number(data.exp);
+        this.stats.hp = isNaN(Number(data.hp)) ? 100 : Number(data.hp);
+        this.stats.max_hp = isNaN(Number(data.max_hp)) ? 100 : Number(data.max_hp);
+        this.stats.sp = isNaN(Number(data.sp)) ? 50 : Number(data.sp);
+        this.stats.max_sp = isNaN(Number(data.max_sp)) ? 50 : Number(data.max_sp);
+        this.stats.atk = isNaN(Number(data.atk)) ? 10 : Number(data.atk);
+        this.stats.def = isNaN(Number(data.def)) ? 5 : Number(data.def);
+        this.stats.gold = isNaN(Number(data.gold)) ? 0 : Number(data.gold);
+        this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
+        this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
         
         // Load appearance if available
         if (data.body_color) this.setBodyColor(data.body_color);

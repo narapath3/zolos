@@ -446,7 +446,7 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
             }
         })
         .on('broadcast', { event: 'chat' }, ({ payload }) => {
-            // Step 9: Use object format
+            // Step 5: Ensure consistent object format for chat messages
             if (chatCallback && payload) {
                 chatCallback({ username: payload.username, message: payload.message });
             }
@@ -495,7 +495,7 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
 
 export function broadcastChat(userId, username, level, message) {
     if (isOfflineMode || !supabase) {
-        // Step 9: Echo back local message using object format
+        // Step 5: Echo back local message using object format
         if (chatCallback) {
             chatCallback({ username, message });
         }
@@ -514,7 +514,7 @@ export function broadcastChat(userId, username, level, message) {
                 if (candidates.length > 0) {
                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
                     const reply = replies[Math.floor(Math.random() * replies.length)];
-                    // Step 9: Use object format
+                    // Step 5: Use object format
                     chatCallback({ username: sender.username, message: reply });
                 }
             }
@@ -529,7 +529,7 @@ export function broadcastChat(userId, username, level, message) {
             payload: { userId, username, level, message }
         });
     }
-    // Step 9: Echo back local message immediately using object format
+    // Step 5: Echo back local message immediately using object format
     if (chatCallback) {
         chatCallback({ username, message });
     }

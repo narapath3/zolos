@@ -87,7 +87,8 @@ async function initGame(charData) {
                 if (gameUI) {
                     gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
                     if (event.critical) {
-                        gameUI.triggerScreenShake(true);
+                        // Step 7: Screen shake on critical hits only
+                        gameUI.triggerScreenShake(4, 300);
                     }
                 }
                 break;
@@ -133,6 +134,12 @@ async function initGame(charData) {
             case 'fishingBite':
                 if (sceneManager) sceneManager.animateFishBite();
                 if (gameUI) gameUI.addCombatLog('❗ Fish on the line!', 'system');
+                break;
+            case 'fishCaught':
+                if (gameUI) {
+                    gameUI.addCombatLog(`🎣 You caught a ${event.item.name}!`, 'loot');
+                    // Item is added via 'lootDrop' event in CombatSystem.js
+                }
                 break;
             case 'fishingStop':
                 if (sceneManager) sceneManager.removeFishingLine();
@@ -220,7 +227,7 @@ async function initGame(charData) {
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
                 
-                // Fix: Robust water detection for remote players.
+                // Step 10 Part B: Robust water detection for remote players.
                 // Re-run environment check based on received X/Z to ensure correct baseY.
                 const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
                 if (remoteEnv === 'water') {
@@ -323,6 +330,7 @@ function handleMouseInteraction(event) {
     if (hit.type === 'monster') {
         character.targetMonster = hit.object;
         autoPath = hit.point;
+        // Step 11: Monster click: red indicator
         particles.createClickIndicator(hit.point, 0xff4444);
     } else if (hit.type === 'npc') {
         // Open Shop when clicking NPC
@@ -332,6 +340,7 @@ function handleMouseInteraction(event) {
     } else if (hit.type === 'ground') {
         autoPath = hit.point;
         character.targetMonster = null;
+        // Step 11: Ground click: green indicator
         particles.createClickIndicator(hit.point, 0x44ff44);
     }
 }
@@ -384,7 +393,8 @@ function gameLoop(time) {
         }
     }
 
-    // Fix: Force swimming state if in water, regardless of what CombatSystem or moveToward says
+    // Step 10 Part A: Force swimming state if in water, regardless of what CombatSystem or moveToward set.
+    // This ensures the 'swimming' state is always the one broadcast.
     if (env === 'water') {
         character.state = 'swimming';
     }

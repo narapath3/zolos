@@ -43,18 +43,33 @@ export class CombatSystem {
     update(dt) {
         // Step 2: Clamp deltaTime to prevent spiral-of-death
         const clampedDt = Math.min(0.1, dt);
+
+        // Dead-state guard: if character is not alive, set state to 'idle', clear target, and return early
+        if (!this.character.isAlive()) {
+            this.character.state = 'idle';
+            this.currentTarget = null;
+            if (this.character.targetMonster) this.character.targetMonster = null;
+            // Store autoFarm state if we died while it was active
+            if (this.autoFarm) {
+                this.wasAutoFarmingBeforeDeath = true;
+                this.autoFarm = false;
+            }
+            return;
+        }
+
+        // Step 8: Auto-resume check after respawn
+        if (this.wasAutoFarmingBeforeDeath && this.character.isAlive()) {
+            if (this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
+                this.autoFarm = true;
+                this.wasAutoFarmingBeforeDeath = false;
+                if (this.onEvent) this.onEvent({ type: 'autoResume' });
+            }
+        }
+
         this.globalCooldown = Math.max(0, this.globalCooldown - clampedDt);
 
         if (this.isFishing) {
             this._updateFishing(clampedDt);
-            return;
-        }
-
-        if (!this.character.isAlive()) {
-            // Dead — respawn after 3 seconds
-            this.character.state = 'idle';
-            this.currentTarget = null;
-            if (this.character.targetMonster) this.character.targetMonster = null;
             return;
         }
 
@@ -257,7 +272,7 @@ export class CombatSystem {
     }
 
     _updateFishing(dt) {
-        // Step 5: Fishing spot position
+        // Step 6: Fishing spot position (nearest water edge)
         const fishingSpot = { x: 0, y: 1.2, z: 2 };
         const playerPos = this.character.getPosition();
         const dist = playerPos.distanceTo(new THREE.Vector3(fishingSpot.x, playerPos.y, fishingSpot.z));
@@ -278,18 +293,28 @@ export class CombatSystem {
             // Check for bite every 3 seconds
             if (this.fishingTimer >= 3.0) {
                 this.fishingTimer = 0;
+                // Roll a random chance (fishingBiteChance = 0.05 per frame is too high, using 0.2 per 3s check)
                 if (Math.random() < 0.2) {
                     this.onEvent({ type: 'fishingBite' });
                     // Catch fish!
                     setTimeout(() => {
                         if (this.isFishing && this.character.state === 'fishing') {
+                            const fishItem = { name: 'Fish', emoji: '🐟', type: 'consumable', chance: 1.0 };
+                            this.character.stats.gold += 5; // Small gold reward for fishing
+                            this.onEvent({
+                                type: 'fishCaught',
+                                item: fishItem
+                            });
+                            // Also trigger standard loot drop for inventory addition
                             this.onEvent({
                                 type: 'lootDrop',
-                                item: { name: 'Fish', emoji: '🐟', type: 'consumable', chance: 1.0 }
+                                item: fishItem,
+                                targetPos: this.character.getPosition()
                             });
                         }
                     }, 1000);
                 }
+                this.fishingTimer = 0;
             }
         }
     }
