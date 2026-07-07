@@ -1857,10 +1857,15 @@ export class GameUI {
       const ny = moveY / maxRadius;
       const threshold = 0.35;
 
-      triggerKeyEvent('KeyW', ny < -threshold);
-      triggerKeyEvent('KeyS', ny > threshold);
-      triggerKeyEvent('KeyA', nx < -threshold);
-      triggerKeyEvent('KeyD', nx > threshold);
+      const inputManager = this.character ? this.character.inputManager : null;
+      if (inputManager) {
+        inputManager.setJoystickInput(nx, ny);
+      } else {
+        triggerKeyEvent('KeyW', ny < -threshold);
+        triggerKeyEvent('KeyS', ny > threshold);
+        triggerKeyEvent('KeyA', nx < -threshold);
+        triggerKeyEvent('KeyD', nx > threshold);
+      }
     };
 
     const handleEnd = (e) => {
@@ -1868,10 +1873,15 @@ export class GameUI {
       knob.style.transform = 'translate(0px, 0px)';
       base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
 
-      triggerKeyEvent('KeyW', false);
-      triggerKeyEvent('KeyS', false);
-      triggerKeyEvent('KeyA', false);
-      triggerKeyEvent('KeyD', false);
+      const inputManager = this.character ? this.character.inputManager : null;
+      if (inputManager) {
+        inputManager.setJoystickInput(0, 0);
+      } else {
+        triggerKeyEvent('KeyW', false);
+        triggerKeyEvent('KeyS', false);
+        triggerKeyEvent('KeyA', false);
+        triggerKeyEvent('KeyD', false);
+      }
     };
 
     // Mobile touch events
