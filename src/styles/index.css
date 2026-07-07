@@ -3437,25 +3437,26 @@ body {
 
   #auto-farm-container {
     bottom: auto;
-    top: 80px;
-    left: 10px;
-    right: auto;
+    top: 10px;
+    right: 10px;
+    left: auto;
     flex-direction: row;
     gap: 8px;
+    z-index: 1600;
   }
 
   .btn-auto {
-    width: 54px;
-    height: 54px;
+    width: 48px;
+    height: 48px;
     padding: 0;
   }
 
   .btn-auto .auto-icon {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .btn-auto .auto-text {
-    font-size: 8px;
+    font-size: 7px;
   }
 
   #minimap-container {
