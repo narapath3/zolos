@@ -856,7 +856,9 @@ body {
   overflow-y: auto;
 }
 
-.inv-slot, .inventory-slot, .shop-slot {
+.inv-slot,
+.inventory-slot,
+.shop-slot {
   aspect-ratio: 1;
   background: linear-gradient(135deg, rgba(30, 40, 60, 0.95), rgba(15, 20, 30, 1));
   border: 2px solid rgba(255, 255, 255, 0.15);
@@ -873,33 +875,38 @@ body {
   overflow: hidden;
 }
 
-.inv-slot::after, .inventory-slot::after, .shop-slot::after {
+.inv-slot::after,
+.inventory-slot::after,
+.shop-slot::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(0,0,0,0.2) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 50%, rgba(0, 0, 0, 0.2) 100%);
   pointer-events: none;
 }
 
-.inv-slot:hover, .inventory-slot:hover {
+.inv-slot:hover,
+.inventory-slot:hover {
   border-color: rgba(240, 192, 64, 0.5);
   background: linear-gradient(135deg, rgba(45, 55, 85, 0.9), rgba(25, 30, 50, 0.95));
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.4),
     0 0 8px rgba(240, 192, 64, 0.2);
   z-index: 2;
 }
 
-.inv-slot.selected, .inventory-slot.selected {
+.inv-slot.selected,
+.inventory-slot.selected {
   border-color: var(--primary) !important;
   background: linear-gradient(135deg, rgba(240, 192, 64, 0.15), rgba(20, 25, 40, 0.95)) !important;
-  box-shadow: 
+  box-shadow:
     0 0 12px rgba(240, 192, 64, 0.4),
     inset 0 1px 2px rgba(255, 255, 255, 0.15);
 }
 
-.inv-slot .inv-qty, .inventory-slot .slot-quantity {
+.inv-slot .inv-qty,
+.inventory-slot .slot-quantity {
   position: absolute;
   bottom: 2px;
   right: 4px;
@@ -2405,29 +2412,91 @@ body {
 }
 
 @keyframes screenShake {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  10% { transform: translate(-1px, -1px) rotate(-0.1deg); }
-  20% { transform: translate(1px, 1px) rotate(0.1deg); }
-  30% { transform: translate(-1px, 1px) rotate(-0.1deg); }
-  40% { transform: translate(1px, -1px) rotate(0.1deg); }
-  50% { transform: translate(-0.5px, 0.5px) rotate(0deg); }
-  60% { transform: translate(0.5px, -0.5px) rotate(0deg); }
-  70% { transform: translate(-0.5px, 0px) rotate(0deg); }
-  80% { transform: translate(0.5px, 0px) rotate(0deg); }
-  90% { transform: translate(0px, 0px) rotate(0deg); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  10% {
+    transform: translate(-1px, -1px) rotate(-0.1deg);
+  }
+
+  20% {
+    transform: translate(1px, 1px) rotate(0.1deg);
+  }
+
+  30% {
+    transform: translate(-1px, 1px) rotate(-0.1deg);
+  }
+
+  40% {
+    transform: translate(1px, -1px) rotate(0.1deg);
+  }
+
+  50% {
+    transform: translate(-0.5px, 0.5px) rotate(0deg);
+  }
+
+  60% {
+    transform: translate(0.5px, -0.5px) rotate(0deg);
+  }
+
+  70% {
+    transform: translate(-0.5px, 0px) rotate(0deg);
+  }
+
+  80% {
+    transform: translate(0.5px, 0px) rotate(0deg);
+  }
+
+  90% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
 }
 
 @keyframes screenShakeCrit {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  10% { transform: translate(-2px, -1px) rotate(-0.2deg); }
-  20% { transform: translate(2px, 1px) rotate(0.2deg); }
-  30% { transform: translate(-2px, 2px) rotate(-0.1deg); }
-  40% { transform: translate(2px, -2px) rotate(0.1deg); }
-  50% { transform: translate(-1px, 1px) rotate(-0.1deg); }
-  60% { transform: translate(1px, -1px) rotate(0.1deg); }
-  70% { transform: translate(-0.5px, 0.5px) rotate(0deg); }
-  80% { transform: translate(0.5px, -0.5px) rotate(0deg); }
-  90% { transform: translate(0px, 0px) rotate(0deg); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  10% {
+    transform: translate(-2px, -1px) rotate(-0.2deg);
+  }
+
+  20% {
+    transform: translate(2px, 1px) rotate(0.2deg);
+  }
+
+  30% {
+    transform: translate(-2px, 2px) rotate(-0.1deg);
+  }
+
+  40% {
+    transform: translate(2px, -2px) rotate(0.1deg);
+  }
+
+  50% {
+    transform: translate(-1px, 1px) rotate(-0.1deg);
+  }
+
+  60% {
+    transform: translate(1px, -1px) rotate(0.1deg);
+  }
+
+  70% {
+    transform: translate(-0.5px, 0.5px) rotate(0deg);
+  }
+
+  80% {
+    transform: translate(0.5px, -0.5px) rotate(0deg);
+  }
+
+  90% {
+    transform: translate(0px, 0px) rotate(0deg);
+  }
 }
 
 .screen-shake {
@@ -3082,49 +3151,6 @@ body {
   }
 }
 
-/* ========== MOBILE JOYSTICK ========== */
-#mobile-joystick-container {
-  position: fixed;
-  bottom: 120px;
-  left: 40px;
-  width: 120px;
-  height: 120px;
-  z-index: 1000;
-  pointer-events: auto;
-  user-select: none;
-  touch-action: none;
-  display: none; /* Hidden by default, shown via media query */
-}
-
-#joystick-base {
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-}
-
-#joystick-stick {
-  width: 50px;
-  height: 50px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
-  transition: transform 0.05s ease-out;
-}
-
-@media (max-width: 900px) {
-  #mobile-joystick-container {
-    display: block;
-  }
-}
-
 /* ========== TARGET INDICATOR ========== */
 #target-indicator {
   position: fixed;
@@ -3151,10 +3177,33 @@ body {
   border: 2px solid #ff4444;
 }
 
-.target-frame .top-left { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
-.target-frame .top-right { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
-.target-frame .bottom-left { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
-.target-frame .bottom-right { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+.target-frame .top-left {
+  top: -2px;
+  left: -2px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.target-frame .top-right {
+  top: -2px;
+  right: -2px;
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.target-frame .bottom-left {
+  bottom: -2px;
+  left: -2px;
+  border-right: 0;
+  border-top: 0;
+}
+
+.target-frame .bottom-right {
+  bottom: -2px;
+  right: -2px;
+  border-left: 0;
+  border-top: 0;
+}
 
 .target-info {
   position: absolute;
@@ -3189,4 +3238,231 @@ body {
   height: 100%;
   background: #ff4444;
   transition: width 0.3s ease;
+}
+
+/* ========== MOBILE PAD CONTROLS ========== */
+#mobile-pad {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1500;
+  pointer-events: none;
+}
+
+#joystick-container {
+  position: absolute;
+  bottom: 40px;
+  left: 40px;
+  width: 130px;
+  height: 130px;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+}
+
+#joystick-base {
+  width: 100%;
+  height: 100%;
+  background: rgba(14, 18, 36, 0.65);
+  border: 2px solid rgba(240, 192, 64, 0.4);
+  border-radius: 50%;
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  transition: border-color 0.3s;
+}
+
+#joystick-knob {
+  width: 54px;
+  height: 54px;
+  background: radial-gradient(circle, #ffd700, #f0a020);
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.3);
+  touch-action: none;
+  user-select: none;
+}
+
+#mobile-actions {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  width: 250px;
+  height: 250px;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+}
+
+.mobile-action-btn {
+  position: absolute;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s, background-color 0.2s;
+  user-select: none;
+  touch-action: none;
+}
+
+.mobile-action-btn:active {
+  transform: scale(0.9);
+}
+
+.mobile-action-btn .btn-icon {
+  font-size: 20px;
+}
+
+.attack-btn {
+  bottom: 15px;
+  right: 15px;
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, #ff6080, #cc3050);
+  border: 3px solid rgba(255, 96, 128, 0.45);
+  font-size: 32px;
+  z-index: 5;
+}
+
+.sprint-btn {
+  bottom: 15px;
+  right: 190px;
+  width: 52px;
+  height: 52px;
+  background: rgba(96, 160, 255, 0.65);
+  border: 2px solid rgba(96, 160, 255, 0.85);
+  font-size: 22px;
+  z-index: 5;
+}
+
+.sprint-btn.active {
+  background: radial-gradient(circle, #ffd700, #f0a020);
+  border-color: #f0c040;
+  color: #120a02;
+  box-shadow: 0 0 15px rgba(240, 192, 64, 0.6);
+}
+
+.mobile-skills-arc {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.skill-btn {
+  width: 52px;
+  height: 52px;
+  background: rgba(14, 18, 36, 0.75);
+  border: 2px solid rgba(100, 140, 255, 0.45);
+  pointer-events: auto;
+}
+
+/* Arc Layout for Skill Buttons */
+#btn-mobile-skill-1 {
+  bottom: 115px;
+  right: 15px;
+}
+
+#btn-mobile-skill-2 {
+  bottom: 95px;
+  right: 95px;
+}
+
+#btn-mobile-skill-3 {
+  bottom: 15px;
+  right: 115px;
+}
+
+.mobile-cooldown-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  pointer-events: none;
+  transition: height 0.1s linear;
+}
+
+/* Media query to display mobile controls on screen widths <= 1024px */
+@media (max-width: 1024px) {
+  #mobile-pad {
+    display: block;
+  }
+
+  /* Make HUD responsive and scale down */
+  #hud-bottom {
+    max-width: calc(100vw - 20px);
+    gap: 4px;
+    padding: 6px 10px;
+    bottom: 8px;
+    overflow-x: auto;
+  }
+
+  .hud-btn {
+    padding: 6px 10px;
+    flex-shrink: 0;
+  }
+
+  .hud-btn span {
+    font-size: 18px;
+  }
+
+  .hud-btn small {
+    display: none;
+    /* Hide button labels to save width */
+  }
+
+  #hud-top {
+    left: 10px;
+    top: 10px;
+    gap: 10px;
+  }
+
+  .bars-container {
+    min-width: 180px;
+  }
+
+  #auto-farm-container {
+    bottom: auto;
+    top: 10px;
+    right: 10px;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .btn-auto {
+    width: 54px;
+    height: 54px;
+    padding: 0;
+  }
+
+  .btn-auto .auto-icon {
+    font-size: 18px;
+  }
+
+  .btn-auto .auto-text {
+    font-size: 8px;
+  }
+
+  #minimap-container {
+    display: none !important;
+    /* Hide to prevent overlay clutter */
+  }
+
+  #kill-counter {
+    display: none !important;
+  }
+
+  #fps-counter {
+    display: none !important;
+  }
 }

@@ -72,12 +72,6 @@
       </div>
     </div>
 
-    <!-- Mobile Joystick -->
-    <div id="mobile-joystick-container" style="display: none;">
-      <div id="joystick-base">
-        <div id="joystick-stick"></div>
-      </div>
-    </div>
 
     <!-- Top HUD -->
     <div id="hud-top">
@@ -118,7 +112,9 @@
     </div>
 
     <!-- FPS Counter -->
-    <div id="fps-counter" style="position:fixed;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#0f0;font-family:monospace;font-size:11px;padding:2px 7px;border-radius:4px;z-index:9999;pointer-events:none;">FPS: --</div>
+    <div id="fps-counter"
+      style="position:fixed;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#0f0;font-family:monospace;font-size:11px;padding:2px 7px;border-radius:4px;z-index:9999;pointer-events:none;">
+      FPS: --</div>
 
     <!-- Auto Farm + Fishing Buttons -->
     <div id="auto-farm-container">
@@ -297,7 +293,8 @@
                 <input type="number" id="market-sell-price-input" min="0" placeholder="ตั้งราคา Zeny...">
               </div>
             </div>
-            <div id="market-sell-price-info" style="font-size: 10px; color: var(--text-dim); margin-top: 5px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 4px;">
+            <div id="market-sell-price-info"
+              style="font-size: 10px; color: var(--text-dim); margin-top: 5px; background: rgba(0,0,0,0.2); padding: 5px; border-radius: 4px;">
               📈 ราคากลาง: กำลังโหลดข้อมูล...
             </div>
             <button id="btn-market-list-action" class="btn-primary" style="width: 100%; margin-top: 10px;">⚖️
@@ -315,7 +312,7 @@
       </div>
       <div class="panel-body">
         <div class="gold-display">💰 <span id="shop-gold-amount">0</span> Zeny</div>
-        
+
         <div class="shop-tabs">
           <button class="shop-tab active" data-tab="all">ทั้งหมด</button>
           <button class="shop-tab" data-tab="usable">ของใช้</button>
@@ -467,7 +464,9 @@
             <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
           </div>
           <!-- Step 8: UID Display -->
-          <div id="profile-uid-display" style="font-size: 10px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-pixel); text-align: center;">UID: #--------</div>
+          <div id="profile-uid-display"
+            style="font-size: 10px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-pixel); text-align: center;">
+            UID: #--------</div>
 
           <div class="form-group appearance-colors">
             <label>🎨 Appearance Colors / ปรับแต่งสี</label>
@@ -513,6 +512,41 @@
             <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Mobile Pad Controls -->
+    <div id="mobile-pad">
+      <!-- Joystick (left side) -->
+      <div id="joystick-container">
+        <div id="joystick-base">
+          <div id="joystick-knob"></div>
+        </div>
+      </div>
+      <!-- Action buttons (right side) -->
+      <div id="mobile-actions">
+        <!-- Sprint button -->
+        <button id="btn-mobile-sprint" class="mobile-action-btn sprint-btn" title="Sprint">🏃</button>
+
+        <!-- Skill buttons -->
+        <div class="mobile-skills-arc">
+          <button class="mobile-action-btn skill-btn" id="btn-mobile-skill-1" data-skill="bash" title="Bash">
+            <span class="btn-icon">⚔️</span>
+            <div class="mobile-cooldown-overlay" id="mobile-cooldown-bash"></div>
+          </button>
+          <button class="mobile-action-btn skill-btn" id="btn-mobile-skill-2" data-skill="heal" title="Heal">
+            <span class="btn-icon">💚</span>
+            <div class="mobile-cooldown-overlay" id="mobile-cooldown-heal"></div>
+          </button>
+          <button class="mobile-action-btn skill-btn" id="btn-mobile-skill-3" data-skill="magnumBreak"
+            title="Magnum Break">
+            <span class="btn-icon">🔥</span>
+            <div class="mobile-cooldown-overlay" id="mobile-cooldown-magnumBreak"></div>
+          </button>
+        </div>
+
+        <!-- Central Attack/Target button -->
+        <button id="btn-mobile-attack" class="mobile-action-btn attack-btn" title="Attack">👊</button>
       </div>
     </div>
 

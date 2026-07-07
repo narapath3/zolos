@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats } from '../network/GameSync.js';
 
 export class GameUI {
@@ -12,6 +12,7 @@ export class GameUI {
     this.character = character;
     this.soundManager = soundManager;
     this.combatSystem = combatSystem;
+    this.particles = null;
 
     this.currentTab = 'all';
     this.selectedItemName = null;
@@ -44,69 +45,8 @@ export class GameUI {
     this._setupLeaderboardTabs();
     this._setupOnlineTabs();
     this._setupAutoBot();
-    this._setupMobileJoystick();
     this._setupTargetIndicator();
-  }
-
-  _setupMobileJoystick() {
-    const container = document.getElementById('mobile-joystick-container');
-    const stick = document.getElementById('joystick-stick');
-    const base = document.getElementById('joystick-base');
-    
-    // We need inputManager which might not be passed to GameUI yet.
-    // Let's assume we can get it from character if not directly available.
-    const inputManager = this.character ? this.character.inputManager : null;
-    if (!container || !stick || !base || !inputManager) return;
-
-    let active = false;
-    let startPos = { x: 0, y: 0 };
-    const maxRadius = 50;
-
-    const handleStart = (e) => {
-      active = true;
-      const touch = e.touches ? e.touches[0] : e;
-      const rect = base.getBoundingClientRect();
-      startPos = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
-      };
-      handleMove(e);
-    };
-
-    const handleMove = (e) => {
-      if (!active) return;
-      if (e.cancelable) e.preventDefault();
-      const touch = e.touches ? e.touches[0] : e;
-      
-      let dx = touch.clientX - startPos.x;
-      let dy = touch.clientY - startPos.y;
-      
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > maxRadius) {
-        dx = (dx / dist) * maxRadius;
-        dy = (dy / dist) * maxRadius;
-      }
-      
-      stick.style.transform = `translate(${dx}px, ${dy}px)`;
-      
-      // Map Y to Z for 3D movement
-      inputManager.setJoystickInput(dx / maxRadius, dy / maxRadius);
-    };
-
-    const handleEnd = () => {
-      active = false;
-      stick.style.transform = 'translate(0px, 0px)';
-      inputManager.setJoystickInput(0, 0);
-    };
-
-    container.addEventListener('touchstart', handleStart, { passive: false });
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', handleEnd);
-    
-    // Mouse support for testing
-    container.addEventListener('mousedown', handleStart);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleEnd);
+    this._setupMobileControls();
   }
 
   _setupTargetIndicator() {
@@ -1236,7 +1176,7 @@ export class GameUI {
     // Step 7: Screen shake on critical hit only
     const container = document.getElementById('game-screen');
     if (!container) return;
-    
+
     const startTime = performance.now();
     const shake = () => {
       const elapsed = performance.now() - startTime;
@@ -1798,14 +1738,224 @@ export class GameUI {
   // ============ Skill HUD Updates ============
   updateSkillCooldown(skillId, currentCooldown, maxCooldown) {
     const overlay = document.getElementById(`cooldown-${skillId}`);
-    if (!overlay) return;
-
-    if (currentCooldown <= 0) {
-      overlay.style.height = '0%';
-    } else {
-      const percentage = (currentCooldown / maxCooldown) * 100;
-      overlay.style.height = `${percentage}%`;
+    if (overlay) {
+      if (currentCooldown <= 0) {
+        overlay.style.height = '0%';
+      } else {
+        const percentage = (currentCooldown / maxCooldown) * 100;
+        overlay.style.height = `${percentage}%`;
+      }
     }
+
+    const mobOverlay = document.getElementById(`mobile-cooldown-${skillId}`);
+    if (mobOverlay) {
+      if (currentCooldown <= 0) {
+        mobOverlay.style.height = '0%';
+      } else {
+        const percentage = (currentCooldown / maxCooldown) * 100;
+        mobOverlay.style.height = `${percentage}%`;
+      }
+    }
+  }
+
+  castSkill(skillId) {
+    if (!this.character || !this.character.isAlive()) return false;
+
+    // Determine target
+    let target = this.character.targetMonster;
+    if (skillId === 'bash' && !target) {
+      if (this.combatSystem && this.combatSystem.monsters) {
+        target = this.combatSystem.monsters.findNearest(this.character.getPosition());
+        // Snap target if within reasonable range (3x normal melee range)
+        if (target && this.character.getPosition().distanceTo(target.getPosition()) > this.character.getAttackRange() * 3) {
+          target = null;
+        }
+      }
+    }
+
+    // Call character's useSkill
+    const success = this.character.useSkill(
+      skillId,
+      target,
+      this.combatSystem ? this.combatSystem.monsters : null,
+      this,
+      this.soundManager,
+      this.particles || window.particles,
+      (skillType, hitTarget, dmg) => {
+        // Handle monster death if this skill killed it
+        if (hitTarget && !hitTarget.alive) {
+          if (this.combatSystem) {
+            this.combatSystem._onMonsterKilled(hitTarget);
+          }
+        }
+      }
+    );
+
+    return success;
+  }
+
+  _setupMobileControls() {
+    const pad = document.getElementById('mobile-pad');
+    const base = document.getElementById('joystick-base');
+    const knob = document.getElementById('joystick-knob');
+    if (!pad || !base || !knob) return;
+
+    let joystickActive = false;
+    let startX = 0;
+    let startY = 0;
+    const maxRadius = 45; // Max knob movement radius in pixels
+
+    // Keep track of virtual key states
+    const activeKeys = {
+      KeyW: false,
+      KeyS: false,
+      KeyA: false,
+      KeyD: false
+    };
+
+    const triggerKeyEvent = (keyCode, isPressed) => {
+      if (activeKeys[keyCode] === isPressed) return;
+      activeKeys[keyCode] = isPressed;
+      const type = isPressed ? 'keydown' : 'keyup';
+      const event = new KeyboardEvent(type, { code: keyCode, key: keyCode });
+      window.dispatchEvent(event);
+    };
+
+    const handleStart = (e) => {
+      e.preventDefault();
+      const touch = e.touches ? e.touches[0] : e;
+      joystickActive = true;
+
+      const rect = base.getBoundingClientRect();
+      startX = rect.left + rect.width / 2;
+      startY = rect.top + rect.height / 2;
+
+      base.style.borderColor = 'var(--primary)';
+    };
+
+    const handleMove = (e) => {
+      if (!joystickActive) return;
+      e.preventDefault();
+
+      const touch = e.touches ? e.touches[0] : e;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      let angle = Math.atan2(dy, dx);
+      let moveX = dx;
+      let moveY = dy;
+
+      if (distance > maxRadius) {
+        moveX = Math.cos(angle) * maxRadius;
+        moveY = Math.sin(angle) * maxRadius;
+      }
+
+      knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
+
+      const nx = moveX / maxRadius;
+      const ny = moveY / maxRadius;
+      const threshold = 0.35;
+
+      triggerKeyEvent('KeyW', ny < -threshold);
+      triggerKeyEvent('KeyS', ny > threshold);
+      triggerKeyEvent('KeyA', nx < -threshold);
+      triggerKeyEvent('KeyD', nx > threshold);
+    };
+
+    const handleEnd = (e) => {
+      joystickActive = false;
+      knob.style.transform = 'translate(0px, 0px)';
+      base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
+
+      triggerKeyEvent('KeyW', false);
+      triggerKeyEvent('KeyS', false);
+      triggerKeyEvent('KeyA', false);
+      triggerKeyEvent('KeyD', false);
+    };
+
+    // Mobile touch events
+    base.addEventListener('touchstart', handleStart, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd, { passive: false });
+
+    // Desktop/mouse fallback (for browser mobile simulation mode)
+    base.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+
+    // Sprint Button logic
+    const sprintBtn = document.getElementById('btn-mobile-sprint');
+    if (sprintBtn) {
+      let isSprintActive = false;
+      const toggleSprint = () => {
+        isSprintActive = !isSprintActive;
+        sprintBtn.classList.toggle('active', isSprintActive);
+
+        const event = new KeyboardEvent(isSprintActive ? 'keydown' : 'keyup', {
+          code: 'ShiftLeft',
+          key: 'Shift'
+        });
+        window.dispatchEvent(event);
+      };
+
+      sprintBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        toggleSprint();
+      });
+      sprintBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        toggleSprint();
+      });
+    }
+
+    // Target/Attack Button logic
+    const attackBtn = document.getElementById('btn-mobile-attack');
+    if (attackBtn) {
+      const triggerAttack = () => {
+        if (!this.character) return;
+
+        if (!this.character.targetMonster) {
+          if (this.combatSystem && this.combatSystem.monsters) {
+            const nearest = this.combatSystem.monsters.findNearest(this.character.getPosition());
+            if (nearest) {
+              this.character.targetMonster = nearest;
+              this.addCombatLog(`🎯 Target selected: ${nearest.data.name}`, 'system');
+            } else {
+              this.addCombatLog('❌ No monsters nearby', 'system');
+            }
+          }
+        } else {
+          const name = this.character.targetMonster.data.name || 'Monster';
+          this.character.targetMonster = null;
+          this.addCombatLog(`❌ Deselected target: ${name}`, 'system');
+        }
+      };
+
+      attackBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        triggerAttack();
+      });
+      attackBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        triggerAttack();
+      });
+    }
+
+    // Skill buttons touch and click triggers
+    ['bash', 'heal', 'magnumBreak'].forEach((skillId, index) => {
+      const btn = document.getElementById(`btn-mobile-skill-${index + 1}`);
+      if (btn) {
+        btn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          this.castSkill(skillId);
+        });
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.castSkill(skillId);
+        });
+      }
+    });
   }
 
   setupSkillClicks(callback) {

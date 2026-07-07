@@ -167,6 +167,12 @@ async function initGame(charData) {
 
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
+    gameUI.particles = particles;
+
+    // Setup skill clicks
+    gameUI.setupSkillClicks((skillId) => {
+        gameUI.castSkill(skillId);
+    });
 
     // Fix D: Clear conflicting autoPath on AUTO activation
     const autoBtn = document.getElementById('btn-auto-farm');
@@ -304,6 +310,15 @@ async function initGame(charData) {
     // Input listeners — Shift key for sprinting
     window.addEventListener('keydown', (e) => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = true;
+
+        // Skill hotkeys triggers: 1, 2, 3
+        if (e.code === 'Digit1' || e.key === '1') {
+            gameUI.castSkill('bash');
+        } else if (e.code === 'Digit2' || e.key === '2') {
+            gameUI.castSkill('heal');
+        } else if (e.code === 'Digit3' || e.key === '3') {
+            gameUI.castSkill('magnumBreak');
+        }
     });
     window.addEventListener('keyup', (e) => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = false;
@@ -481,6 +496,16 @@ function gameLoop(time) {
             const statsPanel = document.getElementById('stats-panel');
             if (statsPanel && statsPanel.style.display !== 'none') {
                 gameUI.updateStats(character.stats);
+            }
+
+            // Update skill cooldown progress bars on mobile and desktop slots
+            if (character.cooldowns) {
+                const SKILLS_LIST = ['bash', 'heal', 'magnumBreak'];
+                SKILLS_LIST.forEach(skillId => {
+                    const current = character.cooldowns[skillId] || 0;
+                    const maxMax = skillId === 'bash' ? 3 : skillId === 'heal' ? 5 : 8; // Max cooldown levels
+                    gameUI.updateSkillCooldown(skillId, current, maxMax);
+                });
             }
 
             // FPS Counter
