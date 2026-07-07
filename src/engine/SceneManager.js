@@ -1927,24 +1927,29 @@ export class SceneManager {
 
         const intersects = raycaster.intersectObjects(targets, true);
         if (intersects.length > 0) {
-            const hit = intersects[0];
-            let obj = hit.object;
+            // Check all intersections to prioritize monsters/NPCs over environment (water/ground)
+            for (let i = 0; i < intersects.length; i++) {
+                const hit = intersects[i];
+                let obj = hit.object;
 
-            while (obj) {
-                if (obj === npc) {
-                    return { type: 'npc', point: hit.point, object: npc };
-                }
-                if (monsters && monsters.monsters) {
-                    const matchedMonster = monsters.monsters.find(m => m.mesh === obj && m.alive);
-                    if (matchedMonster) {
-                        return { type: 'monster', point: hit.point, object: matchedMonster };
+                while (obj) {
+                    if (obj === npc) {
+                        return { type: 'npc', point: hit.point, object: npc };
                     }
+                    if (monsters && monsters.monsters) {
+                        const matchedMonster = monsters.monsters.find(m => m.mesh === obj && m.alive);
+                        if (matchedMonster) {
+                            return { type: 'monster', point: hit.point, object: matchedMonster };
+                        }
+                    }
+                    obj = obj.parent;
                 }
-                obj = obj.parent;
             }
 
-            if (hit.object === this.groundMesh || hit.object === this.waterMesh) {
-                return { type: 'ground', point: hit.point };
+            // If no monster/NPC was hit, check for ground/water from the first intersection
+            const firstHit = intersects[0];
+            if (firstHit.object === this.groundMesh || firstHit.object === this.waterMesh) {
+                return { type: 'ground', point: firstHit.point };
             }
         }
 
