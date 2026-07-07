@@ -92,6 +92,11 @@ export class CombatSystem {
         }
 
         if (target && target.alive) {
+            // Ensure character target is synced for UI target lock in AUTO mode
+            if (this.autoFarm && !this.character.targetMonster) {
+                this.character.targetMonster = target;
+            }
+            
             const playerPos = this.character.getPosition();
             const targetPos = target.getPosition();
             const distance = playerPos.distanceTo(targetPos);

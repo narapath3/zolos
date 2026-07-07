@@ -1915,6 +1915,7 @@ export class SceneManager {
         const targets = [];
 
         if (this.groundMesh) targets.push(this.groundMesh);
+        if (this.waterMesh) targets.push(this.waterMesh);
         if (npc) targets.push(npc);
         if (monsters && monsters.monsters) {
             monsters.monsters.forEach(m => {
@@ -1942,7 +1943,7 @@ export class SceneManager {
                 obj = obj.parent;
             }
 
-            if (hit.object === this.groundMesh) {
+            if (hit.object === this.groundMesh || hit.object === this.waterMesh) {
                 return { type: 'ground', point: hit.point };
             }
         }

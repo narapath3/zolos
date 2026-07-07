@@ -379,7 +379,7 @@ function gameLoop(time) {
 
     if (moveDir) {
         autoPath = null;
-        character.moveSpeed = isShiftPressed ? 7 : 4;
+        character.moveSpeed = isShiftPressed ? 9 : 5.5;
         character.manualMove(moveDir.x, moveDir.z, dt);
     } else if (autoPath) {
         // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
@@ -402,9 +402,9 @@ function gameLoop(time) {
         if (character.state === 'swimming') {
             character.state = 'idle';
         }
-        // Ensure speed is reset to 4 (or higher if shift is pressed)
-        const baseSpeed = isShiftPressed ? 6.5 : 4.0;
-        if (character.moveSpeed < 4.0) {
+        // Ensure speed is reset to 5.5 (or higher if shift is pressed)
+        const baseSpeed = isShiftPressed ? 9.0 : 5.5;
+        if (character.moveSpeed < 5.5) {
             character.moveSpeed = baseSpeed;
         }
     }
@@ -421,6 +421,7 @@ function gameLoop(time) {
         if (dist <= character.getAttackRange()) {
             autoPath = null;
         } else {
+            // Keep walking towards the target monster (works for water monsters too)
             autoPath = character.targetMonster.mesh.position.clone();
         }
     }

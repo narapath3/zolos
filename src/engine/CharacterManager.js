@@ -22,7 +22,7 @@ export class CharacterManager {
         this.attackTimer = 0;
         this.attackCooldown = 1.0; // seconds between attacks
         this.target = null;
-        this.moveSpeed = 4;
+        this.moveSpeed = 5.5;
         
         // Base Y position to support animation offsets without losing ground level
         this.baseY = 1.2; 
