@@ -44,6 +44,109 @@ export class GameUI {
     this._setupLeaderboardTabs();
     this._setupOnlineTabs();
     this._setupAutoBot();
+    this._setupMobileJoystick();
+    this._setupTargetIndicator();
+  }
+
+  _setupMobileJoystick() {
+    const container = document.getElementById('mobile-joystick-container');
+    const stick = document.getElementById('joystick-stick');
+    const base = document.getElementById('joystick-base');
+    
+    // We need inputManager which might not be passed to GameUI yet.
+    // Let's assume we can get it from character if not directly available.
+    const inputManager = this.character ? this.character.inputManager : null;
+    if (!container || !stick || !base || !inputManager) return;
+
+    let active = false;
+    let startPos = { x: 0, y: 0 };
+    const maxRadius = 50;
+
+    const handleStart = (e) => {
+      active = true;
+      const touch = e.touches ? e.touches[0] : e;
+      const rect = base.getBoundingClientRect();
+      startPos = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+      handleMove(e);
+    };
+
+    const handleMove = (e) => {
+      if (!active) return;
+      if (e.cancelable) e.preventDefault();
+      const touch = e.touches ? e.touches[0] : e;
+      
+      let dx = touch.clientX - startPos.x;
+      let dy = touch.clientY - startPos.y;
+      
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > maxRadius) {
+        dx = (dx / dist) * maxRadius;
+        dy = (dy / dist) * maxRadius;
+      }
+      
+      stick.style.transform = `translate(${dx}px, ${dy}px)`;
+      
+      // Map Y to Z for 3D movement
+      inputManager.setJoystickInput(dx / maxRadius, dy / maxRadius);
+    };
+
+    const handleEnd = () => {
+      active = false;
+      stick.style.transform = 'translate(0px, 0px)';
+      inputManager.setJoystickInput(0, 0);
+    };
+
+    container.addEventListener('touchstart', handleStart, { passive: false });
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+    
+    // Mouse support for testing
+    container.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+  }
+
+  _setupTargetIndicator() {
+    this.targetIndicator = document.getElementById('target-indicator');
+    this.targetName = document.getElementById('target-name');
+    this.targetHpFill = document.getElementById('target-hp-fill');
+    this.currentTargetMonster = null;
+  }
+
+  updateTargetIndicator(sceneManager) {
+    if (!this.targetIndicator || !sceneManager) return;
+
+    // Determine target: priority to hover, then locked target
+    let target = null;
+    if (this.hoveredMonster) {
+      target = this.hoveredMonster;
+    } else if (this.character && this.character.targetMonster) {
+      target = this.character.targetMonster;
+    }
+
+    if (!target || !target.alive) {
+      this.targetIndicator.style.display = 'none';
+      this.currentTargetMonster = null;
+      return;
+    }
+
+    this.currentTargetMonster = target;
+    this.targetIndicator.style.display = 'block';
+
+    // Update position
+    const screenPos = sceneManager.worldToScreen(target.mesh.position);
+    this.targetIndicator.style.left = `${screenPos.x}px`;
+    this.targetIndicator.style.top = `${screenPos.y}px`;
+
+    // Update info
+    if (this.targetName) this.targetName.textContent = target.data.name;
+    if (this.targetHpFill) {
+      const hpPercent = (target.hp / target.maxHp) * 100;
+      this.targetHpFill.style.width = `${hpPercent}%`;
+    }
   }
 
   _setupAutoBot() {

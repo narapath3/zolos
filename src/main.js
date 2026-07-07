@@ -25,7 +25,7 @@ import {
 
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
-let soundManager, combatSystem;
+let soundManager, combatSystem, inputManager;
 let isGameStarted = false;
 let lastTime = 0;
 let portalCooldown = 0;
@@ -40,7 +40,6 @@ let lastStatsTime = 0;
 let lastMinimapTime = 0;
 
 // Input state
-const keys = {};
 let autoPath = null;
 let isShiftPressed = false;
 
@@ -64,6 +63,18 @@ async function initGame(charData) {
     document.getElementById('game-screen').style.display = 'block';
 
     sceneManager = new SceneManager(canvas);
+    
+    // Setup input
+    import('./engine/InputManager.js').then(({ InputManager }) => {
+        inputManager = new InputManager();
+        character.inputManager = inputManager;
+        
+        // Setup skill hotkeys
+        inputManager.setupSkillHotkey((skillId) => {
+            if (combatSystem) combatSystem.useSkill(skillId);
+        });
+    });
+
     character = new CharacterManager(sceneManager.scene);
 
     // Load character data
@@ -283,17 +294,26 @@ async function initGame(charData) {
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
 
-    // Input listeners
+    // Input listeners — Shift key for sprinting
     window.addEventListener('keydown', (e) => {
-        keys[e.code] = true;
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = true;
     });
     window.addEventListener('keyup', (e) => {
-        keys[e.code] = false;
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = false;
     });
 
     canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
+    
+    // Mouse move for monster hovering
+    canvas.addEventListener('mousemove', (e) => {
+        if (!sceneManager || !monsters || !gameUI) return;
+        const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPC());
+        if (hit && hit.type === 'monster') {
+            gameUI.hoveredMonster = hit.object;
+        } else {
+            gameUI.hoveredMonster = null;
+        }
+    });
 }
 
 async function showCharacterSelect() {
@@ -355,16 +375,12 @@ function gameLoop(time) {
     if (portalCooldown > 0) portalCooldown -= dt;
 
     // 1. Movement
-    let dirX = 0, dirZ = 0;
-    if (keys['ArrowUp'] || keys['KeyW']) dirZ -= 1;
-    if (keys['ArrowDown'] || keys['KeyS']) dirZ += 1;
-    if (keys['ArrowLeft'] || keys['KeyA']) dirX -= 1;
-    if (keys['ArrowRight'] || keys['KeyD']) dirX += 1;
+    const moveDir = inputManager ? inputManager.getMovementDirection() : null;
 
-    if (dirX !== 0 || dirZ !== 0) {
+    if (moveDir) {
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 7 : 4;
-        character.manualMove(dirX, dirZ, dt);
+        character.manualMove(moveDir.x, moveDir.z, dt);
     } else if (autoPath) {
         // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
         if (combatSystem && combatSystem.autoFarm) {
@@ -439,6 +455,7 @@ function gameLoop(time) {
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);
     if (combatSystem) combatSystem.update(dt);
+    if (gameUI) gameUI.updateTargetIndicator(sceneManager);
 
     // 6. Camera & Networking
     sceneManager.followTarget(character.getPosition());

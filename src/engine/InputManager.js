@@ -4,12 +4,20 @@ export class InputManager {
     constructor() {
         this.keys = {};
         this.enabled = true;
+        
+        // Mobile joystick input state
+        this.joystickVector = { x: 0, z: 0 };
+        this.isJoystickActive = false;
 
         window.addEventListener('keydown', (e) => this._onKeyDown(e));
         window.addEventListener('keyup', (e) => this._onKeyUp(e));
 
         // Reset keys on window blur (prevents stuck keys)
-        window.addEventListener('blur', () => { this.keys = {}; });
+        window.addEventListener('blur', () => { 
+            this.keys = {}; 
+            this.joystickVector = { x: 0, z: 0 };
+            this.isJoystickActive = false;
+        });
 
         this.onSkillHotkeyCallback = null;
     }
@@ -45,6 +53,11 @@ export class InputManager {
     getMovementDirection() {
         if (!this.enabled) return null;
 
+        // Prioritize joystick if active (mobile)
+        if (this.isJoystickActive) {
+            return { x: this.joystickVector.x, z: this.joystickVector.z };
+        }
+
         let x = 0;
         let z = 0;
 
@@ -61,6 +74,24 @@ export class InputManager {
     }
 
     /**
+     * Sets movement vector from mobile joystick.
+     * @param {number} x - horizontal input (-1 to 1)
+     * @param {number} z - vertical input (-1 to 1)
+     */
+    setJoystickInput(x, z) {
+        if (x === 0 && z === 0) {
+            this.isJoystickActive = false;
+            this.joystickVector = { x: 0, z: 0 };
+        } else {
+            this.isJoystickActive = true;
+            // Normalize if needed, though joystick usually provides normalized or clamped values
+            const len = Math.sqrt(x * x + z * z);
+            const n = len > 1 ? len : 1;
+            this.joystickVector = { x: x / n, z: z / n };
+        }
+    }
+
+    /**
      * Returns true if the sprint key (Space) is held.
      */
     isRunning() {
@@ -71,7 +102,7 @@ export class InputManager {
      * Returns true if any movement key is currently pressed.
      */
     hasMovementInput() {
-        return !!(
+        return this.isJoystickActive || !!(
             this.keys['KeyW'] || this.keys['KeyA'] ||
             this.keys['KeyS'] || this.keys['KeyD'] ||
             this.keys['ArrowUp'] || this.keys['ArrowDown'] ||

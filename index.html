@@ -56,6 +56,29 @@
     <!-- Three.js Canvas -->
     <canvas id="game-canvas"></canvas>
 
+    <!-- Target Indicator Overlay -->
+    <div id="target-indicator" style="display: none;">
+      <div class="target-frame">
+        <div class="corner top-left"></div>
+        <div class="corner top-right"></div>
+        <div class="corner bottom-left"></div>
+        <div class="corner bottom-right"></div>
+        <div class="target-info">
+          <div id="target-name">Monster</div>
+          <div class="target-hp-bar">
+            <div id="target-hp-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Joystick -->
+    <div id="mobile-joystick-container" style="display: none;">
+      <div id="joystick-base">
+        <div id="joystick-stick"></div>
+      </div>
+    </div>
+
     <!-- Top HUD -->
     <div id="hud-top">
       <div class="player-info">
