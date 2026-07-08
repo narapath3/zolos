@@ -293,7 +293,7 @@ export class GameUI {
         </div>
         <div class="stats-meta">
           <div class="stats-meta-name">${stats.name}</div>
-          <div class="stats-meta-uid" style="font-size: 10px; color: var(--text-dim); margin-bottom: 4px;">UID: #${this.characterId ? this.characterId.split('_').pop().substring(0, 8).toUpperCase() : 'N/A'}</div>
+          <div class="stats-meta-uid">UID: #${this.characterId ? this.characterId.split('_').pop().substring(0, 8).toUpperCase() : 'N/A'}</div>
           <div class="stats-meta-time">⏱️ Play Time: ${this._formatTime(stats.play_time)}</div>
         </div>
       </div>
@@ -518,9 +518,7 @@ export class GameUI {
         if (isEquipped) {
           slot.classList.add('equipped');
         }
-        if (item.rarity) {
-          slot.classList.add(`rarity-${item.rarity}`);
-        }
+        slot.classList.add(`rarity-${item.rarity || 'common'}`);
 
         slot.innerHTML = `
                   <span>${item.emoji}</span>
@@ -1223,24 +1221,16 @@ export class GameUI {
     }
   }
 
-  triggerScreenShake(intensity = 4, duration = 300) {
-    // Step 7: Screen shake on critical hit only
+  triggerScreenShake(isCritical = false) {
+    if (!isCritical) return;
     const container = document.getElementById('game-screen');
     if (!container) return;
 
-    const startTime = performance.now();
-    const shake = () => {
-      const elapsed = performance.now() - startTime;
-      if (elapsed < duration) {
-        const x = (Math.random() - 0.5) * intensity;
-        const y = (Math.random() - 0.5) * intensity;
-        container.style.transform = `translate(${x}px, ${y}px)`;
-        requestAnimationFrame(shake);
-      } else {
-        container.style.transform = '';
-      }
-    };
-    shake();
+    // Step 5.2: Screen Shake - Only for Critical Hit
+    container.classList.add('screen-shake-crit');
+    setTimeout(() => {
+      container.classList.remove('screen-shake-crit');
+    }, 500);
   }
 
   setAutoFarmState(active) {
@@ -1509,7 +1499,7 @@ export class GameUI {
         const isMine = listing.seller_id === this.characterId;
 
         // Step 8: Apply rarity class to market row
-        const rarityClass = itemInfo.rarity ? `rarity-${itemInfo.rarity}` : '';
+        const rarityClass = `rarity-${itemInfo.rarity || 'common'}`;
         row.innerHTML = `
           <div class="market-item-name-cell ${rarityClass}">
             <span>${itemInfo.emoji}</span>
@@ -1564,10 +1554,7 @@ export class GameUI {
 
     sellable.forEach(item => {
       const slot = document.createElement('div');
-      slot.className = 'inventory-slot';
-      if (item.rarity) {
-        slot.classList.add(`rarity-${item.rarity}`);
-      }
+      slot.className = `inventory-slot rarity-${item.rarity || 'common'}`;
       if (this.selectedMarketItem && this.selectedMarketItem.item_name === item.item_name) {
         slot.classList.add('selected');
       }

@@ -41,8 +41,26 @@ export class CombatSystem {
     }
 
     update(dt) {
-        // Step 2: Clamp deltaTime to prevent spiral-of-death
+        // Step 2: Clamp deltaTime to prevent spiral-of-death and ensure it's a valid number
+        if (isNaN(dt) || dt === undefined) dt = 1/60;
         const clampedDt = Math.min(0.1, dt);
+
+        // Step 6.2: Natural Regeneration
+        if (!this.regenTimer) this.regenTimer = 0;
+        this.regenTimer += clampedDt;
+        if (this.regenTimer >= 3.0) {
+            this.regenTimer = 0;
+            if (this.character.isAlive()) {
+                const maxHp = isNaN(this.character.stats.max_hp) ? 100 : this.character.stats.max_hp;
+                const maxSp = isNaN(this.character.stats.max_sp) ? 50 : this.character.stats.max_sp;
+                
+                const hpRegen = Math.floor(maxHp * 0.02);
+                const spRegen = Math.floor(maxSp * 0.03);
+                
+                this.character.stats.hp = Math.min(maxHp, this.character.stats.hp + hpRegen);
+                this.character.stats.sp = Math.min(maxSp, this.character.stats.sp + spRegen);
+            }
+        }
 
         // Dead-state guard: if character is not alive, set state to 'idle', clear target, and return early
         if (!this.character.isAlive()) {
@@ -57,9 +75,10 @@ export class CombatSystem {
             return;
         }
 
-        // Step 8: Auto-resume check after respawn
+        // Step 6.3: AUTO modeกลับมาทำงานอัตโนมัติเมื่อ HP ถึงเกณฑ์
         if (this.wasAutoFarmingBeforeDeath && this.character.isAlive()) {
-            if (this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
+            const maxHp = isNaN(this.character.stats.max_hp) ? 100 : this.character.stats.max_hp;
+            if (this.character.stats.hp >= maxHp * 0.5) {
                 this.autoFarm = true;
                 this.wasAutoFarmingBeforeDeath = false;
                 if (this.onEvent) this.onEvent({ type: 'autoResume' });
@@ -172,7 +191,10 @@ export class CombatSystem {
 
         // Player attacks monster
         const isCritical = Math.random() < 0.1;
-        let baseDmg = this.character.stats.atk + Math.floor(Math.random() * 5);
+        
+        // Ensure stats are numbers
+        const charAtk = isNaN(this.character.stats.atk) ? 10 : this.character.stats.atk;
+        let baseDmg = charAtk + Math.floor(Math.random() * 5);
         if (isCritical) baseDmg = Math.floor(baseDmg * 1.8);
 
         const actualDmg = monster.takeDamage(baseDmg, isCritical);
@@ -193,8 +215,8 @@ export class CombatSystem {
             
             // Monsters have a limited counter-attack range (usually melee or slightly more)
             if (dist < 4.0) {
-                const baseAtk = isNaN(monster.data.atk) ? 5 : monster.data.atk;
-                const monsterDmg = this.character.takeDamage(baseAtk + Math.floor(Math.random() * 3));
+                const monsterAtk = (monster.data && !isNaN(monster.data.atk)) ? monster.data.atk : 5;
+                const monsterDmg = this.character.takeDamage(monsterAtk + Math.floor(Math.random() * 3));
                 this.onEvent({
                     type: 'monsterAttack',
                     damage: monsterDmg,
@@ -220,22 +242,11 @@ export class CombatSystem {
             if (this.character.targetMonster) this.character.targetMonster = null;
             
             setTimeout(() => {
+                // Step 6.1: Respawn ด้วย HP บางส่วน
                 this.character.respawn();
                 this.onEvent({ type: 'playerRespawn' });
                 
-                // Step 7: Auto-resume if it was active, but wait for at least 50% HP
-                if (wasAutoFarming) {
-                    if (this._autoResumeTimer) clearInterval(this._autoResumeTimer);
-                    this._autoResumeTimer = setInterval(() => {
-                        // Check if character is alive and has enough HP
-                        if (this.character.isAlive() && this.character.stats.hp >= this.character.stats.max_hp * 0.5) {
-                            this.autoFarm = true;
-                            if (this.onEvent) this.onEvent({ type: 'autoResume' });
-                            clearInterval(this._autoResumeTimer);
-                            this._autoResumeTimer = null;
-                        }
-                    }, 1000);
-                }
+                // Note: wasAutoFarmingBeforeDeath is already set in update loop guard
             }, 3000);
         }
     }
@@ -322,19 +333,18 @@ export class CombatSystem {
             // Check for bite every 3 seconds
             if (this.fishingTimer >= 3.0) {
                 this.fishingTimer = 0;
-                // Roll a random chance (fishingBiteChance = 0.05 per frame is too high, using 0.2 per 3s check)
+                // Roll a random chance (0.2 per 3s check)
                 if (Math.random() < 0.2) {
                     this.onEvent({ type: 'fishingBite' });
                     // Catch fish!
                     setTimeout(() => {
                         if (this.isFishing && this.character.state === 'fishing') {
                             const fishItem = { name: 'Fish', emoji: '🐟', type: 'consumable', chance: 1.0 };
-                            this.character.stats.gold += 5; // Small gold reward for fishing
                             this.onEvent({
                                 type: 'fishCaught',
                                 item: fishItem
                             });
-                            // Also trigger standard loot drop for inventory addition
+                            // Trigger standard loot drop for inventory addition
                             this.onEvent({
                                 type: 'lootDrop',
                                 item: fishItem,
@@ -343,7 +353,6 @@ export class CombatSystem {
                         }
                     }, 1000);
                 }
-                this.fishingTimer = 0;
             }
         }
     }

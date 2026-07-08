@@ -446,9 +446,9 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
             }
         })
         .on('broadcast', { event: 'chat' }, ({ payload }) => {
-            // Step 5: Ensure consistent object format for chat messages
+            // Step 9.1: ส่ง payload ทั้งก้อน
             if (chatCallback && payload) {
-                chatCallback({ username: payload.username, message: payload.message });
+                chatCallback(payload);
             }
         })
         .subscribe(async (status, err) => {

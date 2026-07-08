@@ -778,21 +778,7 @@ export class CharacterManager {
         this.animTimer += dt;
         this.attackTimer += dt;
 
-        // Step 7: Natural Regeneration (1% of max_hp per second)
-        if (this.isAlive() && this.stats.hp < this.stats.max_hp) {
-            this.stats.hp = Math.min(this.stats.max_hp, this.stats.hp + (this.stats.max_hp * 0.01 * dt));
-        }
-
-        // Periodic SP Regeneration (every 3 seconds)
-        if (!this.regenTimer) this.regenTimer = 0;
-        this.regenTimer += dt;
-        if (this.regenTimer >= 3.0) {
-            this.regenTimer = 0;
-            if (this.isAlive()) {
-                const spRegen = Math.max(1, Math.floor(this.stats.max_sp * 0.03));
-                this.restoreSp(spRegen);
-            }
-        }
+        // Natural regeneration is now handled by CombatSystem.js to avoid double regen issues
 
         // Count down skill cooldowns
         for (const skillId in this.cooldowns) {

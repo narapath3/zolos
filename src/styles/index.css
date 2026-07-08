@@ -1157,7 +1157,7 @@ body {
 }
 
 .market-items-list {
-  max-height: 220px;
+  max-height: 200px;
   overflow-y: auto;
   min-height: 100px;
 }
@@ -1885,8 +1885,14 @@ body {
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
 }
 
-.stats-meta-time {
+.stats-meta-uid {
   font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.stats-meta-time {
+  font-size: 11px;
   color: var(--text-dim);
 }
 
@@ -2390,7 +2396,7 @@ body {
 
 /* ========== ITEM RARITIES ========== */
 .rarity-common {
-  border: 2px solid #888888 !important;
+  border: 2px solid rgba(180, 180, 180, 0.5) !important;
   box-shadow: inset 0 0 5px rgba(136, 136, 136, 0.3) !important;
 }
 
@@ -2400,24 +2406,24 @@ body {
 }
 
 .rarity-rare {
-  border: 2px solid #2196f3 !important;
-  box-shadow: inset 0 0 10px rgba(33, 150, 243, 0.2), 0 0 8px rgba(33, 150, 243, 0.3) !important;
+  border: 2px solid #60a0ff !important;
+  box-shadow: inset 0 0 10px rgba(96, 160, 255, 0.2), 0 0 8px rgba(96, 160, 255, 0.3) !important;
 }
 
 .rarity-epic {
-  border: 2px solid #9c27b0 !important;
-  background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(0, 0, 0, 0.4)) !important;
-  box-shadow: inset 0 0 12px rgba(156, 39, 176, 0.3), 0 0 12px rgba(156, 39, 176, 0.4) !important;
+  border: 2px solid #d060ff !important;
+  background: linear-gradient(135deg, rgba(208, 96, 255, 0.1), rgba(0, 0, 0, 0.4)) !important;
+  box-shadow: inset 0 0 12px rgba(208, 96, 255, 0.3), 0 0 12px rgba(208, 96, 255, 0.4) !important;
 }
 
 .rarity-legendary {
-  border: 2px solid #ff9800 !important;
-  background: linear-gradient(135deg, rgba(255, 152, 0, 0.15), rgba(0, 0, 0, 0.4)) !important;
-  box-shadow: inset 0 0 15px rgba(255, 152, 0, 0.4), 0 0 15px rgba(255, 152, 0, 0.5) !important;
+  border: 2px solid #ffaa00 !important;
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.15), rgba(0, 0, 0, 0.4)) !important;
+  box-shadow: inset 0 0 15px rgba(255, 170, 0, 0.4), 0 0 15px rgba(255, 170, 0, 0.5) !important;
 }
 
 .rarity-mythic {
-  border: 2px solid #ff0000 !important;
+  border: 2px solid #ff2040 !important;
   background: linear-gradient(135deg, rgba(255, 32, 64, 0.2), rgba(0, 0, 0, 0.5)) !important;
   box-shadow: inset 0 0 18px rgba(255, 32, 64, 0.5), 0 0 20px rgba(255, 32, 64, 0.6) !important;
   animation: mythicPulse 2s ease-in-out infinite;
