@@ -1,0 +1,768 @@
+diff --git a/index.html b/index.html
+index 479abad..28dfd1e 100644
+--- a/index.html
++++ b/index.html
+@@ -177,9 +177,9 @@
+         <span>💬</span>
+         <small>Chat</small>
+       </button>
+-      <button class="hud-btn" id="btn-profile" title="Profile">
++      <button class="hud-btn" id="btn-profile" title="Settings">
+         <span>⚙️</span>
+-        <small>Profile</small>
++        <small>Settings</small>
+       </button>
+       <button class="hud-btn" id="btn-admin" title="Admin" style="display: none;">
+         <span>🛡️</span>
+@@ -456,61 +456,112 @@
+     <!-- Profile Editor Popup Modal -->
+     <div id="profile-editor-modal" class="modal-popup" style="display: none;">
+       <div class="popup-overlay" id="profile-editor-overlay"></div>
+-      <div class="popup-content profile-editor-content">
++      <div class="popup-content profile-editor-content"
++        style="max-height: 80vh; display: flex; flex-direction: column;">
+         <div class="popup-header">
+-          <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
++          <span class="popup-title">⚙️ Settings & Profile / ตั้งค่าและข้อมูล</span>
+           <button class="popup-close" id="btn-close-profile-editor">✕</button>
+         </div>
+-        <div class="popup-body">
+-          <div class="form-group">
+-            <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
+-            <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
+-          </div>
+-          <!-- Step 8: UID Display -->
+-          <div id="profile-uid-display"
+-            style="font-size: 10px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-pixel); text-align: center;">
+-            UID: #--------</div>
+-
+-          <div class="form-group appearance-colors">
+-            <label>🎨 Appearance Colors / ปรับแต่งสี</label>
+-            <div class="color-pickers-row">
+-              <div class="color-picker-item">
+-                <input type="color" id="profile-edit-shirt" value="#4060c0" />
+-                <span>Shirt (เสื้อ)</span>
+-              </div>
+-              <div class="color-picker-item">
+-                <input type="color" id="profile-edit-pants" value="#3a3a5a" />
+-                <span>Pants (กางเกง)</span>
+-              </div>
+-              <div class="color-picker-item">
+-                <input type="color" id="profile-edit-hair" value="#c04040" />
+-                <span>Hair (สีผม)</span>
++
++        <!-- Tab selector headers -->
++        <div class="popup-tabs"
++          style="display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15);">
++          <button id="tab-btn-profile" class="popup-tab active-tab"
++            style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid var(--primary); color: var(--primary); font-family: var(--font-ui); font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s;">👤
++            Profile / ตัวละคร</button>
++          <button id="tab-btn-settings" class="popup-tab"
++            style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font-family: var(--font-ui); font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s;">⚙️
++            Game Config / ตั้งค่าระบบ</button>
++        </div>
++
++        <div class="popup-body" style="overflow-y: auto; flex: 1; padding: 20px;">
++          <!-- Tab 1: Profile -->
++          <div id="tab-content-profile" class="tab-pane">
++            <div class="form-group">
++              <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
++              <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
++            </div>
++            <!-- Step 8: UID Display -->
++            <div id="profile-uid-display"
++              style="font-size: 10px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-pixel); text-align: center;">
++              UID: #--------</div>
++
++            <div class="form-group appearance-colors">
++              <label>🎨 Appearance Colors / ปรับแต่งสี</label>
++              <div class="color-pickers-row">
++                <div class="color-picker-item">
++                  <input type="color" id="profile-edit-shirt" value="#4060c0" />
++                  <span>Shirt (เสื้อ)</span>
++                </div>
++                <div class="color-picker-item">
++                  <input type="color" id="profile-edit-pants" value="#3a3a5a" />
++                  <span>Pants (กางเกง)</span>
++                </div>
++                <div class="color-picker-item">
++                  <input type="color" id="profile-edit-hair" value="#c04040" />
++                  <span>Hair (สีผม)</span>
++                </div>
+               </div>
+             </div>
+-          </div>
+ 
+-          <div class="form-group">
+-            <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
+-            <select id="profile-edit-weapon" class="form-select">
+-              <option value="None">👊 None / มือเปล่า</option>
+-            </select>
+-          </div>
++            <div class="form-group">
++              <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
++              <select id="profile-edit-weapon" class="form-select">
++                <option value="None">👊 None / มือเปล่า</option>
++              </select>
++            </div>
+ 
+-          <div class="form-group">
+-            <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
+-            <select id="profile-edit-hat" class="form-select">
+-              <option value="None">❌ None / ไม่ใส่</option>
+-            </select>
++            <div class="form-group">
++              <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
++              <select id="profile-edit-hat" class="form-select">
++                <option value="None">❌ None / ไม่ใส่</option>
++              </select>
++            </div>
++
++            <div class="form-group">
++              <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
++              <select id="profile-edit-glasses" class="form-select">
++                <option value="None">❌ None / ไม่ใส่</option>
++              </select>
++            </div>
+           </div>
+ 
+-          <div class="form-group">
+-            <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
+-            <select id="profile-edit-glasses" class="form-select">
+-              <option value="None">❌ None / ไม่ใส่</option>
+-            </select>
++          <!-- Tab 2: Settings -->
++          <div id="tab-content-settings" class="tab-pane" style="display: none;">
++            <div class="form-group">
++              <label style="display: block; margin-bottom: 6px;">🔊 Game Audio / ระบบเสียง</label>
++              <div
++                style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
++                <input type="checkbox" id="settings-sound-enabled" checked
++                  style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
++                <span id="settings-sound-label" style="font-size: 13px; color: var(--text); font-weight: 500;">Sound
++                  Effects: ON</span>
++              </div>
++            </div>
++
++            <div class="form-group" style="margin-top: 18px;">
++              <label for="settings-graphics-quality" style="display: block; margin-bottom: 6px;">🖥️ Graphics Quality /
++                คุณภาพกราฟิก</label>
++              <select id="settings-graphics-quality" class="form-select"
++                style="width: 100%; padding: 10px; background: rgba(8, 12, 24, 0.85); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px; outline: none; transition: border-color 0.25s;">
++                <option value="high">🌟 High (Soft Shadows & Anti-aliasing)</option>
++                <option value="medium">⚡ Medium (Basic Shadows & Performance)</option>
++                <option value="low">💨 Low (No Shadows & Maximum FPS)</option>
++              </select>
++            </div>
++
++            <div class="form-group" style="margin-top: 18px;">
++              <label style="display: block; margin-bottom: 6px;">📊 Performance Hud / แสดงประสิทธิภาพ</label>
++              <div
++                style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
++                <input type="checkbox" id="settings-fps-enabled"
++                  style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
++                <span style="font-size: 13px; color: var(--text); font-weight: 500;">Show Performance Stats (FPS)</span>
++              </div>
++            </div>
+           </div>
+ 
+-          <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
++          <div class="popup-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+             <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
+             <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
+           </div>
+diff --git a/src/engine/AdaptiveRendererSystem.js b/src/engine/AdaptiveRendererSystem.js
+index fd9eb02..0f299fc 100644
+--- a/src/engine/AdaptiveRendererSystem.js
++++ b/src/engine/AdaptiveRendererSystem.js
+@@ -10,13 +10,13 @@ export class AdaptiveRendererSystem {
+     this.renderer = renderer;
+     this.camera = camera;
+     this.scene = scene;
+-    
++
+     // Performance Metrics
+     this.fps = 60;
+     this.frameTime = 0;
+     this.frameCount = 0;
+     this.lastTime = performance.now();
+-    
++
+     // Quality Levels
+     this.qualityLevel = 'high'; // high, medium, low, ultra-low
+     this.pixelRatio = window.devicePixelRatio;
+@@ -25,7 +25,7 @@ export class AdaptiveRendererSystem {
+     this.antialiasing = true;
+     this.postProcessing = true;
+     this.particleQuality = 1.0; // 0.0 - 1.0
+-    
++
+     // Thresholds
+     this.fpsThresholds = {
+       high: 55,
+@@ -33,17 +33,17 @@ export class AdaptiveRendererSystem {
+       low: 30,
+       ultraLow: 20,
+     };
+-    
++
+     this.init();
+   }
+ 
+   init() {
+     // ตรวจจับประเภทอุปกรณ์
+     this.detectDeviceType();
+-    
++
+     // ตั้งค่า Renderer เบื้องต้น
+     this.configureRenderer();
+-    
++
+     // เริ่มการตรวจสอบประสิทธิภาพ
+     this.startPerformanceMonitoring();
+   }
+@@ -56,7 +56,7 @@ export class AdaptiveRendererSystem {
+     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+     const cores = navigator.hardwareConcurrency || 4;
+     const memory = navigator.deviceMemory || 8;
+-    
++
+     this.deviceType = {
+       isMobile,
+       cores,
+@@ -65,9 +65,9 @@ export class AdaptiveRendererSystem {
+       isMidRange: isMobile && cores >= 4 && memory >= 4,
+       isHighEnd: !isMobile || (cores >= 8 && memory >= 8),
+     };
+-    
++
+     // console.log('📱 Device Type:', this.deviceType);
+-    
++
+     // ตั้งค่าคุณภาพเบื้องต้นตามประเภทอุปกรณ์
+     if (this.deviceType.isLowEnd) {
+       this.qualityLevel = 'ultra-low';
+@@ -90,13 +90,10 @@ export class AdaptiveRendererSystem {
+       this.renderer.antialias = false;
+       this.antialiasing = false;
+     }
+-    
++
+     // ตั้งค่า Pixel Ratio
+     this.renderer.setPixelRatio(this.pixelRatio);
+-    
+-    // ตั้งค่า Power Preference
+-    this.renderer.getContext().getExtension('WEBGL_lose_context');
+-    
++
+     // ปิด Shadow Map บนอุปกรณ์สเปคต่ำ
+     if (this.qualityLevel === 'ultra-low') {
+       this.renderer.shadowMap.enabled = false;
+@@ -104,14 +101,10 @@ export class AdaptiveRendererSystem {
+     } else if (this.qualityLevel === 'low') {
+       this.renderer.shadowMap.type = THREE.BasicShadowMap;
+       this.shadowQuality = 'basic';
+-    } else {
+-      this.renderer.shadowMap.type = THREE.PCFShadowMap;
+-      this.shadowQuality = 'pcf';
++      this.renderer.shadowMap.needsUpdate = true;
+     }
+-    
+-    // ตั้งค่า Precision สำหรับ Shader
+-    this.renderer.precision = this.deviceType.isLowEnd ? 'lowp' : 'mediump';
+-    
++    // For medium/high, keep whatever SceneManager already set (PCFSoftShadowMap)
++
+     // console.log(`✅ Renderer configured for ${this.qualityLevel} quality`);
+   }
+ 
+@@ -131,7 +124,7 @@ export class AdaptiveRendererSystem {
+   updatePerformanceMetrics() {
+     const now = performance.now();
+     const deltaTime = now - this.lastTime;
+-    
++
+     if (deltaTime > 0) {
+       // Calculate FPS over a longer period for stability
+       this.frameCount++;
+@@ -144,9 +137,9 @@ export class AdaptiveRendererSystem {
+       }
+       this.frameTime = deltaTime;
+     }
+-    
++
+     this.lastTime = now;
+-    
++
+     // console.log(`📊 FPS: ${this.fps}, Frame Time: ${this.frameTime.toFixed(2)}ms`);
+   }
+ 
+@@ -155,7 +148,7 @@ export class AdaptiveRendererSystem {
+    */
+   adaptQualityBasedOnPerformance() {
+     const previousQuality = this.qualityLevel;
+-    
++
+     if (this.fps < this.fpsThresholds.ultraLow) {
+       this.qualityLevel = 'ultra-low';
+     } else if (this.fps < this.fpsThresholds.low) {
+@@ -165,7 +158,7 @@ export class AdaptiveRendererSystem {
+     } else if (this.fps >= this.fpsThresholds.high) {
+       this.qualityLevel = 'high';
+     }
+-    
++
+     // ถ้าคุณภาพเปลี่ยน ให้ปรับการตั้งค่า
+     if (previousQuality !== this.qualityLevel) {
+       this.applyQualitySettings();
+@@ -187,7 +180,7 @@ export class AdaptiveRendererSystem {
+         this.particleQuality = 0.3;
+         this.renderer.shadowMap.enabled = false;
+         break;
+-        
++
+       case 'low':
+         this.pixelRatio = 0.85;
+         this.shadowMapSize = 512;
+@@ -198,7 +191,7 @@ export class AdaptiveRendererSystem {
+         this.renderer.shadowMap.type = THREE.BasicShadowMap;
+         this.renderer.shadowMap.enabled = true;
+         break;
+-        
++
+       case 'medium':
+         this.pixelRatio = 1.0;
+         this.shadowMapSize = 1024;
+@@ -209,7 +202,7 @@ export class AdaptiveRendererSystem {
+         this.renderer.shadowMap.type = THREE.PCFShadowMap;
+         this.renderer.shadowMap.enabled = true;
+         break;
+-        
++
+       case 'high':
+         this.pixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 0.75);
+         this.shadowMapSize = 2048;
+@@ -221,13 +214,13 @@ export class AdaptiveRendererSystem {
+         this.renderer.shadowMap.enabled = true;
+         break;
+     }
+-    
++
+     // ใช้การตั้งค่า Pixel Ratio
+     this.renderer.setPixelRatio(this.pixelRatio);
+-    
++
+     // อัปเดต Shadow Map Size
+     this.updateShadowMapSize();
+-    
++
+     // ปรับ Particle Quality
+     this.updateParticleQuality();
+   }
+diff --git a/src/main.js b/src/main.js
+index 5586bf5..9e95134 100644
+--- a/src/main.js
++++ b/src/main.js
+@@ -7,6 +7,7 @@ import { CombatSystem } from './engine/CombatSystem.js';
+ import * as THREE from 'three';
+ import { ParticleSystem } from './engine/ParticleSystem.js';
+ import { SoundManager } from './engine/SoundManager.js';
++import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
+ import { GameUI } from './ui/GameUI.js';
+ import { AuthUI } from './ui/AuthUI.js';
+ import { AdminUI } from './ui/AdminUI.js';
+@@ -63,12 +64,12 @@ async function initGame(charData) {
+     document.getElementById('game-screen').style.display = 'block';
+ 
+     sceneManager = new SceneManager(canvas);
+-    
++
+     // Setup input
+     import('./engine/InputManager.js').then(({ InputManager }) => {
+         inputManager = new InputManager();
+         character.inputManager = inputManager;
+-        
++
+         // Setup skill hotkeys
+         inputManager.setupSkillHotkey((skillId) => {
+             if (combatSystem) combatSystem.useSkill(skillId);
+@@ -184,6 +185,19 @@ async function initGame(charData) {
+         });
+     }
+ 
++    // Initialize Adaptive Renderer System and expose to window for settings UI
++    window.rendererSystem = new AdaptiveRendererSystem(
++        sceneManager.renderer,
++        sceneManager.camera,
++        sceneManager.scene
++    );
++
++    // FPS counter: hide by default unless user opted in
++    const fpsEl = document.getElementById('fps-counter');
++    if (fpsEl) {
++        fpsEl.style.display = localStorage.getItem('zolos_show_fps') === 'true' ? 'block' : 'none';
++    }
++
+     // Initialize Admin UI
+     window.adminUI = new AdminUI();
+     window.adminUI.checkAdmin(charData.user_id);
+@@ -250,7 +264,7 @@ async function initGame(charData) {
+ 
+             if (rp.character) {
+                 rp.character.state = p.state || 'idle';
+-                
++
+                 // Step 10 Part B: Robust water detection for remote players.
+                 // Re-run environment check based on received X/Z to ensure correct baseY.
+                 const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
+@@ -297,6 +311,57 @@ async function initGame(charData) {
+         });
+     }
+ 
++    // Setup Logout Button
++    gameUI.setupLogoutButton(async () => {
++        // 1. Stop game loop
++        isGameStarted = false;
++
++        // 2. Stop auto-save
++        stopAutoSave();
++
++        // 3. Leave multiplayer presence
++        if (userId) {
++            try { leavePresence(userId); } catch (e) { console.error('Leave presence error:', e); }
++        }
++
++        // 4. Remove remote player meshes
++        for (const [id, rp] of remotePlayersMap.entries()) {
++            if (rp.mesh) sceneManager.scene.remove(rp.mesh);
++        }
++        remotePlayersMap.clear();
++
++        // 5. Sign out from Supabase
++        try {
++            const { clearActiveSession, supabase } = await import('./network/SupabaseClient.js');
++            clearActiveSession();
++            if (supabase) await supabase.auth.signOut();
++        } catch (e) {
++            console.error('Logout Supabase error:', e);
++        }
++
++        // 6. Reset UI
++        document.getElementById('game-screen').style.display = 'none';
++        document.getElementById('auth-screen').style.display = 'flex';
++
++        // Close Admin UI on logout
++        if (window.adminUI) {
++            if (typeof window.adminUI.close === 'function') {
++                window.adminUI.close();
++            } else {
++                window.adminUI.isOpen = false;
++                if (window.adminUI.container) {
++                    window.adminUI.container.style.display = 'none';
++                }
++            }
++        }
++
++        // 7. Re-show auth screen with fresh state
++        if (authUI) {
++            authUI._sessionData = null;
++            authUI.show();
++        }
++    });
++
+     // Setup HUD & Initial Stats
+     if (gameUI.initHUD) {
+         gameUI.initHUD(character);
+@@ -325,7 +390,7 @@ async function initGame(charData) {
+     });
+ 
+     canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
+-    
++
+     // Mouse move for monster hovering
+     canvas.addEventListener('mousemove', (e) => {
+         if (!sceneManager || !monsters || !gameUI) return;
+diff --git a/src/styles/index.css b/src/styles/index.css
+index 15d971c..348f4ae 100644
+--- a/src/styles/index.css
++++ b/src/styles/index.css
+@@ -3490,7 +3490,7 @@ body {
+   }
+ 
+   #fps-counter {
+-    display: none !important;
++    display: none;
+   }
+ }
+ 
+@@ -3627,4 +3627,100 @@ body {
+ 
+ .panels-open #auto-farm-container {
+   display: none !important;
++}
++
++/* ========== ADMIN BUTTON ========== */
++#btn-admin {
++  position: relative;
++  overflow: hidden;
++}
++
++#btn-admin span {
++  filter: drop-shadow(0 0 4px rgba(96, 160, 255, 0.6));
++}
++
++#btn-admin:hover {
++  background: rgba(96, 160, 255, 0.12) !important;
++  border-color: rgba(96, 160, 255, 0.5) !important;
++  box-shadow: 0 0 18px rgba(96, 160, 255, 0.2),
++    inset 0 0 12px rgba(96, 160, 255, 0.08);
++}
++
++#btn-admin::after {
++  content: '';
++  position: absolute;
++  inset: 0;
++  border-radius: inherit;
++  background: linear-gradient(135deg, transparent 40%, rgba(96, 160, 255, 0.08) 100%);
++  pointer-events: none;
++}
++
++/* ========== LOGOUT BUTTON ========== */
++#btn-logout span {
++  filter: drop-shadow(0 0 3px rgba(255, 96, 128, 0.5));
++}
++
++#btn-logout:hover {
++  background: rgba(255, 96, 128, 0.12) !important;
++  border-color: rgba(255, 96, 128, 0.5) !important;
++  color: #ff8098 !important;
++  box-shadow: 0 0 18px rgba(255, 96, 128, 0.15);
++}
++
++#btn-logout:active {
++  background: rgba(255, 96, 128, 0.22) !important;
++  box-shadow: 0 0 24px rgba(255, 96, 128, 0.3);
++}
++
++/* ========== SETTINGS BUTTON ========== */
++#btn-profile span {
++  filter: drop-shadow(0 0 3px rgba(240, 192, 64, 0.4));
++}
++
++#btn-profile:hover {
++  background: rgba(240, 192, 64, 0.1) !important;
++  border-color: rgba(240, 192, 64, 0.4) !important;
++  box-shadow: 0 0 16px rgba(240, 192, 64, 0.12);
++}
++
++/* ========== SETTINGS POPUP TABS ========== */
++.popup-tabs {
++  user-select: none;
++}
++
++.popup-tab {
++  position: relative;
++  letter-spacing: 0.5px;
++}
++
++.popup-tab:hover {
++  color: var(--text) !important;
++  background: rgba(255, 255, 255, 0.03) !important;
++}
++
++.popup-tab.active-tab {
++  color: var(--primary) !important;
++  border-bottom-color: var(--primary) !important;
++}
++
++.popup-tab.active-tab::after {
++  content: '';
++  position: absolute;
++  bottom: 0;
++  left: 20%;
++  width: 60%;
++  height: 2px;
++  background: var(--primary);
++  border-radius: 2px 2px 0 0;
++  box-shadow: 0 0 8px var(--primary-glow);
++}
++
++/* Settings form selects hover */
++#tab-content-settings .form-select:focus {
++  border-color: var(--primary);
++  box-shadow: 0 0 12px rgba(240, 192, 64, 0.2);
++}
++
++#tab-content-settings input[type="checkbox"]:checked {
++  box-shadow: 0 0 8px rgba(240, 192, 64, 0.3);
+ }
+\ No newline at end of file
+diff --git a/src/ui/AdminUI.js b/src/ui/AdminUI.js
+index c91d8ec..8d30a29 100644
+--- a/src/ui/AdminUI.js
++++ b/src/ui/AdminUI.js
+@@ -82,6 +82,14 @@ export class AdminUI {
+         }
+     }
+ 
++    close() {
++        this.isOpen = false;
++        if (this.container) this.container.style.display = 'none';
++        if (window.gameUI) {
++            window.gameUI.updateMobileControlsVisibility();
++        }
++    }
++
+     async refreshData() {
+         if (this.currentTab === 'users') {
+             await this.loadUsers();
+diff --git a/src/ui/GameUI.js b/src/ui/GameUI.js
+index 58ae43c..cbc4ed4 100644
+--- a/src/ui/GameUI.js
++++ b/src/ui/GameUI.js
+@@ -1064,7 +1064,7 @@ export class GameUI {
+     }, 8000);
+   }
+ 
+-  // ============ Profile Editor ============
++  // ============ Profile Editor & Settings ============
+   _setupProfileEditor() {
+     const modal = document.getElementById('profile-editor-modal');
+     const overlay = document.getElementById('profile-editor-overlay');
+@@ -1072,15 +1072,114 @@ export class GameUI {
+     const saveBtn = document.getElementById('btn-save-profile');
+     const cancelBtn = document.getElementById('btn-cancel-profile');
+     const playerInfo = document.querySelector('.player-info');
++    const btnProfile = document.getElementById('btn-profile');
+ 
+-    if (!modal || !playerInfo) return;
++    if (!modal) return;
+ 
+     // Helper: convert int hex to #rrggbb string
+     const hexToStr = (h) => '#' + ('000000' + h.toString(16)).slice(-6);
+     // Helper: convert #rrggbb string to int
+     const strToHex = (s) => parseInt(s.replace('#', ''), 16);
+ 
++    // Setup tab switching in Settings modal
++    const tabProfileBtn = document.getElementById('tab-btn-profile');
++    const tabSettingsBtn = document.getElementById('tab-btn-settings');
++    const tabProfilePane = document.getElementById('tab-content-profile');
++    const tabSettingsPane = document.getElementById('tab-content-settings');
++
++    if (tabProfileBtn && tabSettingsBtn && tabProfilePane && tabSettingsPane) {
++      tabProfileBtn.addEventListener('click', (e) => {
++        e.preventDefault();
++        tabProfilePane.style.display = 'block';
++        tabSettingsPane.style.display = 'none';
++        tabProfileBtn.classList.add('active-tab');
++        tabSettingsBtn.classList.remove('active-tab');
++        tabProfileBtn.style.borderBottomColor = 'var(--primary)';
++        tabProfileBtn.style.color = 'var(--primary)';
++        tabSettingsBtn.style.borderBottomColor = 'transparent';
++        tabSettingsBtn.style.color = 'var(--text-dim)';
++      });
++
++      tabSettingsBtn.addEventListener('click', (e) => {
++        e.preventDefault();
++        tabProfilePane.style.display = 'none';
++        tabSettingsPane.style.display = 'block';
++        tabProfileBtn.classList.remove('active-tab');
++        tabSettingsBtn.classList.add('active-tab');
++        tabSettingsBtn.style.borderBottomColor = 'var(--primary)';
++        tabSettingsBtn.style.color = 'var(--primary)';
++        tabProfileBtn.style.borderBottomColor = 'transparent';
++        tabProfileBtn.style.color = 'var(--text-dim)';
++
++        // Sync config values when opening
++        const soundCheckbox = document.getElementById('settings-sound-enabled');
++        const soundLabel = document.getElementById('settings-sound-label');
++        if (soundCheckbox && this.soundManager) {
++          soundCheckbox.checked = this.soundManager.enabled;
++          if (soundLabel) {
++            soundLabel.textContent = `Sound Effects: ${this.soundManager.enabled ? 'ON' : 'OFF'}`;
++          }
++        }
++        const graphicsSelect = document.getElementById('settings-graphics-quality');
++        if (graphicsSelect && window.rendererSystem) {
++          graphicsSelect.value = window.rendererSystem.qualityLevel;
++        }
++        const fpsCheckbox = document.getElementById('settings-fps-enabled');
++        if (fpsCheckbox) {
++          fpsCheckbox.checked = localStorage.getItem('zolos_show_fps') === 'true';
++        }
++      });
++    }
++
++    // Audio Mute settings listener
++    const soundCheckbox = document.getElementById('settings-sound-enabled');
++    if (soundCheckbox) {
++      soundCheckbox.addEventListener('change', (e) => {
++        if (this.soundManager) {
++          this.soundManager.enabled = e.target.checked;
++          const soundLabel = document.getElementById('settings-sound-label');
++          if (soundLabel) {
++            soundLabel.textContent = `Sound Effects: ${this.soundManager.enabled ? 'ON' : 'OFF'}`;
++          }
++          if (e.target.checked) {
++            this.soundManager.playUseItemSound();
++          }
++        }
++      });
++    }
++
++    // Graphics settings listener
++    const graphicsSelect = document.getElementById('settings-graphics-quality');
++    if (graphicsSelect) {
++      graphicsSelect.addEventListener('change', (e) => {
++        const q = e.target.value;
++        if (window.rendererSystem) {
++          window.rendererSystem.qualityLevel = q;
++          window.rendererSystem.applyQualitySettings();
++          this.addCombatLog(`🖥️ Graphics Quality set to: ${q.toUpperCase()}`, 'system');
++        }
++      });
++    }
++
++    // FPS Display settings listener
++    const fpsCheckbox = document.getElementById('settings-fps-enabled');
++    if (fpsCheckbox) {
++      fpsCheckbox.addEventListener('change', (e) => {
++        const enabled = e.target.checked;
++        localStorage.setItem('zolos_show_fps', enabled ? 'true' : 'false');
++        const fpsEl = document.getElementById('fps-counter');
++        if (fpsEl) {
++          fpsEl.style.display = enabled ? 'block' : 'none';
++        }
++      });
++    }
++
+     const openEditor = () => {
++      // Default to profile tab on open
++      if (tabProfileBtn) {
++        tabProfileBtn.click();
++      }
++
+       // Populate current values
+       const nameInput = document.getElementById('profile-edit-name');
+       const shirtInput = document.getElementById('profile-edit-shirt');
+@@ -1132,7 +1231,7 @@ export class GameUI {
+           hatItems.forEach(i => {
+             const opt = document.createElement('option');
+             opt.value = i.item_name;
+-            const em = hatEmojiMap[i.item_name] || '🎩';
++            const em = hatEmojiMap[i.item_name] || '🧙';
+             opt.textContent = `${em} ${i.item_name}`;
+             hatSelect.appendChild(opt);
+           });
+@@ -1164,8 +1263,9 @@ export class GameUI {
+       this.updateMobileControlsVisibility();
+     };
+ 
+-    // Open on player-info click
+-    playerInfo.addEventListener('click', openEditor);
++    // Open on click
++    if (playerInfo) playerInfo.addEventListener('click', openEditor);
++    if (btnProfile) btnProfile.addEventListener('click', openEditor);
+ 
+     // Close buttons
+     if (closeBtn) closeBtn.addEventListener('click', closeEditor);

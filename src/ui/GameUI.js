@@ -1064,7 +1064,7 @@ export class GameUI {
     }, 8000);
   }
 
-  // ============ Profile Editor ============
+  // ============ Profile Editor & Settings ============
   _setupProfileEditor() {
     const modal = document.getElementById('profile-editor-modal');
     const overlay = document.getElementById('profile-editor-overlay');
@@ -1072,15 +1072,114 @@ export class GameUI {
     const saveBtn = document.getElementById('btn-save-profile');
     const cancelBtn = document.getElementById('btn-cancel-profile');
     const playerInfo = document.querySelector('.player-info');
+    const btnProfile = document.getElementById('btn-profile');
 
-    if (!modal || !playerInfo) return;
+    if (!modal) return;
 
     // Helper: convert int hex to #rrggbb string
     const hexToStr = (h) => '#' + ('000000' + h.toString(16)).slice(-6);
     // Helper: convert #rrggbb string to int
     const strToHex = (s) => parseInt(s.replace('#', ''), 16);
 
+    // Setup tab switching in Settings modal
+    const tabProfileBtn = document.getElementById('tab-btn-profile');
+    const tabSettingsBtn = document.getElementById('tab-btn-settings');
+    const tabProfilePane = document.getElementById('tab-content-profile');
+    const tabSettingsPane = document.getElementById('tab-content-settings');
+
+    if (tabProfileBtn && tabSettingsBtn && tabProfilePane && tabSettingsPane) {
+      tabProfileBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        tabProfilePane.style.display = 'block';
+        tabSettingsPane.style.display = 'none';
+        tabProfileBtn.classList.add('active-tab');
+        tabSettingsBtn.classList.remove('active-tab');
+        tabProfileBtn.style.borderBottomColor = 'var(--primary)';
+        tabProfileBtn.style.color = 'var(--primary)';
+        tabSettingsBtn.style.borderBottomColor = 'transparent';
+        tabSettingsBtn.style.color = 'var(--text-dim)';
+      });
+
+      tabSettingsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        tabProfilePane.style.display = 'none';
+        tabSettingsPane.style.display = 'block';
+        tabProfileBtn.classList.remove('active-tab');
+        tabSettingsBtn.classList.add('active-tab');
+        tabSettingsBtn.style.borderBottomColor = 'var(--primary)';
+        tabSettingsBtn.style.color = 'var(--primary)';
+        tabProfileBtn.style.borderBottomColor = 'transparent';
+        tabProfileBtn.style.color = 'var(--text-dim)';
+
+        // Sync config values when opening
+        const soundCheckbox = document.getElementById('settings-sound-enabled');
+        const soundLabel = document.getElementById('settings-sound-label');
+        if (soundCheckbox && this.soundManager) {
+          soundCheckbox.checked = this.soundManager.enabled;
+          if (soundLabel) {
+            soundLabel.textContent = `Sound Effects: ${this.soundManager.enabled ? 'ON' : 'OFF'}`;
+          }
+        }
+        const graphicsSelect = document.getElementById('settings-graphics-quality');
+        if (graphicsSelect && window.rendererSystem) {
+          graphicsSelect.value = window.rendererSystem.qualityLevel;
+        }
+        const fpsCheckbox = document.getElementById('settings-fps-enabled');
+        if (fpsCheckbox) {
+          fpsCheckbox.checked = localStorage.getItem('zolos_show_fps') === 'true';
+        }
+      });
+    }
+
+    // Audio Mute settings listener
+    const soundCheckbox = document.getElementById('settings-sound-enabled');
+    if (soundCheckbox) {
+      soundCheckbox.addEventListener('change', (e) => {
+        if (this.soundManager) {
+          this.soundManager.enabled = e.target.checked;
+          const soundLabel = document.getElementById('settings-sound-label');
+          if (soundLabel) {
+            soundLabel.textContent = `Sound Effects: ${this.soundManager.enabled ? 'ON' : 'OFF'}`;
+          }
+          if (e.target.checked) {
+            this.soundManager.playUseItemSound();
+          }
+        }
+      });
+    }
+
+    // Graphics settings listener
+    const graphicsSelect = document.getElementById('settings-graphics-quality');
+    if (graphicsSelect) {
+      graphicsSelect.addEventListener('change', (e) => {
+        const q = e.target.value;
+        if (window.rendererSystem) {
+          window.rendererSystem.qualityLevel = q;
+          window.rendererSystem.applyQualitySettings();
+          this.addCombatLog(`🖥️ Graphics Quality set to: ${q.toUpperCase()}`, 'system');
+        }
+      });
+    }
+
+    // FPS Display settings listener
+    const fpsCheckbox = document.getElementById('settings-fps-enabled');
+    if (fpsCheckbox) {
+      fpsCheckbox.addEventListener('change', (e) => {
+        const enabled = e.target.checked;
+        localStorage.setItem('zolos_show_fps', enabled ? 'true' : 'false');
+        const fpsEl = document.getElementById('fps-counter');
+        if (fpsEl) {
+          fpsEl.style.display = enabled ? 'block' : 'none';
+        }
+      });
+    }
+
     const openEditor = () => {
+      // Default to profile tab on open
+      if (tabProfileBtn) {
+        tabProfileBtn.click();
+      }
+
       // Populate current values
       const nameInput = document.getElementById('profile-edit-name');
       const shirtInput = document.getElementById('profile-edit-shirt');
@@ -1132,7 +1231,7 @@ export class GameUI {
           hatItems.forEach(i => {
             const opt = document.createElement('option');
             opt.value = i.item_name;
-            const em = hatEmojiMap[i.item_name] || '🎩';
+            const em = hatEmojiMap[i.item_name] || '🧙';
             opt.textContent = `${em} ${i.item_name}`;
             hatSelect.appendChild(opt);
           });
@@ -1164,8 +1263,9 @@ export class GameUI {
       this.updateMobileControlsVisibility();
     };
 
-    // Open on player-info click
-    playerInfo.addEventListener('click', openEditor);
+    // Open on click
+    if (playerInfo) playerInfo.addEventListener('click', openEditor);
+    if (btnProfile) btnProfile.addEventListener('click', openEditor);
 
     // Close buttons
     if (closeBtn) closeBtn.addEventListener('click', closeEditor);

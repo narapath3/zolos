@@ -10,13 +10,13 @@ export class AdaptiveRendererSystem {
     this.renderer = renderer;
     this.camera = camera;
     this.scene = scene;
-    
+
     // Performance Metrics
     this.fps = 60;
     this.frameTime = 0;
     this.frameCount = 0;
     this.lastTime = performance.now();
-    
+
     // Quality Levels
     this.qualityLevel = 'high'; // high, medium, low, ultra-low
     this.pixelRatio = window.devicePixelRatio;
@@ -25,7 +25,7 @@ export class AdaptiveRendererSystem {
     this.antialiasing = true;
     this.postProcessing = true;
     this.particleQuality = 1.0; // 0.0 - 1.0
-    
+
     // Thresholds
     this.fpsThresholds = {
       high: 55,
@@ -33,17 +33,17 @@ export class AdaptiveRendererSystem {
       low: 30,
       ultraLow: 20,
     };
-    
+
     this.init();
   }
 
   init() {
     // ตรวจจับประเภทอุปกรณ์
     this.detectDeviceType();
-    
+
     // ตั้งค่า Renderer เบื้องต้น
     this.configureRenderer();
-    
+
     // เริ่มการตรวจสอบประสิทธิภาพ
     this.startPerformanceMonitoring();
   }
@@ -52,11 +52,13 @@ export class AdaptiveRendererSystem {
    * ตรวจจับประเภทอุปกรณ์
    */
   detectDeviceType() {
+    const savedQuality = localStorage.getItem('zolos_graphics_quality');
+
     const ua = navigator.userAgent;
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
     const cores = navigator.hardwareConcurrency || 4;
     const memory = navigator.deviceMemory || 8;
-    
+
     this.deviceType = {
       isMobile,
       cores,
@@ -65,19 +67,60 @@ export class AdaptiveRendererSystem {
       isMidRange: isMobile && cores >= 4 && memory >= 4,
       isHighEnd: !isMobile || (cores >= 8 && memory >= 8),
     };
-    
-    // console.log('📱 Device Type:', this.deviceType);
-    
-    // ตั้งค่าคุณภาพเบื้องต้นตามประเภทอุปกรณ์
-    if (this.deviceType.isLowEnd) {
-      this.qualityLevel = 'ultra-low';
-      this.pixelRatio = 0.85; // Increased from 0.75
-    } else if (this.deviceType.isMidRange) {
-      this.qualityLevel = 'medium';
-      this.pixelRatio = 0.9; // Increased from 0.75
+
+    if (savedQuality) {
+      this.qualityLevel = savedQuality;
     } else {
-      this.qualityLevel = 'high';
-      this.pixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 1.0); // Minimum 1.0 for high end
+      if (this.deviceType.isLowEnd) {
+        this.qualityLevel = 'ultra-low';
+      } else if (this.deviceType.isMidRange) {
+        this.qualityLevel = 'medium';
+      } else {
+        this.qualityLevel = 'high';
+      }
+      localStorage.setItem('zolos_graphics_quality', this.qualityLevel);
+    }
+
+    this.updateQualityParams();
+  }
+
+  updateQualityParams() {
+    switch (this.qualityLevel) {
+      case 'ultra-low':
+        this.pixelRatio = 0.85;
+        this.shadowMapSize = 256;
+        this.shadowQuality = 'none';
+        this.antialiasing = false;
+        this.postProcessing = false;
+        this.particleQuality = 0.3;
+        break;
+
+      case 'low':
+        this.pixelRatio = 0.85;
+        this.shadowMapSize = 512;
+        this.shadowQuality = 'basic';
+        this.antialiasing = false;
+        this.postProcessing = false;
+        this.particleQuality = 0.5;
+        break;
+
+      case 'medium':
+        this.pixelRatio = 1.0;
+        this.shadowMapSize = 1024;
+        this.shadowQuality = 'pcf';
+        this.antialiasing = false;
+        this.postProcessing = true;
+        this.particleQuality = 0.8;
+        break;
+
+      case 'high':
+        this.pixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 1.0);
+        this.shadowMapSize = 2048;
+        this.shadowQuality = 'pcf-soft';
+        this.antialiasing = true;
+        this.postProcessing = true;
+        this.particleQuality = 1.0;
+        break;
     }
   }
 
@@ -85,34 +128,29 @@ export class AdaptiveRendererSystem {
    * ตั้งค่า Renderer
    */
   configureRenderer() {
-    // ปิด Antialiasing บนอุปกรณ์สเปคต่ำ
     if (this.deviceType.isLowEnd) {
       this.renderer.antialias = false;
       this.antialiasing = false;
     }
-    
-    // ตั้งค่า Pixel Ratio
+
     this.renderer.setPixelRatio(this.pixelRatio);
-    
-    // ตั้งค่า Power Preference
-    this.renderer.getContext().getExtension('WEBGL_lose_context');
-    
-    // ปิด Shadow Map บนอุปกรณ์สเปคต่ำ
-    if (this.qualityLevel === 'ultra-low') {
-      this.renderer.shadowMap.enabled = false;
-      this.shadowQuality = 'none';
-    } else if (this.qualityLevel === 'low') {
+
+    if (this.qualityLevel === 'low') {
       this.renderer.shadowMap.type = THREE.BasicShadowMap;
-      this.shadowQuality = 'basic';
-    } else {
+    } else if (this.qualityLevel === 'medium') {
       this.renderer.shadowMap.type = THREE.PCFShadowMap;
-      this.shadowQuality = 'pcf';
+    } else if (this.qualityLevel === 'high') {
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
-    
-    // ตั้งค่า Precision สำหรับ Shader
-    this.renderer.precision = this.deviceType.isLowEnd ? 'lowp' : 'mediump';
-    
-    // console.log(`✅ Renderer configured for ${this.qualityLevel} quality`);
+
+    const enableShadows = (this.shadowQuality !== 'none');
+    this.scene.traverse((object) => {
+      if (object.isLight && object.castShadow !== undefined) {
+        if (object.isDirectionalLight || object.isPointLight) {
+          object.castShadow = enableShadows;
+        }
+      }
+    });
   }
 
   /**
@@ -131,7 +169,7 @@ export class AdaptiveRendererSystem {
   updatePerformanceMetrics() {
     const now = performance.now();
     const deltaTime = now - this.lastTime;
-    
+
     if (deltaTime > 0) {
       // Calculate FPS over a longer period for stability
       this.frameCount++;
@@ -144,9 +182,9 @@ export class AdaptiveRendererSystem {
       }
       this.frameTime = deltaTime;
     }
-    
+
     this.lastTime = now;
-    
+
     // console.log(`📊 FPS: ${this.fps}, Frame Time: ${this.frameTime.toFixed(2)}ms`);
   }
 
@@ -155,7 +193,7 @@ export class AdaptiveRendererSystem {
    */
   adaptQualityBasedOnPerformance() {
     const previousQuality = this.qualityLevel;
-    
+
     if (this.fps < this.fpsThresholds.ultraLow) {
       this.qualityLevel = 'ultra-low';
     } else if (this.fps < this.fpsThresholds.low) {
@@ -165,7 +203,7 @@ export class AdaptiveRendererSystem {
     } else if (this.fps >= this.fpsThresholds.high) {
       this.qualityLevel = 'high';
     }
-    
+
     // ถ้าคุณภาพเปลี่ยน ให้ปรับการตั้งค่า
     if (previousQuality !== this.qualityLevel) {
       this.applyQualitySettings();
@@ -177,57 +215,44 @@ export class AdaptiveRendererSystem {
    * ใช้การตั้งค่าคุณภาพ
    */
   applyQualitySettings() {
-    switch (this.qualityLevel) {
-      case 'ultra-low':
-        this.pixelRatio = 0.85; // Increased from 0.75
-        this.shadowMapSize = 256;
-        this.shadowQuality = 'none';
-        this.antialiasing = false;
-        this.postProcessing = false;
-        this.particleQuality = 0.3;
-        this.renderer.shadowMap.enabled = false;
-        break;
-        
-      case 'low':
-        this.pixelRatio = 0.85;
-        this.shadowMapSize = 512;
-        this.shadowQuality = 'basic';
-        this.antialiasing = false;
-        this.postProcessing = false;
-        this.particleQuality = 0.5;
-        this.renderer.shadowMap.type = THREE.BasicShadowMap;
-        this.renderer.shadowMap.enabled = true;
-        break;
-        
-      case 'medium':
-        this.pixelRatio = 1.0;
-        this.shadowMapSize = 1024;
-        this.shadowQuality = 'pcf';
-        this.antialiasing = false;
-        this.postProcessing = true;
-        this.particleQuality = 0.75;
-        this.renderer.shadowMap.type = THREE.PCFShadowMap;
-        this.renderer.shadowMap.enabled = true;
-        break;
-        
-      case 'high':
-        this.pixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 0.75);
-        this.shadowMapSize = 2048;
-        this.shadowQuality = 'pcf';
-        this.antialiasing = true;
-        this.postProcessing = true;
-        this.particleQuality = 1.0;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.renderer.shadowMap.enabled = true;
-        break;
-    }
-    
-    // ใช้การตั้งค่า Pixel Ratio
+    this.updateQualityParams();
+
+    localStorage.setItem('zolos_graphics_quality', this.qualityLevel);
+
     this.renderer.setPixelRatio(this.pixelRatio);
-    
+
+    if (this.qualityLevel === 'low') {
+      this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    } else if (this.qualityLevel === 'medium') {
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    } else if (this.qualityLevel === 'high') {
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
+
+    const enableShadows = (this.shadowQuality !== 'none');
+    this.scene.traverse((object) => {
+      if (object.isLight && object.castShadow !== undefined) {
+        if (object.isDirectionalLight || object.isPointLight) {
+          object.castShadow = enableShadows;
+        }
+      }
+    });
+
+    this.scene.traverse((object) => {
+      if (object.isMesh && object.material) {
+        if (Array.isArray(object.material)) {
+          object.material.forEach((mat) => {
+            mat.needsUpdate = true;
+          });
+        } else {
+          object.material.needsUpdate = true;
+        }
+      }
+    });
+
     // อัปเดต Shadow Map Size
     this.updateShadowMapSize();
-    
+
     // ปรับ Particle Quality
     this.updateParticleQuality();
   }

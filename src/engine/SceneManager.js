@@ -110,12 +110,45 @@ export class SceneManager {
         this.camera.position.set(0, 18, 18);
         this.camera.lookAt(0, 0, 0);
 
+        // Detect initial quality level
+        const savedQuality = localStorage.getItem('zolos_graphics_quality');
+        let initialQuality = savedQuality;
+        if (!initialQuality) {
+            const ua = navigator.userAgent;
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+            const cores = navigator.hardwareConcurrency || 4;
+            const memory = navigator.deviceMemory || 8;
+            const isLowEnd = isMobile && (cores <= 2 || memory <= 2);
+            const isMidRange = isMobile && cores >= 4 && memory >= 4;
+            initialQuality = isLowEnd ? 'ultra-low' : (isMidRange ? 'medium' : 'high');
+            localStorage.setItem('zolos_graphics_quality', initialQuality);
+        }
+
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        const useAntialias = (initialQuality !== 'ultra-low' && initialQuality !== 'low');
+        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: useAntialias });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        let initialPixelRatio = 1.0;
+        if (initialQuality === 'ultra-low' || initialQuality === 'low') {
+            initialPixelRatio = 0.85;
+        } else if (initialQuality === 'medium') {
+            initialPixelRatio = 1.0;
+        } else {
+            initialPixelRatio = Math.max(Math.min(window.devicePixelRatio, 2), 1.0);
+        }
+        this.renderer.setPixelRatio(initialPixelRatio);
+
+        // Keep shadow map enabled so that Three.js allocates shadow buffers.
+        // We will toggle light.castShadow dynamically to turn shadows on/off.
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        if (initialQuality === 'low') {
+            this.renderer.shadowMap.type = THREE.BasicShadowMap;
+        } else if (initialQuality === 'medium') {
+            this.renderer.shadowMap.type = THREE.PCFShadowMap;
+        } else {
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        }
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.3;
 
@@ -151,7 +184,8 @@ export class SceneManager {
         // Directional (sun)
         this.sunLight = new THREE.DirectionalLight(0xffe8c0, 1.4);
         this.sunLight.position.set(12, 25, 10);
-        this.sunLight.castShadow = true;
+        const savedQuality = localStorage.getItem('zolos_graphics_quality') || 'high';
+        this.sunLight.castShadow = (savedQuality !== 'ultra-low');
         this.sunLight.shadow.mapSize.set(1024, 1024); // Reduced from 2048 for performance
         this.sunLight.shadow.camera.near = 0.5;
         this.sunLight.shadow.camera.far = 80;
@@ -1560,17 +1594,17 @@ export class SceneManager {
         // Portal color by destination tier
         const PORTAL_COLORS = {
             prontera: 0x40c0ff,   // Cyan — starter
-            payon:    0x60ff80,   // Green — forest
+            payon: 0x60ff80,   // Green — forest
             glast_heim: 0xc040ff, // Purple — ruins
-            mjolnir:  0xffa040,   // Orange — mountains
+            mjolnir: 0xffa040,   // Orange — mountains
             abyss_lake: 0x2060ff, // Deep Blue — abyss
         };
 
         const PORTAL_MAP = {
-            prontera:   [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }],
-            payon:      [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
+            prontera: [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }],
+            payon: [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
             glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
-            mjolnir:    [{ x: -25, z: 0, target: 'payon' }, { x: 25, z: 0, target: 'abyss_lake' }],
+            mjolnir: [{ x: -25, z: 0, target: 'payon' }, { x: 25, z: 0, target: 'abyss_lake' }],
             abyss_lake: [{ x: 25, z: 0, target: 'glast_heim' }, { x: -25, z: 0, target: 'mjolnir' }],
         };
 

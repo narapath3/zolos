@@ -82,6 +82,14 @@ export class AdminUI {
         }
     }
 
+    close() {
+        this.isOpen = false;
+        if (this.container) this.container.style.display = 'none';
+        if (window.gameUI) {
+            window.gameUI.updateMobileControlsVisibility();
+        }
+    }
+
     async refreshData() {
         if (this.currentTab === 'users') {
             await this.loadUsers();

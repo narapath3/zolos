@@ -177,9 +177,9 @@
         <span>💬</span>
         <small>Chat</small>
       </button>
-      <button class="hud-btn" id="btn-profile" title="Profile">
+      <button class="hud-btn" id="btn-profile" title="Settings">
         <span>⚙️</span>
-        <small>Profile</small>
+        <small>Settings</small>
       </button>
       <button class="hud-btn" id="btn-admin" title="Admin" style="display: none;">
         <span>🛡️</span>
@@ -456,61 +456,112 @@
     <!-- Profile Editor Popup Modal -->
     <div id="profile-editor-modal" class="modal-popup" style="display: none;">
       <div class="popup-overlay" id="profile-editor-overlay"></div>
-      <div class="popup-content profile-editor-content">
+      <div class="popup-content profile-editor-content"
+        style="max-height: 80vh; display: flex; flex-direction: column;">
         <div class="popup-header">
-          <span class="popup-title">⚙️ Edit Profile / ตกแต่งตัวละคร</span>
+          <span class="popup-title">⚙️ Settings & Profile / ตั้งค่าและข้อมูล</span>
           <button class="popup-close" id="btn-close-profile-editor">✕</button>
         </div>
-        <div class="popup-body">
-          <div class="form-group">
-            <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
-            <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
-          </div>
-          <!-- Step 8: UID Display -->
-          <div id="profile-uid-display"
-            style="font-size: 10px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-pixel); text-align: center;">
-            UID: #--------</div>
 
-          <div class="form-group appearance-colors">
-            <label>🎨 Appearance Colors / ปรับแต่งสี</label>
-            <div class="color-pickers-row">
-              <div class="color-picker-item">
-                <input type="color" id="profile-edit-shirt" value="#4060c0" />
-                <span>Shirt (เสื้อ)</span>
+        <!-- Tab selector headers -->
+        <div class="popup-tabs"
+          style="display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15);">
+          <button id="tab-btn-profile" class="popup-tab active-tab"
+            style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid var(--primary); color: var(--primary); font-family: var(--font-ui); font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s;">👤
+            Profile / ตัวละคร</button>
+          <button id="tab-btn-settings" class="popup-tab"
+            style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font-family: var(--font-ui); font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s;">⚙️
+            Game Config / ตั้งค่าระบบ</button>
+        </div>
+
+        <div class="popup-body" style="overflow-y: auto; flex: 1; padding: 20px;">
+          <!-- Tab 1: Profile -->
+          <div id="tab-content-profile" class="tab-pane">
+            <div class="form-group">
+              <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
+              <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
+            </div>
+            <!-- Step 8: UID Display -->
+            <div id="profile-uid-display"
+              style="font-size: 10px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-pixel); text-align: center;">
+              UID: #--------</div>
+
+            <div class="form-group appearance-colors">
+              <label>🎨 Appearance Colors / ปรับแต่งสี</label>
+              <div class="color-pickers-row">
+                <div class="color-picker-item">
+                  <input type="color" id="profile-edit-shirt" value="#4060c0" />
+                  <span>Shirt (เสื้อ)</span>
+                </div>
+                <div class="color-picker-item">
+                  <input type="color" id="profile-edit-pants" value="#3a3a5a" />
+                  <span>Pants (กางเกง)</span>
+                </div>
+                <div class="color-picker-item">
+                  <input type="color" id="profile-edit-hair" value="#c04040" />
+                  <span>Hair (สีผม)</span>
+                </div>
               </div>
-              <div class="color-picker-item">
-                <input type="color" id="profile-edit-pants" value="#3a3a5a" />
-                <span>Pants (กางเกง)</span>
+            </div>
+
+            <div class="form-group">
+              <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
+              <select id="profile-edit-weapon" class="form-select">
+                <option value="None">👊 None / มือเปล่า</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
+              <select id="profile-edit-hat" class="form-select">
+                <option value="None">❌ None / ไม่ใส่</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
+              <select id="profile-edit-glasses" class="form-select">
+                <option value="None">❌ None / ไม่ใส่</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tab 2: Settings -->
+          <div id="tab-content-settings" class="tab-pane" style="display: none;">
+            <div class="form-group">
+              <label style="display: block; margin-bottom: 6px;">🔊 Game Audio / ระบบเสียง</label>
+              <div
+                style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                <input type="checkbox" id="settings-sound-enabled" checked
+                  style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                <span id="settings-sound-label" style="font-size: 13px; color: var(--text); font-weight: 500;">Sound
+                  Effects: ON</span>
               </div>
-              <div class="color-picker-item">
-                <input type="color" id="profile-edit-hair" value="#c04040" />
-                <span>Hair (สีผม)</span>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label for="settings-graphics-quality" style="display: block; margin-bottom: 6px;">🖥️ Graphics Quality /
+                คุณภาพกราฟิก</label>
+              <select id="settings-graphics-quality" class="form-select"
+                style="width: 100%; padding: 10px; background: rgba(8, 12, 24, 0.85); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px; outline: none; transition: border-color 0.25s;">
+                <option value="high">🌟 High (Soft Shadows & Anti-aliasing)</option>
+                <option value="medium">⚡ Medium (Basic Shadows & Performance)</option>
+                <option value="low">💨 Low (No Shadows & Maximum FPS)</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label style="display: block; margin-bottom: 6px;">📊 Performance Hud / แสดงประสิทธิภาพ</label>
+              <div
+                style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                <input type="checkbox" id="settings-fps-enabled"
+                  style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                <span style="font-size: 13px; color: var(--text); font-weight: 500;">Show Performance Stats (FPS)</span>
               </div>
             </div>
           </div>
 
-          <div class="form-group">
-            <label for="profile-edit-weapon">⚔️ Weapon / อาวุธสวมใส่</label>
-            <select id="profile-edit-weapon" class="form-select">
-              <option value="None">👊 None / มือเปล่า</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="profile-edit-hat">🧙‍♂️ Hat / หมวก</label>
-            <select id="profile-edit-hat" class="form-select">
-              <option value="None">❌ None / ไม่ใส่</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="profile-edit-glasses">👓 Glasses / แว่นตา</label>
-            <select id="profile-edit-glasses" class="form-select">
-              <option value="None">❌ None / ไม่ใส่</option>
-            </select>
-          </div>
-
-          <div class="popup-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+          <div class="popup-actions" style="margin-top: 20px; display: flex; gap: 10px;">
             <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
             <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
           </div>

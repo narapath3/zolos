@@ -7,6 +7,7 @@ import { CombatSystem } from './engine/CombatSystem.js';
 import * as THREE from 'three';
 import { ParticleSystem } from './engine/ParticleSystem.js';
 import { SoundManager } from './engine/SoundManager.js';
+import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
 import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { AdminUI } from './ui/AdminUI.js';
@@ -63,12 +64,12 @@ async function initGame(charData) {
     document.getElementById('game-screen').style.display = 'block';
 
     sceneManager = new SceneManager(canvas);
-    
+
     // Setup input
     import('./engine/InputManager.js').then(({ InputManager }) => {
         inputManager = new InputManager();
         character.inputManager = inputManager;
-        
+
         // Setup skill hotkeys
         inputManager.setupSkillHotkey((skillId) => {
             if (combatSystem) combatSystem.useSkill(skillId);
@@ -184,6 +185,19 @@ async function initGame(charData) {
         });
     }
 
+    // Initialize Adaptive Renderer System and expose to window for settings UI
+    window.rendererSystem = new AdaptiveRendererSystem(
+        sceneManager.renderer,
+        sceneManager.camera,
+        sceneManager.scene
+    );
+
+    // FPS counter: hide by default unless user opted in
+    const fpsEl = document.getElementById('fps-counter');
+    if (fpsEl) {
+        fpsEl.style.display = localStorage.getItem('zolos_show_fps') === 'true' ? 'block' : 'none';
+    }
+
     // Initialize Admin UI
     window.adminUI = new AdminUI();
     window.adminUI.checkAdmin(charData.user_id);
@@ -250,7 +264,7 @@ async function initGame(charData) {
 
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
-                
+
                 // Step 10 Part B: Robust water detection for remote players.
                 // Re-run environment check based on received X/Z to ensure correct baseY.
                 const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
@@ -297,6 +311,57 @@ async function initGame(charData) {
         });
     }
 
+    // Setup Logout Button
+    gameUI.setupLogoutButton(async () => {
+        // 1. Stop game loop
+        isGameStarted = false;
+
+        // 2. Stop auto-save
+        stopAutoSave();
+
+        // 3. Leave multiplayer presence
+        if (userId) {
+            try { leavePresence(userId); } catch (e) { console.error('Leave presence error:', e); }
+        }
+
+        // 4. Remove remote player meshes
+        for (const [id, rp] of remotePlayersMap.entries()) {
+            if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+        }
+        remotePlayersMap.clear();
+
+        // 5. Sign out from Supabase
+        try {
+            const { clearActiveSession, supabase } = await import('./network/SupabaseClient.js');
+            clearActiveSession();
+            if (supabase) await supabase.auth.signOut();
+        } catch (e) {
+            console.error('Logout Supabase error:', e);
+        }
+
+        // 6. Reset UI
+        document.getElementById('game-screen').style.display = 'none';
+        document.getElementById('auth-screen').style.display = 'flex';
+
+        // Close Admin UI on logout
+        if (window.adminUI) {
+            if (typeof window.adminUI.close === 'function') {
+                window.adminUI.close();
+            } else {
+                window.adminUI.isOpen = false;
+                if (window.adminUI.container) {
+                    window.adminUI.container.style.display = 'none';
+                }
+            }
+        }
+
+        // 7. Re-show auth screen with fresh state
+        if (authUI) {
+            authUI._sessionData = null;
+            authUI.show();
+        }
+    });
+
     // Setup HUD & Initial Stats
     if (gameUI.initHUD) {
         gameUI.initHUD(character);
@@ -325,7 +390,7 @@ async function initGame(charData) {
     });
 
     canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
-    
+
     // Mouse move for monster hovering
     canvas.addEventListener('mousemove', (e) => {
         if (!sceneManager || !monsters || !gameUI) return;
