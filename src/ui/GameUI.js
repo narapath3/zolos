@@ -1882,6 +1882,9 @@ export class GameUI {
     };
 
     const handleStart = (e) => {
+      // Only active if the mobile control pad is visible on screen (responsive check)
+      if (window.getComputedStyle(pad).display === 'none') return;
+
       // Only respond to touches on the LEFT half of the screen
       const touch = e.touches ? e.touches[0] : e;
       if (touch.clientX > window.innerWidth / 2) return;
@@ -1890,7 +1893,9 @@ export class GameUI {
       const target = e.target;
       if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
         target.closest('#hud-bottom') || target.closest('.side-panel') ||
-        target.closest('.modal-popup') || target.closest('#hud-top')) return;
+        target.closest('.modal-popup') || target.closest('#hud-top') ||
+        target.closest('#minimap-container') || target.closest('#target-indicator') ||
+        target.closest('#fps-counter') || target.closest('#kill-counter')) return;
 
       e.preventDefault();
       joystickActive = true;
@@ -1972,13 +1977,13 @@ export class GameUI {
       }
     };
 
-    // Listen on the entire pad overlay for floating joystick
-    pad.addEventListener('touchstart', handleStart, { passive: false });
+    // Listen on the window for floating joystick (since mobile-pad has pointer-events: none)
+    window.addEventListener('touchstart', handleStart, { passive: false });
     window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('touchend', handleEnd, { passive: false });
 
     // Desktop/mouse fallback (for browser mobile simulation mode)
-    pad.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousedown', handleStart);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleEnd);
 
