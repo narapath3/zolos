@@ -1763,11 +1763,13 @@ body {
     padding: 1px 3px;
   }
 
-  /* Combat log mobile tuning */
+  /* Combat log mobile tuning - moved above controls */
   #combat-log {
-    width: min(300px, calc(100% - 40px));
-    bottom: calc(155px + env(safe-area-inset-bottom));
-    left: calc(15px + env(safe-area-inset-left));
+    bottom: auto;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(280px, 40vw);
     max-height: 100px;
   }
 
@@ -3343,8 +3345,8 @@ body {
 }
 
 .sprint-btn {
-  bottom: 15px;
-  right: 190px;
+  bottom: 105px;
+  right: 110px;
   width: 52px;
   height: 52px;
   background: rgba(96, 160, 255, 0.65);
@@ -3408,8 +3410,24 @@ body {
     display: block;
   }
 
+  /* Ensure mobile-pad stays visible when auto-farm is active (no panels open) */
+  body:not(.panels-open) #mobile-pad {
+    display: block !important;
+  }
+
   #skill-bar {
     display: none !important;
+  }
+
+  /* Move combat log above mobile controls */
+  #combat-log {
+    bottom: auto;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(280px, 40vw);
+    max-height: 100px;
+    z-index: 90;
   }
 
   /* Make HUD responsive and scale down to avoid overlapping with left/right pads */

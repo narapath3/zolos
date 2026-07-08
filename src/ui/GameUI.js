@@ -93,7 +93,8 @@ export class GameUI {
   _setupAutoBot() {
     const autoBtn = document.getElementById('btn-auto-farm');
     if (autoBtn) {
-      autoBtn.addEventListener('click', () => {
+      autoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (this.combatSystem) {
           const isAuto = this.combatSystem.toggleAutoFarm();
           this.setAutoFarmState(isAuto);
@@ -105,7 +106,8 @@ export class GameUI {
 
     const fishingBtn = document.getElementById('btn-fishing');
     if (fishingBtn) {
-      fishingBtn.addEventListener('click', () => {
+      fishingBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (this.combatSystem) {
           const isFishing = this.combatSystem.toggleFishing();
           this.setFishingState(isFishing);
