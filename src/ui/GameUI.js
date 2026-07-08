@@ -1834,14 +1834,21 @@ export class GameUI {
 
   _setupMobileControls() {
     const pad = document.getElementById('mobile-pad');
+    const container = document.getElementById('joystick-container');
     const base = document.getElementById('joystick-base');
     const knob = document.getElementById('joystick-knob');
-    if (!pad || !base || !knob) return;
+    if (!pad || !container || !base || !knob) return;
 
     let joystickActive = false;
+    let joystickTouchId = null;
     let startX = 0;
     let startY = 0;
     const maxRadius = 45; // Max knob movement radius in pixels
+
+    // Hide joystick container by default (floating mode)
+    container.style.opacity = '0';
+    container.style.pointerEvents = 'none';
+    container.style.transition = 'opacity 0.15s ease';
 
     // Keep track of virtual key states
     const activeKeys = {
@@ -1859,15 +1866,41 @@ export class GameUI {
       window.dispatchEvent(event);
     };
 
+    // Show joystick at a specific position
+    const showJoystickAt = (x, y) => {
+      const size = container.offsetWidth || 130;
+      container.style.left = `${x - size / 2}px`;
+      container.style.top = `${y - size / 2}px`;
+      container.style.bottom = 'auto';
+      container.style.opacity = '1';
+      container.style.pointerEvents = 'auto';
+    };
+
+    const hideJoystick = () => {
+      container.style.opacity = '0';
+      container.style.pointerEvents = 'none';
+    };
+
     const handleStart = (e) => {
-      e.preventDefault();
+      // Only respond to touches on the LEFT half of the screen
       const touch = e.touches ? e.touches[0] : e;
+      if (touch.clientX > window.innerWidth / 2) return;
+
+      // Ignore if touching an interactive element (buttons, etc.)
+      const target = e.target;
+      if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
+        target.closest('#hud-bottom') || target.closest('.side-panel') ||
+        target.closest('.modal-popup') || target.closest('#hud-top')) return;
+
+      e.preventDefault();
       joystickActive = true;
+      if (e.touches) joystickTouchId = e.touches[0].identifier;
 
-      const rect = base.getBoundingClientRect();
-      startX = rect.left + rect.width / 2;
-      startY = rect.top + rect.height / 2;
+      startX = touch.clientX;
+      startY = touch.clientY;
 
+      showJoystickAt(startX, startY);
+      knob.style.transform = 'translate(0px, 0px)';
       base.style.borderColor = 'var(--primary)';
     };
 
@@ -1875,7 +1908,14 @@ export class GameUI {
       if (!joystickActive) return;
       e.preventDefault();
 
-      const touch = e.touches ? e.touches[0] : e;
+      let touch;
+      if (e.touches) {
+        touch = Array.from(e.touches).find(t => t.identifier === joystickTouchId);
+        if (!touch) return;
+      } else {
+        touch = e;
+      }
+
       const dx = touch.clientX - startX;
       const dy = touch.clientY - startY;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1907,9 +1947,19 @@ export class GameUI {
     };
 
     const handleEnd = (e) => {
+      if (!joystickActive) return;
+
+      // For touch events, only end if the correct touch was released
+      if (e.changedTouches) {
+        const found = Array.from(e.changedTouches).find(t => t.identifier === joystickTouchId);
+        if (!found) return;
+      }
+
       joystickActive = false;
+      joystickTouchId = null;
       knob.style.transform = 'translate(0px, 0px)';
       base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
+      hideJoystick();
 
       const inputManager = this.character ? this.character.inputManager : null;
       if (inputManager) {
@@ -1922,13 +1972,13 @@ export class GameUI {
       }
     };
 
-    // Mobile touch events
-    base.addEventListener('touchstart', handleStart, { passive: false });
+    // Listen on the entire pad overlay for floating joystick
+    pad.addEventListener('touchstart', handleStart, { passive: false });
     window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('touchend', handleEnd, { passive: false });
 
     // Desktop/mouse fallback (for browser mobile simulation mode)
-    base.addEventListener('mousedown', handleStart);
+    pad.addEventListener('mousedown', handleStart);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleEnd);
 
