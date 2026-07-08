@@ -3119,45 +3119,7 @@ body {
   margin-bottom: 14px;
 }
 
-/* Media query at the bottom to handle responsive overrides cleanly */
-@media (max-width: 600px) {
-  #hud-top {
-    right: 148px;
-    /* Leave space for the minimap and prevent overlap */
-  }
-
-  #minimap-container {
-    display: flex;
-    /* Show the minimap on mobile as well */
-    width: 100px;
-    /* Slightly smaller minimap for mobile screen space */
-    height: 100px;
-    top: 8px;
-    right: 8px;
-  }
-
-  .minimap-canvas-wrapper {
-    width: 86px;
-    height: 86px;
-  }
-
-  .minimap-header {
-    bottom: -22px;
-    padding: 2px 6px;
-  }
-
-  #minimap-coords {
-    font-size: 6px;
-  }
-
-  #kill-counter {
-    top: 140px;
-    /* Positioned below the minimap coordinates */
-    right: 8px;
-    padding: 5px 8px;
-    font-size: 9px;
-  }
-}
+/* Responsive minimap/hud overrides now handled in the 1024px / 768px / 480px media queries below */
 
 /* ========== TARGET INDICATOR ========== */
 #target-indicator {
@@ -3260,14 +3222,15 @@ body {
 }
 
 #joystick-container {
-  position: absolute;
+  position: fixed;
   bottom: calc(20px + env(safe-area-inset-bottom));
   left: calc(24px + env(safe-area-inset-left));
-  width: 130px;
-  height: 130px;
+  width: clamp(100px, 18vw, 130px);
+  height: clamp(100px, 18vw, 130px);
   pointer-events: auto;
   user-select: none;
   touch-action: none;
+  transition: opacity 0.15s ease;
 }
 
 #joystick-base {
@@ -3285,8 +3248,8 @@ body {
 }
 
 #joystick-knob {
-  width: 54px;
-  height: 54px;
+  width: clamp(40px, 7vw, 54px);
+  height: clamp(40px, 7vw, 54px);
   background: radial-gradient(circle, #ffd700, #f0a020);
   border-radius: 50%;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.3);
@@ -3295,11 +3258,11 @@ body {
 }
 
 #mobile-actions {
-  position: absolute;
+  position: fixed;
   bottom: calc(15px + env(safe-area-inset-bottom));
   right: calc(20px + env(safe-area-inset-right));
-  width: 220px;
-  height: 220px;
+  width: clamp(160px, 30vw, 220px);
+  height: clamp(160px, 30vw, 220px);
   pointer-events: auto;
   user-select: none;
   touch-action: none;
@@ -3330,24 +3293,24 @@ body {
 }
 
 .attack-btn {
-  bottom: 15px;
-  right: 15px;
-  width: 80px;
-  height: 80px;
+  bottom: 8%;
+  right: 8%;
+  width: clamp(56px, 10vw, 80px);
+  height: clamp(56px, 10vw, 80px);
   background: radial-gradient(circle, #ff6080, #cc3050);
   border: 3px solid rgba(255, 96, 128, 0.45);
-  font-size: 32px;
+  font-size: clamp(22px, 4vw, 32px);
   z-index: 5;
 }
 
 .sprint-btn {
-  bottom: 170px;
-  right: 55px;
-  width: 48px;
-  height: 48px;
+  bottom: 78%;
+  right: 28%;
+  width: clamp(36px, 6.5vw, 48px);
+  height: clamp(36px, 6.5vw, 48px);
   background: rgba(96, 160, 255, 0.65);
   border: 2px solid rgba(96, 160, 255, 0.85);
-  font-size: 20px;
+  font-size: clamp(14px, 2.8vw, 20px);
   z-index: 5;
 }
 
@@ -3365,27 +3328,27 @@ body {
 }
 
 .skill-btn {
-  width: 52px;
-  height: 52px;
+  width: clamp(38px, 7vw, 52px);
+  height: clamp(38px, 7vw, 52px);
   background: rgba(14, 18, 36, 0.75);
   border: 2px solid rgba(100, 140, 255, 0.45);
   pointer-events: auto;
 }
 
-/* Arc Layout for Skill Buttons */
+/* Arc Layout for Skill Buttons — percentage-based */
 #btn-mobile-skill-1 {
-  bottom: 110px;
-  right: 10px;
+  bottom: 52%;
+  right: 5%;
 }
 
 #btn-mobile-skill-2 {
-  bottom: 110px;
-  right: 80px;
+  bottom: 52%;
+  right: 38%;
 }
 
 #btn-mobile-skill-3 {
-  bottom: 15px;
-  right: 115px;
+  bottom: 8%;
+  right: 55%;
 }
 
 .mobile-cooldown-overlay {
@@ -3415,51 +3378,47 @@ body {
     display: none !important;
   }
 
-  /* Tablet responsive overrides (widths between 769px and 1024px) */
+  /* Tablet: bottom menu bar — flex wrap, anchored to bottom */
   #hud-bottom {
-    max-width: 580px;
-    min-width: 440px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
     gap: 4px;
-    padding: 8px 10px;
-    bottom: 12px;
-    grid-template-columns: repeat(5, 1fr);
+    padding: 6px 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(320px, 70vw, 580px);
+    max-width: calc(100vw - 16px);
+    min-width: unset;
+    grid-template-columns: unset;
   }
 
   .hud-btn {
-    padding: 6px 4px;
+    padding: 5px 4px;
+    min-width: 40px;
+    flex: 0 0 auto;
   }
 
   .hud-btn span {
-    font-size: 18px;
+    font-size: clamp(16px, 2.5vw, 20px);
   }
 
   .hud-btn small {
     display: block;
-    font-size: 8px;
+    font-size: 7px;
   }
 
-  /* Tablet-specific controls positioning - lifted up to prevent issues */
-  #joystick-container {
-    bottom: 120px;
-    left: 35px;
-    transform: scale(0.9);
-  }
-
-  #mobile-actions {
-    bottom: 110px;
-    right: 30px;
-    transform: scale(0.9);
-  }
-
-  /* Tablet-specific combat log placement at bottom-left under joystick */
+  /* Tablet-specific combat log placement at bottom-left */
   #combat-log {
-    bottom: 15px;
-    left: 20px;
+    bottom: 80px;
+    left: 10px;
     top: auto;
     right: auto;
     transform: none;
-    width: min(320px, 40vw);
-    max-height: 100px;
+    width: min(280px, 35vw);
+    max-height: 80px;
     z-index: 90;
   }
 
@@ -3485,14 +3444,14 @@ body {
 
   .btn-auto,
   .btn-fishing {
-    width: 48px;
-    height: 48px;
+    width: clamp(40px, 6vw, 48px);
+    height: clamp(40px, 6vw, 48px);
     padding: 0;
   }
 
   .btn-auto .auto-icon,
   .btn-fishing .fishing-icon {
-    font-size: 16px;
+    font-size: clamp(14px, 2.2vw, 16px);
   }
 
   .btn-auto .auto-text,
@@ -3500,13 +3459,34 @@ body {
     font-size: 7px;
   }
 
+  /* Show minimap on tablet — smaller version */
   #minimap-container {
-    display: none !important;
-    /* Hide to prevent overlay clutter */
+    display: flex !important;
+    width: 85px;
+    height: 85px;
+    top: 8px;
+    right: 8px;
+  }
+
+  .minimap-canvas-wrapper {
+    width: 72px;
+    height: 72px;
+  }
+
+  .minimap-header {
+    bottom: -20px;
+    padding: 2px 5px;
+  }
+
+  #minimap-coords {
+    font-size: 6px;
   }
 
   #kill-counter {
-    display: none !important;
+    top: 100px;
+    right: 8px;
+    padding: 4px 6px;
+    font-size: 9px;
   }
 
   #fps-counter {
@@ -3516,106 +3496,127 @@ body {
 
 /* Adjustments for mobile screen widths <= 768px */
 @media (max-width: 768px) {
-  #joystick-container {
-    transform: scale(0.8);
-    transform-origin: bottom left;
-    bottom: calc(15px + env(safe-area-inset-bottom));
-    left: calc(10px + env(safe-area-inset-left));
-  }
 
-  #mobile-actions {
-    transform: scale(0.8);
-    transform-origin: bottom right;
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    right: calc(10px + env(safe-area-inset-right));
-  }
-
-  /* Move HUD to top-right on mobile to prevent overlapping with joystick */
+  /* Mobile: bottom menu bar — compact flex row */
   #hud-bottom {
     position: fixed;
-    top: 10px;
-    right: 10px;
-    bottom: auto;
-    left: auto;
-    transform: none;
-    grid-template-columns: repeat(5, 1fr);
-    max-width: 250px;
+    bottom: calc(4px + env(safe-area-inset-bottom));
+    left: 50%;
+    top: auto;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100vw - 12px);
+    max-width: none;
     min-width: unset;
-    padding: 4px 6px;
-    gap: 2px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-evenly;
+    align-items: center;
+    padding: 4px 2px;
+    gap: 1px;
     z-index: 1700;
+    border-radius: 10px;
+    grid-template-columns: unset;
   }
 
   .hud-btn {
     padding: 4px 2px;
+    min-width: 0;
+    flex: 1 1 0;
   }
 
   .hud-btn span {
-    font-size: 16px;
+    font-size: clamp(14px, 4vw, 18px);
   }
 
   .hud-btn small {
     display: none !important;
   }
 
-  /* Keep combat log at top center for mobile to prevent overlapping active areas */
+  /* Lift mobile controls above the bottom menu bar */
+  #mobile-actions {
+    bottom: calc(60px + env(safe-area-inset-bottom));
+    right: calc(8px + env(safe-area-inset-right));
+  }
+
+  /* Mobile minimap — even smaller */
+  #minimap-container {
+    display: flex !important;
+    width: 70px;
+    height: 70px;
+    top: 8px;
+    right: 8px;
+  }
+
+  .minimap-canvas-wrapper {
+    width: 58px;
+    height: 58px;
+  }
+
+  /* HUD (HP/SP/EXP) — leave space for minimap */
+  #hud-top {
+    right: 90px;
+  }
+
+  /* Combat log above bottom bar */
   #combat-log {
-    bottom: auto;
-    top: 120px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(280px, 40vw);
-    max-height: 100px;
+    bottom: calc(58px + env(safe-area-inset-bottom));
+    top: auto;
+    left: 10px;
+    right: auto;
+    transform: none;
+    width: min(220px, 50vw);
+    max-height: 70px;
     z-index: 90;
   }
 }
 
 @media (max-width: 480px) {
-  #joystick-container {
-    transform: scale(0.7);
-    transform-origin: bottom left;
-    bottom: calc(12px + env(safe-area-inset-bottom));
-    left: calc(8px + env(safe-area-inset-left));
+
+  /* Smaller screens: tighter action button area */
+  #mobile-actions {
+    width: clamp(140px, 38vw, 180px);
+    height: clamp(140px, 38vw, 180px);
+    bottom: calc(55px + env(safe-area-inset-bottom));
+    right: calc(6px + env(safe-area-inset-right));
   }
 
-  #mobile-actions {
-    transform: scale(0.7);
-    transform-origin: bottom right;
-    bottom: calc(8px + env(safe-area-inset-bottom));
-    right: calc(8px + env(safe-area-inset-right));
+  /* Even smaller minimap */
+  #minimap-container {
+    width: 60px;
+    height: 60px;
+  }
+
+  .minimap-canvas-wrapper {
+    width: 48px;
+    height: 48px;
+  }
+
+  #hud-top {
+    right: 78px;
   }
 }
 
 /* Adjustments for low-height landscape screens */
 @media (max-height: 480px) {
-  #joystick-container {
-    transform: scale(0.75);
-    transform-origin: bottom left;
-    bottom: calc(8px + env(safe-area-inset-bottom));
-    left: calc(12px + env(safe-area-inset-left));
+  #mobile-actions {
+    width: clamp(130px, 28vh, 180px);
+    height: clamp(130px, 28vh, 180px);
+    bottom: calc(50px + env(safe-area-inset-bottom));
+    right: calc(8px + env(safe-area-inset-right));
   }
 
-  #mobile-actions {
-    transform: scale(0.75);
-    transform-origin: bottom right;
-    bottom: calc(5px + env(safe-area-inset-bottom));
-    right: calc(12px + env(safe-area-inset-right));
+  #hud-bottom {
+    padding: 3px 2px;
   }
 }
 
 @media (max-height: 380px) {
-  #joystick-container {
-    transform: scale(0.65);
-    transform-origin: bottom left;
-    bottom: calc(5px + env(safe-area-inset-bottom));
-    left: calc(8px + env(safe-area-inset-left));
-  }
-
   #mobile-actions {
-    transform: scale(0.65);
-    transform-origin: bottom right;
-    bottom: calc(3px + env(safe-area-inset-bottom));
-    right: calc(8px + env(safe-area-inset-right));
+    width: clamp(110px, 25vh, 160px);
+    height: clamp(110px, 25vh, 160px);
+    bottom: calc(45px + env(safe-area-inset-bottom));
+    right: calc(6px + env(safe-area-inset-right));
   }
 }
 
