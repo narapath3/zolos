@@ -1763,14 +1763,18 @@ body {
     padding: 1px 3px;
   }
 
-  /* Combat log mobile tuning - moved above controls */
+  /* Combat log mobile tuning - moved to bottom left above controls */
   #combat-log {
-    bottom: auto;
-    top: 120px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(280px, 40vw);
-    max-height: 100px;
+    bottom: 180px;
+    top: auto;
+    left: 10px;
+    transform: none;
+    width: calc(100% - 100px);
+    max-height: 80px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 50;
   }
 
   /* Auto farm / Fishing mobile tuning */
