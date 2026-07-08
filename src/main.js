@@ -156,7 +156,9 @@ async function initGame(charData) {
                 break;
             case 'fishCaught':
                 if (gameUI) {
-                    gameUI.addCombatLog(`🎣 You caught a ${event.item.name}!`, 'loot');
+                    const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
+                    const e = rarityEmoji[event.rarity] || '⚪';
+                    gameUI.addCombatLog(`🎣 You caught a ${e} ${event.item.name}!`, 'loot');
                     // Item is added via 'lootDrop' event in CombatSystem.js
                 }
                 break;
@@ -192,10 +194,27 @@ async function initGame(charData) {
         sceneManager.scene
     );
 
-    // FPS counter: hide by default unless user opted in
-    const fpsEl = document.getElementById('fps-counter');
-    if (fpsEl) {
-        fpsEl.style.display = localStorage.getItem('zolos_show_fps') === 'true' ? 'block' : 'none';
+    // Apply persisted game settings
+    if (character && character.gameSettings) {
+        if (soundManager) {
+            soundManager.enabled = character.gameSettings.sound_enabled !== false;
+        }
+        if (window.rendererSystem) {
+            window.rendererSystem.qualityLevel = character.gameSettings.graphics_quality || 'medium';
+            window.rendererSystem.applyQualitySettings();
+        }
+        const fpsEl = document.getElementById('fps-counter');
+        if (fpsEl) {
+            const fpsEnabled = character.gameSettings.fps_enabled === true;
+            fpsEl.style.display = fpsEnabled ? 'block' : 'none';
+            localStorage.setItem('zolos_show_fps', fpsEnabled ? 'true' : 'false');
+        }
+    } else {
+        // FPS counter fallback: hide by default unless user opted in
+        const fpsEl = document.getElementById('fps-counter');
+        if (fpsEl) {
+            fpsEl.style.display = localStorage.getItem('zolos_show_fps') === 'true' ? 'block' : 'none';
+        }
     }
 
     // Initialize Admin UI
@@ -292,9 +311,10 @@ async function initGame(charData) {
 
     // Start auto-save
     startAutoSave(() => {
+        const saveData = character.getSaveData();
         return {
             characterId: charData.id,
-            updates: character.getSaveData()
+            updates: saveData.updates
         };
     }, 15000);
 

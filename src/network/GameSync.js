@@ -55,6 +55,10 @@ export async function createCharacter(userId) {
         total_kills: 0,
         play_time: 0,
         last_map: 'prontera_field',
+        // Game settings defaults
+        sound_enabled: true,
+        graphics_quality: 'medium',
+        fps_enabled: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
     };

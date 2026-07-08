@@ -23,9 +23,9 @@ export class CharacterManager {
         this.attackCooldown = 1.0; // seconds between attacks
         this.target = null;
         this.moveSpeed = 5.5;
-        
+
         // Base Y position to support animation offsets without losing ground level
-        this.baseY = 1.2; 
+        this.baseY = 1.2;
 
         // Skill cooldown state
         this.cooldowns = {
@@ -53,6 +53,13 @@ export class CharacterManager {
         this.equippedWeapon = null;
         this.equippedArmor = null;
         this.equippedShield = null;
+
+        // Game settings (persisted to DB)
+        this.gameSettings = {
+            sound_enabled: true,
+            graphics_quality: 'medium',
+            fps_enabled: false,
+        };
 
         // Custom property getters for base stats + equipment bonuses
         this.stats._baseAtk = 10;
@@ -468,7 +475,7 @@ export class CharacterManager {
         } else if (this.equippedHat === 'Cat Ears') {
             const earMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
             const innerMat = new THREE.MeshLambertMaterial({ color: 0xffaaaa });
-            
+
             for (let i = -1; i <= 1; i += 2) {
                 const earGeo = new THREE.ConeGeometry(0.12, 0.25, 4);
                 const ear = new THREE.Mesh(earGeo, earMat);
@@ -581,7 +588,7 @@ export class CharacterManager {
                 const frame = new THREE.Mesh(frameGeo, frameMat);
                 frame.position.set(i * 0.12, 1.72, 0.26);
                 glassesGroup.add(frame);
-                
+
                 const lensGeo = new THREE.BoxGeometry(0.16, 0.11, 0.05);
                 const lens = new THREE.Mesh(lensGeo, lensMat);
                 lens.position.set(i * 0.12, 1.72, 0.27);
@@ -615,7 +622,7 @@ export class CharacterManager {
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        
+
         ctx.fillText(`${this.stats.name} Lv.${this.stats.level}`, 128, 40);
 
         const texture = new THREE.CanvasTexture(canvas);
@@ -690,7 +697,7 @@ export class CharacterManager {
             this.stats._baseMaxSp = (Number(this.stats._baseMaxSp) || 50) + (Number(gains.sp) || 0);
             this.stats._baseAtk = (Number(this.stats._baseAtk) || 10) + (Number(gains.atk) || 0);
             this.stats._baseDef = (Number(this.stats._baseDef) || 5) + (Number(gains.def) || 0);
-            
+
             // Fully restore current HP/SP on level up
             this.stats.hp = this.stats.max_hp;
             this.stats.sp = this.stats.max_sp;
@@ -707,15 +714,15 @@ export class CharacterManager {
     takeDamage(amount) {
         const dmgAmount = Number(amount) || 0;
         const currentDef = Number(this.stats.def) || 0;
-        
+
         const actualDmg = Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
-        
+
         // Step 4: Ensure hp is a number before subtracting
         const currentHp = Number(this.stats.hp);
         if (isNaN(currentHp)) {
             this.stats.hp = Number(this.stats.max_hp) || 100;
         }
-        
+
         this.stats.hp = Math.max(0, (Number(this.stats.hp) || 0) - actualDmg);
         return actualDmg;
     }
@@ -740,15 +747,15 @@ export class CharacterManager {
         // Step 8: Set hp/sp to 20% on respawn, ensure no NaN
         const maxHp = Number(this.stats.max_hp || 100);
         const maxSp = Number(this.stats.max_sp || 50);
-        
+
         this.stats.hp = Math.floor(maxHp * 0.2);
         this.stats.sp = Math.floor(maxSp * 0.2);
-        
+
         this.baseY = 1.2;
         this.mesh.position.set(0, 1.2, 10);
         this.state = 'idle';
         this.target = null;
-        
+
         // Step 8: Flag for CombatSystem to check for auto-resume
         this.justRespawned = true;
     }
@@ -769,6 +776,10 @@ export class CharacterManager {
                 gold: this.stats.gold,
                 total_kills: this.stats.total_kills,
                 play_time: this.stats.play_time,
+                // Game settings
+                sound_enabled: this.gameSettings.sound_enabled,
+                graphics_quality: this.gameSettings.graphics_quality,
+                fps_enabled: this.gameSettings.fps_enabled,
             }
         };
     }
@@ -963,7 +974,7 @@ export class CharacterManager {
         if (!data) return;
         this.characterId = data.id;
         this.stats.name = data.name || 'Novice';
-        
+
         // Step 4: Robust numeric field loading with isNaN() guards and Number() casts
         this.stats.level = isNaN(Number(data.level)) ? 1 : Number(data.level);
         this.stats.exp = isNaN(Number(data.exp)) ? 0 : Number(data.exp);
@@ -976,7 +987,7 @@ export class CharacterManager {
         this.stats.gold = isNaN(Number(data.gold)) ? 0 : Number(data.gold);
         this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
-        
+
         // Load appearance if available
         if (data.body_color) this.setBodyColor(data.body_color);
         if (data.hair_color) this.setHairColor(data.hair_color);
@@ -985,10 +996,21 @@ export class CharacterManager {
         if (data.glasses) this.setGlasses(data.glasses);
         if (data.weapon) this.equipWeapon(data.weapon);
 
+        // Load game settings if available
+        if (data.sound_enabled !== undefined && data.sound_enabled !== null) {
+            this.gameSettings.sound_enabled = !!data.sound_enabled;
+        }
+        if (data.graphics_quality) {
+            this.gameSettings.graphics_quality = data.graphics_quality;
+        }
+        if (data.fps_enabled !== undefined && data.fps_enabled !== null) {
+            this.gameSettings.fps_enabled = !!data.fps_enabled;
+        }
+
         // Ensure starting position is safe
         this.baseY = 1.2;
         this.mesh.position.set(0, 1.2, 10);
-        
+
         this.updateNameTag();
     }
 

@@ -1,6 +1,6 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
-import { MONSTERS } from './GameData.js';
+import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS } from './GameData.js';
 
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent) {
@@ -42,7 +42,7 @@ export class CombatSystem {
 
     update(dt) {
         // Step 2: Clamp deltaTime to prevent spiral-of-death and ensure it's a valid number
-        if (isNaN(dt) || dt === undefined) dt = 1/60;
+        if (isNaN(dt) || dt === undefined) dt = 1 / 60;
         const clampedDt = Math.min(0.1, dt);
 
         // Step 6.2: Natural Regeneration
@@ -53,10 +53,10 @@ export class CombatSystem {
             if (this.character.isAlive()) {
                 const maxHp = isNaN(this.character.stats.max_hp) ? 100 : this.character.stats.max_hp;
                 const maxSp = isNaN(this.character.stats.max_sp) ? 50 : this.character.stats.max_sp;
-                
+
                 const hpRegen = Math.floor(maxHp * 0.02);
                 const spRegen = Math.floor(maxSp * 0.03);
-                
+
                 this.character.stats.hp = Math.min(maxHp, this.character.stats.hp + hpRegen);
                 this.character.stats.sp = Math.min(maxSp, this.character.stats.sp + spRegen);
             }
@@ -115,7 +115,7 @@ export class CombatSystem {
             if (this.autoFarm && !this.character.targetMonster) {
                 this.character.targetMonster = target;
             }
-            
+
             const playerPos = this.character.getPosition();
             const targetPos = target.getPosition();
             // Use 2D distance (XZ plane) for range checks to avoid issues with submerged monsters
@@ -154,7 +154,7 @@ export class CombatSystem {
             }
             // Reset Target reference if we had any
             this.currentTarget = null;
-            
+
             // Fix C: Handle case where AUTO finds no monster target
             // Ensure character returns to idle state when no target is found, 
             // especially during autoFarm to prevent getting stuck in 'walking' or 'attacking' state
@@ -191,7 +191,7 @@ export class CombatSystem {
 
         // Player attacks monster
         const isCritical = Math.random() < 0.1;
-        
+
         // Ensure stats are numbers
         const charAtk = isNaN(this.character.stats.atk) ? 10 : this.character.stats.atk;
         let baseDmg = charAtk + Math.floor(Math.random() * 5);
@@ -212,7 +212,7 @@ export class CombatSystem {
             const playerPos = this.character.getPosition();
             const monsterPos = monster.getPosition();
             const dist = playerPos.distanceTo(monsterPos);
-            
+
             // Monsters have a limited counter-attack range (usually melee or slightly more)
             if (dist < 4.0) {
                 const monsterAtk = (monster.data && !isNaN(monster.data.atk)) ? monster.data.atk : 5;
@@ -234,18 +234,18 @@ export class CombatSystem {
         // Player died?
         if (!this.character.isAlive()) {
             this.onEvent({ type: 'playerDeath' });
-            
+
             // Step 7: Store autoFarm state to resume after respawn
             const wasAutoFarming = this.autoFarm;
             this.autoFarm = false;
             this.currentTarget = null;
             if (this.character.targetMonster) this.character.targetMonster = null;
-            
+
             setTimeout(() => {
                 // Step 6.1: Respawn ด้วย HP บางส่วน
                 this.character.respawn();
                 this.onEvent({ type: 'playerRespawn' });
-                
+
                 // Note: wasAutoFarmingBeforeDeath is already set in update loop guard
             }, 3000);
         }
@@ -339,10 +339,35 @@ export class CombatSystem {
                     // Catch fish!
                     setTimeout(() => {
                         if (this.isFishing && this.character.state === 'fishing') {
-                            const fishItem = { name: 'Fish', emoji: '🐟', type: 'consumable', chance: 1.0 };
+                            // Weighted random selection of rarity
+                            const roll = Math.random();
+                            let selectedRarity = 'common';
+                            let cumulative = 0;
+                            for (const [rarity, weight] of Object.entries(FISH_RARITY_WEIGHTS)) {
+                                cumulative += weight;
+                                if (roll <= cumulative) {
+                                    selectedRarity = rarity;
+                                    break;
+                                }
+                            }
+
+                            // Pick a random fish from the matching rarity pool
+                            const pool = Object.entries(FISH_SPECIES).filter(([_, data]) => data.rarity === selectedRarity);
+                            const [fishName, fishData] = pool[Math.floor(Math.random() * pool.length)];
+
+                            const fishItem = {
+                                name: fishName,
+                                emoji: fishData.emoji,
+                                type: 'fish',
+                                rarity: fishData.rarity,
+                                price: fishData.price,
+                                desc: fishData.desc
+                            };
+
                             this.onEvent({
                                 type: 'fishCaught',
-                                item: fishItem
+                                item: fishItem,
+                                rarity: fishItem.rarity
                             });
                             // Trigger standard loot drop for inventory addition
                             this.onEvent({

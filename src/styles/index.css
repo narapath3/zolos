@@ -958,6 +958,58 @@ body {
   box-shadow: 0 0 8px rgba(64, 224, 128, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
+/* Rarity Slots Border Glows */
+.inv-slot.rarity-uncommon {
+  border-color: #28a745 !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(40, 167, 69, 0.35);
+}
+
+.inv-slot.rarity-rare {
+  border-color: #007bff !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 10px rgba(0, 123, 255, 0.45);
+}
+
+.inv-slot.rarity-epic {
+  border-color: #a335ee !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(163, 53, 238, 0.55);
+}
+
+.inv-slot.rarity-legendary {
+  animation: legendaryShimmer 2s ease-in-out infinite;
+}
+
+.inv-slot.rarity-mythic {
+  animation: mythicShimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes legendaryShimmer {
+
+  0%,
+  100% {
+    border-color: #ff8000;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 0 10px rgba(255, 128, 0, 0.5);
+  }
+
+  50% {
+    border-color: #ffe000;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 20px rgba(255, 224, 0, 0.8);
+  }
+}
+
+@keyframes mythicShimmer {
+
+  0%,
+  100% {
+    border-color: #ff3f3f;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 0 12px rgba(255, 63, 63, 0.6);
+  }
+
+  50% {
+    border-color: #ff3fee;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3), 0 0 25px rgba(255, 63, 238, 0.9);
+  }
+}
+
 .inv-equipped-badge {
   position: absolute;
   top: 2px;
@@ -1028,6 +1080,33 @@ body {
   font-size: 13px;
   color: var(--primary);
   font-weight: bold;
+}
+
+/* Rarity Detail Text Colors */
+.detail-name.color-common {
+  color: #ffffff;
+}
+
+.detail-name.color-uncommon {
+  color: #1eff00;
+}
+
+.detail-name.color-rare {
+  color: #0070dd;
+}
+
+.detail-name.color-epic {
+  color: #a335ee;
+}
+
+.detail-name.color-legendary {
+  color: #ff8000;
+  text-shadow: 0 0 8px rgba(255, 128, 0, 0.5);
+}
+
+.detail-name.color-mythic {
+  color: #ff3f3f;
+  text-shadow: 0 0 12px rgba(255, 63, 63, 0.8);
 }
 
 .detail-type {
@@ -3723,4 +3802,57 @@ body {
 
 #tab-content-settings input[type="checkbox"]:checked {
   box-shadow: 0 0 8px rgba(240, 192, 64, 0.3);
+}
+
+/* ========== FISH & ITEM RARITY STYLING ========== */
+.inv-slot.rarity-common {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.inv-slot.rarity-uncommon {
+  border-color: #40e080 !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 10px rgba(64, 224, 128, 0.25);
+}
+
+.inv-slot.rarity-rare {
+  border-color: #4080ff !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 10px rgba(64, 128, 255, 0.25);
+}
+
+.inv-slot.rarity-legendary {
+  border-color: #f0c040 !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 15px rgba(240, 192, 64, 0.4);
+}
+
+.color-common {
+  color: var(--text-dim) !important;
+}
+
+.color-uncommon {
+  color: #40e080 !important;
+  text-shadow: 0 0 8px rgba(64, 224, 128, 0.3);
+}
+
+.color-rare {
+  color: #4080ff !important;
+  text-shadow: 0 0 8px rgba(64, 128, 255, 0.3);
+}
+
+.color-legendary {
+  color: #f0c040 !important;
+  text-shadow: 0 0 12px rgba(240, 192, 64, 0.5);
+  animation: legendaryShimmer 2s ease-in-out infinite;
+}
+
+@keyframes legendaryShimmer {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(240, 192, 64, 0.3));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px rgba(240, 192, 64, 0.8));
+    transform: scale(1.02);
+  }
 }

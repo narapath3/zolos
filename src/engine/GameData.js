@@ -120,6 +120,110 @@ export const ITEMS = {
     'Aegis of Olympus': { emoji: '🌌', type: 'shield', rarity: 'mythic', desc: 'โล่เทวทูตอีจิสม่านอวกาศ ดูดซับการปัดเป่าดาเมจทั้งหมดอย่างไร้ขีดจำกัด (DEF +160, HP +1500)', price: 95000, defBonus: 160, hpBonus: 1500 }
 };
 
+// ============ FISH SPECIES ============
+// 73 fish species inspired by Coral Island, distributed across 4 rarity tiers
+export const FISH_SPECIES = {
+    // ---- COMMON FISH (30) ----
+    'Tilapia': { emoji: '🐟', rarity: 'common', price: 30, desc: 'ปลานิลน้ำจืดตัวเล็กเนื้อขาว ตกได้ง่ายจากบ่อและแม่น้ำทั่วไป' },
+    'Catfish': { emoji: '🐟', rarity: 'common', price: 35, desc: 'ปลาดุกหนวดยาวอาศัยอยู่ก้นแม่น้ำ เนื้อมันนุ่มปรุงอาหารอร่อย' },
+    'Carp': { emoji: '🐟', rarity: 'common', price: 28, desc: 'ปลาคาร์ปสีทองอ่อนว่ายน้ำช้าๆ พบได้ทั่วไปในทะเลสาบ' },
+    'Perch': { emoji: '🐟', rarity: 'common', price: 32, desc: 'ปลาเพิร์ชลายทาง ชอบอาศัยตามก้อนหินใต้น้ำ' },
+    'Sardine': { emoji: '🐟', rarity: 'common', price: 20, desc: 'ปลาซาร์ดีนตัวเล็กว่ายเป็นฝูง มักพบบริเวณชายฝั่ง' },
+    'Anchovy': { emoji: '🐟', rarity: 'common', price: 18, desc: 'ปลาแอนโชวี่ขนาดจิ๋วรสเค็ม ใช้ทำซอสปลาชั้นดี' },
+    'Mackerel': { emoji: '🐟', rarity: 'common', price: 38, desc: 'ปลาทูน้ำเงินเนื้อแน่น นิยมย่างกินกับน้ำจิ้มแจ่ว' },
+    'Herring': { emoji: '🐟', rarity: 'common', price: 25, desc: 'ปลาเฮอร์ริงสีเงินแวววาว ว่ายน้ำเร็วมากทั้งฝูง' },
+    'Shad': { emoji: '🐟', rarity: 'common', price: 30, desc: 'ปลาแชดหลังเขียวพุงขาว ชอบอยู่ในน้ำตื้นใกล้ท่าเรือ' },
+    'Smelt': { emoji: '🐟', rarity: 'common', price: 22, desc: 'ปลาสเมลต์ตัวใสเล็กจิ๋ว ส่งกลิ่นหอมคล้ายแตงกวา' },
+    'Goby': { emoji: '🐟', rarity: 'common', price: 20, desc: 'ปลาบู่ตัวกลมป้อมชอบซ่อนตามโขดหิน' },
+    'Mullet': { emoji: '🐟', rarity: 'common', price: 28, desc: 'ปลากระบอกริมน้ำกระโดดเล่นบนผิวน้ำยามเช้าตรู่' },
+    'Sole': { emoji: '🐟', rarity: 'common', price: 34, desc: 'ปลาลิ้นหมาแบนราบแนบพื้นทราย พรางตัวเก่งมาก' },
+    'Crucian Carp': { emoji: '🐟', rarity: 'common', price: 26, desc: 'ปลาตะเพียนทองเงาวับ ตกได้ง่ายจากทุกแหล่งน้ำ' },
+    'Bass': { emoji: '🐟', rarity: 'common', price: 40, desc: 'ปลากะพงน้ำจืดตัวอ้วน ชอบกินเหยื่อขนาดใหญ่' },
+    'Trout': { emoji: '🐟', rarity: 'common', price: 42, desc: 'ปลาเทราต์ลายจุดแดง พบในลำธารน้ำเย็นใสกระจ่าง' },
+    'Pike': { emoji: '🐟', rarity: 'common', price: 45, desc: 'ปลาไพค์ปากแหลมดุร้าย นักล่าแห่งทุ่งกกริมทะเลสาบ' },
+    'Bluegill': { emoji: '🐟', rarity: 'common', price: 24, desc: 'ปลาบลูกิลล์ครีบสีฟ้าเข้ม ตกง่ายเหมาะกับมือใหม่' },
+    'Minnow': { emoji: '🐟', rarity: 'common', price: 12, desc: 'ปลาซิวจิ๋วสีเงิน ว่ายกันเป็นฝูงนับร้อยตัว' },
+    'Sunfish': { emoji: '🐟', rarity: 'common', price: 30, desc: 'ปลาซันฟิชลำตัวแบน สีส้มทองสดใส' },
+    'Roach': { emoji: '🐟', rarity: 'common', price: 22, desc: 'ปลาโรชครีบแดง ชอบรวมฝูงในน้ำนิ่ง' },
+    'Dace': { emoji: '🐟', rarity: 'common', price: 20, desc: 'ปลาเดซลำตัวเรียวยาว ว่ายทวนกระแสน้ำได้ดี' },
+    'Whiting': { emoji: '🐟', rarity: 'common', price: 36, desc: 'ปลาไวท์ติ้งเนื้อขาวละเอียด เป็นที่นิยมในร้านอาหาร' },
+    'Flounder': { emoji: '🐟', rarity: 'common', price: 38, desc: 'ปลาลิ้นหมาใหญ่ นอนราบพื้นทรายตาย้ายข้าง' },
+    'Snapper': { emoji: '🐟', rarity: 'common', price: 44, desc: 'ปลากะพงแดงปากแหลม เนื้อแน่นหวานอร่อย' },
+    'Cod': { emoji: '🐟', rarity: 'common', price: 40, desc: 'ปลาค็อดหนังลื่น นิยมนำมาทำฟิชแอนด์ชิปส์' },
+    'Haddock': { emoji: '🐟', rarity: 'common', price: 42, desc: 'ปลาแฮดด็อคมีจุดดำข้างลำตัว เนื้อหนาเหมาะรมควัน' },
+    'Pollock': { emoji: '🐟', rarity: 'common', price: 35, desc: 'ปลาพอลล็อคครีบเหลืองอ่อน พบในน้ำลึก' },
+    'Butterfish': { emoji: '🐟', rarity: 'common', price: 32, desc: 'ปลาบัตเตอร์ฟิชลื่นเหนียว หลุดมือง่ายเวลาจับ' },
+    'Sea Bass': { emoji: '🐟', rarity: 'common', price: 48, desc: 'ปลากะพงทะเลตัวใหญ่ ตีน้ำกระโจนเมื่อติดเบ็ด' },
+
+    // ---- UNCOMMON FISH (22) ----
+    'Rainbow Trout': { emoji: '🌈', rarity: 'uncommon', price: 65, desc: 'ปลาเทราต์สายรุ้งลายสีสดใส อาศัยในลำธารเขาน้ำใสเย็น' },
+    'Salmon': { emoji: '🐠', rarity: 'uncommon', price: 80, desc: 'ปลาแซลมอนสีชมพูส้ม ว่ายทวนน้ำตกขึ้นไปหลายร้อยกิโลเพื่อวางไข่' },
+    'Tuna': { emoji: '🐠', rarity: 'uncommon', price: 90, desc: 'ปลาทูน่าครีบเหลืองขนาดใหญ่ ว่ายเร็วและแข็งแรงมาก' },
+    'Swordfish': { emoji: '🗡️', rarity: 'uncommon', price: 110, desc: 'ปลากระโทงจะงอยปากแหลมยาว พุ่งฝ่าน้ำเร็วดั่งสายฟ้า' },
+    'Eel': { emoji: '🐍', rarity: 'uncommon', price: 70, desc: 'ปลาไหลตัวยาวลื่นเลื้อย ซ่อนอยู่ในรูโคลนก้นแม่น้ำ' },
+    'Barramundi': { emoji: '🐠', rarity: 'uncommon', price: 85, desc: 'ปลากะพงขาวตัวโตเนื้อแน่น มีราคาสูงในตลาด' },
+    'Grouper': { emoji: '🐠', rarity: 'uncommon', price: 95, desc: 'ปลาเก๋าปากกว้าง อ้าปากดูดเหยื่อทั้งตัว' },
+    'Red Snapper': { emoji: '🐠', rarity: 'uncommon', price: 88, desc: 'ปลากะพงแดงสีสวยสดใส เนื้อนุ่มละมุนลิ้น' },
+    'Yellowtail': { emoji: '🐠', rarity: 'uncommon', price: 92, desc: 'ปลาหางเหลืองญี่ปุ่น หรือปลาฮามาจิ ทำซาชิมิรสเด็ด' },
+    'Pompano': { emoji: '🐠', rarity: 'uncommon', price: 78, desc: 'ปลาปอมปาโนลำตัวแบนสีเงินแวว ตกได้บริเวณหาดทราย' },
+    'Wahoo': { emoji: '🐠', rarity: 'uncommon', price: 100, desc: 'ปลาวาฮูเรียวยาวว่ายเร็วสุด สู้ดิ้นรนอย่างดุเดือดบนสาย' },
+    'Mahi-Mahi': { emoji: '🐠', rarity: 'uncommon', price: 105, desc: 'ปลาโดราโด้สีเขียวทองรุ้ง สวยงามเหนือระดับ' },
+    'Sailfish': { emoji: '⛵', rarity: 'uncommon', price: 120, desc: 'ปลาเซลฟิชครีบหลังใหญ่คล้ายใบเรือ ว่ายเร็วที่สุดในทะเล' },
+    'Sturgeon': { emoji: '🐠', rarity: 'uncommon', price: 130, desc: 'ปลาสเตอร์เจียนโบราณ มีเกล็ดแข็งคล้ายเกราะอัศวิน' },
+    'Walleye': { emoji: '🐠', rarity: 'uncommon', price: 72, desc: 'ปลาวอลอายตาโตมองเห็นในที่มืดได้ ล่าเหยื่อกลางคืน' },
+    'Striped Bass': { emoji: '🐠', rarity: 'uncommon', price: 82, desc: 'ปลากะพงลาย เส้นดำพาดข้างลำตัวสง่างาม' },
+    'King Mackerel': { emoji: '🐠', rarity: 'uncommon', price: 98, desc: 'ปลาอินทรีย์ตัวใหญ่ฟันคม ล่าเหยื่อแบบพุ่งฉกเร็ว' },
+    'Dorado': { emoji: '🐠', rarity: 'uncommon', price: 115, desc: 'ปลาโดราโด้ทองอร่าม เปล่งประกายเหนือน้ำยามพระอาทิตย์ตก' },
+    'Arapaima': { emoji: '🐠', rarity: 'uncommon', price: 140, desc: 'ปลาช่อนอเมซอนยักษ์ ขนาดใหญ่โตกว่าคนสะดวกแค่ไหน' },
+    'Paddlefish': { emoji: '🐠', rarity: 'uncommon', price: 125, desc: 'ปลาพายจมูกยาวแบนคล้ายไม้พาย กรองกินแพลงก์ตอน' },
+    'Tarpon': { emoji: '🐠', rarity: 'uncommon', price: 108, desc: 'ปลาตาร์ปอนเกล็ดเงินใหญ่กระโดดขึ้นจากน้ำอย่างสง่า' },
+    'Bonefish': { emoji: '🐠', rarity: 'uncommon', price: 75, desc: 'ปลาโบนฟิชว่ายเร็วในน้ำตื้น สีเงินกลมกลืนกับทราย' },
+
+    // ---- RARE FISH (14) ----
+    'Golden Koi': { emoji: '✨', rarity: 'rare', price: 250, desc: 'ปลาคาร์ฟทองคำในตำนาน เกล็ดเปล่งประกายสีทองอร่ามตา' },
+    'Arowana': { emoji: '🐉', rarity: 'rare', price: 300, desc: 'ปลามังกรทองกระโดดข้ามผิวน้ำ เชื่อกันว่านำโชคลาภมาให้' },
+    'Moonfish': { emoji: '🌙', rarity: 'rare', price: 280, desc: 'ปลาพระจันทร์ลำตัวกลมส่องแสงเรืองราตรี พบเฉพาะคืนพระจันทร์เต็มดวง' },
+    'Ghost Fish': { emoji: '👻', rarity: 'rare', price: 320, desc: 'ปลาผีโปร่งแสงไร้สีตัวใส มองทะลุเห็นกระดูก หายากสุดขีด' },
+    'Crystal Fish': { emoji: '💎', rarity: 'rare', price: 350, desc: 'ปลาคริสตัลเกล็ดใสราวเพชร สะท้อนแสงรุ้งหลากสีอลังการ' },
+    'Sunstone Fish': { emoji: '☀️', rarity: 'rare', price: 280, desc: 'ปลาหินแดดสีส้มแดงอุ่นมือ เกล็ดเก็บความร้อนแสงอาทิตย์' },
+    'Stargazer': { emoji: '⭐', rarity: 'rare', price: 300, desc: 'ปลาดาวตาชี้ขึ้นฟ้า ฝังตัวในทรายจ้องมองดวงดาว' },
+    'Coelacanth': { emoji: '🦕', rarity: 'rare', price: 400, desc: 'ปลาซีลาแคนท์ฟอสซิลที่ยังมีชีวิต อายุเผ่าพันธุ์กว่าล้านปี' },
+    'Electric Eel': { emoji: '⚡', rarity: 'rare', price: 350, desc: 'ปลาไหลไฟฟ้าปล่อยกระแสช็อตรุนแรง จับด้วยมือเปล่าอันตราย' },
+    'Oarfish': { emoji: '🐉', rarity: 'rare', price: 380, desc: 'ปลาพญานาคตัวยาวหลายเมตร ปรากฏตัวก่อนเกิดแผ่นดินไหว' },
+    'Piranha': { emoji: '🦷', rarity: 'rare', price: 220, desc: 'ปลาปิรันย่าฟันคมจัด กัดเหยื่อได้ในพริบตา อันตรายมาก' },
+    'Marlin': { emoji: '🗡️', rarity: 'rare', price: 360, desc: 'ปลามาร์ลินจะงอยปากยาวดั่งดาบ นักสู้แห่งท้องทะเลลึก' },
+    'Giant Catfish': { emoji: '🐟', rarity: 'rare', price: 340, desc: 'ปลาบึกยักษ์แม่น้ำโขง ตัวใหญ่ยิ่งกว่าคน ใกล้สูญพันธุ์' },
+    'Anglerfish': { emoji: '🔦', rarity: 'rare', price: 330, desc: 'ปลาตกเบ็ดน้ำลึกมีไฟส่องหน้าผาก ล่อเหยื่อในความมืดสนิท' },
+
+    // ---- LEGENDARY FISH (7) ----
+    'Great White Shark': { emoji: '🦈', rarity: 'legendary', price: 1200, desc: 'ฉลามขาวยักษ์ราชาแห่งท้องทะเล จับได้ต้องใช้ทั้งแรงกายใจ' },
+    'Hammerhead': { emoji: '🦈', rarity: 'legendary', price: 1100, desc: 'ฉลามหัวค้อนทรงแปลกตาเปี่ยมพลัง มองเห็นรอบทิศอย่างน่าเกรงขาม' },
+    'Raja Ampat Shark': { emoji: '🦈', rarity: 'legendary', price: 1500, desc: 'ฉลามราชาอัมพัตจากน่านน้ำอินโดนีเซีย หายากที่สุดในโลก' },
+    'Leviathan': { emoji: '🐲', rarity: 'legendary', price: 2000, desc: 'ปลาปีศาจในตำนานขนาดมหึมา ว่าเป็นสัตว์ร้ายแห่งก้นมหาสมุทร' },
+    'Phoenix Fish': { emoji: '🔥', rarity: 'legendary', price: 1800, desc: 'ปลาฟีนิกซ์เปลวเพลิง เกล็ดลุกไหม้สีแดงทองไม่เคยดับ' },
+    'Frost Dragon Fish': { emoji: '❄️', rarity: 'legendary', price: 1600, desc: 'ปลามังกรน้ำแข็งจากธารน้ำอาร์กติก แตะตัวแล้วหนาวจนกระดูกสั่น' },
+    'Emperor Fish': { emoji: '👑', rarity: 'legendary', price: 2500, desc: 'ปลาจักรพรรดิราชาแห่งสายน้ำทั้งหมด มงกุฎทองบนหัวเปล่งแสงเทวะ' },
+};
+
+// Fish rarity catch weights (must sum to 1.0)
+export const FISH_RARITY_WEIGHTS = {
+    common: 0.55,
+    uncommon: 0.28,
+    rare: 0.13,
+    legendary: 0.04
+};
+
+// Auto-register all fish into ITEMS registry
+Object.entries(FISH_SPECIES).forEach(([name, data]) => {
+    ITEMS[name] = {
+        emoji: data.emoji,
+        type: 'fish',
+        rarity: data.rarity,
+        desc: data.desc,
+        price: data.price,
+    };
+});
+
 // ============ MONSTERS ============
 // Exactly 20 beautifully designed types distributed by difficulty, color, map, drops
 export const MONSTERS = {

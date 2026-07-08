@@ -504,6 +504,8 @@ export class GameUI {
       filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(i.item_type));
     } else if (this.currentTab === 'etc') {
       filtered = this.inventory.filter(i => i.item_type === 'material');
+    } else if (this.currentTab === 'fish') {
+      filtered = this.inventory.filter(i => i.item_type === 'fish');
     }
 
     // Fill inventory slots
@@ -585,6 +587,8 @@ export class GameUI {
       typeStr = 'Armor';
     } else if (item.item_type === 'shield') {
       typeStr = 'Shield';
+    } else if (item.item_type === 'fish') {
+      typeStr = 'Fish';
     }
     document.getElementById('detail-type').textContent = typeStr;
     const droppers = this._getItemDroppers(item.item_name);
@@ -1145,6 +1149,10 @@ export class GameUI {
             this.soundManager.playUseItemSound();
           }
         }
+        if (this.character && this.character.gameSettings) {
+          this.character.gameSettings.sound_enabled = e.target.checked;
+          this.character.saveStatsToDatabase();
+        }
       });
     }
 
@@ -1158,6 +1166,10 @@ export class GameUI {
           window.rendererSystem.applyQualitySettings();
           this.addCombatLog(`🖥️ Graphics Quality set to: ${q.toUpperCase()}`, 'system');
         }
+        if (this.character && this.character.gameSettings) {
+          this.character.gameSettings.graphics_quality = q;
+          this.character.saveStatsToDatabase();
+        }
       });
     }
 
@@ -1170,6 +1182,10 @@ export class GameUI {
         const fpsEl = document.getElementById('fps-counter');
         if (fpsEl) {
           fpsEl.style.display = enabled ? 'block' : 'none';
+        }
+        if (this.character && this.character.gameSettings) {
+          this.character.gameSettings.fps_enabled = enabled;
+          this.character.saveStatsToDatabase();
         }
       });
     }
