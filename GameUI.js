@@ -69,7 +69,7 @@ export class GameUI {
       this._refreshLeaderboard();
     });
     document.getElementById('btn-players-list').addEventListener('click', () => this._togglePanel('players-panel'));
-    
+
     const btnAdmin = document.getElementById('btn-admin');
     if (btnAdmin) {
       btnAdmin.addEventListener('click', () => {
@@ -991,6 +991,10 @@ export class GameUI {
     // Open on player-info click
     playerInfo.addEventListener('click', openEditor);
 
+    // Open on Profile menu button click
+    const btnProfile = document.getElementById('btn-profile');
+    if (btnProfile) btnProfile.addEventListener('click', openEditor);
+
     // Close buttons
     if (closeBtn) closeBtn.addEventListener('click', closeEditor);
     if (cancelBtn) cancelBtn.addEventListener('click', closeEditor);
@@ -1177,7 +1181,7 @@ export class GameUI {
 
     // Deduct gold
     this.character.stats.gold -= item.price;
-    
+
     // Add to inventory
     const existing = this.inventory.find(i => i.item_name === item.name);
     if (existing) {
@@ -1205,7 +1209,7 @@ export class GameUI {
     }
 
     this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
-    
+
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
       else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();

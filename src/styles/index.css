@@ -656,14 +656,17 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  display: flex;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 16px;
+  padding: 8px 12px;
   backdrop-filter: blur(10px);
   animation: slideInUp 0.5s ease-out;
+  min-width: 320px;
+  max-width: 420px;
 }
 
 @keyframes slideInUp {
@@ -682,31 +685,45 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 8px 16px;
+  padding: 6px 4px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   color: var(--text-dim);
+  min-width: 0;
 }
 
 .hud-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--border);
+  background: rgba(240, 192, 64, 0.08);
+  border-color: rgba(240, 192, 64, 0.3);
   color: var(--text);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(240, 192, 64, 0.15);
+}
+
+.hud-btn:active {
+  transform: translateY(0px) scale(0.95);
+  box-shadow: none;
 }
 
 .hud-btn span {
-  font-size: 22px;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .hud-btn small {
-  font-size: 9px;
+  font-size: 8px;
   font-family: var(--font-pixel);
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
 }
 
 /* ========== SIDE PANELS ========== */
@@ -1683,29 +1700,22 @@ body {
     padding: 6px;
     width: calc(100% - 16px);
     box-sizing: border-box;
-    justify-content: space-around;
+    min-width: unset;
+    max-width: unset;
+    grid-template-columns: repeat(5, 1fr);
   }
 
   .hud-btn {
-    padding: 6px 2px;
-    gap: 0;
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
+    padding: 4px 2px;
+    gap: 1px;
   }
 
   .hud-btn span {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .hud-btn small {
     font-size: 7px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-    display: block;
-    text-align: center;
     letter-spacing: 0;
   }
 
@@ -3405,19 +3415,19 @@ body {
   /* Make HUD responsive and scale down to avoid overlapping with left/right pads */
   #hud-bottom {
     max-width: calc(100vw - 400px);
-    gap: 4px;
-    padding: 6px 10px;
+    min-width: unset;
+    gap: 2px;
+    padding: 4px 6px;
     bottom: 8px;
-    overflow-x: auto;
+    grid-template-columns: repeat(5, 1fr);
   }
 
   .hud-btn {
-    padding: 6px 10px;
-    flex-shrink: 0;
+    padding: 4px 2px;
   }
 
   .hud-btn span {
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .hud-btn small {
@@ -3509,6 +3519,7 @@ body {
 
   #hud-bottom {
     max-width: calc(100vw - 320px);
+    min-width: unset;
   }
 }
 
@@ -3529,6 +3540,7 @@ body {
 
   #hud-bottom {
     max-width: calc(100vw - 265px);
+    min-width: unset;
     bottom: 4px;
   }
 }
@@ -3551,8 +3563,9 @@ body {
 
   #hud-bottom {
     max-width: calc(100vw - 300px);
+    min-width: unset;
     bottom: 3.5px;
-    padding: 4px 8px;
+    padding: 4px 6px;
   }
 
   #combat-log {
@@ -3579,8 +3592,9 @@ body {
 
   #hud-bottom {
     max-width: calc(100vw - 260px);
+    min-width: unset;
     bottom: 2px;
-    padding: 2px 6px;
+    padding: 2px 4px;
   }
 
   #combat-log {
