@@ -200,7 +200,7 @@ async function initGame(charData) {
             soundManager.enabled = character.gameSettings.sound_enabled !== false;
         }
         if (window.rendererSystem) {
-            window.rendererSystem.qualityLevel = character.gameSettings.graphics_quality || 'medium';
+            window.rendererSystem.qualityLevel = character.gameSettings.graphics_quality || 'auto';
             window.rendererSystem.applyQualitySettings();
         }
         const fpsEl = document.getElementById('fps-counter');

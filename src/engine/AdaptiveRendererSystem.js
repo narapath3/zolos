@@ -18,7 +18,8 @@ export class AdaptiveRendererSystem {
     this.lastTime = performance.now();
 
     // Quality Levels
-    this.qualityLevel = 'high'; // high, medium, low, ultra-low
+    this.selectedQualityLevel = 'auto'; // auto, high, medium, low, ultra-low
+    this.activeQualityLevel = 'high'; // high, medium, low, ultra-low
     this.pixelRatio = window.devicePixelRatio;
     this.shadowMapSize = 1024;
     this.shadowQuality = 'pcf'; // pcf, basic, none
@@ -35,6 +36,17 @@ export class AdaptiveRendererSystem {
     };
 
     this.init();
+  }
+
+  get qualityLevel() {
+    return this.selectedQualityLevel;
+  }
+
+  set qualityLevel(value) {
+    this.selectedQualityLevel = value;
+    if (value !== 'auto') {
+      this.activeQualityLevel = value;
+    }
   }
 
   init() {
@@ -69,23 +81,29 @@ export class AdaptiveRendererSystem {
     };
 
     if (savedQuality) {
-      this.qualityLevel = savedQuality;
+      this.selectedQualityLevel = savedQuality;
     } else {
+      this.selectedQualityLevel = 'auto';
+      localStorage.setItem('zolos_graphics_quality', this.selectedQualityLevel);
+    }
+
+    if (this.selectedQualityLevel === 'auto') {
       if (this.deviceType.isLowEnd) {
-        this.qualityLevel = 'ultra-low';
+        this.activeQualityLevel = 'ultra-low';
       } else if (this.deviceType.isMidRange) {
-        this.qualityLevel = 'medium';
+        this.activeQualityLevel = 'medium';
       } else {
-        this.qualityLevel = 'high';
+        this.activeQualityLevel = 'high';
       }
-      localStorage.setItem('zolos_graphics_quality', this.qualityLevel);
+    } else {
+      this.activeQualityLevel = this.selectedQualityLevel;
     }
 
     this.updateQualityParams();
   }
 
   updateQualityParams() {
-    switch (this.qualityLevel) {
+    switch (this.activeQualityLevel) {
       case 'ultra-low':
         this.pixelRatio = 0.85;
         this.shadowMapSize = 256;
@@ -135,11 +153,11 @@ export class AdaptiveRendererSystem {
 
     this.renderer.setPixelRatio(this.pixelRatio);
 
-    if (this.qualityLevel === 'low') {
+    if (this.activeQualityLevel === 'low') {
       this.renderer.shadowMap.type = THREE.BasicShadowMap;
-    } else if (this.qualityLevel === 'medium') {
+    } else if (this.activeQualityLevel === 'medium') {
       this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    } else if (this.qualityLevel === 'high') {
+    } else if (this.activeQualityLevel === 'high') {
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
 
@@ -192,20 +210,22 @@ export class AdaptiveRendererSystem {
    * ปรับคุณภาพตามประสิทธิภาพ
    */
   adaptQualityBasedOnPerformance() {
-    const previousQuality = this.qualityLevel;
+    if (this.selectedQualityLevel !== 'auto') return;
+
+    const previousQuality = this.activeQualityLevel;
 
     if (this.fps < this.fpsThresholds.ultraLow) {
-      this.qualityLevel = 'ultra-low';
+      this.activeQualityLevel = 'ultra-low';
     } else if (this.fps < this.fpsThresholds.low) {
-      this.qualityLevel = 'low';
+      this.activeQualityLevel = 'low';
     } else if (this.fps < this.fpsThresholds.medium) {
-      this.qualityLevel = 'medium';
+      this.activeQualityLevel = 'medium';
     } else if (this.fps >= this.fpsThresholds.high) {
-      this.qualityLevel = 'high';
+      this.activeQualityLevel = 'high';
     }
 
     // ถ้าคุณภาพเปลี่ยน ให้ปรับการตั้งค่า
-    if (previousQuality !== this.qualityLevel) {
+    if (previousQuality !== this.activeQualityLevel) {
       this.applyQualitySettings();
       // Quality changed silently
     }
@@ -215,17 +235,21 @@ export class AdaptiveRendererSystem {
    * ใช้การตั้งค่าคุณภาพ
    */
   applyQualitySettings() {
+    if (this.selectedQualityLevel !== 'auto') {
+      this.activeQualityLevel = this.selectedQualityLevel;
+    }
+
     this.updateQualityParams();
 
-    localStorage.setItem('zolos_graphics_quality', this.qualityLevel);
+    localStorage.setItem('zolos_graphics_quality', this.selectedQualityLevel);
 
     this.renderer.setPixelRatio(this.pixelRatio);
 
-    if (this.qualityLevel === 'low') {
+    if (this.activeQualityLevel === 'low') {
       this.renderer.shadowMap.type = THREE.BasicShadowMap;
-    } else if (this.qualityLevel === 'medium') {
+    } else if (this.activeQualityLevel === 'medium') {
       this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    } else if (this.qualityLevel === 'high') {
+    } else if (this.activeQualityLevel === 'high') {
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
 
@@ -285,7 +309,8 @@ export class AdaptiveRendererSystem {
     return {
       fps: this.fps,
       frameTime: this.frameTime,
-      qualityLevel: this.qualityLevel,
+      qualityLevel: this.selectedQualityLevel,
+      activeQualityLevel: this.activeQualityLevel,
       pixelRatio: this.pixelRatio,
       shadowMapSize: this.shadowMapSize,
       shadowQuality: this.shadowQuality,
