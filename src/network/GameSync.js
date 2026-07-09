@@ -21,11 +21,16 @@ export async function loadCharacter(userId) {
         if (char) {
             if (char.name === 'Novice' || char.name === 'Guest') {
                 const profile = localDb.get(`profile_${userId}`);
-                if (profile && profile.username) {
+                if (profile && profile.username && profile.username !== 'Novice' && profile.username !== 'Guest') {
                     char.name = profile.username;
-                    localDb.set(`char_${userId}`, char);
-                    updateLocalLeaderboard(char);
+                } else if (userId.startsWith('guest_')) {
+                    char.name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                    localDb.set(`profile_${userId}`, { id: userId, username: char.name, created_at: new Date().toISOString() });
+                } else {
+                    char.name = 'Adventurer_' + Math.random().toString(36).substring(2, 7).toUpperCase();
                 }
+                localDb.set(`char_${userId}`, char);
+                updateLocalLeaderboard(char);
             }
             return char;
         }
@@ -49,11 +54,22 @@ export async function loadCharacter(userId) {
     let char = data;
     if (char && (char.name === 'Novice' || char.name === 'Guest')) {
         try {
-            const { getProfile } = await import('./SupabaseClient.js');
+            const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
             const profile = await getProfile(userId);
-            if (profile && profile.username) {
+            if (profile && profile.username && profile.username !== 'Novice' && profile.username !== 'Guest') {
                 char.name = profile.username;
                 await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
+            } else {
+                let isAnon = false;
+                if (supabaseClient) {
+                    const { data: { user } } = await supabaseClient.auth.getUser();
+                    if (user && user.is_anonymous) isAnon = true;
+                }
+                if (userId.startsWith('guest_') || isAnon) {
+                    char.name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                    await supabase.from('profiles').upsert({ id: userId, username: char.name });
+                    await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
+                }
             }
         } catch (e) {
             console.warn('Failed to update character name from profile on load:', e);
@@ -65,17 +81,40 @@ export async function loadCharacter(userId) {
 export async function createCharacter(userId) {
     let name = userId.startsWith('guest_') ? 'Guest' : 'Novice';
     try {
-        const { getProfile } = await import('./SupabaseClient.js');
+        const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
         const profile = await getProfile(userId);
-        if (profile && profile.username) {
+        if (profile && profile.username && profile.username !== 'Novice' && profile.username !== 'Guest') {
             name = profile.username;
-        } else if (userId.startsWith('guest_')) {
-            name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+        } else {
+            let isAnon = false;
+            if (supabaseClient) {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (user && user.is_anonymous) isAnon = true;
+            }
+            if (userId.startsWith('guest_') || isAnon) {
+                name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                if (supabaseClient && !isOfflineMode) {
+                    await supabaseClient.from('profiles').upsert({ id: userId, username: name });
+                }
+            }
         }
     } catch (e) {
         console.warn("Failed to get profile for name, using fallback:", e);
         if (userId.startsWith('guest_')) {
             name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+        } else {
+            try {
+                const { supabase: supabaseClient } = await import('./SupabaseClient.js');
+                if (supabaseClient) {
+                    const { data: { user } } = await supabaseClient.auth.getUser();
+                    if (user && user.is_anonymous) {
+                        name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                        await supabaseClient.from('profiles').upsert({ id: userId, username: name });
+                    }
+                }
+            } catch (innerErr) {
+                // Ignore and use default
+            }
         }
     }
 
