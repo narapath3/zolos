@@ -57,8 +57,8 @@ export class CharacterManager {
         // Game settings (persisted to DB)
         this.gameSettings = {
             sound_enabled: true,
-            graphics_quality: 'medium',
-            fps_enabled: false,
+            graphics_quality: 'auto',
+            fps_enabled: true,
         };
 
         // Custom property getters for base stats + equipment bonuses
