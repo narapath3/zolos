@@ -2249,9 +2249,35 @@ export class GameUI {
         });
         listContainer.appendChild(slot);
       });
+    } else if (this.currentWikiTab === 'fish') {
+      Object.keys(ITEMS).forEach(key => {
+        const item = ITEMS[key];
+        if (item.type !== 'fish') return;
+        const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+        if (!match) return;
+
+        const slot = document.createElement('div');
+        slot.className = 'wiki-slot';
+        if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
+        if (this.selectedWikiItem === key) {
+          slot.classList.add('selected');
+        }
+        slot.innerHTML = `
+          <span class="wiki-slot-emoji">${item.emoji || '🐟'}</span>
+          <span class="wiki-slot-name">${key}</span>
+        `;
+        slot.title = key;
+        slot.addEventListener('click', () => {
+          this.selectedWikiItem = key;
+          this._renderWikiList();
+          this._renderWikiDetail();
+        });
+        listContainer.appendChild(slot);
+      });
     } else {
       Object.keys(ITEMS).forEach(key => {
         const item = ITEMS[key];
+        if (item.type === 'fish') return;
         const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
         if (!match) return;
 
