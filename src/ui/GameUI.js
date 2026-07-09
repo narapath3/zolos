@@ -96,6 +96,10 @@ export class GameUI {
       autoBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (this.combatSystem) {
+          if (this.combatSystem.isFishing) {
+            this.addCombatLog("🚫 ไม่สามารถเปิดบอทขณะตกปลาได้", 'system');
+            return;
+          }
           const isAuto = this.combatSystem.toggleAutoFarm();
           this.setAutoFarmState(isAuto);
           this.setFishingState(false);

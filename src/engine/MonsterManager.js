@@ -632,14 +632,14 @@ class Monster {
         // Recursive hit flash for all bodyMesh children
         const isFlashing = this.hitFlash > 0;
         const wasFlashing = this._wasFlashing || false;
-        
+
         if (isFlashing || wasFlashing !== isFlashing) {
             this._wasFlashing = isFlashing;
-            
+
             // Critical hit double pulse logic
             let currentFlashIntensity = 0;
             let currentFlashColor = 0x000000;
-            
+
             if (isFlashing) {
                 currentFlashColor = 0xffffff;
                 if (this.isCriticalHit) {
@@ -656,7 +656,7 @@ class Monster {
                     if (!child.userData.originalColor) {
                         child.userData.originalColor = child.material.color.clone();
                     }
-                    
+
                     if (isFlashing) {
                         child.material.color.setHex(0xffffff);
                         if (child.material.emissive) {
@@ -848,9 +848,13 @@ export class MonsterManager {
         return pos;
     }
 
+    findMonsterById(id) {
+        return [...this.monsters, ...this.waterMonsters].find(m => m.id === id);
+    }
+
     spawnInitial(playerLevel) {
         const rng = createSeededRng(getDailySeed());
-        const count = Math.min(MAX_MONSTERS, 6 + Math.floor(playerLevel / 2));
+        const count = MAX_MONSTERS; // Spawn fixed max count to ensure consistency across all clients
 
         // Spawn seeded land monsters using map-specific database
         const spawnTable = getSpawnTable(playerLevel, this.mapId);
@@ -861,6 +865,10 @@ export class MonsterManager {
             const pos = this._getRandomPositionForMonster(entry.type, rng);
 
             const monster = new Monster(this.scene, entry.type, pos);
+            monster.id = `land_${i}`;
+            monster.spawnIndex = i;
+            monster.spawnPosition = pos.clone();
+            monster.isWaterMonster = false;
             this.monsters.push(monster);
         }
 
@@ -875,6 +883,10 @@ export class MonsterManager {
             const pos = this._getRandomPositionForMonster(type, useRng);
 
             const monster = new Monster(this.scene, type, pos);
+            monster.id = `water_${i}`;
+            monster.spawnIndex = i;
+            monster.spawnPosition = pos.clone();
+            monster.isWaterMonster = true;
             this.waterMonsters.push(monster);
         }
     }
@@ -913,59 +925,21 @@ export class MonsterManager {
             this.deadQueue[i].timer -= dt;
             if (this.deadQueue[i].timer <= 0) {
                 const entry = this.deadQueue.splice(i, 1)[0];
-
-                if (entry.isWater) {
-                    // Respawn as water monster
-                    const type = pickRandomWaterMonster(playerLevel);
-                    const pos = this._getRandomPositionForMonster(type, Math.random);
-
-                    entry.monster.type = type;
-                    const allMonsters = getAllMonsters();
-                    const monsterData = allMonsters[type];
-                    if (monsterData) {
-                        entry.monster.data = monsterData;
-                        entry.monster.maxHp = monsterData.hp;
-                        entry.monster.isWaterMonster = true;
-                        if (entry.monster.bodyMesh && entry.monster.bodyMesh.material) {
-                            entry.monster.bodyMesh.material.color.setHex(monsterData.color);
-                        }
-                        entry.monster.reset(pos);
-                    }
-                } else {
-                    // Respawn as land monster
-                    const type = pickRandomMonster(playerLevel, this.mapId);
-                    const pos = this._getRandomPositionForMonster(type, Math.random);
-
-                    entry.monster.type = type;
-                    const allMonsters = getAllMonsters();
-                    const monsterData = allMonsters[type];
-                    if (monsterData) {
-                        entry.monster.data = monsterData;
-                        entry.monster.maxHp = monsterData.hp;
-                        entry.monster.isWaterMonster = false;
-                        if (entry.monster.bodyMesh && entry.monster.bodyMesh.material) {
-                            entry.monster.bodyMesh.material.color.setHex(monsterData.color);
-                        }
-                        entry.monster.reset(pos);
-                    }
-                }
+                const monster = entry.monster;
+                // Simply reset the same monster at its original spawnPosition and type!
+                monster.reset(monster.spawnPosition);
             }
-        }
-
-        // Ensure monster count
-        const aliveCount = this.monsters.filter(m => m.alive).length + this.deadQueue.filter(d => !d.isWater).length;
-        const targetCount = Math.min(MAX_MONSTERS, 6 + Math.floor(playerLevel / 2));
-        while (aliveCount + this.monsters.length < targetCount && this.monsters.length < MAX_MONSTERS) {
-            this._spawnOne(playerLevel);
         }
     }
 
     // Queue a monster for respawn
     queueRespawn(monster) {
         const isWater = monster.isWaterMonster;
+        // Deterministic respawn timer based on spawn index
+        const respawnDelay = RESPAWN_TIME + (monster.spawnIndex % 3);
         this.deadQueue.push({
             monster,
-            timer: RESPAWN_TIME + Math.random() * 2,
+            timer: respawnDelay,
             isWater
         });
     }

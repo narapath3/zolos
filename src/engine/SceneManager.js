@@ -2161,15 +2161,15 @@ export class SceneManager {
     }
 
     // ============ 3D Fishing Visuals ============
-    createFishingLine(playerPos) {
+    createFishingLine(playerPos, bobberPos) {
         this.removeFishingLine();
 
         this._fishingGroup = new THREE.Group();
 
-        // Bobber landing position — water near bridge edge
-        const bobberX = 2.8;
-        const bobberZ = -2;
-        const bobberY = 0.05;
+        // Use dynamic bobber position if provided, otherwise fall back to defaults
+        const bobberX = bobberPos ? bobberPos.x : 2.8;
+        const bobberZ = bobberPos ? bobberPos.z : -2;
+        const bobberY = bobberPos ? (bobberPos.y || 0.05) : 0.05;
 
         // Create curved fishing line from player hand to bobber
         const curve = new THREE.QuadraticBezierCurve3(

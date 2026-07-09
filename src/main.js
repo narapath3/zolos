@@ -146,8 +146,11 @@ async function initGame(charData) {
             case 'fishingStart':
                 if (gameUI) gameUI.addCombatLog('🎣 Walking to water...', 'system');
                 break;
+            case 'fishingNoWater':
+                if (gameUI) gameUI.addCombatLog('🚫 ไม่มีแหล่งน้ำใกล้เคียง!', 'warning');
+                break;
             case 'fishingCast':
-                if (sceneManager && character) sceneManager.createFishingLine(character.getPosition());
+                if (sceneManager && character) sceneManager.createFishingLine(character.getPosition(), event.bobberPos);
                 if (gameUI) gameUI.addCombatLog('🎣 Cast the line into the water...', 'system');
                 break;
             case 'fishingBite':
@@ -166,7 +169,7 @@ async function initGame(charData) {
                 if (sceneManager) sceneManager.removeFishingLine();
                 break;
         }
-    });
+    }, sceneManager);
 
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
@@ -450,6 +453,7 @@ async function showCharacterSelect() {
 // ============ Input Handling ============
 function handleMouseInteraction(event) {
     if (!isGameStarted) return;
+    if (combatSystem && combatSystem.isFishing) return;
 
     const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPC());
     if (!hit) return;
@@ -482,13 +486,14 @@ function gameLoop(time) {
     if (portalCooldown > 0) portalCooldown -= dt;
 
     // 1. Movement
-    const moveDir = inputManager ? inputManager.getMovementDirection() : null;
+    const isFishingActive = combatSystem && combatSystem.isFishing;
+    const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
 
     if (moveDir) {
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 9 : 5.5;
         character.manualMove(moveDir.x, moveDir.z, dt);
-    } else if (autoPath) {
+    } else if (autoPath && !isFishingActive) {
         // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
         if (combatSystem && combatSystem.autoFarm) {
             autoPath = null;

@@ -3,10 +3,11 @@ import * as THREE from 'three';
 import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS } from './GameData.js';
 
 export class CombatSystem {
-    constructor(characterManager, monsterManager, onCombatEvent) {
+    constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
         this.character = characterManager;
         this.monsters = monsterManager;
         this.onEvent = onCombatEvent; // callback for UI events
+        this.sceneManager = sceneManager;
         this.autoFarm = false;
         this.isFishing = false;
         this.fishingTimer = 0;
@@ -17,7 +18,7 @@ export class CombatSystem {
     }
 
     toggleAutoFarm() {
-        if (this.isFishing) this.toggleFishing();
+        if (this.isFishing) return false;
         this.autoFarm = !this.autoFarm;
         if (!this.autoFarm) {
             this.currentTarget = null;
@@ -32,12 +33,75 @@ export class CombatSystem {
             this.autoFarm = false;
             this.currentTarget = null;
             this.fishingTimer = 0;
+
+            const playerPos = this.character.getPosition();
+            const waterMatch = this._findNearestWater(playerPos);
+            if (!waterMatch) {
+                this.isFishing = false;
+                this.onEvent({ type: 'fishingNoWater' });
+                return false;
+            }
+
+            // Calculate stand spot and bobber target
+            this.fishingStandSpot = new THREE.Vector3()
+                .copy(playerPos)
+                .addScaledVector(waterMatch.dir, waterMatch.distance - 0.8);
+
+            // Adjust height to stay grounded
+            this.fishingStandSpot.y = playerPos.y;
+
+            this.fishingBobberSpot = new THREE.Vector3()
+                .copy(playerPos)
+                .addScaledVector(waterMatch.dir, waterMatch.distance + 1.8);
+            this.fishingBobberSpot.y = 0.05;
+
+            // Calculate rotation to face water
+            this.fishingRotation = Math.atan2(waterMatch.dir.x, waterMatch.dir.z);
+
             this.onEvent({ type: 'fishingStart' });
         } else {
             this.character.state = 'idle';
             this.onEvent({ type: 'fishingStop' });
         }
         return this.isFishing;
+    }
+
+    _findNearestWater(playerPos) {
+        if (!this.sceneManager) return null;
+
+        let closestDist = Infinity;
+        let closestDir = null;
+
+        // Scan 36 directions
+        for (let angle = 0; angle < Math.PI * 2; angle += (Math.PI * 2) / 36) {
+            const dirX = Math.sin(angle);
+            const dirZ = Math.cos(angle);
+
+            // Scan outward up to 20 units
+            for (let dist = 1.0; dist <= 20.0; dist += 0.5) {
+                const testPos = new THREE.Vector3(
+                    playerPos.x + dirX * dist,
+                    playerPos.y,
+                    playerPos.z + dirZ * dist
+                );
+
+                if (this.sceneManager.isInWater(testPos)) {
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closestDir = new THREE.Vector3(dirX, 0, dirZ);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (closestDir) {
+            return {
+                dir: closestDir,
+                distance: closestDist
+            };
+        }
+        return null;
     }
 
     update(dt) {
@@ -312,21 +376,25 @@ export class CombatSystem {
     }
 
     _updateFishing(dt) {
-        // Step 6: Fishing spot position (nearest water edge)
-        const fishingSpot = { x: 0, y: 1.2, z: 2 };
-        const playerPos = this.character.getPosition();
-        const dist = playerPos.distanceTo(new THREE.Vector3(fishingSpot.x, playerPos.y, fishingSpot.z));
+        if (!this.fishingStandSpot || !this.fishingBobberSpot) return;
 
-        if (dist > 1.0) {
-            // Walk to fishing spot
-            this.character.moveToward(fishingSpot, dt);
+        const playerPos = this.character.getPosition();
+        const dist = playerPos.distanceTo(this.fishingStandSpot);
+
+        if (dist > 0.5) {
+            // Walk to calculated stand spot
+            this.character.moveToward(this.fishingStandSpot, dt);
         } else {
-            // At fishing spot — face the water (+X direction)
-            this.character.mesh.rotation.y = Math.PI / 2;
+            // At fishing spot — snap to stand spot and rotate to face bobber
+            this.character.mesh.position.copy(this.fishingStandSpot);
+            this.character.mesh.rotation.y = this.fishingRotation;
 
             if (this.character.state !== 'fishing') {
                 this.character.state = 'fishing';
-                this.onEvent({ type: 'fishingCast' });
+                this.onEvent({
+                    type: 'fishingCast',
+                    bobberPos: this.fishingBobberSpot
+                });
             }
 
             this.fishingTimer += dt;
