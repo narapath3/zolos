@@ -22,6 +22,8 @@ import {
     stopAutoSave,
     broadcastPosition,
     broadcastChat,
+    getDeterministicGuestName,
+    isPlaceholderName,
 } from './network/GameSync.js';
 
 // ============ App State ============
@@ -269,7 +271,11 @@ async function initGame(charData) {
             if (!rp) {
                 // Create a real hero model for the remote player
                 const remoteChar = new CharacterManager(sceneManager.scene);
-                remoteChar.stats.name = p.username || 'Adventurer';
+                let rName = p.username;
+                if (!rName || isPlaceholderName(rName)) {
+                    rName = getDeterministicGuestName(p.userId);
+                }
+                remoteChar.stats.name = rName;
                 remoteChar.stats.level = p.level || 1;
                 remoteChar.updateNameTag();
 

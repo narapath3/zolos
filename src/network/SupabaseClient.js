@@ -91,10 +91,25 @@ export async function signIn(email, password) {
   return data;
 }
 
+export function getDeterministicGuestName(id) {
+  if (!id) return 'Adventurer';
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  const code = Math.abs(hash).toString(36).substring(0, 5).toUpperCase();
+  return 'Guest_' + (code || 'X0000');
+}
+
+export function isPlaceholderName(name) {
+  return !name || name === 'Novice' || name === 'Guest' || name === 'Adventurer';
+}
+
 export async function signInAnonymously() {
   if (isOfflineMode || !supabase) {
     const userId = 'guest_' + Math.random().toString(36).substring(2, 10);
-    const guestName = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const guestName = getDeterministicGuestName(userId);
     const profile = { id: userId, username: guestName, created_at: new Date().toISOString() };
     localDb.set(`profile_${userId}`, profile);
     saveActiveSession(userId);
@@ -107,7 +122,7 @@ export async function signInAnonymously() {
 
     // Create guest profile
     if (data.user) {
-      const guestName = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+      const guestName = getDeterministicGuestName(data.user.id);
       await supabase.from('profiles').upsert({
         id: data.user.id,
         username: guestName
@@ -118,7 +133,7 @@ export async function signInAnonymously() {
   } catch (e) {
     console.warn("Supabase anonymous sign-in failed, utilizing local guest session fallback:", e.message);
     const userId = 'guest_' + Math.random().toString(36).substring(2, 10);
-    const guestName = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const guestName = getDeterministicGuestName(userId);
     const profile = { id: userId, username: guestName, created_at: new Date().toISOString() };
     localDb.set(`profile_${userId}`, profile);
     saveActiveSession(userId);

@@ -1,5 +1,6 @@
 // Game Sync — Save/Load character data to Supabase + Realtime Presence
-import { supabase, isOfflineMode, localDb } from './SupabaseClient.js';
+import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName } from './SupabaseClient.js';
+export { getDeterministicGuestName, isPlaceholderName };
 
 let presenceChannel = null;
 let autoSaveInterval = null;
@@ -19,15 +20,13 @@ export async function loadCharacter(userId) {
     if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
         let char = localDb.get(`char_${userId}`);
         if (char) {
-            if (char.name === 'Novice' || char.name === 'Guest') {
+            if (isPlaceholderName(char.name)) {
                 const profile = localDb.get(`profile_${userId}`);
-                if (profile && profile.username && profile.username !== 'Novice' && profile.username !== 'Guest') {
+                if (profile && profile.username && !isPlaceholderName(profile.username)) {
                     char.name = profile.username;
-                } else if (userId.startsWith('guest_')) {
-                    char.name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
-                    localDb.set(`profile_${userId}`, { id: userId, username: char.name, created_at: new Date().toISOString() });
                 } else {
-                    char.name = 'Adventurer_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                    char.name = getDeterministicGuestName(userId);
+                    localDb.set(`profile_${userId}`, { id: userId, username: char.name, created_at: new Date().toISOString() });
                 }
                 localDb.set(`char_${userId}`, char);
                 updateLocalLeaderboard(char);
@@ -52,11 +51,11 @@ export async function loadCharacter(userId) {
     if (error) throw error;
 
     let char = data;
-    if (char && (char.name === 'Novice' || char.name === 'Guest')) {
+    if (char && isPlaceholderName(char.name)) {
         try {
             const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
             const profile = await getProfile(userId);
-            if (profile && profile.username && profile.username !== 'Novice' && profile.username !== 'Guest') {
+            if (profile && profile.username && !isPlaceholderName(profile.username)) {
                 char.name = profile.username;
                 await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
             } else {
@@ -66,7 +65,7 @@ export async function loadCharacter(userId) {
                     if (user && user.is_anonymous) isAnon = true;
                 }
                 if (userId.startsWith('guest_') || isAnon) {
-                    char.name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                    char.name = getDeterministicGuestName(userId);
                     await supabase.from('profiles').upsert({ id: userId, username: char.name });
                     await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
                 }
@@ -79,11 +78,11 @@ export async function loadCharacter(userId) {
 }
 
 export async function createCharacter(userId) {
-    let name = userId.startsWith('guest_') ? 'Guest' : 'Novice';
+    let name = getDeterministicGuestName(userId);
     try {
         const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
         const profile = await getProfile(userId);
-        if (profile && profile.username && profile.username !== 'Novice' && profile.username !== 'Guest') {
+        if (profile && profile.username && !isPlaceholderName(profile.username)) {
             name = profile.username;
         } else {
             let isAnon = false;
@@ -92,7 +91,7 @@ export async function createCharacter(userId) {
                 if (user && user.is_anonymous) isAnon = true;
             }
             if (userId.startsWith('guest_') || isAnon) {
-                name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+                name = getDeterministicGuestName(userId);
                 if (supabaseClient && !isOfflineMode) {
                     await supabaseClient.from('profiles').upsert({ id: userId, username: name });
                 }
@@ -100,21 +99,18 @@ export async function createCharacter(userId) {
         }
     } catch (e) {
         console.warn("Failed to get profile for name, using fallback:", e);
-        if (userId.startsWith('guest_')) {
-            name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
-        } else {
-            try {
-                const { supabase: supabaseClient } = await import('./SupabaseClient.js');
-                if (supabaseClient) {
-                    const { data: { user } } = await supabaseClient.auth.getUser();
-                    if (user && user.is_anonymous) {
-                        name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
-                        await supabaseClient.from('profiles').upsert({ id: userId, username: name });
-                    }
+        name = getDeterministicGuestName(userId);
+        try {
+            const { supabase: supabaseClient } = await import('./SupabaseClient.js');
+            if (supabaseClient && !isOfflineMode) {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (user && user.is_anonymous) {
+                    name = getDeterministicGuestName(userId);
+                    await supabaseClient.from('profiles').upsert({ id: userId, username: name });
                 }
-            } catch (innerErr) {
-                // Ignore and use default
             }
+        } catch (innerErr) {
+            // Ignore and use default
         }
     }
 

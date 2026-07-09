@@ -1,6 +1,7 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
 import { getExpRequired, getStatGains, SKILLS, ITEMS } from './GameData.js';
+import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
 export class CharacterManager {
     constructor(scene) {
@@ -36,7 +37,7 @@ export class CharacterManager {
 
         // Stats (will be loaded from DB)
         this.stats = {
-            name: 'Novice',
+            name: 'Guest',
             level: 1,
             exp: 0,
             hp: 100,
@@ -973,7 +974,12 @@ export class CharacterManager {
     loadStats(data) {
         if (!data) return;
         this.characterId = data.id;
-        this.stats.name = data.name || 'Novice';
+
+        let name = data.name;
+        if (!name || isPlaceholderName(name)) {
+            name = getDeterministicGuestName(data.user_id || data.id || this.characterId);
+        }
+        this.stats.name = name;
 
         // Step 4: Robust numeric field loading with isNaN() guards and Number() casts
         this.stats.level = isNaN(Number(data.level)) ? 1 : Number(data.level);

@@ -1,5 +1,4 @@
-// Auth UI — Login/Register/Guest screen
-import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount } from '../network/SupabaseClient.js';
+import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount, getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
 export class AuthUI {
     constructor(onAuthSuccess) {
@@ -93,7 +92,10 @@ export class AuthUI {
             const session = await getSession();
             if (session) {
                 const profile = await getProfile(session.user.id);
-                const username = profile?.username || 'Adventurer';
+                let username = profile?.username;
+                if (!username || isPlaceholderName(username)) {
+                    username = getDeterministicGuestName(session.user.id);
+                }
                 this._sessionData = {
                     userId: session.user.id,
                     username,
@@ -245,7 +247,7 @@ export class AuthUI {
         this._setStatus('Starting as guest...', 'info');
         try {
             const data = await signInAnonymously();
-            const username = data.guestName || 'Guest';
+            const username = data.guestName || getDeterministicGuestName(data.user?.id);
             this._setStatus('Welcome, ' + username + '! 🎮', 'success');
             setTimeout(() => {
                 this.onAuthSuccess({

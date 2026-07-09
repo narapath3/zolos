@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName } from '../network/GameSync.js';
 
 export class GameUI {
   constructor(character = null, soundManager = null, combatSystem = null) {
@@ -783,9 +783,11 @@ export class GameUI {
       const cat = this.leaderboardCategory;
       body.innerHTML = data.map((entry, i) => {
         const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
-        const username = (entry.name && entry.name !== 'Novice' && entry.name !== 'Guest')
+        const username = (entry.name && !isPlaceholderName(entry.name))
           ? entry.name
-          : (entry.profiles?.username || entry.name || 'Novice');
+          : (entry.profiles?.username && !isPlaceholderName(entry.profiles.username)
+            ? entry.profiles.username
+            : getDeterministicGuestName(entry.user_id || entry.name || `entry_${i}`));
         let valueText = '';
         if (cat === 'level') valueText = `Lv.${entry.level} | 💀${entry.total_kills ?? 0}`;
         else if (cat === 'gold') valueText = `💰 ${(entry.gold ?? 0).toLocaleString()} Zeny`;
