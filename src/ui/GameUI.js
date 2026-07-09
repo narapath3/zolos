@@ -1,5 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeItem } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade } from '../network/GameSync.js';
+
 
 export class GameUI {
   constructor(character = null, soundManager = null, combatSystem = null) {
@@ -923,6 +924,18 @@ export class GameUI {
         }
       });
     }
+
+    // Trade action from profile popup
+    const popupTradeBtn = document.getElementById('btn-popup-trade');
+    if (popupTradeBtn) {
+      popupTradeBtn.addEventListener('click', () => {
+        if (this.selectedProfilePlayer) {
+          if (popup) popup.style.display = 'none';
+          this.updateMobileControlsVisibility();
+          this.openTradePanel(this.selectedProfilePlayer);
+        }
+      });
+    }
   }
 
   _showPlayerPopup(player) {
@@ -947,6 +960,16 @@ export class GameUI {
         addFriendBtn.style.pointerEvents = 'auto';
         const isFriend = this.friends.includes(player.username);
         addFriendBtn.innerHTML = isFriend ? '❌ Remove Friend' : '⭐ Add Friend';
+      }
+    }
+
+    const popupTradeBtn = document.getElementById('btn-popup-trade');
+    if (popupTradeBtn) {
+      const myName = this.character && this.character.stats ? this.character.stats.name : '';
+      if (player.username === myName) {
+        popupTradeBtn.style.display = 'none';
+      } else {
+        popupTradeBtn.style.display = 'block';
       }
     }
 
@@ -2707,17 +2730,66 @@ export class GameUI {
   _setupTradePanel() {
     this.tradeTarget = null;
     this.tradeSelectedItem = null;
+    this.activeTradeRequest = null;
+    this.tradeTimeout = null;
 
+    // Sender Panel Setup
     const closeBtn = document.getElementById('btn-close-trade');
     const overlay = document.getElementById('trade-panel-overlay');
-    const close = () => {
+    const closeTradePanel = () => {
+      // Clear timeout & wait overlay if any active trade
+      if (this.tradeTimeout) {
+        clearTimeout(this.tradeTimeout);
+        this.tradeTimeout = null;
+      }
+      const waitOverlay = document.getElementById('trade-waiting-overlay');
+      if (waitOverlay) waitOverlay.style.display = 'none';
+
       const panel = document.getElementById('trade-panel');
       if (panel) panel.style.display = 'none';
       this.tradeTarget = null;
       this.tradeSelectedItem = null;
     };
-    if (closeBtn) closeBtn.addEventListener('click', close);
-    if (overlay) overlay.addEventListener('click', close);
+    if (closeBtn) closeBtn.addEventListener('click', closeTradePanel);
+    if (overlay) overlay.addEventListener('click', closeTradePanel);
+
+    // Cancel Waiting Button
+    const cancelWaitBtn = document.getElementById('btn-cancel-waiting-trade');
+    if (cancelWaitBtn) {
+      cancelWaitBtn.addEventListener('click', async () => {
+        if (this.tradeTarget && this.characterId) {
+          const req = {
+            senderUserId: this.characterId,
+            targetUserId: this.tradeTarget.userId,
+            senderName: this.character && this.character.stats ? this.character.stats.name : 'Player'
+          };
+          await sendTradeCancelPacket(this.characterId, this.tradeTarget.userId, req);
+        }
+        closeTradePanel();
+        this.addCombatLog('🤝 ยกเลิกการรอคอยการซื้อขาย', 'system');
+      });
+    }
+
+    // Receiver Panel Setup
+    const closeConfirmBtn = document.getElementById('btn-close-trade-confirm');
+    const confirmOverlay = document.getElementById('trade-confirm-overlay');
+    const closeConfirmPanel = () => {
+      const panel = document.getElementById('trade-confirm-modal');
+      if (panel) panel.style.display = 'none';
+      this.activeTradeRequest = null;
+    };
+    if (closeConfirmBtn) closeConfirmBtn.addEventListener('click', closeConfirmPanel);
+    if (confirmOverlay) confirmOverlay.addEventListener('click', closeConfirmPanel);
+
+    // Accept & Decline Buttons
+    const acceptBtn = document.getElementById('btn-accept-trade');
+    const declineBtn = document.getElementById('btn-decline-trade');
+    if (acceptBtn) {
+      acceptBtn.addEventListener('click', () => this._acceptIncomingTrade());
+    }
+    if (declineBtn) {
+      declineBtn.addEventListener('click', () => this._declineIncomingTrade());
+    }
 
     const executeBtn = document.getElementById('btn-execute-trade');
     if (executeBtn) {
@@ -2736,6 +2808,10 @@ export class GameUI {
     const levelEl = document.getElementById('trade-target-level');
     if (nameEl) nameEl.textContent = remotePlayer.username || 'Player';
     if (levelEl) levelEl.textContent = `Lv.${remotePlayer.level || 1}`;
+
+    // Hide wait overlay on open
+    const waitOverlay = document.getElementById('trade-waiting-overlay');
+    if (waitOverlay) waitOverlay.style.display = 'none';
 
     // Hide form until item is selected
     const form = document.getElementById('trade-selected-form');
@@ -2823,42 +2899,229 @@ export class GameUI {
       return;
     }
 
+    // Show waiting spinner
+    const waitOverlay = document.getElementById('trade-waiting-overlay');
+    if (waitOverlay) waitOverlay.style.display = 'flex';
+
     try {
-      await sendTradeItem(
+      const myName = this.character && this.character.stats ? this.character.stats.name : 'Player';
+      await sendTradeRequestPacket(
         this.characterId,
+        myName,
         this.tradeTarget.userId,
         this.tradeTarget.username || 'Player',
         item.item_name,
         item.item_type,
         quantity,
-        price
+        price,
+        item.stats || {}
       );
 
-      // Update local inventory
-      const localItem = this.inventory.find(i => i.item_name === item.item_name);
-      if (localItem) {
-        localItem.quantity -= quantity;
-        if (localItem.quantity <= 0) {
-          const idx = this.inventory.indexOf(localItem);
-          this.inventory.splice(idx, 1);
+      // Start 30 seconds timeout
+      this.tradeTimeout = setTimeout(() => {
+        if (waitOverlay && waitOverlay.style.display !== 'none') {
+          waitOverlay.style.display = 'none';
+          this.addCombatLog('⏱️ คำขอการซื้อขายหมดเวลาไม่มีการตอบรับ', 'warning');
+          this.tradeTarget = null;
+          this.tradeSelectedItem = null;
         }
-      }
-
-      this.addCombatLog(`🤝 ส่ง ${item.item_name} x${quantity} ให้ ${this.tradeTarget.username}${price > 0 ? ` (${price} Zeny)` : ''}!`, 'loot');
-
-      // Refresh inventory displays
-      this._renderInventory();
-
-      // Close trade panel
-      const panel = document.getElementById('trade-panel');
-      if (panel) panel.style.display = 'none';
-      this.tradeTarget = null;
-      this.tradeSelectedItem = null;
+      }, 30000);
 
     } catch (err) {
-      console.error('[Trade] Error:', err);
-      this.addCombatLog('❌ เกิดข้อผิดพลาดในการส่งไอเทม', 'warning');
+      console.error('[Trade] Request Error:', err);
+      this.addCombatLog('❌ เกิดข้อผิดพลาดในการส่งคำขอซื้อขาย', 'warning');
+      if (waitOverlay) waitOverlay.style.display = 'none';
     }
+  }
+
+  receiveTradeRequest(payload) {
+    if (!payload) return;
+    this.activeTradeRequest = payload;
+
+    // Populate confirm modal fields
+    const senderName = document.getElementById('trade-confirm-sender-name');
+    const senderLevel = document.getElementById('trade-confirm-sender-level');
+    const itemName = document.getElementById('trade-confirm-item-name');
+    const itemQty = document.getElementById('trade-confirm-item-qty');
+    const itemIcon = document.getElementById('trade-confirm-item-icon');
+    const priceDisplay = document.getElementById('trade-confirm-price-display');
+    const acceptBtn = document.getElementById('btn-accept-trade');
+
+    if (senderName) senderName.textContent = payload.senderName || 'Anonymous';
+    if (senderLevel) senderLevel.style.display = 'none';
+
+    const meta = ITEMS[payload.itemName] || {};
+    if (itemIcon) itemIcon.textContent = meta.emoji || '📦';
+    if (itemName) {
+      itemName.textContent = payload.itemName;
+      itemName.className = 'detail-name ' + `color-${meta.rarity || 'common'}`;
+    }
+    if (itemQty) itemQty.textContent = `จำนวน: x${payload.quantity}`;
+
+    if (priceDisplay) {
+      if (payload.price > 0) {
+        priceDisplay.textContent = `ราคา: ${payload.price.toLocaleString()} Zeny`;
+        priceDisplay.style.color = '#ffdd44';
+      } else {
+        priceDisplay.textContent = `ราคา: 0 Zeny (ฟรี)`;
+        priceDisplay.style.color = '#40e080';
+      }
+    }
+
+    // Check Receiver Zeny Gold
+    if (acceptBtn) {
+      const myGold = this.character && this.character.stats ? this.character.stats.gold : 0;
+      if (payload.price > myGold) {
+        acceptBtn.disabled = true;
+        acceptBtn.style.opacity = '0.5';
+        acceptBtn.textContent = 'Zeny ไม่พอ (Insufficient Zeny)';
+      } else {
+        acceptBtn.disabled = false;
+        acceptBtn.style.opacity = '1';
+        acceptBtn.textContent = '🤝 ตกลง (Accept)';
+      }
+    }
+
+    // Display the modal
+    const panel = document.getElementById('trade-confirm-modal');
+    if (panel) panel.style.display = 'flex';
+  }
+
+  receiveTradeCancel(payload) {
+    if (!payload) return;
+    if (this.activeTradeRequest && this.activeTradeRequest.senderUserId === payload.senderUserId) {
+      const panel = document.getElementById('trade-confirm-modal');
+      if (panel) panel.style.display = 'none';
+      this.activeTradeRequest = null;
+      const senderName = payload.requestPayload?.senderName || 'ผู้เล่น';
+      this.addCombatLog(`🤝 ${senderName} ได้ยกเลิกคำขอโอนไอเทมและราคาเสนอแล้ว`, 'system');
+    }
+  }
+
+  async _acceptIncomingTrade() {
+    const req = this.activeTradeRequest;
+    if (!req) return;
+
+    // Check Receiver Zeny again to make sure
+    const myGold = this.character && this.character.stats ? this.character.stats.gold : 0;
+    if (req.price > myGold) {
+      this.addCombatLog('❌ แต้ม Zeny ของคุณไม่เพียงพอสำหรับการซื้อขายนี้', 'warning');
+      return;
+    }
+
+    try {
+      // Execute receiver transaction logic
+      await executeDecentralizedReceiverTrade(
+        this.characterId,
+        req.itemName,
+        req.itemType,
+        req.quantity,
+        req.stats || {},
+        req.price
+      );
+
+      // Re-load inventory to force refresh
+      await this.loadInventoryFromDB(this.characterId);
+
+      // Deduct gold from character stats locally so HUD renders correctly immediately
+      if (this.character && this.character.stats) {
+        this.character.stats.gold = Math.max(0, this.character.stats.gold - req.price);
+        this.updateHUD(this.character.stats);
+        this.updateStats(this.character.stats);
+      }
+
+      this.addCombatLog(`🤝 ได้รับ [${req.itemName}] x${req.quantity} จาก ${req.senderName}!`, 'loot');
+
+      // Send Response accepted = true
+      await sendTradeResponsePacket(req.senderUserId, req.targetUserId, true, req);
+
+      // Close modal
+      const panel = document.getElementById('trade-confirm-modal');
+      if (panel) panel.style.display = 'none';
+      this.activeTradeRequest = null;
+
+    } catch (err) {
+      console.error('[Trade] Accept Error:', err);
+      this.addCombatLog('❌ เกิดข้อผิดพลาดในการตอบรับการซื้อขาย', 'warning');
+    }
+  }
+
+  async _declineIncomingTrade() {
+    const req = this.activeTradeRequest;
+    if (!req) return;
+
+    try {
+      // Send Response accepted = false
+      await sendTradeResponsePacket(req.senderUserId, req.targetUserId, false, req);
+
+      // Close modal
+      const panel = document.getElementById('trade-confirm-modal');
+      if (panel) panel.style.display = 'none';
+      this.activeTradeRequest = null;
+
+    } catch (err) {
+      console.error('[Trade] Decline Error:', err);
+    }
+  }
+
+  async receiveTradeResponse(payload) {
+    if (!payload) return;
+
+    // Clear timeout & wait overlay
+    if (this.tradeTimeout) {
+      clearTimeout(this.tradeTimeout);
+      this.tradeTimeout = null;
+    }
+
+    const waitOverlay = document.getElementById('trade-waiting-overlay');
+    if (waitOverlay) waitOverlay.style.display = 'none';
+
+    // Close trade panel
+    const panel = document.getElementById('trade-panel');
+    if (panel) panel.style.display = 'none';
+
+    const req = payload.requestPayload;
+    if (payload.accepted) {
+      // Execute sender transaction logic
+      try {
+        await executeDecentralizedSenderTrade(
+          this.characterId,
+          req.targetName,
+          req.itemName,
+          req.itemType,
+          req.quantity,
+          req.price
+        );
+
+        // Deduct from local inventory
+        const localItem = this.inventory.find(i => i.item_name === req.itemName);
+        if (localItem) {
+          localItem.quantity -= req.quantity;
+          if (localItem.quantity <= 0) {
+            const idx = this.inventory.indexOf(localItem);
+            this.inventory.splice(idx, 1);
+          }
+        }
+
+        // Add gold to character stats locally so HUD renders correctly immediately
+        if (this.character && this.character.stats) {
+          this.character.stats.gold = (this.character.stats.gold || 0) + req.price;
+          this.updateHUD(this.character.stats);
+          this.updateStats(this.character.stats);
+        }
+
+        this.addCombatLog(`🤝 ส่ง ${req.itemName} x${req.quantity} ให้ ${req.targetName} เรียบร้อยแล้ว!`, 'loot');
+        this._renderInventory();
+
+      } catch (err) {
+        console.error('[Trade] Execute Sender Error:', err);
+      }
+    } else {
+      this.addCombatLog(`❌ ${req.targetName} ปฏิเสธการโอนไอเทมการซื้อขาย`, 'warning');
+    }
+
+    this.tradeTarget = null;
+    this.tradeSelectedItem = null;
   }
 }
 

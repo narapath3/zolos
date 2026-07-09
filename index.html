@@ -451,6 +451,8 @@
           <div class="player-detail-level" id="player-popup-level">Lv.1</div>
           <div class="player-detail-status" id="player-popup-status">Status: Online</div>
           <button id="btn-add-friend" class="btn-primary">⭐ Add Friend</button>
+          <button id="btn-popup-trade" class="btn-secondary" style="margin-top: 8px; width: 100%;">🤝 โอนของ
+            (Trade)</button>
         </div>
       </div>
     </div>
@@ -576,7 +578,20 @@
     <!-- Trade Panel Modal -->
     <div id="trade-panel" class="modal-popup" style="display: none;">
       <div class="popup-overlay" id="trade-panel-overlay"></div>
-      <div class="popup-content trade-panel-content">
+      <div class="popup-content trade-panel-content" style="position: relative;">
+        <!-- Wait Overlay -->
+        <div id="trade-waiting-overlay"
+          style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8, 12, 24, 0.95); color: #fff; z-index: 10; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; padding: 20px; text-align: center;">
+          <div class="loader-spinner"
+            style="border: 4px solid rgba(255,255,255,0.1); border-left-color: var(--primary); border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin-bottom: 15px;">
+          </div>
+          <div id="trade-waiting-text"
+            style="font-size: 11px; font-family: var(--font-pixel); color: var(--primary); margin-bottom: 15px; line-height: 1.5;">
+            กรุณารอผู้รับตอบตกลงการซื้อขาย...</div>
+          <button id="btn-cancel-waiting-trade" class="btn-secondary"
+            style="padding: 6px 16px; font-size: 11px; border-radius: 4px;">ยกเลิก (Cancel)</button>
+        </div>
+
         <div class="popup-header">
           <span class="popup-title">🤝 ส่งไอเทม (Trade)</span>
           <button class="popup-close" id="btn-close-trade">✕</button>
@@ -611,8 +626,50 @@
                 <input type="number" id="trade-price-input" min="0" value="0" placeholder="0 = ฟรี">
               </div>
             </div>
-            <button id="btn-execute-trade" class="btn-primary" style="width: 100%; margin-top: 10px;">🤝 ส่งไอเทม (Send
-              Item)</button>
+            <button id="btn-execute-trade" class="btn-primary" style="width: 100%; margin-top: 10px;">🤝 ส่งคำขอโอน
+              (Send Request)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trade Confirmation Modal (Receiver) -->
+    <div id="trade-confirm-modal" class="modal-popup" style="display: none;">
+      <div class="popup-overlay" id="trade-confirm-overlay"></div>
+      <div class="popup-content trade-panel-content">
+        <div class="popup-header">
+          <span class="popup-title">🤝 คำขอรับไอเทม (Trade Request)</span>
+          <button class="popup-close" id="btn-close-trade-confirm">✕</button>
+        </div>
+        <div class="popup-body">
+          <div class="trade-target-info">
+            <div class="player-avatar">👤</div>
+            <div class="trade-target-name" id="trade-confirm-sender-name">Player A</div>
+            <div class="trade-target-level" id="trade-confirm-sender-level">Lv.1</div>
+          </div>
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div id="trade-confirm-message"
+              style="font-size: 12px; font-family: var(--font-ui); color: var(--text-dim); margin-bottom: 12px;">
+              ต้องการส่งไอเทมต่อไปนี้ให้คุณ:
+            </div>
+            <div class="trade-selected-item-row"
+              style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); margin-bottom: 12px;">
+              <span id="trade-confirm-item-icon" class="detail-icon" style="font-size: 24px;">📦</span>
+              <div class="detail-info-block" style="text-align: left;">
+                <div id="trade-confirm-item-name" class="detail-name"
+                  style="font-weight: bold; color: var(--primary); font-family: var(--font-pixel); font-size: 11px;">
+                  Item Name</div>
+                <div id="trade-confirm-item-qty" class="detail-type" style="color: var(--text);">จำนวน: x1</div>
+              </div>
+            </div>
+            <div id="trade-confirm-price-display"
+              style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); margin-bottom: 15px;">
+              ราคา: 0 Zeny (ฟรี)
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button id="btn-accept-trade" class="btn-primary" style="flex: 1;">🤝 ตกลง (Accept)</button>
+            <button id="btn-decline-trade" class="btn-secondary" style="flex: 1;">ยกเลิก (Cancel)</button>
           </div>
         </div>
       </div>

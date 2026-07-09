@@ -530,6 +530,23 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
                 chatCallback(payload);
             }
         })
+        .on('broadcast', { event: 'trade_request' }, ({ payload }) => {
+            if (payload && payload.targetUserId === userId) {
+                if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
+            }
+        })
+        .on('broadcast', { event: 'trade_response' }, ({ payload }) => {
+            if (payload && payload.senderUserId === userId) {
+                if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
+            }
+        })
+        .on('broadcast', { event: 'trade_cancel' }, ({ payload }) => {
+            if (payload && payload.targetUserId === userId) {
+                if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
+                    window.gameUI.receiveTradeCancel(payload);
+                }
+            }
+        })
         .subscribe(async (status, err) => {
             console.log('[Zolos] 📡 Channel status:', status, err ? 'Error: ' + err : '');
             if (status === 'SUBSCRIBED') {
@@ -991,39 +1008,116 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
 }
 
 // ============ P2P DIRECT TRADE ============
-export async function sendTradeItem(senderCharId, targetUserId, targetName, itemName, itemType, quantity, price = 0) {
+export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}) {
+    if (isOfflineMode || !supabase) {
+        // Simulation mode: auto respond after 1.5s
+        setTimeout(() => {
+            if (window.gameUI) {
+                window.gameUI.receiveTradeResponse({
+                    senderUserId: currentUserId,
+                    targetUserId: targetUserId,
+                    accepted: Math.random() > 0.15,
+                    requestPayload: {
+                        senderUserId: currentUserId,
+                        senderCharacterId: senderCharId,
+                        senderName: senderName,
+                        targetUserId: targetUserId,
+                        targetName: targetName,
+                        itemName: itemName,
+                        itemType: itemType,
+                        quantity: quantity,
+                        price: price,
+                        stats: stats
+                    }
+                });
+            }
+        }, 1500);
+        return { success: true };
+    }
+
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'trade_request',
+            payload: {
+                senderUserId: currentUserId,
+                senderCharacterId: senderCharId,
+                senderName: senderName,
+                targetUserId: targetUserId,
+                targetName: targetName,
+                itemName: itemName,
+                itemType: itemType,
+                quantity: quantity,
+                price: price,
+                stats: stats
+            }
+        });
+    }
+    return { success: true };
+}
+
+export async function sendTradeResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
+    if (isOfflineMode || !supabase) return { success: true };
+
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'trade_response',
+            payload: {
+                senderUserId: senderUserId,
+                targetUserId: targetUserId,
+                accepted: accepted,
+                requestPayload: originalRequest
+            }
+        });
+    }
+    return { success: true };
+}
+
+export async function sendTradeCancelPacket(senderUserId, targetUserId, originalRequest) {
+    if (isOfflineMode || !supabase) return { success: true };
+
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'trade_cancel',
+            payload: {
+                senderUserId: senderUserId,
+                targetUserId: targetUserId,
+                requestPayload: originalRequest
+            }
+        });
+    }
+    return { success: true };
+}
+
+export async function executeDecentralizedSenderTrade(senderCharId, targetName, itemName, itemType, quantity, price = 0) {
     // Deduct item from sender inventory
     await saveInventoryItem(senderCharId, itemName, itemType, -quantity);
 
-    // Deduct gold from sender if price > 0 (for simplicity, deduct locally)
+    // Add gold to sender if price > 0
     if (price > 0) {
         const isLocal = isOfflineMode || !supabase || senderCharId.startsWith('guest_') || senderCharId.startsWith('local_');
         if (isLocal) {
             const char = localDb.get(`char_${senderCharId}`);
             if (char) {
-                char.gold = (char.gold || 0) + price; // sender receives the gold
+                char.gold = (char.gold || 0) + price;
                 localDb.set(`char_${senderCharId}`, char);
             }
-        }
-    }
-
-    // In offline mode, add item to target's local inventory
-    if (isOfflineMode || !supabase) {
-        const targetInv = localDb.get(`inventory_${targetUserId}`) || [];
-        const existing = targetInv.find(i => i.item_name === itemName);
-        if (existing) {
-            existing.quantity += quantity;
         } else {
-            targetInv.push({
-                id: 'inv_' + Math.random().toString(36).substring(2, 10),
-                character_id: targetUserId,
-                item_name: itemName,
-                item_type: itemType,
-                quantity,
-                stats: {}
-            });
+            try {
+                const { data: char } = await supabase
+                    .from('characters')
+                    .select('gold')
+                    .eq('id', senderCharId)
+                    .single();
+                if (char) {
+                    await saveCharacter(senderCharId, { gold: (char.gold || 0) + price });
+                }
+            } catch (err) {
+                console.error('[Trade] Failed to add gold to sender:', err);
+            }
         }
-        localDb.set(`inventory_${targetUserId}`, targetInv);
     }
 
     // Broadcast trade notification via chat
@@ -1048,6 +1142,37 @@ export async function sendTradeItem(senderCharId, targetUserId, targetName, item
         });
     }
 
+    return { success: true };
+}
+
+export async function executeDecentralizedReceiverTrade(receiverCharId, itemName, itemType, quantity, stats = {}, price = 0) {
+    // Add item to receiver inventory
+    await saveInventoryItem(receiverCharId, itemName, itemType, quantity, stats);
+
+    // Deduct gold from receiver
+    if (price > 0) {
+        const isLocal = isOfflineMode || !supabase || receiverCharId.startsWith('guest_') || receiverCharId.startsWith('local_');
+        if (isLocal) {
+            const char = localDb.get(`char_${receiverCharId}`);
+            if (char) {
+                char.gold = Math.max(0, (char.gold || 0) - price);
+                localDb.set(`char_${receiverCharId}`, char);
+            }
+        } else {
+            try {
+                const { data: char } = await supabase
+                    .from('characters')
+                    .select('gold')
+                    .eq('id', receiverCharId)
+                    .single();
+                if (char) {
+                    await saveCharacter(receiverCharId, { gold: Math.max(0, (char.gold || 0) - price) });
+                }
+            } catch (err) {
+                console.error('[Trade] Failed to deduct gold from receiver:', err);
+            }
+        }
+    }
     return { success: true };
 }
 
