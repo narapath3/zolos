@@ -56,6 +56,18 @@ async function initAuth() {
     });
 }
 
+// Project 3D vector to screen-space 2D coordinates (X, Y in pixels)
+function worldToScreen(pos, offsetY = 1.6) {
+    if (!sceneManager || !sceneManager.camera || !sceneManager.canvas) return { x: 0, y: 0 };
+    const tempV = pos.clone();
+    tempV.y += offsetY;
+    tempV.project(sceneManager.camera);
+    const canvas = sceneManager.canvas;
+    const x = (tempV.x * 0.5 + 0.5) * canvas.clientWidth;
+    const y = (tempV.y * -0.5 + 0.5) * canvas.clientHeight;
+    return { x, y };
+}
+
 // ============ Initialize Game ============
 async function initGame(charData) {
     const canvas = document.getElementById('game-canvas');
@@ -103,7 +115,12 @@ async function initGame(charData) {
                 }
                 break;
             case 'playerAttack':
-                if (particles) particles.spawnHitEffect(event.targetPos, event.critical);
+                if (particles) {
+                    particles.spawnHitEffect(event.targetPos, event.critical);
+                    const screenPos = worldToScreen(event.targetPos, 1.2);
+                    const dmgType = event.critical ? 'critical-dmg' : 'player-dmg';
+                    particles.spawnDamageNumber(screenPos.x, screenPos.y, event.damage, dmgType);
+                }
                 if (soundManager) soundManager.playAtkSound();
                 if (gameUI) {
                     gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
@@ -115,6 +132,10 @@ async function initGame(charData) {
                 break;
             case 'monsterAttack':
                 if (gameUI) gameUI.addCombatLog(`🩸 ${event.monsterName} hits you for ${event.damage} damage`, 'warning');
+                if (particles && event.targetPos) {
+                    const screenPos = worldToScreen(event.targetPos, 1.6);
+                    particles.spawnDamageNumber(screenPos.x, screenPos.y, event.damage, 'monster-dmg');
+                }
                 break;
             case 'expGain':
                 if (gameUI) gameUI.addCombatLog(`✨ +${event.amount} EXP`, 'exp');
@@ -461,7 +482,7 @@ function handleMouseInteraction(event) {
     if (!isGameStarted) return;
     if (combatSystem && combatSystem.isFishing) return;
 
-    const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPC());
+    const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPC(), remotePlayersMap);
     if (!hit) return;
 
     if (hit.type === 'monster') {
@@ -469,6 +490,10 @@ function handleMouseInteraction(event) {
         autoPath = hit.point;
         // Step 11: Monster click: red indicator
         particles.createClickIndicator(hit.point, 0xff4444);
+    } else if (hit.type === 'player') {
+        // Click other player: blue indicator & open trade panel
+        particles.createClickIndicator(hit.point, 0x60a0ff);
+        if (gameUI) gameUI.openTradePanel(hit.object);
     } else if (hit.type === 'npc') {
         // Open Shop when clicking NPC
         gameUI._togglePanel('shop-panel');

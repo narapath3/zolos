@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeItem } from '../network/GameSync.js';
 
 export class GameUI {
   constructor(character = null, soundManager = null, combatSystem = null) {
@@ -46,6 +46,7 @@ export class GameUI {
     this._setupOnlineTabs();
     this._setupAutoBot();
     this._setupTargetIndicator();
+    this._setupTradePanel();
     this._setupMobileControls();
     window.gameUI = this;
   }
@@ -2700,6 +2701,164 @@ export class GameUI {
     ctx.strokeStyle = '#00aeff';
     ctx.lineWidth = 1;
     ctx.stroke();
+  }
+
+  // ============ Trade Panel ============
+  _setupTradePanel() {
+    this.tradeTarget = null;
+    this.tradeSelectedItem = null;
+
+    const closeBtn = document.getElementById('btn-close-trade');
+    const overlay = document.getElementById('trade-panel-overlay');
+    const close = () => {
+      const panel = document.getElementById('trade-panel');
+      if (panel) panel.style.display = 'none';
+      this.tradeTarget = null;
+      this.tradeSelectedItem = null;
+    };
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (overlay) overlay.addEventListener('click', close);
+
+    const executeBtn = document.getElementById('btn-execute-trade');
+    if (executeBtn) {
+      executeBtn.addEventListener('click', () => this._executeTrade());
+    }
+  }
+
+  openTradePanel(remotePlayer) {
+    if (!remotePlayer) return;
+
+    this.tradeTarget = remotePlayer;
+    this.tradeSelectedItem = null;
+
+    // Populate target info
+    const nameEl = document.getElementById('trade-target-name');
+    const levelEl = document.getElementById('trade-target-level');
+    if (nameEl) nameEl.textContent = remotePlayer.username || 'Player';
+    if (levelEl) levelEl.textContent = `Lv.${remotePlayer.level || 1}`;
+
+    // Hide form until item is selected
+    const form = document.getElementById('trade-selected-form');
+    if (form) form.style.display = 'none';
+
+    // Render sender's tradeable inventory
+    this._renderTradeInventory();
+
+    // Show modal
+    const panel = document.getElementById('trade-panel');
+    if (panel) panel.style.display = 'flex';
+  }
+
+  _renderTradeInventory() {
+    const grid = document.getElementById('trade-inventory-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    // Filter to tradeable items (quantity > 0, not equipped)
+    const tradeable = this.inventory.filter(i => {
+      if (i.quantity <= 0) return false;
+      if (i.stats && i.stats.equipped) return false;
+      return true;
+    });
+
+    if (tradeable.length === 0) {
+      grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;font-size:12px;">ไม่มีไอเทมที่สามารถส่งได้</div>';
+      return;
+    }
+
+    tradeable.forEach(item => {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot';
+      if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
+      if (this.tradeSelectedItem && this.tradeSelectedItem.item_name === item.item_name) {
+        slot.classList.add('selected');
+      }
+
+      slot.innerHTML = `
+        <span>${item.emoji || '📦'}</span>
+        <span class="inv-qty">${item.quantity}</span>
+      `;
+      slot.title = `${item.item_name} x${item.quantity}`;
+
+      slot.addEventListener('click', () => {
+        this.tradeSelectedItem = item;
+        this._renderTradeInventory();
+
+        // Show and populate form
+        const form = document.getElementById('trade-selected-form');
+        if (form) form.style.display = 'block';
+
+        const icon = document.getElementById('trade-selected-icon');
+        const name = document.getElementById('trade-selected-name');
+        const qtyInfo = document.getElementById('trade-selected-qty-info');
+        const qtyInput = document.getElementById('trade-qty-input');
+
+        if (icon) icon.textContent = item.emoji || '📦';
+        if (name) name.textContent = item.item_name;
+        if (qtyInfo) qtyInfo.textContent = `จำนวนที่มี: ${item.quantity}`;
+        if (qtyInput) {
+          qtyInput.max = item.quantity;
+          qtyInput.value = 1;
+        }
+      });
+
+      grid.appendChild(slot);
+    });
+  }
+
+  async _executeTrade() {
+    if (!this.tradeTarget || !this.tradeSelectedItem || !this.characterId) {
+      this.addCombatLog('❌ ไม่สามารถส่งไอเทมได้ - ไม่ได้เลือกไอเทมหรือเป้าหมาย', 'warning');
+      return;
+    }
+
+    const item = this.tradeSelectedItem;
+    const qtyInput = document.getElementById('trade-qty-input');
+    const priceInput = document.getElementById('trade-price-input');
+    const quantity = Math.min(parseInt(qtyInput?.value) || 1, item.quantity);
+    const price = parseInt(priceInput?.value) || 0;
+
+    if (quantity <= 0) {
+      this.addCombatLog('❌ จำนวนต้องมากกว่า 0', 'warning');
+      return;
+    }
+
+    try {
+      await sendTradeItem(
+        this.characterId,
+        this.tradeTarget.userId,
+        this.tradeTarget.username || 'Player',
+        item.item_name,
+        item.item_type,
+        quantity,
+        price
+      );
+
+      // Update local inventory
+      const localItem = this.inventory.find(i => i.item_name === item.item_name);
+      if (localItem) {
+        localItem.quantity -= quantity;
+        if (localItem.quantity <= 0) {
+          const idx = this.inventory.indexOf(localItem);
+          this.inventory.splice(idx, 1);
+        }
+      }
+
+      this.addCombatLog(`🤝 ส่ง ${item.item_name} x${quantity} ให้ ${this.tradeTarget.username}${price > 0 ? ` (${price} Zeny)` : ''}!`, 'loot');
+
+      // Refresh inventory displays
+      this._renderInventory();
+
+      // Close trade panel
+      const panel = document.getElementById('trade-panel');
+      if (panel) panel.style.display = 'none';
+      this.tradeTarget = null;
+      this.tradeSelectedItem = null;
+
+    } catch (err) {
+      console.error('[Trade] Error:', err);
+      this.addCombatLog('❌ เกิดข้อผิดพลาดในการส่งไอเทม', 'warning');
+    }
   }
 }
 

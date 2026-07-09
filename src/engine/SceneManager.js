@@ -1936,7 +1936,7 @@ export class SceneManager {
         this.npcMesh = group;
     }
 
-    getMouseIntersection(event, monsters, npc) {
+    getMouseIntersection(event, monsters, npc, remotePlayersMap) {
         if (!this.canvas) return null;
 
         const rect = this.canvas.getBoundingClientRect();
@@ -1958,10 +1958,17 @@ export class SceneManager {
                 }
             });
         }
+        if (remotePlayersMap) {
+            remotePlayersMap.forEach(rp => {
+                if (rp.mesh) {
+                    targets.push(rp.mesh);
+                }
+            });
+        }
 
         const intersects = raycaster.intersectObjects(targets, true);
         if (intersects.length > 0) {
-            // Check all intersections to prioritize monsters/NPCs over environment (water/ground)
+            // Check all intersections to prioritize monsters/NPCs/Players over environment (water/ground)
             for (let i = 0; i < intersects.length; i++) {
                 const hit = intersects[i];
                 let obj = hit.object;
@@ -1976,11 +1983,26 @@ export class SceneManager {
                             return { type: 'monster', point: hit.point, object: matchedMonster };
                         }
                     }
+                    if (remotePlayersMap) {
+                        for (const [uid, rp] of remotePlayersMap.entries()) {
+                            if (rp.mesh === obj) {
+                                return {
+                                    type: 'player',
+                                    point: hit.point,
+                                    object: {
+                                        userId: uid,
+                                        username: rp.character?.stats?.name || 'Guest',
+                                        level: rp.character?.stats?.level || 1
+                                    }
+                                };
+                            }
+                        }
+                    }
                     obj = obj.parent;
                 }
             }
 
-            // If no monster/NPC was hit, check for ground/water from the first intersection
+            // If no monster/NPC/Player was hit, check for ground/water from the first intersection
             const firstHit = intersects[0];
             if (firstHit.object === this.groundMesh || firstHit.object === this.waterMesh) {
                 return { type: 'ground', point: firstHit.point };

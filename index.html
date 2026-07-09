@@ -573,6 +573,51 @@
       </div>
     </div>
 
+    <!-- Trade Panel Modal -->
+    <div id="trade-panel" class="modal-popup" style="display: none;">
+      <div class="popup-overlay" id="trade-panel-overlay"></div>
+      <div class="popup-content trade-panel-content">
+        <div class="popup-header">
+          <span class="popup-title">🤝 ส่งไอเทม (Trade)</span>
+          <button class="popup-close" id="btn-close-trade">✕</button>
+        </div>
+        <div class="popup-body">
+          <div class="trade-target-info">
+            <div class="player-avatar">👤</div>
+            <div class="trade-target-name" id="trade-target-name">Player</div>
+            <div class="trade-target-level" id="trade-target-level">Lv.1</div>
+          </div>
+
+          <div class="trade-section-label">📦 เลือกไอเทมที่จะส่ง:</div>
+          <div class="trade-inventory-grid" id="trade-inventory-grid">
+            <!-- Rendered programmatically -->
+          </div>
+
+          <div id="trade-selected-form" class="trade-selected-form" style="display: none;">
+            <div class="trade-selected-item-row">
+              <span id="trade-selected-icon" class="detail-icon">📦</span>
+              <div class="detail-info-block">
+                <div id="trade-selected-name" class="detail-name">Item Name</div>
+                <div id="trade-selected-qty-info" class="detail-type">จำนวนที่มี: 0</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="trade-qty-input">จำนวน:</label>
+                <input type="number" id="trade-qty-input" min="1" value="1">
+              </div>
+              <div class="form-group flex-2">
+                <label for="trade-price-input">ราคา (Zeny):</label>
+                <input type="number" id="trade-price-input" min="0" value="0" placeholder="0 = ฟรี">
+              </div>
+            </div>
+            <button id="btn-execute-trade" class="btn-primary" style="width: 100%; margin-top: 10px;">🤝 ส่งไอเทม (Send
+              Item)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Mobile Pad Controls -->
     <div id="mobile-pad">
       <!-- Joystick (left side) -->

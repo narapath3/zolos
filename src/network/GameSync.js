@@ -990,4 +990,64 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     return listing;
 }
 
+// ============ P2P DIRECT TRADE ============
+export async function sendTradeItem(senderCharId, targetUserId, targetName, itemName, itemType, quantity, price = 0) {
+    // Deduct item from sender inventory
+    await saveInventoryItem(senderCharId, itemName, itemType, -quantity);
+
+    // Deduct gold from sender if price > 0 (for simplicity, deduct locally)
+    if (price > 0) {
+        const isLocal = isOfflineMode || !supabase || senderCharId.startsWith('guest_') || senderCharId.startsWith('local_');
+        if (isLocal) {
+            const char = localDb.get(`char_${senderCharId}`);
+            if (char) {
+                char.gold = (char.gold || 0) + price; // sender receives the gold
+                localDb.set(`char_${senderCharId}`, char);
+            }
+        }
+    }
+
+    // In offline mode, add item to target's local inventory
+    if (isOfflineMode || !supabase) {
+        const targetInv = localDb.get(`inventory_${targetUserId}`) || [];
+        const existing = targetInv.find(i => i.item_name === itemName);
+        if (existing) {
+            existing.quantity += quantity;
+        } else {
+            targetInv.push({
+                id: 'inv_' + Math.random().toString(36).substring(2, 10),
+                character_id: targetUserId,
+                item_name: itemName,
+                item_type: itemType,
+                quantity,
+                stats: {}
+            });
+        }
+        localDb.set(`inventory_${targetUserId}`, targetInv);
+    }
+
+    // Broadcast trade notification via chat
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'chat',
+            payload: {
+                userId: 'system',
+                username: '📢 Trade',
+                level: 99,
+                message: `${currentUsername} ส่ง [${itemName}] x${quantity} ให้ [${targetName}]${price > 0 ? ` (${price} Zeny)` : ' (ฟรี)'}!`
+            }
+        });
+    }
+
+    // Local chat echo
+    if (chatCallback) {
+        chatCallback({
+            username: '📢 Trade',
+            message: `${currentUsername} ส่ง [${itemName}] x${quantity} ให้ [${targetName}]${price > 0 ? ` (${price} Zeny)` : ' (ฟรี)'}!`
+        });
+    }
+
+    return { success: true };
+}
 
