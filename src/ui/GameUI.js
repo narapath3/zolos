@@ -783,7 +783,9 @@ export class GameUI {
       const cat = this.leaderboardCategory;
       body.innerHTML = data.map((entry, i) => {
         const rankIcon = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
-        const username = entry.name || entry.profiles?.username || 'Novice';
+        const username = (entry.name && entry.name !== 'Novice' && entry.name !== 'Guest')
+          ? entry.name
+          : (entry.profiles?.username || entry.name || 'Novice');
         let valueText = '';
         if (cat === 'level') valueText = `Lv.${entry.level} | 💀${entry.total_kills ?? 0}`;
         else if (cat === 'gold') valueText = `💰 ${(entry.gold ?? 0).toLocaleString()} Zeny`;

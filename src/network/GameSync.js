@@ -17,8 +17,18 @@ let currentLevel = 1;
 // ============ Character CRUD ============
 export async function loadCharacter(userId) {
     if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
-        const char = localDb.get(`char_${userId}`);
-        if (char) return char;
+        let char = localDb.get(`char_${userId}`);
+        if (char) {
+            if (char.name === 'Novice' || char.name === 'Guest') {
+                const profile = localDb.get(`profile_${userId}`);
+                if (profile && profile.username) {
+                    char.name = profile.username;
+                    localDb.set(`char_${userId}`, char);
+                    updateLocalLeaderboard(char);
+                }
+            }
+            return char;
+        }
         return await createCharacter(userId);
     }
 
@@ -35,14 +45,44 @@ export async function loadCharacter(userId) {
         return await createCharacter(userId);
     }
     if (error) throw error;
-    return data;
+
+    let char = data;
+    if (char && (char.name === 'Novice' || char.name === 'Guest')) {
+        try {
+            const { getProfile } = await import('./SupabaseClient.js');
+            const profile = await getProfile(userId);
+            if (profile && profile.username) {
+                char.name = profile.username;
+                await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
+            }
+        } catch (e) {
+            console.warn('Failed to update character name from profile on load:', e);
+        }
+    }
+    return char;
 }
 
 export async function createCharacter(userId) {
+    let name = userId.startsWith('guest_') ? 'Guest' : 'Novice';
+    try {
+        const { getProfile } = await import('./SupabaseClient.js');
+        const profile = await getProfile(userId);
+        if (profile && profile.username) {
+            name = profile.username;
+        } else if (userId.startsWith('guest_')) {
+            name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+        }
+    } catch (e) {
+        console.warn("Failed to get profile for name, using fallback:", e);
+        if (userId.startsWith('guest_')) {
+            name = 'Guest_' + Math.random().toString(36).substring(2, 7).toUpperCase();
+        }
+    }
+
     const charData = {
         id: userId.startsWith('local_') || userId.startsWith('guest_') ? userId : 'char_' + Math.random().toString(36).substring(2, 10),
         user_id: userId,
-        name: userId.startsWith('guest_') ? 'Guest' : 'Novice',
+        name: name,
         level: 1,
         exp: 0,
         hp: 100,
