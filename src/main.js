@@ -566,7 +566,7 @@ function gameLoop(time) {
     if (gameUI) gameUI.updateTargetIndicator(sceneManager);
 
     // 6. Camera & Networking
-    sceneManager.followTarget(character.getPosition());
+    sceneManager.followTarget(character.getPosition(), character.baseY);
 
     const now = performance.now();
     if (now - lastBroadcastTime > 100) {

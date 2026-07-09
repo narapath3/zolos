@@ -2008,21 +2008,26 @@ export class SceneManager {
     }
 
     // Follow a target position (camera follows player)
-    followTarget(targetPos) {
+    // stableY: use the character's baseY instead of animated mesh.position.y
+    //          to prevent camera shake from walking/running bounce animation
+    followTarget(targetPos, stableY) {
         const offsetX = 0;
         const offsetY = 18;
         const offsetZ = 18;
         const smoothing = 0.08;
 
+        // Use stableY (baseY) for camera Y to avoid bounce-induced shake
+        const followY = stableY !== undefined ? stableY : targetPos.y;
+
         const targetCamX = targetPos.x + offsetX;
-        const targetCamY = targetPos.y + offsetY;
+        const targetCamY = followY + offsetY;
         const targetCamZ = targetPos.z + offsetZ;
 
         this.camera.position.x += (targetCamX - this.camera.position.x) * smoothing;
         this.camera.position.y += (targetCamY - this.camera.position.y) * smoothing;
         this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
 
-        this.camera.lookAt(targetPos.x, targetPos.y, targetPos.z);
+        this.camera.lookAt(targetPos.x, followY, targetPos.z);
     }
 
     // Check if a position is in the winding river (and not on the bridge)
