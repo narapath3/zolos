@@ -3204,7 +3204,7 @@ body {
 #target-indicator {
   position: fixed;
   pointer-events: none;
-  z-index: 500;
+  z-index: 90;
   width: 80px;
   height: 80px;
   transform: translate(-50%, -50%);
