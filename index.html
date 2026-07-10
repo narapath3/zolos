@@ -169,6 +169,10 @@
         <span>📖</span>
         <small>Wiki</small>
       </button>
+      <button class="hud-btn" id="btn-daily-quests" title="Daily Quests">
+        <span>📜</span>
+        <small>Quest</small>
+      </button>
       <button class="hud-btn" id="btn-players-list" title="Online Players">
         <span>👥</span>
         <small>Online</small>
@@ -406,6 +410,46 @@
             <div id="wiki-detail-content" class="detail-content notranslate" style="display: none;">
               <!-- filled dynamically by JS -->
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Quests Panel -->
+    <div id="daily-quests-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>📜 Daily Quests</h3>
+        <button class="panel-close" data-close="daily-quests-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="quest-summary"
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(0, 0, 0, 0.2); padding: 8px; border-radius: 6px; border: 1px dashed rgba(255, 255, 255, 0.1);">
+          <div class="quest-streak" style="font-weight: bold; color: var(--gold, #ffd700);">🔥 Streak: <span
+              id="val-quest-streak">0</span> Days</div>
+          <div class="quest-reset" style="font-size: 10px; color: var(--text-dim);">Reset at midnight (Local)</div>
+        </div>
+
+        <div id="quest-list-container" class="quest-list-container"
+          style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+          <!-- Rendered programmatically -->
+        </div>
+
+        <div class="roulette-section"
+          style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 12px; text-align: center;">
+          <h4 style="margin: 0 0 8px 0; font-size: 11px; color: var(--secondary)">🎡 Spin Lucky Roulette (3/3 completed)
+          </h4>
+          <button id="btn-spin-roulette" class="btn-primary" style="width: 100%;" disabled>🎡 Spin Lucky Roulette (0/3
+            Quests)</button>
+
+          <div id="roulette-rewards-display" class="roulette-rewards-display"
+            style="display: none; margin-top: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; position: relative; overflow: hidden; height: 50px;">
+            <div id="roulette-strip" class="roulette-strip"
+              style="display: flex; gap: 10px; position: absolute; left: 10px; transition: transform 3s cubic-bezier(0.1, 0.8, 0.1, 1); width: max-content;">
+              <!-- Spinning rewards will be displayed dynamically -->
+            </div>
+            <div class="roulette-pointer"
+              style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: 12px; color: #ffd700; text-shadow: 0 0 4px #000; animation: pointerBounce 0.5s infinite alternate; z-index: 10;">
+              ▼</div>
           </div>
         </div>
       </div>

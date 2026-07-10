@@ -213,7 +213,11 @@ async function initGame(charData) {
                     const e = rarityEmoji[event.rarity] || '⚪';
                     gameUI.addCombatLog(`🎣 You caught a ${e} ${event.item.name}!`, 'loot');
                     // Item is added via 'lootDrop' event in CombatSystem.js
+                    gameUI.incrementQuestProgress('fish', 'any');
                 }
+                break;
+            case 'monsterKilled':
+                if (gameUI) gameUI.incrementQuestProgress('hunt', event.monsterName);
                 break;
             case 'fishingStop':
                 if (sceneManager) sceneManager.removeFishingLine();

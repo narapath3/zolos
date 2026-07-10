@@ -353,6 +353,12 @@ export class CombatSystem {
             }
         }
 
+        // Daily Quest hunt progress event
+        this.onEvent({
+            type: 'monsterKilled',
+            monsterName: data.name
+        });
+
         // Kill count
         this.character.stats.total_kills++;
 

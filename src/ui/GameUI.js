@@ -49,6 +49,7 @@ export class GameUI {
     this._setupTargetIndicator();
     this._setupTradePanel();
     this._setupMobileControls();
+    this._setupDailyQuests();
     window.gameUI = this;
   }
 
@@ -658,6 +659,8 @@ export class GameUI {
       if (this.soundManager) {
         this.soundManager.playUseItemSound();
       }
+
+      this.incrementQuestProgress('consume', item.item_name);
 
       item.quantity--;
 
@@ -3248,6 +3251,323 @@ export class GameUI {
 
     this.tradeTarget = null;
     this.tradeSelectedItem = null;
+  }
+
+  // ============ Daily Quest System ============
+  _setupDailyQuests() {
+    this._checkDailyQuestsReset();
+
+    const btnDaily = document.getElementById('btn-daily-quests');
+    if (btnDaily) {
+      btnDaily.addEventListener('click', () => {
+        this._togglePanel('daily-quests-panel');
+        this._renderDailyQuests();
+      });
+    }
+
+    const btnSpin = document.getElementById('btn-spin-roulette');
+    if (btnSpin) {
+      btnSpin.addEventListener('click', () => {
+        this._spinRoulette();
+      });
+    }
+  }
+
+  _checkDailyQuestsReset() {
+    const today = new Date().toDateString();
+    let data = null;
+    try {
+      const stored = localStorage.getItem('zolos_daily_quests');
+      if (stored) {
+        data = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('[Daily Quest] Failed to parse local storage:', e);
+    }
+
+    if (!data || data.lastDate !== today) {
+      const previousStreak = data ? (data.streak || 0) : 0;
+      let allCompletedYesterday = false;
+      if (data && data.quests) {
+        allCompletedYesterday = data.quests.every(q => q.current >= q.target);
+      }
+
+      const newStreak = allCompletedYesterday ? previousStreak + 1 : 0;
+
+      // Select random monster
+      const monsterPool = ['Poring', 'Fabre', 'Lunatic', 'Bigfoot', 'Fly'];
+      const targetMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
+
+      // Select random consumable
+      const consumePool = ['Apple', 'Carrot', 'Red Herb', 'Yellow Herb'];
+      const targetConsumable = consumePool[Math.floor(Math.random() * consumePool.length)];
+
+      data = {
+        lastDate: today,
+        streak: newStreak,
+        rouletteSpent: false,
+        quests: [
+          {
+            id: 'hunt',
+            name: '⚔️ ล่ามอนสเตอร์ยอดนิยม',
+            desc: `กำจัดตัวมอนเตอร์ ${targetMonster} จำนวน 5 ตัว`,
+            targetName: targetMonster,
+            current: 0,
+            target: 5,
+            rewardGold: 200,
+            rewardExp: 150,
+            isClaimed: false
+          },
+          {
+            id: 'fish',
+            name: '🎣 ท้าทายยอดนักตกปลา',
+            desc: 'ตกปลาชนิดใดก็ได้จากแม่น้ำจำนวน 3 ตัว',
+            targetName: 'any',
+            current: 0,
+            target: 3,
+            rewardGold: 200,
+            rewardExp: 150,
+            isClaimed: false
+          },
+          {
+            id: 'consume',
+            name: '🥤 ผู้รักสุขภาพฟื้นพลัง',
+            desc: `ใช้งานยาฟื้นพลัง ${targetConsumable} จำนวน 3 ชิ้น`,
+            targetName: targetConsumable,
+            current: 0,
+            target: 3,
+            rewardGold: 150,
+            rewardExp: 100,
+            isClaimed: false
+          }
+        ]
+      };
+
+      localStorage.setItem('zolos_daily_quests', JSON.stringify(data));
+      this.addCombatLog('📜 ได้รับภารกิจรายวันชุดใหม่เรียบร้อยแล้ว! แตะที่ปุ่ม Quest เพื่อเปิดดู', 'system');
+    }
+
+    this.dailyQuestsState = data;
+  }
+
+  _renderDailyQuests() {
+    const listContainer = document.getElementById('quest-list-container');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+    const state = this.dailyQuestsState;
+    if (!state || !state.quests) return;
+
+    const streakVal = document.getElementById('val-quest-streak');
+    if (streakVal) streakVal.textContent = state.streak;
+
+    let completedCount = 0;
+
+    state.quests.forEach((q, idx) => {
+      const isCompleted = q.current >= q.target;
+      if (isCompleted) completedCount++;
+
+      const pct = Math.min(100, Math.floor((q.current / q.target) * 100));
+
+      const row = document.createElement('div');
+      row.className = `quest-row ${isCompleted ? 'completed' : ''}`;
+
+      row.innerHTML = `
+        <div class="quest-header-row">
+          <span class="quest-title-text">${q.name}</span>
+          <span class="quest-status-badge">${isCompleted ? 'สำเร็จ' : 'กำลังทำ'}</span>
+        </div>
+        <div class="quest-desc-text">${q.desc}</div>
+        <div class="quest-progress-container">
+          <div class="quest-progress-bg">
+            <div class="quest-progress-fill" style="width: ${pct}%;"></div>
+          </div>
+          <span class="quest-progress-text">${q.current} / ${q.target}</span>
+        </div>
+        <div class="quest-reward-row">
+          <span class="quest-reward-span">🪙 +${q.rewardGold}z | ✨ +${q.rewardExp}xp</span>
+          <button class="btn-quest-claim" id="btn-claim-quest-${idx}" ${isCompleted && !q.isClaimed ? '' : 'disabled'}>
+            ${q.isClaimed ? 'รับแล้ว' : 'รับรางวัล'}
+          </button>
+        </div>
+      `;
+
+      listContainer.appendChild(row);
+
+      const claimBtn = row.querySelector(`#btn-claim-quest-${idx}`);
+      if (claimBtn && isCompleted && !q.isClaimed) {
+        claimBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this._claimQuestReward(idx);
+        });
+      }
+    });
+
+    const spinBtn = document.getElementById('btn-spin-roulette');
+    if (spinBtn) {
+      if (completedCount >= 3) {
+        if (state.rouletteSpent) {
+          spinBtn.textContent = '🎡 สปินแล้ววันนี้ (สุ่มใหม่ในวันพรุ่งนี้)';
+          spinBtn.disabled = true;
+        } else {
+          spinBtn.textContent = '🎡 สปินวงล้อเสี่ยงโชครับไอเทมเทพ!';
+          spinBtn.disabled = false;
+        }
+      } else {
+        spinBtn.textContent = `🎡 ล็อควงล้อนำโชค (เคลียร์เควส ${completedCount}/3)`;
+        spinBtn.disabled = true;
+      }
+    }
+  }
+
+  _claimQuestReward(idx) {
+    const state = this.dailyQuestsState;
+    if (!state || !state.quests || !state.quests[idx]) return;
+
+    const q = state.quests[idx];
+    if (q.isClaimed || q.current < q.target) return;
+
+    q.isClaimed = true;
+    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+
+    if (this.character && this.character.stats) {
+      this.character.stats.gold += q.rewardGold;
+      const leveledUp = this.character.addExp(q.rewardExp);
+
+      this.addCombatLog(`🎉 รับรางวัลเควส: +${q.rewardGold} Zeny และ +${q.rewardExp} EXP!`, 'gold');
+
+      if (leveledUp) {
+        if (this.soundManager && this.soundManager.playLevelUpSound) {
+          this.soundManager.playLevelUpSound();
+        }
+        this.addCombatLog(`🎉 LEVEL UP! เลเวลของคุณตอนนี้คือ ${this.character.stats.level}!`, 'levelup');
+      }
+
+      this.updateHUD(this.character.stats);
+      this.updateStats(this.character.stats);
+    }
+
+    this._renderDailyQuests();
+    if (this.soundManager && this.soundManager.playUseItemSound) {
+      this.soundManager.playUseItemSound();
+    }
+  }
+
+  _spinRoulette() {
+    const state = this.dailyQuestsState;
+    if (!state || state.rouletteSpent) return;
+
+    const spinBtn = document.getElementById('btn-spin-roulette');
+    const display = document.getElementById('roulette-rewards-display');
+    const strip = document.getElementById('roulette-strip');
+    if (!spinBtn || !display || !strip) return;
+
+    state.rouletteSpent = true;
+    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+    spinBtn.disabled = true;
+    spinBtn.textContent = '🎡 กำลังหมุนเสี่ยงโชค...';
+
+    // Roster of items in the pool
+    const pool = [
+      { name: 'Apple', emoji: '🍎', rarity: 'common' },
+      { name: 'Carrot', emoji: '🥕', rarity: 'common' },
+      { name: 'Red Herb', emoji: '🌿', rarity: 'common' },
+      { name: 'Yellow Elixir', emoji: '🧪', rarity: 'rare' },
+      { name: 'Emperium Crystal', emoji: '💎', rarity: 'legendary' },
+      { name: 'Ghostring Scroll', emoji: '📜', rarity: 'legendary' },
+      { name: 'Golden Deviruchi Hat', emoji: '👑', rarity: 'legendary' }
+    ];
+
+    strip.innerHTML = '';
+    const itemsCount = 35;
+    const stripItems = [];
+    for (let i = 0; i < itemsCount; i++) {
+      let item;
+      if (i === 28) {
+        const rng = Math.random();
+        if (rng < 0.05) item = pool[6]; // Golden Deviruchi Hat
+        else if (rng < 0.15) item = pool[5]; // Ghostring Scroll
+        else if (rng < 0.3) item = pool[4]; // Emperium Crystal
+        else if (rng < 0.5) item = pool[3]; // Yellow Elixir
+        else item = pool[Math.floor(Math.random() * 3)];
+      } else {
+        item = pool[Math.floor(Math.random() * pool.length)];
+      }
+      stripItems.push(item);
+
+      const itemBox = document.createElement('div');
+      itemBox.className = `roulette-item-box rarity-${item.rarity}`;
+      itemBox.innerHTML = `<span>${item.emoji}</span>`;
+      itemBox.title = item.name;
+      strip.appendChild(itemBox);
+    }
+
+    const winner = stripItems[28];
+    display.style.display = 'flex';
+    strip.style.transition = 'none';
+    strip.style.transform = 'translateX(0px)';
+
+    if (this.soundManager && this.soundManager.playUseItemSound) {
+      this.soundManager.playUseItemSound();
+    }
+
+    setTimeout(() => {
+      strip.style.transition = 'transform 3.5s cubic-bezier(0.1, 0.8, 0.1, 1)';
+      const offset = -(28 * 54) + 120;
+      strip.style.transform = `translateX(${offset}px)`;
+    }, 50);
+
+    setTimeout(() => {
+      const winBox = strip.childNodes[28];
+      if (winBox) winBox.classList.add('selected-outcome');
+
+      this.addItem({
+        name: winner.name,
+        type: winner.rarity === 'common' ? 'consumable' : (winner.name.includes('Hat') ? 'hat' : 'material'),
+        emoji: winner.emoji
+      });
+
+      this.addCombatLog(`🎡 กงล้อหมุนหยุดที่: รับไอเทมดรอปแดนสวรรค์ [${winner.emoji} ${winner.name}]!`, 'loot');
+
+      if (winner.rarity === 'legendary') {
+        if (this.soundManager && this.soundManager.playLevelUpSound) {
+          this.soundManager.playLevelUpSound();
+        }
+      }
+
+      spinBtn.textContent = '🎡 สปินแล้ววันนี้ (สุ่มใหม่ในวันพรุ่งนี้)';
+      this._renderDailyQuests();
+    }, 3800);
+  }
+
+  incrementQuestProgress(type, targetName = '') {
+    const state = this.dailyQuestsState;
+    if (!state || !state.quests) return;
+
+    let updated = false;
+    state.quests.forEach(q => {
+      if (q.id === type) {
+        if (q.targetName === 'any' || q.targetName === targetName) {
+          if (q.current < q.target) {
+            q.current++;
+            updated = true;
+            this.addCombatLog(`📈 ภารกิจ [${q.name}]: คืบหน้า ${q.current}/${q.target}`, 'system');
+
+            if (q.current === q.target) {
+              this.addCombatLog(`✨ ภารกิจ [${q.name}] สำเร็จแล้ว! กดรับรางวัลได้เลย`, 'levelup');
+            }
+          }
+        }
+      }
+    });
+
+    if (updated) {
+      localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+      const panel = document.getElementById('daily-quests-panel');
+      if (panel && panel.style.display !== 'none') {
+        this._renderDailyQuests();
+      }
+    }
   }
 }
 

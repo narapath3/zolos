@@ -656,8 +656,9 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 4px;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -667,6 +668,10 @@ body {
   animation: slideInUp 0.5s ease-out;
   min-width: 580px;
   max-width: 780px;
+}
+
+#hud-bottom .hud-btn {
+  flex: 1;
 }
 
 @keyframes slideInUp {
@@ -4152,5 +4157,180 @@ body {
 
   100% {
     transform: rotate(360deg);
+  }
+}
+
+/* ========== DAILY QUEST SYSTEM STYLES ========== */
+.quest-row {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.quest-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(240, 192, 64, 0.2);
+}
+
+.quest-row.completed {
+  border-color: rgba(64, 255, 128, 0.3);
+  background: rgba(64, 255, 128, 0.02);
+}
+
+.quest-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.quest-title-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quest-status-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-pixel, monospace);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim, #8090b0);
+}
+
+.quest-row.completed .quest-status-badge {
+  background: rgba(64, 255, 128, 0.15);
+  color: #40e080;
+  text-shadow: 0 0 5px rgba(64, 255, 128, 0.3);
+}
+
+.quest-desc-text {
+  font-size: 9.5px;
+  color: var(--text-dim, #8090b0);
+  margin-bottom: 8px;
+}
+
+.quest-progress-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quest-progress-bg {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.quest-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--secondary, #3388ff), #20a0ff);
+  width: 0%;
+  transition: width 0.4s ease-out;
+}
+
+.quest-row.completed .quest-progress-fill {
+  background: linear-gradient(90deg, #40e080, #50ffaa);
+}
+
+.quest-progress-text {
+  font-size: 8px;
+  font-family: var(--font-pixel, monospace);
+  color: #fff;
+  min-width: 32px;
+  text-align: right;
+}
+
+.quest-reward-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.quest-reward-span {
+  font-size: 10px;
+  color: #ffd700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-quest-claim {
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #ffd700, #f0a020);
+  border: 1px solid #ffd700;
+  color: #120a02;
+  font-family: var(--font-pixel, monospace);
+  font-size: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(240, 192, 64, 0.3);
+  transition: all 0.2s;
+}
+
+.btn-quest-claim:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 10px rgba(240, 192, 64, 0.6);
+}
+
+.btn-quest-claim:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Roulette Spinner Animations */
+.roulette-rewards-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.roulette-item-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  position: relative;
+  font-size: 16px;
+}
+
+.roulette-item-box.selected-outcome {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.15);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+
+@keyframes pointerBounce {
+  from {
+    top: 0px;
+  }
+
+  to {
+    top: 4px;
   }
 }
