@@ -4334,3 +4334,125 @@ body {
     top: 4px;
   }
 }
+
+/* ========== MOBILE RESPONSIVE ========== */
+@media (max-width: 480px) {
+
+  /* Side panels: fit within the viewport with padding */
+  .side-panel {
+    width: calc(100vw - 24px);
+    max-width: 380px;
+    max-height: 80vh;
+    max-height: 80dvh;
+  }
+
+  .panel-body {
+    max-height: calc(80vh - 60px);
+    max-height: calc(80dvh - 60px);
+  }
+
+  /* Inventory grid: keep 5 columns but shrink gap */
+  .inventory-grid {
+    gap: 4px;
+    padding: 6px;
+    max-height: 200px;
+  }
+
+  /* Inventory slots: slightly smaller on mobile */
+  .inv-slot,
+  .inventory-slot,
+  .shop-slot {
+    font-size: 22px;
+    border-width: 1.5px;
+    border-radius: 6px;
+  }
+
+  .inv-slot .inv-qty,
+  .inventory-slot .slot-quantity {
+    font-size: 8px;
+    bottom: 1px;
+    right: 2px;
+  }
+
+  .inv-equipped-badge {
+    font-size: 7px;
+    top: 1px;
+    left: 2px;
+  }
+
+  /* Tabs: shrink for mobile */
+  .inventory-tabs {
+    gap: 2px;
+  }
+
+  .inv-tab {
+    font-size: 9px;
+    padding: 5px 0;
+  }
+
+  /* Detail box */
+  .item-detail-box {
+    margin-top: 10px;
+    padding: 8px;
+    min-height: 70px;
+  }
+
+  .detail-icon {
+    font-size: 24px;
+    width: 34px;
+    height: 34px;
+    padding: 4px;
+  }
+
+  .detail-name {
+    font-size: 11px;
+  }
+
+  .detail-desc {
+    font-size: 10px;
+    padding: 4px 6px;
+  }
+
+  .detail-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Bottom HUD: auto width, flexible */
+  #hud-bottom {
+    min-width: unset;
+    max-width: calc(100vw - 20px);
+    width: auto;
+    padding: 6px 8px;
+    gap: 2px;
+    bottom: 10px;
+  }
+
+  .hud-btn {
+    padding: 4px 2px;
+  }
+
+  .hud-btn span {
+    font-size: 18px;
+  }
+
+  .hud-btn small {
+    font-size: 7px;
+  }
+
+  /* Gold display */
+  .gold-display {
+    font-size: 11px;
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+
+  /* Panel header */
+  .panel-header {
+    padding: 12px 14px;
+  }
+
+  .panel-body {
+    padding: 12px 14px;
+  }
+}
