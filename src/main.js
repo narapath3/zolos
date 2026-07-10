@@ -227,6 +227,7 @@ async function initGame(charData) {
 
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
+    window.gameUI = gameUI;
     gameUI.particles = particles;
 
     // Setup skill clicks

@@ -1570,6 +1570,9 @@ export class GameUI {
   }
 
   _renderShop() {
+    // Increment quest progress for visiting the shop
+    this.incrementQuestProgress('shop', 'any');
+
     const grid = document.getElementById('shop-grid');
     if (!grid) return;
 
@@ -3305,7 +3308,7 @@ export class GameUI {
       console.error('[Daily Quest] Failed to parse local storage:', e);
     }
 
-    if (!data || data.lastDate !== today) {
+    if (!data || data.lastDate !== today || !data.quests || data.quests.length < 4) {
       const previousStreak = data ? (data.streak || 0) : 0;
       let allCompletedYesterday = false;
       if (data && data.quests) {
@@ -3358,6 +3361,17 @@ export class GameUI {
             target: 3,
             rewardGold: 150,
             rewardExp: 100,
+            isClaimed: false
+          },
+          {
+            id: 'shop',
+            name: '🛍️ เยี่ยมชมร้านค้าคาฟรา',
+            desc: 'คุยกับ NPC คาฟรา เพื่อเปิดดูร้านค้า 1 ครั้ง',
+            targetName: 'any',
+            current: 0,
+            target: 1,
+            rewardGold: 100,
+            rewardExp: 80,
             isClaimed: false
           }
         ]
