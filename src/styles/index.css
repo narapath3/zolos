@@ -868,7 +868,7 @@ body {
 
 .inventory-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
   gap: 6px;
   background: rgba(0, 0, 0, 0.25);
   padding: 8px;
@@ -2216,7 +2216,7 @@ body {
 
 .shop-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
   gap: 6px;
   background: rgba(0, 0, 0, 0.25);
   padding: 8px;
@@ -4112,7 +4112,7 @@ body {
 
 .trade-inventory-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
   gap: 4px;
   max-height: 180px;
   overflow-y: auto;
@@ -4351,11 +4351,14 @@ body {
     max-height: calc(80dvh - 60px);
   }
 
-  /* Inventory grid: keep 5 columns but shrink gap */
-  .inventory-grid {
+  /* Grids: responsive gap/padding for mobile */
+  .inventory-grid,
+  .shop-grid,
+  .trade-inventory-grid {
     gap: 4px;
     padding: 6px;
     max-height: 200px;
+    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
   }
 
   /* Inventory slots: slightly smaller on mobile */
@@ -4445,6 +4448,22 @@ body {
     font-size: 11px;
     padding: 8px;
     margin-bottom: 8px;
+  }
+
+  /* Shop-specific */
+  .shop-detail-box {
+    margin-top: 8px;
+    padding: 8px;
+    min-height: 80px;
+  }
+
+  .shop-tab {
+    font-size: 9px;
+    padding: 5px 0;
+  }
+
+  .shop-slot .slot-price-tag {
+    font-size: 6px;
   }
 
   /* Panel header */
