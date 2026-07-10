@@ -46,6 +46,33 @@ let lastMinimapTime = 0;
 let autoPath = null;
 let isShiftPressed = false;
 
+// Hover highlight state
+let hoveredMeshGroup = null;
+const HOVER_EMISSIVE_PLAYER = new THREE.Color(0x3388ff);
+const HOVER_EMISSIVE_MONSTER = new THREE.Color(0xff4444);
+
+function applyHoverHighlight(meshGroup, emissiveColor) {
+    if (!meshGroup) return;
+    meshGroup.traverse((child) => {
+        if (child.isMesh && child.material && child.material.emissive) {
+            child.material._origEmissive = child.material.emissive.clone();
+            child.material.emissive.copy(emissiveColor);
+            child.material.emissiveIntensity = 0.45;
+        }
+    });
+}
+
+function removeHoverHighlight(meshGroup) {
+    if (!meshGroup) return;
+    meshGroup.traverse((child) => {
+        if (child.isMesh && child.material && child.material._origEmissive) {
+            child.material.emissive.copy(child.material._origEmissive);
+            child.material.emissiveIntensity = 0;
+            delete child.material._origEmissive;
+        }
+    });
+}
+
 // ============ Initialize Auth ============
 async function initAuth() {
     // Initial UI setup - Use AuthUI for login screen
@@ -441,15 +468,41 @@ async function initGame(charData) {
 
     canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
 
-    // Mouse move for monster hovering
+    // Mouse move for monster/player hovering with highlight glow
     canvas.addEventListener('mousemove', (e) => {
         if (!sceneManager || !monsters || !gameUI) return;
-        const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPC());
-        if (hit && hit.type === 'monster') {
+        const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPC(), remotePlayersMap);
+
+        let newHoverMesh = null;
+        let emissiveColor = null;
+
+        if (hit && hit.type === 'monster' && hit.object && hit.object.mesh) {
             gameUI.hoveredMonster = hit.object;
+            newHoverMesh = hit.object.mesh;
+            emissiveColor = HOVER_EMISSIVE_MONSTER;
+        } else if (hit && hit.type === 'player' && hit.object) {
+            gameUI.hoveredMonster = null;
+            // Find the remote player mesh by userId
+            const rp = remotePlayersMap.get(hit.object.userId);
+            if (rp && rp.mesh) {
+                newHoverMesh = rp.mesh;
+                emissiveColor = HOVER_EMISSIVE_PLAYER;
+            }
         } else {
             gameUI.hoveredMonster = null;
         }
+
+        // Only update highlight if hovered mesh changed
+        if (newHoverMesh !== hoveredMeshGroup) {
+            removeHoverHighlight(hoveredMeshGroup);
+            hoveredMeshGroup = newHoverMesh;
+            if (hoveredMeshGroup && emissiveColor) {
+                applyHoverHighlight(hoveredMeshGroup, emissiveColor);
+            }
+        }
+
+        // Update cursor style
+        canvas.style.cursor = newHoverMesh ? 'pointer' : 'default';
     });
 }
 
