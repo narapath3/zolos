@@ -1002,15 +1002,27 @@ export class CharacterManager {
         if (data.glasses) this.setGlasses(data.glasses);
         if (data.weapon) this.equipWeapon(data.weapon);
 
-        // Load game settings if available
+        // Load game settings — check DB data first, then fallback to localStorage
+        let localSettings = {};
+        try {
+            const settingsKey = `zolos_settings_${this.characterId}`;
+            localSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+        } catch (e) { /* localStorage unavailable */ }
+
         if (data.sound_enabled !== undefined && data.sound_enabled !== null) {
             this.gameSettings.sound_enabled = !!data.sound_enabled;
+        } else if (localSettings.sound_enabled !== undefined) {
+            this.gameSettings.sound_enabled = !!localSettings.sound_enabled;
         }
         if (data.graphics_quality) {
             this.gameSettings.graphics_quality = data.graphics_quality;
+        } else if (localSettings.graphics_quality) {
+            this.gameSettings.graphics_quality = localSettings.graphics_quality;
         }
         if (data.fps_enabled !== undefined && data.fps_enabled !== null) {
             this.gameSettings.fps_enabled = !!data.fps_enabled;
+        } else if (localSettings.fps_enabled !== undefined) {
+            this.gameSettings.fps_enabled = !!localSettings.fps_enabled;
         }
 
         // Ensure starting position is safe

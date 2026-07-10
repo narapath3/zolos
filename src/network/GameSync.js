@@ -138,6 +138,18 @@ export async function createCharacter(userId) {
         updated_at: new Date().toISOString()
     };
 
+    // Save default settings to localStorage
+    try {
+        const settingsKey = `zolos_settings_${charData.id}`;
+        if (!localStorage.getItem(settingsKey)) {
+            localStorage.setItem(settingsKey, JSON.stringify({
+                sound_enabled: charData.sound_enabled,
+                graphics_quality: charData.graphics_quality,
+                fps_enabled: charData.fps_enabled
+            }));
+        }
+    } catch (e) { /* localStorage unavailable */ }
+
     if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
         localDb.set(`char_${userId}`, charData);
         // Update local leaderboard
@@ -147,9 +159,15 @@ export async function createCharacter(userId) {
         return charData;
     }
 
+    // Strip client-side settings fields that don't exist in the DB schema
+    const dbCharData = { ...charData };
+    delete dbCharData.fps_enabled;
+    delete dbCharData.sound_enabled;
+    delete dbCharData.graphics_quality;
+
     const { data, error } = await supabase
         .from('characters')
-        .insert(charData)
+        .insert(dbCharData)
         .select()
         .single();
 
@@ -161,6 +179,16 @@ export async function createCharacter(userId) {
 }
 
 export async function saveCharacter(characterId, updates) {
+    // Persist game settings to localStorage first so it applies to both online and offline modes
+    try {
+        const settingsKey = `zolos_settings_${characterId}`;
+        const existingSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+        if (updates.fps_enabled !== undefined) existingSettings.fps_enabled = updates.fps_enabled;
+        if (updates.sound_enabled !== undefined) existingSettings.sound_enabled = updates.sound_enabled;
+        if (updates.graphics_quality !== undefined) existingSettings.graphics_quality = updates.graphics_quality;
+        localStorage.setItem(settingsKey, JSON.stringify(existingSettings));
+    } catch (e) { /* localStorage unavailable */ }
+
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         // CharacterId is activeUserId in offline mode or guest mode
         const userId = characterId;
@@ -173,9 +201,16 @@ export async function saveCharacter(characterId, updates) {
         return;
     }
 
+    // Strip client-side settings fields that don't exist in the DB schema
+    // to prevent PGRST204 errors that would abort the entire save
+    const dbUpdates = { ...updates };
+    delete dbUpdates.fps_enabled;
+    delete dbUpdates.sound_enabled;
+    delete dbUpdates.graphics_quality;
+
     const { error } = await supabase
         .from('characters')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ ...dbUpdates, updated_at: new Date().toISOString() })
         .eq('id', characterId);
 
     if (error) console.error('Save error:', error);

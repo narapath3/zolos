@@ -2,8 +2,9 @@
 // Replace with your actual Supabase URL and Anon Key
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co').trim();
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY').trim();
+const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' && process.env ? process.env : {});
+const SUPABASE_URL = (env.VITE_SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co').trim();
+const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY').trim();
 
 export const isOfflineMode =
   SUPABASE_URL.includes('YOUR_PROJECT') ||
