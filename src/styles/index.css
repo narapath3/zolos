@@ -3462,36 +3462,62 @@ body {
     display: none !important;
   }
 
-  /* Tablet: bottom menu bar — flex wrap, anchored to bottom */
+  /* Tablet: bottom menu bar — single scrollable row, no wrap */
   #hud-bottom {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
     align-items: center;
-    gap: 4px;
-    padding: 6px 10px;
+    gap: 2px;
+    padding: 6px 8px;
     bottom: calc(8px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%);
-    width: clamp(320px, 70vw, 580px);
-    max-width: calc(100vw - 16px);
+    width: auto;
+    max-width: 95vw;
     min-width: unset;
     grid-template-columns: unset;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  #hud-bottom::-webkit-scrollbar {
+    display: none;
   }
 
   .hud-btn {
-    padding: 5px 4px;
-    min-width: 40px;
+    padding: 5px 3px;
+    min-width: 44px;
     flex: 0 0 auto;
   }
 
   .hud-btn span {
-    font-size: clamp(16px, 2.5vw, 20px);
+    font-size: clamp(16px, 2.2vw, 20px);
   }
 
   .hud-btn small {
     display: block;
     font-size: 7px;
+    white-space: nowrap;
+  }
+
+  /* Tablet: inventory/shop grids — ensure items don't overlap */
+  .inventory-grid,
+  .shop-grid,
+  .trade-inventory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .inv-slot,
+  .inventory-slot,
+  .shop-slot {
+    font-size: 24px;
+    min-width: 0;
+    min-height: 0;
   }
 
   /* Tablet-specific combat log placement at bottom-left */

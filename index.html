@@ -349,6 +349,69 @@
       </div>
     </div>
 
+    <!-- NPC Item Sell Shop Panel -->
+    <div id="sell-shop-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>💰 ร้านรับซื้อไอเทม (Sell Shop)</h3>
+        <button class="panel-close" data-close="sell-shop-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="gold-display">💰 <span id="sell-shop-gold-amount">0</span> Zeny</div>
+
+        <div
+          style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px; font-family: var(--font-ui); line-height: 1.4;">
+          เลือกไอเทมจากกระเป๋าของคุณที่ต้องการนำมาขายให้พ่อค้าเพื่อแลกเป็นเงิน Zeny
+        </div>
+
+        <div class="inventory-grid" id="sell-shop-inventory-grid">
+          <!-- Rendered programmatically -->
+        </div>
+
+        <div id="sell-shop-detail-box" class="shop-detail-box" style="margin-top: 15px;">
+          <div id="sell-shop-detail-placeholder" class="shop-detail-placeholder">
+            คลิกไอเทมในกระเป๋าด้านบนเพื่อระบุจำนวนและยืนยันการขาย</div>
+          <div id="sell-shop-detail-content" class="shop-detail-content" style="display: none;">
+            <div class="detail-row">
+              <span id="sell-shop-detail-icon" class="detail-icon">📦</span>
+              <div class="detail-info-block">
+                <div id="sell-shop-detail-name" class="detail-name" style="font-weight: bold; color: var(--primary);">
+                  Item Name</div>
+                <div id="sell-shop-detail-type" class="detail-type">Type</div>
+              </div>
+            </div>
+            <div id="sell-shop-detail-desc" class="detail-desc"
+              style="font-size: 11px; margin-top: 8px; color: var(--text-dim); line-height: 1.4;">Description.</div>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label for="sell-shop-qty-input" style="font-size: 11px; color: var(--text);">จำนวนที่จะขาย:</label>
+                <span id="sell-shop-owned-qty" style="font-size: 11px; color: var(--text-dim);">มีอยู่: 0 ชิ้น</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <input type="number" id="sell-shop-qty-input" min="1" value="1"
+                  style="flex: 1; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: var(--font-pixel); text-align: center;">
+                <button id="btn-sell-shop-max" class="btn-secondary"
+                  style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
+              </div>
+            </div>
+
+            <div class="detail-actions"
+              style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+              <div class="price-info" style="display: flex; flex-direction: column;">
+                <span style="font-size: 10px; color: var(--text-dim);">ราคารับซื้อชิ้นละ: <span
+                    id="sell-shop-unit-price">0</span> z</span>
+                <span class="detail-price"
+                  style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); white-space: nowrap;">ได้เงินทั้งหมด:
+                  <span id="sell-shop-total-price">0</span> z</span>
+              </div>
+              <button id="btn-sell-shop-confirm" class="btn-use-item"
+                style="padding: 8px 16px; background: #c88f1a !important; border: 1px solid #eba423 !important;">ขายไอเทม</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Leaderboard Panel -->
     <div id="leaderboard-panel" class="side-panel" style="display: none;">
       <div class="panel-header">

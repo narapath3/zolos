@@ -1569,218 +1569,170 @@ export class GameUI {
     }
   }
 
-  _renderShop() {
-    // Increment quest progress for visiting the shop
-    this.incrementQuestProgress('shop', 'any');
-
-    const grid = document.getElementById('shop-grid');
-    if (!grid) return;
-
-    grid.innerHTML = '';
-
-    // Filter items based on tab
-    const filteredItems = SHOP_ITEMS.filter(item => {
-      const itemData = ITEMS[item.name];
-      if (!itemData) return false;
-
-      if (this.currentShopTab === 'all') return true;
-      if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
-      if (this.currentShopTab === 'equip') return ['weapon', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
-      return false;
-    });
-
-    filteredItems.forEach(item => {
-      const itemData = ITEMS[item.name];
-      const slot = document.createElement('div');
-      slot.className = 'shop-slot';
-      if (itemData.rarity) {
-        slot.classList.add(`rarity-${itemData.rarity}`);
-      }
-      if (this.selectedShopItem && this.selectedShopItem.name === item.name) {
-        slot.classList.add('selected');
-      }
-
-      slot.innerHTML = `
-        <span class="slot-emoji">${itemData.emoji}</span>
-        <div class="slot-price-tag">${item.price}z</div>
-      `;
-
-      slot.addEventListener('click', () => {
-        this.selectedShopItem = item;
-        this._renderShop();
-        this._updateShopDetailBox();
-      });
-
-      grid.appendChild(slot);
-    });
-
-    // Update gold display
-    const goldDisplay = document.getElementById('shop-gold-amount');
-    if (goldDisplay && this.character) {
-      goldDisplay.textContent = this.character.stats.gold.toLocaleString();
-    }
+เ      goldDisplay.textContent = this.character.stats.gold.toLocaleString();
+}
   }
 
-  _updateShopDetailBox() {
-    const placeholder = document.getElementById('shop-detail-placeholder');
-    const content = document.getElementById('shop-detail-content');
-    if (!placeholder || !content) return;
+_updateShopDetailBox() {
+  const placeholder = document.getElementById('shop-detail-placeholder');
+  const content = document.getElementById('shop-detail-content');
+  if (!placeholder || !content) return;
 
-    if (!this.selectedShopItem) {
-      placeholder.style.display = 'block';
-      content.style.display = 'none';
-      return;
-    }
-
-    placeholder.style.display = 'none';
-    content.style.display = 'block';
-
-    const itemData = ITEMS[this.selectedShopItem.name];
-    document.getElementById('shop-detail-icon').textContent = itemData.emoji;
-    document.getElementById('shop-detail-name').textContent = this.selectedShopItem.name;
-    document.getElementById('shop-detail-type').textContent = itemData.type.toUpperCase();
-    document.getElementById('shop-detail-desc').textContent = itemData.desc || 'ไม่มีคำอธิบาย';
-    document.getElementById('shop-detail-price-val').textContent = this.selectedShopItem.price;
+  if (!this.selectedShopItem) {
+    placeholder.style.display = 'block';
+    content.style.display = 'none';
+    return;
   }
+
+  placeholder.style.display = 'none';
+  content.style.display = 'block';
+
+  const itemData = ITEMS[this.selectedShopItem.name];
+  document.getElementById('shop-detail-icon').textContent = itemData.emoji;
+  document.getElementById('shop-detail-name').textContent = this.selectedShopItem.name;
+  document.getElementById('shop-detail-type').textContent = itemData.type.toUpperCase();
+  document.getElementById('shop-detail-desc').textContent = itemData.desc || 'ไม่มีคำอธิบาย';
+  document.getElementById('shop-detail-price-val').textContent = this.selectedShopItem.price;
+}
 
   async _performShopAction() {
-    if (!this.selectedShopItem || !this.character) return;
+  if (!this.selectedShopItem || !this.character) return;
 
-    const item = this.selectedShopItem;
-    const itemData = ITEMS[item.name];
+  const item = this.selectedShopItem;
+  const itemData = ITEMS[item.name];
 
-    if (this.character.stats.gold < item.price) {
-      this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system');
-      if (this.soundManager && this.soundManager.playErrorSound) this.soundManager.playErrorSound();
+  if (this.character.stats.gold < item.price) {
+    this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system');
+    if (this.soundManager && this.soundManager.playErrorSound) this.soundManager.playErrorSound();
+    return;
+  }
+
+  // Deduct gold
+  this.character.stats.gold -= item.price;
+
+  // Add to inventory
+  const existing = this.inventory.find(i => i.item_name === item.name);
+  if (existing) {
+    existing.quantity += 1;
+  } else {
+    this.inventory.push({
+      item_name: item.name,
+      item_type: itemData.type,
+      emoji: itemData.emoji,
+      desc: itemData.desc,
+      price: itemData.price || item.price,
+      healHp: itemData.healHp || 0,
+      restoreSp: itemData.restoreSp || 0,
+      quantity: 1,
+      stats: itemData.stats || {}
+    });
+  }
+
+  // Save persistence
+  if (this.characterId) {
+    // Fixed argument order: (characterId, itemName, itemType, quantity)
+    await saveInventoryItem(this.characterId, item.name, itemData.type, 1);
+    if (this.character.saveStatsToDatabase) {
+      await this.character.saveStatsToDatabase();
+    }
+  }
+
+  this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
+
+  if (this.soundManager) {
+    if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+    else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
+  }
+
+  // Refresh UI
+  this._renderShop();
+  this._renderInventory();
+  this.updateHUD(this.character.stats);
+  this.updateStats(this.character.stats);
+}
+
+
+// ============ P2P Marketplace Logic ============
+_setupMarketEvents() {
+  // Tab switching
+  const tabs = document.querySelectorAll('.market-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      this.marketTab = tab.getAttribute('data-tab');
+      this.selectedMarketItem = null;
+
+      // Reset form
+      const form = document.getElementById('market-sell-form');
+      if (form) form.style.display = 'none';
+
+      this._renderMarket();
+    });
+  });
+
+  // Search filter
+  const searchInput = document.getElementById('market-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      this._renderMarket();
+    });
+  }
+
+  // List button
+  const listBtn = document.getElementById('btn-market-list-action');
+  if (listBtn) {
+    listBtn.addEventListener('click', () => this._performMarketListAction());
+  }
+}
+
+_isItemEquipped(item) {
+  if (!this.character || !item) return false;
+  if (item.stats && item.stats.equipped === true) return true;
+  if (item.item_name === this.character.equippedHat) return true;
+  if (item.item_name === this.character.equippedGlasses) return true;
+  if (item.item_name === this.character.equippedArmor) return true;
+  if (item.item_name === this.character.equippedShield) return true;
+  return false;
+}
+
+  async _renderMarket() {
+  // Update gold display
+  const goldDisplay = document.getElementById('market-gold-amount');
+  if (goldDisplay && this.character) {
+    goldDisplay.textContent = this.character.stats.gold;
+  }
+
+  if (this.marketTab === 'buy') {
+    document.getElementById('market-buy-container').style.display = 'block';
+    document.getElementById('market-sell-container').style.display = 'none';
+
+    const grid = document.getElementById('market-items-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const query = (document.getElementById('market-search-input')?.value || '').toLowerCase().trim();
+
+    const listings = await fetchMarketListings();
+    const filtered = listings.filter(l =>
+      l.item_name.toLowerCase().includes(query)
+    );
+
+    if (filtered.length === 0) {
+      grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;grid-column: span 5;">ไม่มีไอเทมที่วางขายในขณะนี้</div>';
       return;
     }
 
-    // Deduct gold
-    this.character.stats.gold -= item.price;
+    filtered.forEach(listing => {
+      const itemInfo = ITEMS[listing.item_name] || { emoji: '📦' };
+      const row = document.createElement('div');
+      row.className = 'market-item-row';
 
-    // Add to inventory
-    const existing = this.inventory.find(i => i.item_name === item.name);
-    if (existing) {
-      existing.quantity += 1;
-    } else {
-      this.inventory.push({
-        item_name: item.name,
-        item_type: itemData.type,
-        emoji: itemData.emoji,
-        desc: itemData.desc,
-        price: itemData.price || item.price,
-        healHp: itemData.healHp || 0,
-        restoreSp: itemData.restoreSp || 0,
-        quantity: 1,
-        stats: itemData.stats || {}
-      });
-    }
+      const isMine = listing.seller_id === this.characterId;
 
-    // Save persistence
-    if (this.characterId) {
-      // Fixed argument order: (characterId, itemName, itemType, quantity)
-      await saveInventoryItem(this.characterId, item.name, itemData.type, 1);
-      if (this.character.saveStatsToDatabase) {
-        await this.character.saveStatsToDatabase();
-      }
-    }
-
-    this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
-
-    if (this.soundManager) {
-      if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
-      else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
-    }
-
-    // Refresh UI
-    this._renderShop();
-    this._renderInventory();
-    this.updateHUD(this.character.stats);
-    this.updateStats(this.character.stats);
-  }
-
-
-  // ============ P2P Marketplace Logic ============
-  _setupMarketEvents() {
-    // Tab switching
-    const tabs = document.querySelectorAll('.market-tab');
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        this.marketTab = tab.getAttribute('data-tab');
-        this.selectedMarketItem = null;
-
-        // Reset form
-        const form = document.getElementById('market-sell-form');
-        if (form) form.style.display = 'none';
-
-        this._renderMarket();
-      });
-    });
-
-    // Search filter
-    const searchInput = document.getElementById('market-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => {
-        this._renderMarket();
-      });
-    }
-
-    // List button
-    const listBtn = document.getElementById('btn-market-list-action');
-    if (listBtn) {
-      listBtn.addEventListener('click', () => this._performMarketListAction());
-    }
-  }
-
-  _isItemEquipped(item) {
-    if (!this.character || !item) return false;
-    if (item.stats && item.stats.equipped === true) return true;
-    if (item.item_name === this.character.equippedHat) return true;
-    if (item.item_name === this.character.equippedGlasses) return true;
-    if (item.item_name === this.character.equippedArmor) return true;
-    if (item.item_name === this.character.equippedShield) return true;
-    return false;
-  }
-
-  async _renderMarket() {
-    // Update gold display
-    const goldDisplay = document.getElementById('market-gold-amount');
-    if (goldDisplay && this.character) {
-      goldDisplay.textContent = this.character.stats.gold;
-    }
-
-    if (this.marketTab === 'buy') {
-      document.getElementById('market-buy-container').style.display = 'block';
-      document.getElementById('market-sell-container').style.display = 'none';
-
-      const grid = document.getElementById('market-items-grid');
-      if (!grid) return;
-      grid.innerHTML = '';
-
-      const query = (document.getElementById('market-search-input')?.value || '').toLowerCase().trim();
-
-      const listings = await fetchMarketListings();
-      const filtered = listings.filter(l =>
-        l.item_name.toLowerCase().includes(query)
-      );
-
-      if (filtered.length === 0) {
-        grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;grid-column: span 5;">ไม่มีไอเทมที่วางขายในขณะนี้</div>';
-        return;
-      }
-
-      filtered.forEach(listing => {
-        const itemInfo = ITEMS[listing.item_name] || { emoji: '📦' };
-        const row = document.createElement('div');
-        row.className = 'market-item-row';
-
-        const isMine = listing.seller_id === this.characterId;
-
-        // Step 8: Apply rarity class to market row
-        const rarityClass = `rarity-${itemInfo.rarity || 'common'}`;
-        row.innerHTML = `
+      // Step 8: Apply rarity class to market row
+      const rarityClass = `rarity-${itemInfo.rarity || 'common'}`;
+      row.innerHTML = `
           <div class="market-item-name-cell ${rarityClass}">
             <span>${itemInfo.emoji}</span>
             <span class="market-item-name-text" title="${listing.item_name}">${listing.item_name}</span>
@@ -1790,768 +1742,768 @@ export class GameUI {
           <div class="market-item-seller-cell" title="${listing.seller_name}">${listing.seller_name}${isMine ? ' (คุณ)' : ''}</div>
           <div class="market-item-action-cell">
             ${isMine ?
-            `<button class="btn-market-cancel" data-id="${listing.id}">ยกเลิก</button>` :
-            `<button class="btn-market-buy" data-id="${listing.id}">ซื้อ</button>`
-          }
+          `<button class="btn-market-cancel" data-id="${listing.id}">ยกเลิก</button>` :
+          `<button class="btn-market-buy" data-id="${listing.id}">ซื้อ</button>`
+        }
           </div>
         `;
 
-        // Action click
-        const actionBtn = row.querySelector('button');
-        if (actionBtn) {
-          actionBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (isMine) {
-              this._performMarketCancelAction(listing);
-            } else {
-              this._performMarketBuyAction(listing);
-            }
-          });
-        }
+      // Action click
+      const actionBtn = row.querySelector('button');
+      if (actionBtn) {
+        actionBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (isMine) {
+            this._performMarketCancelAction(listing);
+          } else {
+            this._performMarketBuyAction(listing);
+          }
+        });
+      }
 
-        grid.appendChild(row);
-      });
-    } else {
-      document.getElementById('market-buy-container').style.display = 'none';
-      document.getElementById('market-sell-container').style.display = 'block';
+      grid.appendChild(row);
+    });
+  } else {
+    document.getElementById('market-buy-container').style.display = 'none';
+    document.getElementById('market-sell-container').style.display = 'block';
 
-      this._renderMarketSellInventory();
-    }
+    this._renderMarketSellInventory();
+  }
+}
+
+_renderMarketSellInventory() {
+  const grid = document.getElementById('market-sell-inventory-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  // Filter only non-equipped sellable items
+  const sellable = this.inventory.filter(item => !this._isItemEquipped(item));
+
+  if (sellable.length === 0) {
+    grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
+    return;
   }
 
-  _renderMarketSellInventory() {
-    const grid = document.getElementById('market-sell-inventory-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    // Filter only non-equipped sellable items
-    const sellable = this.inventory.filter(item => !this._isItemEquipped(item));
-
-    if (sellable.length === 0) {
-      grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
-      return;
+  sellable.forEach(item => {
+    const slot = document.createElement('div');
+    slot.className = `inventory-slot rarity-${item.rarity || 'common'}`;
+    if (this.selectedMarketItem && this.selectedMarketItem.item_name === item.item_name) {
+      slot.classList.add('selected');
     }
-
-    sellable.forEach(item => {
-      const slot = document.createElement('div');
-      slot.className = `inventory-slot rarity-${item.rarity || 'common'}`;
-      if (this.selectedMarketItem && this.selectedMarketItem.item_name === item.item_name) {
-        slot.classList.add('selected');
-      }
-      slot.innerHTML = `
+    slot.innerHTML = `
         <div class="slot-icon">${item.emoji}</div>
         <div class="slot-quantity">x${item.quantity}</div>
       `;
-      slot.addEventListener('click', () => {
-        this.selectedMarketItem = item;
-        this._renderMarketSellInventory();
-        this._updateMarketSellForm();
-      });
-      grid.appendChild(slot);
+    slot.addEventListener('click', () => {
+      this.selectedMarketItem = item;
+      this._renderMarketSellInventory();
+      this._updateMarketSellForm();
     });
-  }
+    grid.appendChild(slot);
+  });
+}
 
   async _updateMarketSellForm() {
-    const form = document.getElementById('market-sell-form');
-    if (!form || !this.selectedMarketItem) return;
+  const form = document.getElementById('market-sell-form');
+  if (!form || !this.selectedMarketItem) return;
 
-    form.style.display = 'block';
-    // Step 8: Ensure the form is visible without scrolling
-    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    document.getElementById('market-sell-item-icon').textContent = this.selectedMarketItem.emoji;
-    document.getElementById('market-sell-item-name').textContent = this.selectedMarketItem.item_name;
-    document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่มี: ${this.selectedMarketItem.quantity}`;
+  form.style.display = 'block';
+  // Step 8: Ensure the form is visible without scrolling
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  document.getElementById('market-sell-item-icon').textContent = this.selectedMarketItem.emoji;
+  document.getElementById('market-sell-item-name').textContent = this.selectedMarketItem.item_name;
+  document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่มี: ${this.selectedMarketItem.quantity}`;
 
-    // Load Average Price
-    const priceInfoEl = document.getElementById('market-sell-price-info');
-    if (priceInfoEl) {
-      priceInfoEl.textContent = '⌛ กำลังคำนวณราคากลาง...';
-      const stats = await fetchMarketPriceStats(this.selectedMarketItem.item_name);
-      if (stats && stats.avgPrice) {
-        priceInfoEl.innerHTML = `📈 ราคากลางล่าสุด: <span style="color:var(--zeny-gold); font-weight:bold;">${stats.avgPrice.toLocaleString()} Zeny</span> / ชิ้น`;
-      } else {
-        priceInfoEl.textContent = '📈 ราคากลาง: ยังไม่มีข้อมูลการซื้อขาย';
-      }
-    }
-
-    // Set defaults
-    const qtyInput = document.getElementById('market-sell-qty-input');
-    const priceInput = document.getElementById('market-sell-price-input');
-    if (qtyInput) {
-      qtyInput.value = 1;
-      qtyInput.max = this.selectedMarketItem.quantity;
-    }
-    if (priceInput) {
-      priceInput.value = '';
+  // Load Average Price
+  const priceInfoEl = document.getElementById('market-sell-price-info');
+  if (priceInfoEl) {
+    priceInfoEl.textContent = '⌛ กำลังคำนวณราคากลาง...';
+    const stats = await fetchMarketPriceStats(this.selectedMarketItem.item_name);
+    if (stats && stats.avgPrice) {
+      priceInfoEl.innerHTML = `📈 ราคากลางล่าสุด: <span style="color:var(--zeny-gold); font-weight:bold;">${stats.avgPrice.toLocaleString()} Zeny</span> / ชิ้น`;
+    } else {
+      priceInfoEl.textContent = '📈 ราคากลาง: ยังไม่มีข้อมูลการซื้อขาย';
     }
   }
+
+  // Set defaults
+  const qtyInput = document.getElementById('market-sell-qty-input');
+  const priceInput = document.getElementById('market-sell-price-input');
+  if (qtyInput) {
+    qtyInput.value = 1;
+    qtyInput.max = this.selectedMarketItem.quantity;
+  }
+  if (priceInput) {
+    priceInput.value = '';
+  }
+}
 
   async _performMarketListAction() {
-    if (!this.selectedMarketItem || !this.character || !this.characterId) return;
+  if (!this.selectedMarketItem || !this.character || !this.characterId) return;
 
-    const item = this.selectedMarketItem;
-    const qtyInput = document.getElementById('market-sell-qty-input');
-    const priceInput = document.getElementById('market-sell-price-input');
+  const item = this.selectedMarketItem;
+  const qtyInput = document.getElementById('market-sell-qty-input');
+  const priceInput = document.getElementById('market-sell-price-input');
 
-    if (!qtyInput || !priceInput) return;
+  if (!qtyInput || !priceInput) return;
 
-    const qty = parseInt(qtyInput.value);
-    const price = parseInt(priceInput.value);
+  const qty = parseInt(qtyInput.value);
+  const price = parseInt(priceInput.value);
 
-    if (isNaN(qty) || qty < 1 || qty > item.quantity) {
-      this.addCombatLog('❌ จำนวนที่ตั้งขายไม่ถูกต้อง!', 'system');
-      if (this.soundManager) this.soundManager.playErrorSound?.();
-      return;
-    }
-
-    if (isNaN(price) || price < 0) {
-      this.addCombatLog('❌ ราคา Zeny ไม่ถูกต้อง!', 'system');
-      if (this.soundManager) this.soundManager.playErrorSound?.();
-      return;
-    }
-
-    // Call service to list
-    try {
-      const listing = await listMarketItem(
-        this.characterId,
-        this.character.stats.name,
-        item.item_name,
-        item.item_type,
-        qty,
-        price,
-        item.stats || {}
-      );
-
-      if (listing) {
-        // Deduct from local inventory
-        const itemIdx = this.inventory.findIndex(i => i.item_name === item.item_name);
-        if (itemIdx >= 0) {
-          this.inventory[itemIdx].quantity -= qty;
-          if (this.inventory[itemIdx].quantity <= 0) {
-            this.inventory.splice(itemIdx, 1);
-          }
-        }
-
-        // Sync inventory DB decrement
-        await saveInventoryItem(this.characterId, item.item_name, item.item_type, -qty, item.stats || {});
-
-        this.addCombatLog(`⚖️ ตั้งขาย ${item.emoji} ${item.item_name} x${qty} ราคา ${price} Zeny แล้ว`, 'system');
-        if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
-
-        // Reset selection and close form
-        this.selectedMarketItem = null;
-        document.getElementById('market-sell-form').style.display = 'none';
-
-        // Refresh displays
-        this._renderMarket();
-        this._renderInventory();
-      } else {
-        throw new Error('Listing failed');
-      }
-    } catch (err) {
-      console.error('Market listing failed:', err);
-      this.addCombatLog('❌ เกิดข้อผิดพลาดในการตั้งขาย! กรุณาลองใหม่อีกครั้ง', 'system');
-      if (this.soundManager) this.soundManager.playErrorSound?.();
-    }
+  if (isNaN(qty) || qty < 1 || qty > item.quantity) {
+    this.addCombatLog('❌ จำนวนที่ตั้งขายไม่ถูกต้อง!', 'system');
+    if (this.soundManager) this.soundManager.playErrorSound?.();
+    return;
   }
 
-  async _performMarketBuyAction(listing) {
-    if (!this.character || !this.characterId) return;
-
-    if (this.character.stats.gold < listing.price) {
-      this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอสำหรับการสั่งซื้อนี้!', 'system');
-      if (this.soundManager) this.soundManager.playErrorSound?.();
-      return;
-    }
-
-    if (confirm(`คุณต้องการซื้อ ${listing.item_name} x${listing.quantity} ในราคา ${listing.price} Zeny หรือไม่?`)) {
-      // Decrease gold
-      this.character.stats.gold -= listing.price;
-
-      // Purchase service call (removes listing and adds gold to seller)
-      const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
-
-      if (boughtResult) {
-        // Add item to local inventory
-        const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
-        const existing = this.inventory.find(i => i.item_name === listing.item_name);
-        if (existing) {
-          existing.quantity += listing.quantity;
-        } else {
-          this.inventory.push({
-            item_name: listing.item_name,
-            item_type: listing.item_type,
-            emoji: itemRegistry.emoji || '📦',
-            desc: itemRegistry.desc || '',
-            price: itemRegistry.price || 10,
-            healHp: itemRegistry.healHp || 0,
-            restoreSp: itemRegistry.restoreSp || 0,
-            quantity: listing.quantity,
-            stats: listing.stats || {}
-          });
-        }
-
-        // Save character stats for gold sync
-        if (this.character.saveStatsToDatabase) {
-          this.character.saveStatsToDatabase().catch(() => { });
-        }
-
-        this.addCombatLog(`🛒 ซื้อ ${listing.item_name} x${listing.quantity} สำเร็จ (-${listing.price} Zeny)`, 'system');
-        if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
-
-        // Refresh displays
-        this._renderMarket();
-        this._renderInventory();
-        this.updateHUD(this.character.stats);
-        this.updateStats(this.character.stats);
-      } else {
-        // Refund gold
-        this.character.stats.gold += listing.price;
-        this.addCombatLog('❌ การซื้อล้มเหลว! ไอเทมอาจถูกผู้เล่นอื่นซื้อไปแล้ว', 'system');
-        if (this.soundManager) this.soundManager.playErrorSound?.();
-        this._renderMarket();
-      }
-    }
+  if (isNaN(price) || price < 0) {
+    this.addCombatLog('❌ ราคา Zeny ไม่ถูกต้อง!', 'system');
+    if (this.soundManager) this.soundManager.playErrorSound?.();
+    return;
   }
 
-  async _performMarketCancelAction(listing) {
-    if (!this.characterId) return;
-
-    if (confirm(`คุณต้องการยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} หรือไม่?`)) {
-      const canceled = await cancelMarketListing(listing.id, this.characterId);
-      if (canceled) {
-        // Add back to local inventory
-        const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
-        const existing = this.inventory.find(i => i.item_name === listing.item_name);
-        if (existing) {
-          existing.quantity += listing.quantity;
-        } else {
-          this.inventory.push({
-            item_name: listing.item_name,
-            item_type: listing.item_type,
-            emoji: itemRegistry.emoji || '📦',
-            desc: itemRegistry.desc || '',
-            price: itemRegistry.price || 10,
-            healHp: itemRegistry.healHp || 0,
-            restoreSp: itemRegistry.restoreSp || 0,
-            quantity: listing.quantity,
-            stats: listing.stats || {}
-          });
-        }
-
-        this.addCombatLog(`⚖️ ยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} สำเร็จ`, 'system');
-        if (this.soundManager) this.soundManager.playUseItemSound?.();
-
-        // Refresh displays
-        this._renderMarket();
-        this._renderInventory();
-      } else {
-        this.addCombatLog('❌ ยกเลิกไม่สำเร็จ!', 'system');
-        if (this.soundManager) this.soundManager.playErrorSound?.();
-        this._renderMarket();
-      }
-    }
-  }
-
-  // ============ Skill HUD Updates ============
-  updateSkillCooldown(skillId, currentCooldown, maxCooldown) {
-    const overlay = document.getElementById(`cooldown-${skillId}`);
-    if (overlay) {
-      if (currentCooldown <= 0) {
-        overlay.style.height = '0%';
-      } else {
-        const percentage = (currentCooldown / maxCooldown) * 100;
-        overlay.style.height = `${percentage}%`;
-      }
-    }
-
-    const mobOverlay = document.getElementById(`mobile-cooldown-${skillId}`);
-    if (mobOverlay) {
-      if (currentCooldown <= 0) {
-        mobOverlay.style.height = '0%';
-      } else {
-        const percentage = (currentCooldown / maxCooldown) * 100;
-        mobOverlay.style.height = `${percentage}%`;
-      }
-    }
-  }
-
-  castSkill(skillId) {
-    if (!this.character || !this.character.isAlive()) return false;
-
-    // Determine target
-    let target = this.character.targetMonster;
-    if (skillId === 'bash' && !target) {
-      if (this.combatSystem && this.combatSystem.monsters) {
-        target = this.combatSystem.monsters.findNearest(this.character.getPosition());
-        // Snap target if within reasonable range (3x normal melee range)
-        if (target && this.character.getPosition().distanceTo(target.getPosition()) > this.character.getAttackRange() * 3) {
-          target = null;
-        }
-      }
-    }
-
-    // Call character's useSkill
-    const success = this.character.useSkill(
-      skillId,
-      target,
-      this.combatSystem ? this.combatSystem.monsters : null,
-      this,
-      this.soundManager,
-      this.particles || window.particles,
-      (skillType, hitTarget, dmg) => {
-        // Handle monster death if this skill killed it
-        if (hitTarget && !hitTarget.alive) {
-          if (this.combatSystem) {
-            this.combatSystem._onMonsterKilled(hitTarget);
-          }
-        }
-      }
+  // Call service to list
+  try {
+    const listing = await listMarketItem(
+      this.characterId,
+      this.character.stats.name,
+      item.item_name,
+      item.item_type,
+      qty,
+      price,
+      item.stats || {}
     );
 
-    return success;
+    if (listing) {
+      // Deduct from local inventory
+      const itemIdx = this.inventory.findIndex(i => i.item_name === item.item_name);
+      if (itemIdx >= 0) {
+        this.inventory[itemIdx].quantity -= qty;
+        if (this.inventory[itemIdx].quantity <= 0) {
+          this.inventory.splice(itemIdx, 1);
+        }
+      }
+
+      // Sync inventory DB decrement
+      await saveInventoryItem(this.characterId, item.item_name, item.item_type, -qty, item.stats || {});
+
+      this.addCombatLog(`⚖️ ตั้งขาย ${item.emoji} ${item.item_name} x${qty} ราคา ${price} Zeny แล้ว`, 'system');
+      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
+
+      // Reset selection and close form
+      this.selectedMarketItem = null;
+      document.getElementById('market-sell-form').style.display = 'none';
+
+      // Refresh displays
+      this._renderMarket();
+      this._renderInventory();
+    } else {
+      throw new Error('Listing failed');
+    }
+  } catch (err) {
+    console.error('Market listing failed:', err);
+    this.addCombatLog('❌ เกิดข้อผิดพลาดในการตั้งขาย! กรุณาลองใหม่อีกครั้ง', 'system');
+    if (this.soundManager) this.soundManager.playErrorSound?.();
+  }
+}
+
+  async _performMarketBuyAction(listing) {
+  if (!this.character || !this.characterId) return;
+
+  if (this.character.stats.gold < listing.price) {
+    this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอสำหรับการสั่งซื้อนี้!', 'system');
+    if (this.soundManager) this.soundManager.playErrorSound?.();
+    return;
   }
 
-  _setupMobileControls() {
-    const pad = document.getElementById('mobile-pad');
-    const container = document.getElementById('joystick-container');
-    const base = document.getElementById('joystick-base');
-    const knob = document.getElementById('joystick-knob');
-    if (!pad || !container || !base || !knob) return;
+  if (confirm(`คุณต้องการซื้อ ${listing.item_name} x${listing.quantity} ในราคา ${listing.price} Zeny หรือไม่?`)) {
+    // Decrease gold
+    this.character.stats.gold -= listing.price;
 
-    let joystickActive = false;
-    let joystickTouchId = null;
-    let joystickStartTime = 0;
-    let startX = 0;
-    let startY = 0;
-    const maxRadius = 45; // Max knob movement radius in pixels
+    // Purchase service call (removes listing and adds gold to seller)
+    const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
 
-    // Hide joystick container by default (floating mode)
+    if (boughtResult) {
+      // Add item to local inventory
+      const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
+      const existing = this.inventory.find(i => i.item_name === listing.item_name);
+      if (existing) {
+        existing.quantity += listing.quantity;
+      } else {
+        this.inventory.push({
+          item_name: listing.item_name,
+          item_type: listing.item_type,
+          emoji: itemRegistry.emoji || '📦',
+          desc: itemRegistry.desc || '',
+          price: itemRegistry.price || 10,
+          healHp: itemRegistry.healHp || 0,
+          restoreSp: itemRegistry.restoreSp || 0,
+          quantity: listing.quantity,
+          stats: listing.stats || {}
+        });
+      }
+
+      // Save character stats for gold sync
+      if (this.character.saveStatsToDatabase) {
+        this.character.saveStatsToDatabase().catch(() => { });
+      }
+
+      this.addCombatLog(`🛒 ซื้อ ${listing.item_name} x${listing.quantity} สำเร็จ (-${listing.price} Zeny)`, 'system');
+      if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
+
+      // Refresh displays
+      this._renderMarket();
+      this._renderInventory();
+      this.updateHUD(this.character.stats);
+      this.updateStats(this.character.stats);
+    } else {
+      // Refund gold
+      this.character.stats.gold += listing.price;
+      this.addCombatLog('❌ การซื้อล้มเหลว! ไอเทมอาจถูกผู้เล่นอื่นซื้อไปแล้ว', 'system');
+      if (this.soundManager) this.soundManager.playErrorSound?.();
+      this._renderMarket();
+    }
+  }
+}
+
+  async _performMarketCancelAction(listing) {
+  if (!this.characterId) return;
+
+  if (confirm(`คุณต้องการยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} หรือไม่?`)) {
+    const canceled = await cancelMarketListing(listing.id, this.characterId);
+    if (canceled) {
+      // Add back to local inventory
+      const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
+      const existing = this.inventory.find(i => i.item_name === listing.item_name);
+      if (existing) {
+        existing.quantity += listing.quantity;
+      } else {
+        this.inventory.push({
+          item_name: listing.item_name,
+          item_type: listing.item_type,
+          emoji: itemRegistry.emoji || '📦',
+          desc: itemRegistry.desc || '',
+          price: itemRegistry.price || 10,
+          healHp: itemRegistry.healHp || 0,
+          restoreSp: itemRegistry.restoreSp || 0,
+          quantity: listing.quantity,
+          stats: listing.stats || {}
+        });
+      }
+
+      this.addCombatLog(`⚖️ ยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} สำเร็จ`, 'system');
+      if (this.soundManager) this.soundManager.playUseItemSound?.();
+
+      // Refresh displays
+      this._renderMarket();
+      this._renderInventory();
+    } else {
+      this.addCombatLog('❌ ยกเลิกไม่สำเร็จ!', 'system');
+      if (this.soundManager) this.soundManager.playErrorSound?.();
+      this._renderMarket();
+    }
+  }
+}
+
+// ============ Skill HUD Updates ============
+updateSkillCooldown(skillId, currentCooldown, maxCooldown) {
+  const overlay = document.getElementById(`cooldown-${skillId}`);
+  if (overlay) {
+    if (currentCooldown <= 0) {
+      overlay.style.height = '0%';
+    } else {
+      const percentage = (currentCooldown / maxCooldown) * 100;
+      overlay.style.height = `${percentage}%`;
+    }
+  }
+
+  const mobOverlay = document.getElementById(`mobile-cooldown-${skillId}`);
+  if (mobOverlay) {
+    if (currentCooldown <= 0) {
+      mobOverlay.style.height = '0%';
+    } else {
+      const percentage = (currentCooldown / maxCooldown) * 100;
+      mobOverlay.style.height = `${percentage}%`;
+    }
+  }
+}
+
+castSkill(skillId) {
+  if (!this.character || !this.character.isAlive()) return false;
+
+  // Determine target
+  let target = this.character.targetMonster;
+  if (skillId === 'bash' && !target) {
+    if (this.combatSystem && this.combatSystem.monsters) {
+      target = this.combatSystem.monsters.findNearest(this.character.getPosition());
+      // Snap target if within reasonable range (3x normal melee range)
+      if (target && this.character.getPosition().distanceTo(target.getPosition()) > this.character.getAttackRange() * 3) {
+        target = null;
+      }
+    }
+  }
+
+  // Call character's useSkill
+  const success = this.character.useSkill(
+    skillId,
+    target,
+    this.combatSystem ? this.combatSystem.monsters : null,
+    this,
+    this.soundManager,
+    this.particles || window.particles,
+    (skillType, hitTarget, dmg) => {
+      // Handle monster death if this skill killed it
+      if (hitTarget && !hitTarget.alive) {
+        if (this.combatSystem) {
+          this.combatSystem._onMonsterKilled(hitTarget);
+        }
+      }
+    }
+  );
+
+  return success;
+}
+
+_setupMobileControls() {
+  const pad = document.getElementById('mobile-pad');
+  const container = document.getElementById('joystick-container');
+  const base = document.getElementById('joystick-base');
+  const knob = document.getElementById('joystick-knob');
+  if (!pad || !container || !base || !knob) return;
+
+  let joystickActive = false;
+  let joystickTouchId = null;
+  let joystickStartTime = 0;
+  let startX = 0;
+  let startY = 0;
+  const maxRadius = 45; // Max knob movement radius in pixels
+
+  // Hide joystick container by default (floating mode)
+  container.style.opacity = '0';
+  container.style.pointerEvents = 'none';
+  container.style.transition = 'opacity 0.15s ease';
+
+  // Keep track of virtual key states
+  const activeKeys = {
+    KeyW: false,
+    KeyS: false,
+    KeyA: false,
+    KeyD: false
+  };
+
+  const triggerKeyEvent = (keyCode, isPressed) => {
+    if (activeKeys[keyCode] === isPressed) return;
+    activeKeys[keyCode] = isPressed;
+    const type = isPressed ? 'keydown' : 'keyup';
+    const event = new KeyboardEvent(type, { code: keyCode, key: keyCode });
+    window.dispatchEvent(event);
+  };
+
+  // Show joystick at a specific position
+  const showJoystickAt = (x, y) => {
+    const size = container.offsetWidth || 130;
+    container.style.left = `${x - size / 2}px`;
+    container.style.top = `${y - size / 2}px`;
+    container.style.bottom = 'auto';
+    container.style.opacity = '1';
+    container.style.pointerEvents = 'auto';
+  };
+
+  const hideJoystick = () => {
     container.style.opacity = '0';
     container.style.pointerEvents = 'none';
-    container.style.transition = 'opacity 0.15s ease';
+  };
 
-    // Keep track of virtual key states
-    const activeKeys = {
-      KeyW: false,
-      KeyS: false,
-      KeyA: false,
-      KeyD: false
-    };
+  const handleStart = (e) => {
+    // Only active if the mobile control pad is visible on screen (responsive check)
+    if (window.getComputedStyle(pad).display === 'none') return;
 
-    const triggerKeyEvent = (keyCode, isPressed) => {
-      if (activeKeys[keyCode] === isPressed) return;
-      activeKeys[keyCode] = isPressed;
-      const type = isPressed ? 'keydown' : 'keyup';
-      const event = new KeyboardEvent(type, { code: keyCode, key: keyCode });
+    // Only respond to touches on the LEFT half of the screen
+    const touch = e.touches ? e.touches[0] : e;
+    if (touch.clientX > window.innerWidth / 2) return;
+
+    // Ignore if touching an interactive element (buttons, etc.)
+    const target = e.target;
+    if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
+      target.closest('#hud-bottom') || target.closest('.side-panel') ||
+      target.closest('.modal-popup') || target.closest('#hud-top') ||
+      target.closest('#minimap-container') || target.closest('#target-indicator') ||
+      target.closest('#fps-counter') || target.closest('#kill-counter')) return;
+
+    e.preventDefault();
+    joystickActive = true;
+    if (e.touches) joystickTouchId = e.touches[0].identifier;
+
+    joystickStartTime = performance.now();
+    startX = touch.clientX;
+    startY = touch.clientY;
+
+    showJoystickAt(startX, startY);
+    knob.style.transform = 'translate(0px, 0px)';
+    base.style.borderColor = 'var(--primary)';
+  };
+
+  const handleMove = (e) => {
+    if (!joystickActive) return;
+    e.preventDefault();
+
+    let touch;
+    if (e.touches) {
+      touch = Array.from(e.touches).find(t => t.identifier === joystickTouchId);
+      if (!touch) return;
+    } else {
+      touch = e;
+    }
+
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    let angle = Math.atan2(dy, dx);
+    let moveX = dx;
+    let moveY = dy;
+
+    if (distance > maxRadius) {
+      moveX = Math.cos(angle) * maxRadius;
+      moveY = Math.sin(angle) * maxRadius;
+    }
+
+    knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
+
+    const nx = moveX / maxRadius;
+    const ny = moveY / maxRadius;
+    const threshold = 0.35;
+
+    const inputManager = this.character ? this.character.inputManager : null;
+    if (inputManager) {
+      inputManager.setJoystickInput(nx, ny);
+    } else {
+      triggerKeyEvent('KeyW', ny < -threshold);
+      triggerKeyEvent('KeyS', ny > threshold);
+      triggerKeyEvent('KeyA', nx < -threshold);
+      triggerKeyEvent('KeyD', nx > threshold);
+    }
+  };
+
+  const handleEnd = (e) => {
+    if (!joystickActive) return;
+
+    // Find the touch coordinates that ended
+    let touch;
+    if (e.changedTouches) {
+      touch = Array.from(e.changedTouches).find(t => t.identifier === joystickTouchId);
+      if (!touch) return;
+    } else {
+      touch = e;
+    }
+
+    const duration = performance.now() - joystickStartTime;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    joystickActive = false;
+    joystickTouchId = null;
+    knob.style.transform = 'translate(0px, 0px)';
+    base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
+    hideJoystick();
+
+    const inputManager = this.character ? this.character.inputManager : null;
+    if (inputManager) {
+      inputManager.setJoystickInput(0, 0);
+    } else {
+      triggerKeyEvent('KeyW', false);
+      triggerKeyEvent('KeyS', false);
+      triggerKeyEvent('KeyA', false);
+      triggerKeyEvent('KeyD', false);
+    }
+
+    // Tap detection: short tap with small movement
+    if (duration < 250 && distance < 15) {
+      if (window.handleCanvasTap) {
+        window.handleCanvasTap({
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+      }
+    }
+  };
+
+  // Listen on the window for floating joystick (since mobile-pad has pointer-events: none)
+  window.addEventListener('touchstart', handleStart, { passive: false });
+  window.addEventListener('touchmove', handleMove, { passive: false });
+  window.addEventListener('touchend', handleEnd, { passive: false });
+
+  // Desktop/mouse fallback (for browser mobile simulation mode)
+  window.addEventListener('mousedown', handleStart);
+  window.addEventListener('mousemove', handleMove);
+  window.addEventListener('mouseup', handleEnd);
+
+  // Sprint Button logic
+  const sprintBtn = document.getElementById('btn-mobile-sprint');
+  if (sprintBtn) {
+    let isSprintActive = false;
+    const toggleSprint = () => {
+      isSprintActive = !isSprintActive;
+      sprintBtn.classList.toggle('active', isSprintActive);
+
+      const event = new KeyboardEvent(isSprintActive ? 'keydown' : 'keyup', {
+        code: 'ShiftLeft',
+        key: 'Shift'
+      });
       window.dispatchEvent(event);
     };
 
-    // Show joystick at a specific position
-    const showJoystickAt = (x, y) => {
-      const size = container.offsetWidth || 130;
-      container.style.left = `${x - size / 2}px`;
-      container.style.top = `${y - size / 2}px`;
-      container.style.bottom = 'auto';
-      container.style.opacity = '1';
-      container.style.pointerEvents = 'auto';
-    };
-
-    const hideJoystick = () => {
-      container.style.opacity = '0';
-      container.style.pointerEvents = 'none';
-    };
-
-    const handleStart = (e) => {
-      // Only active if the mobile control pad is visible on screen (responsive check)
-      if (window.getComputedStyle(pad).display === 'none') return;
-
-      // Only respond to touches on the LEFT half of the screen
-      const touch = e.touches ? e.touches[0] : e;
-      if (touch.clientX > window.innerWidth / 2) return;
-
-      // Ignore if touching an interactive element (buttons, etc.)
-      const target = e.target;
-      if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
-        target.closest('#hud-bottom') || target.closest('.side-panel') ||
-        target.closest('.modal-popup') || target.closest('#hud-top') ||
-        target.closest('#minimap-container') || target.closest('#target-indicator') ||
-        target.closest('#fps-counter') || target.closest('#kill-counter')) return;
-
+    sprintBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      joystickActive = true;
-      if (e.touches) joystickTouchId = e.touches[0].identifier;
-
-      joystickStartTime = performance.now();
-      startX = touch.clientX;
-      startY = touch.clientY;
-
-      showJoystickAt(startX, startY);
-      knob.style.transform = 'translate(0px, 0px)';
-      base.style.borderColor = 'var(--primary)';
-    };
-
-    const handleMove = (e) => {
-      if (!joystickActive) return;
+      toggleSprint();
+    });
+    sprintBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      toggleSprint();
+    });
+  }
 
-      let touch;
-      if (e.touches) {
-        touch = Array.from(e.touches).find(t => t.identifier === joystickTouchId);
-        if (!touch) return;
-      } else {
-        touch = e;
-      }
+  // Target/Attack Button logic
+  const attackBtn = document.getElementById('btn-mobile-attack');
+  if (attackBtn) {
+    const triggerAttack = () => {
+      if (!this.character) return;
 
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      let angle = Math.atan2(dy, dx);
-      let moveX = dx;
-      let moveY = dy;
-
-      if (distance > maxRadius) {
-        moveX = Math.cos(angle) * maxRadius;
-        moveY = Math.sin(angle) * maxRadius;
-      }
-
-      knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
-
-      const nx = moveX / maxRadius;
-      const ny = moveY / maxRadius;
-      const threshold = 0.35;
-
-      const inputManager = this.character ? this.character.inputManager : null;
-      if (inputManager) {
-        inputManager.setJoystickInput(nx, ny);
-      } else {
-        triggerKeyEvent('KeyW', ny < -threshold);
-        triggerKeyEvent('KeyS', ny > threshold);
-        triggerKeyEvent('KeyA', nx < -threshold);
-        triggerKeyEvent('KeyD', nx > threshold);
-      }
-    };
-
-    const handleEnd = (e) => {
-      if (!joystickActive) return;
-
-      // Find the touch coordinates that ended
-      let touch;
-      if (e.changedTouches) {
-        touch = Array.from(e.changedTouches).find(t => t.identifier === joystickTouchId);
-        if (!touch) return;
-      } else {
-        touch = e;
-      }
-
-      const duration = performance.now() - joystickStartTime;
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      joystickActive = false;
-      joystickTouchId = null;
-      knob.style.transform = 'translate(0px, 0px)';
-      base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
-      hideJoystick();
-
-      const inputManager = this.character ? this.character.inputManager : null;
-      if (inputManager) {
-        inputManager.setJoystickInput(0, 0);
-      } else {
-        triggerKeyEvent('KeyW', false);
-        triggerKeyEvent('KeyS', false);
-        triggerKeyEvent('KeyA', false);
-        triggerKeyEvent('KeyD', false);
-      }
-
-      // Tap detection: short tap with small movement
-      if (duration < 250 && distance < 15) {
-        if (window.handleCanvasTap) {
-          window.handleCanvasTap({
-            clientX: touch.clientX,
-            clientY: touch.clientY
-          });
-        }
-      }
-    };
-
-    // Listen on the window for floating joystick (since mobile-pad has pointer-events: none)
-    window.addEventListener('touchstart', handleStart, { passive: false });
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', handleEnd, { passive: false });
-
-    // Desktop/mouse fallback (for browser mobile simulation mode)
-    window.addEventListener('mousedown', handleStart);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleEnd);
-
-    // Sprint Button logic
-    const sprintBtn = document.getElementById('btn-mobile-sprint');
-    if (sprintBtn) {
-      let isSprintActive = false;
-      const toggleSprint = () => {
-        isSprintActive = !isSprintActive;
-        sprintBtn.classList.toggle('active', isSprintActive);
-
-        const event = new KeyboardEvent(isSprintActive ? 'keydown' : 'keyup', {
-          code: 'ShiftLeft',
-          key: 'Shift'
-        });
-        window.dispatchEvent(event);
-      };
-
-      sprintBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        toggleSprint();
-      });
-      sprintBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        toggleSprint();
-      });
-    }
-
-    // Target/Attack Button logic
-    const attackBtn = document.getElementById('btn-mobile-attack');
-    if (attackBtn) {
-      const triggerAttack = () => {
-        if (!this.character) return;
-
-        if (!this.character.targetMonster) {
-          if (this.combatSystem && this.combatSystem.monsters) {
-            const nearest = this.combatSystem.monsters.findNearest(this.character.getPosition());
-            if (nearest) {
-              this.character.targetMonster = nearest;
-              this.addCombatLog(`🎯 Target selected: ${nearest.data.name}`, 'system');
-            } else {
-              this.addCombatLog('❌ No monsters nearby', 'system');
-            }
+      if (!this.character.targetMonster) {
+        if (this.combatSystem && this.combatSystem.monsters) {
+          const nearest = this.combatSystem.monsters.findNearest(this.character.getPosition());
+          if (nearest) {
+            this.character.targetMonster = nearest;
+            this.addCombatLog(`🎯 Target selected: ${nearest.data.name}`, 'system');
+          } else {
+            this.addCombatLog('❌ No monsters nearby', 'system');
           }
-        } else {
-          const name = this.character.targetMonster.data.name || 'Monster';
-          this.character.targetMonster = null;
-          this.addCombatLog(`❌ Deselected target: ${name}`, 'system');
         }
-      };
-
-      attackBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        triggerAttack();
-      });
-      attackBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        triggerAttack();
-      });
-    }
-
-    // Skill buttons touch and click triggers
-    ['bash', 'heal', 'magnumBreak'].forEach((skillId, index) => {
-      const btn = document.getElementById(`btn-mobile-skill-${index + 1}`);
-      if (btn) {
-        btn.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          this.castSkill(skillId);
-        });
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.castSkill(skillId);
-        });
+      } else {
+        const name = this.character.targetMonster.data.name || 'Monster';
+        this.character.targetMonster = null;
+        this.addCombatLog(`❌ Deselected target: ${name}`, 'system');
       }
+    };
+
+    attackBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      triggerAttack();
+    });
+    attackBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      triggerAttack();
     });
   }
 
-  setupSkillClicks(callback) {
-    const slots = document.querySelectorAll('.skill-slot');
-    slots.forEach(slot => {
-      slot.addEventListener('click', () => {
-        const skillId = slot.getAttribute('data-skill');
-        callback(skillId);
+  // Skill buttons touch and click triggers
+  ['bash', 'heal', 'magnumBreak'].forEach((skillId, index) => {
+    const btn = document.getElementById(`btn-mobile-skill-${index + 1}`);
+    if (btn) {
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        this.castSkill(skillId);
       });
-    });
-  }
-
-  // ============ Wiki Panel Control & Render ============
-  _setupWiki() {
-    // Select tabs
-    document.querySelectorAll('.wiki-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.wiki-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        this.currentWikiTab = tab.getAttribute('data-tab');
-        this.selectedWikiItem = null;
-        this._renderWikiList();
-      });
-    });
-
-    // Search events
-    const searchInput = document.getElementById('wiki-search-input');
-    if (searchInput) {
-      searchInput.addEventListener('input', () => {
-        this._renderWikiList();
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.castSkill(skillId);
       });
     }
+  });
+}
 
-    this.currentWikiTab = 'monsters';
-    this.selectedWikiItem = null;
+setupSkillClicks(callback) {
+  const slots = document.querySelectorAll('.skill-slot');
+  slots.forEach(slot => {
+    slot.addEventListener('click', () => {
+      const skillId = slot.getAttribute('data-skill');
+      callback(skillId);
+    });
+  });
+}
+
+// ============ Wiki Panel Control & Render ============
+_setupWiki() {
+  // Select tabs
+  document.querySelectorAll('.wiki-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.wiki-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      this.currentWikiTab = tab.getAttribute('data-tab');
+      this.selectedWikiItem = null;
+      this._renderWikiList();
+    });
+  });
+
+  // Search events
+  const searchInput = document.getElementById('wiki-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      this._renderWikiList();
+    });
   }
 
-  _renderWiki() {
-    this._renderWikiList();
-    this._renderWikiDetail();
-  }
+  this.currentWikiTab = 'monsters';
+  this.selectedWikiItem = null;
+}
 
-  _renderWikiList() {
-    const listContainer = document.getElementById('wiki-list');
-    if (!listContainer) return;
-    listContainer.innerHTML = '';
+_renderWiki() {
+  this._renderWikiList();
+  this._renderWikiDetail();
+}
 
-    const query = (document.getElementById('wiki-search-input')?.value || '').toLowerCase().trim();
+_renderWikiList() {
+  const listContainer = document.getElementById('wiki-list');
+  if (!listContainer) return;
+  listContainer.innerHTML = '';
 
-    if (this.currentWikiTab === 'monsters') {
-      const allMons = getAllMonsters();
-      Object.keys(allMons).forEach(key => {
-        const monster = allMons[key];
-        const match = key.toLowerCase().includes(query) || monster.name.toLowerCase().includes(query);
-        if (!match) return;
+  const query = (document.getElementById('wiki-search-input')?.value || '').toLowerCase().trim();
 
-        const slot = document.createElement('div');
-        slot.className = 'wiki-slot';
-        if (monster.waterOnly) slot.classList.add('water-monster');
-        if (this.selectedWikiItem === key) {
-          slot.classList.add('selected');
-        }
-        slot.innerHTML = `
+  if (this.currentWikiTab === 'monsters') {
+    const allMons = getAllMonsters();
+    Object.keys(allMons).forEach(key => {
+      const monster = allMons[key];
+      const match = key.toLowerCase().includes(query) || monster.name.toLowerCase().includes(query);
+      if (!match) return;
+
+      const slot = document.createElement('div');
+      slot.className = 'wiki-slot';
+      if (monster.waterOnly) slot.classList.add('water-monster');
+      if (this.selectedWikiItem === key) {
+        slot.classList.add('selected');
+      }
+      slot.innerHTML = `
           <span class="wiki-slot-emoji">${monster.emoji || '👾'}</span>
           <span class="wiki-slot-name">${monster.name}</span>
         `;
-        slot.title = monster.name;
-        slot.addEventListener('click', () => {
-          this.selectedWikiItem = key;
-          this._renderWikiList();
-          this._renderWikiDetail();
-        });
-        listContainer.appendChild(slot);
+      slot.title = monster.name;
+      slot.addEventListener('click', () => {
+        this.selectedWikiItem = key;
+        this._renderWikiList();
+        this._renderWikiDetail();
       });
-    } else if (this.currentWikiTab === 'fish') {
-      Object.keys(ITEMS).forEach(key => {
-        const item = ITEMS[key];
-        if (item.type !== 'fish') return;
-        const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
-        if (!match) return;
+      listContainer.appendChild(slot);
+    });
+  } else if (this.currentWikiTab === 'fish') {
+    Object.keys(ITEMS).forEach(key => {
+      const item = ITEMS[key];
+      if (item.type !== 'fish') return;
+      const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+      if (!match) return;
 
-        const slot = document.createElement('div');
-        slot.className = 'wiki-slot';
-        if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
-        if (this.selectedWikiItem === key) {
-          slot.classList.add('selected');
-        }
-        slot.innerHTML = `
+      const slot = document.createElement('div');
+      slot.className = 'wiki-slot';
+      if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
+      if (this.selectedWikiItem === key) {
+        slot.classList.add('selected');
+      }
+      slot.innerHTML = `
           <span class="wiki-slot-emoji">${item.emoji || '🐟'}</span>
           <span class="wiki-slot-name">${key}</span>
         `;
-        slot.title = key;
-        slot.addEventListener('click', () => {
-          this.selectedWikiItem = key;
-          this._renderWikiList();
-          this._renderWikiDetail();
-        });
-        listContainer.appendChild(slot);
+      slot.title = key;
+      slot.addEventListener('click', () => {
+        this.selectedWikiItem = key;
+        this._renderWikiList();
+        this._renderWikiDetail();
       });
-    } else {
-      Object.keys(ITEMS).forEach(key => {
-        const item = ITEMS[key];
-        if (item.type === 'fish') return;
-        const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
-        if (!match) return;
+      listContainer.appendChild(slot);
+    });
+  } else {
+    Object.keys(ITEMS).forEach(key => {
+      const item = ITEMS[key];
+      if (item.type === 'fish') return;
+      const match = key.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query);
+      if (!match) return;
 
-        const slot = document.createElement('div');
-        slot.className = 'wiki-slot';
-        if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
-        if (this.selectedWikiItem === key) {
-          slot.classList.add('selected');
-        }
-        slot.innerHTML = `
+      const slot = document.createElement('div');
+      slot.className = 'wiki-slot';
+      if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
+      if (this.selectedWikiItem === key) {
+        slot.classList.add('selected');
+      }
+      slot.innerHTML = `
           <span class="wiki-slot-emoji">${item.emoji || '📦'}</span>
           <span class="wiki-slot-name">${key}</span>
         `;
-        slot.title = key;
-        slot.addEventListener('click', () => {
-          this.selectedWikiItem = key;
-          this._renderWikiList();
-          this._renderWikiDetail();
-        });
-        listContainer.appendChild(slot);
+      slot.title = key;
+      slot.addEventListener('click', () => {
+        this.selectedWikiItem = key;
+        this._renderWikiList();
+        this._renderWikiDetail();
       });
-    }
-
-    if (!this.selectedWikiItem) {
-      document.getElementById('wiki-detail-placeholder').style.display = 'block';
-      document.getElementById('wiki-detail-content').style.display = 'none';
-    }
+      listContainer.appendChild(slot);
+    });
   }
 
-  _renderWikiDetail() {
-    const placeholder = document.getElementById('wiki-detail-placeholder');
-    const content = document.getElementById('wiki-detail-content');
+  if (!this.selectedWikiItem) {
+    document.getElementById('wiki-detail-placeholder').style.display = 'block';
+    document.getElementById('wiki-detail-content').style.display = 'none';
+  }
+}
 
-    if (!this.selectedWikiItem) {
-      placeholder.style.display = 'block';
-      content.style.display = 'none';
-      return;
-    }
+_renderWikiDetail() {
+  const placeholder = document.getElementById('wiki-detail-placeholder');
+  const content = document.getElementById('wiki-detail-content');
 
-    placeholder.style.display = 'none';
-    content.style.display = 'block';
+  if (!this.selectedWikiItem) {
+    placeholder.style.display = 'block';
+    content.style.display = 'none';
+    return;
+  }
 
-    const key = this.selectedWikiItem;
+  placeholder.style.display = 'none';
+  content.style.display = 'block';
 
-    if (this.currentWikiTab === 'monsters') {
-      const allMons = getAllMonsters();
-      const monster = allMons[key];
-      if (!monster) return;
+  const key = this.selectedWikiItem;
 
-      // Determine map area
-      let mapArea = 'Prontera Field';
-      if (PAYON_MONSTERS[key]) mapArea = 'Payon Forest 🌲';
-      else if (GLAST_MONSTERS[key]) mapArea = 'Glast Heim 🏰';
-      else if (MJOLNIR_MONSTERS[key]) mapArea = 'Mjolnir Mountains ⛰️';
-      else if (ABYSS_MONSTERS[key]) mapArea = 'Abyss Lake 🌊';
-      else if (WATER_MONSTERS[key]) mapArea = 'Water Zone 🌊';
+  if (this.currentWikiTab === 'monsters') {
+    const allMons = getAllMonsters();
+    const monster = allMons[key];
+    if (!monster) return;
 
-      // Find drop items details
-      let dropHtml = '';
-      if (monster.loot && monster.loot.length > 0) {
-        dropHtml = `<div class="wiki-section-title">🎁 Loot Drops / อัตราดรอป:</div><div class="wiki-drops-list">`;
-        monster.loot.forEach(lootInfo => {
-          const itemMeta = ITEMS[lootInfo.name];
-          const emoji = itemMeta?.emoji || lootInfo.emoji || '📦';
-          const rarity = itemMeta?.rarity || 'common';
-          const pct = (lootInfo.chance * 100).toFixed(1);
-          dropHtml += `
+    // Determine map area
+    let mapArea = 'Prontera Field';
+    if (PAYON_MONSTERS[key]) mapArea = 'Payon Forest 🌲';
+    else if (GLAST_MONSTERS[key]) mapArea = 'Glast Heim 🏰';
+    else if (MJOLNIR_MONSTERS[key]) mapArea = 'Mjolnir Mountains ⛰️';
+    else if (ABYSS_MONSTERS[key]) mapArea = 'Abyss Lake 🌊';
+    else if (WATER_MONSTERS[key]) mapArea = 'Water Zone 🌊';
+
+    // Find drop items details
+    let dropHtml = '';
+    if (monster.loot && monster.loot.length > 0) {
+      dropHtml = `<div class="wiki-section-title">🎁 Loot Drops / อัตราดรอป:</div><div class="wiki-drops-list">`;
+      monster.loot.forEach(lootInfo => {
+        const itemMeta = ITEMS[lootInfo.name];
+        const emoji = itemMeta?.emoji || lootInfo.emoji || '📦';
+        const rarity = itemMeta?.rarity || 'common';
+        const pct = (lootInfo.chance * 100).toFixed(1);
+        dropHtml += `
             <div class="wiki-drop-item">
               <span class="color-${rarity}">${emoji} ${lootInfo.name}</span>
               <span style="color:#20e060">${pct}%</span>
             </div>
           `;
-        });
-        dropHtml += `</div>`;
-      } else {
-        dropHtml = `<div class="wiki-section-title">🎁 Loot Drops:</div><div style="font-size:11px;color:var(--text-dim)">No drops</div>`;
-      }
+      });
+      dropHtml += `</div>`;
+    } else {
+      dropHtml = `<div class="wiki-section-title">🎁 Loot Drops:</div><div style="font-size:11px;color:var(--text-dim)">No drops</div>`;
+    }
 
-      // Calculate an approximate level based on stats since it's not explicitly in DB
-      const approxLevel = Math.max(1, Math.floor(monster.hp / 20) + Math.floor(monster.atk / 4));
-      const goldText = (typeof monster.gold === 'object') ? (monster.gold.min + ' - ' + monster.gold.max) : monster.gold;
+    // Calculate an approximate level based on stats since it's not explicitly in DB
+    const approxLevel = Math.max(1, Math.floor(monster.hp / 20) + Math.floor(monster.atk / 4));
+    const goldText = (typeof monster.gold === 'object') ? (monster.gold.min + ' - ' + monster.gold.max) : monster.gold;
 
-      const envDict = {
-        water: 'Water Zone / แหล่งน้ำ 🌊',
-        ground: 'Main Land / พื้นดิน 🏜️',
-        cave: 'Cave / ในถ้ำ 🪨',
-        mountain: 'Mountain / ภูเขา 🏔️'
-      };
-      const envName = envDict[monster.environment] || monster.environment || 'Unknown';
-      content.innerHTML = `
+    const envDict = {
+      water: 'Water Zone / แหล่งน้ำ 🌊',
+      ground: 'Main Land / พื้นดิน 🏜️',
+      cave: 'Cave / ในถ้ำ 🪨',
+      mountain: 'Mountain / ภูเขา 🏔️'
+    };
+    const envName = envDict[monster.environment] || monster.environment || 'Unknown';
+    content.innerHTML = `
         <div class="detail-row">
           <span class="detail-icon" style="background:${monster.color}22">${monster.emoji || '👾'}</span>
           <div class="detail-info-block">
@@ -2567,44 +2519,44 @@ export class GameUI {
         </div>
         ${dropHtml}
       `;
-    } else {
-      const item = ITEMS[key];
-      if (!item) return;
+  } else {
+    const item = ITEMS[key];
+    if (!item) return;
 
-      // Equip stats details
-      let statsHtml = '';
-      if (item.atkBonus || item.defBonus || item.hpBonus || item.spBonus) {
-        statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div><div class="detail-desc">`;
-        if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br />`;
-        if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br />`;
-        if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br />`;
-        if (item.spBonus) statsHtml += `💙 SP Bonus: +${item.spBonus}<br />`;
-        statsHtml += `</div>`;
-      }
+    // Equip stats details
+    let statsHtml = '';
+    if (item.atkBonus || item.defBonus || item.hpBonus || item.spBonus) {
+      statsHtml = `<div class="wiki-section-title">📊 Equipment Bonuses / โบนัสสเตตัส:</div><div class="detail-desc">`;
+      if (item.atkBonus) statsHtml += `⚔️ ATK Bonus: +${item.atkBonus}<br />`;
+      if (item.defBonus) statsHtml += `🛡️ DEF Bonus: +${item.defBonus}<br />`;
+      if (item.hpBonus) statsHtml += `💚 HP Bonus: +${item.hpBonus}<br />`;
+      if (item.spBonus) statsHtml += `💙 SP Bonus: +${item.spBonus}<br />`;
+      statsHtml += `</div>`;
+    }
 
-      // Check who drops this item
-      let droppedByHtml = '';
-      const droppers = this._getItemDroppers(key);
+    // Check who drops this item
+    let droppedByHtml = '';
+    const droppers = this._getItemDroppers(key);
 
-      if (droppers.length > 0) {
-        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
-        droppers.forEach(d => {
-          droppedByHtml += `
+    if (droppers.length > 0) {
+      droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
+      droppers.forEach(d => {
+        droppedByHtml += `
             <div class="wiki-drop-item">
               <span>${d.emoji} ${d.name}</span>
               <span style="color:#60a0ff">${(d.chance * 100).toFixed(1)}%</span>
             </div>
           `;
-        });
-        droppedByHtml += `</div>`;
-      } else {
-        droppedByHtml = `
+      });
+      droppedByHtml += `</div>`;
+    } else {
+      droppedByHtml = `
           <div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div>
           <div style="font-size:11px;color:var(--text-dim);padding-left:4px;">ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)</div>
         `;
-      }
+    }
 
-      content.innerHTML = `
+    content.innerHTML = `
         <div class="detail-row">
           <span class="detail-icon">${item.emoji || '📦'}</span>
           <div class="detail-info-block">
@@ -2619,794 +2571,794 @@ export class GameUI {
         ${statsHtml}
         ${droppedByHtml}
       `;
-    }
+  }
+}
+
+_setupMinimap() {
+  this.minimapCanvas = document.getElementById('minimap-canvas');
+  this.minimapCoords = document.getElementById('minimap-coords');
+  if (this.minimapCanvas) {
+    this.minimapCtx = this.minimapCanvas.getContext('2d');
+  }
+}
+
+updateMinimap(playerPos, monsters, portals, npc, remotePlayersMap, currentMap) {
+  if (!this.minimapCanvas || !this.minimapCtx || !playerPos) return;
+
+  const canvas = this.minimapCanvas;
+  const ctx = this.minimapCtx;
+  const width = canvas.width;
+  const height = canvas.height;
+  const cx = width / 2;
+  const cy = height / 2;
+
+  // Update coordinate text overlay
+  if (this.minimapCoords) {
+    this.minimapCoords.textContent = `X: ${Math.round(playerPos.x)}, Z: ${Math.round(playerPos.z)}`;
   }
 
-  _setupMinimap() {
-    this.minimapCanvas = document.getElementById('minimap-canvas');
-    this.minimapCoords = document.getElementById('minimap-coords');
-    if (this.minimapCanvas) {
-      this.minimapCtx = this.minimapCanvas.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
+
+  // Save state for circular clipping
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, cx - 1, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Map base scales: World size is 70x70 (-35 to +35)
+  // Scale: pixels per game world unit (zoom level)
+  const scale = 2.8;
+  const px = playerPos.x;
+  const pz = playerPos.z;
+
+  // 1. Draw Ground (color based on current map)
+  const MAP_GROUND_COLORS = {
+    prontera: '#3a7a3a',
+    payon: '#5a4a2a',
+    glast_heim: '#2a2035',
+    mjolnir: '#7a7060',
+    abyss_lake: '#0a1020',
+  };
+  ctx.fillStyle = MAP_GROUND_COLORS[currentMap] || '#3a7a3a';
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Cave Zone (x < -6 && z < -6)
+  // Draw it in world coordinates translated to canvas
+  // Cave zone extends from -35 to -6 on x and z
+  const caveX1 = cx + (-35 - px) * scale;
+  const caveZ1 = cy + (-35 - pz) * scale;
+  const caveX2 = cx + (-6 - px) * scale;
+  const caveZ2 = cy + (-6 - pz) * scale;
+
+  ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
+  ctx.fillRect(caveX1, caveZ1, caveX2 - caveX1, caveZ2 - caveZ1);
+
+  // 3. Mountain Zone (x > 6 && z > 6)
+  // Mountain zone extends from 6 to 35 on x and z
+  const mtX1 = cx + (6 - px) * scale;
+  const mtZ1 = cy + (6 - pz) * scale;
+  const mtX2 = cx + (35 - px) * scale;
+  const mtZ2 = cy + (35 - pz) * scale;
+
+  ctx.fillStyle = 'rgba(100, 95, 90, 0.45)';
+  ctx.fillRect(mtX1, mtZ1, mtX2 - mtX1, mtZ2 - mtZ1);
+
+  // 4. Winding River
+  // Render the river by drawing connected segments in the visible viewport
+  ctx.beginPath();
+  let first = true;
+  const viewWidthUnits = width / scale;
+  const xStart = Math.max(-35, px - viewWidthUnits / 2 - 2);
+  const xEnd = Math.min(35, px + viewWidthUnits / 2 + 2);
+
+  for (let rx = xStart; rx <= xEnd; rx += 1.0) {
+    const rz = Math.sin(rx * 0.08) * 10 - 2;
+    const dx = rx - px;
+    const dz = rz - pz;
+    const tx = cx + dx * scale;
+    const ty = cy + dz * scale;
+
+    if (first) {
+      ctx.moveTo(tx, ty);
+      first = false;
+    } else {
+      ctx.lineTo(tx, ty);
     }
   }
+  const MAP_RIVER_COLORS = {
+    prontera: '#2d6d9d',
+    payon: '#254e40',
+    glast_heim: '#1a0a2a',
+    mjolnir: '#5080a0',
+    abyss_lake: '#0a1a40',
+  };
+  ctx.strokeStyle = MAP_RIVER_COLORS[currentMap] || '#2d6d9d';
+  ctx.lineWidth = 5.5 * scale; // Width represents our 5.5 units riverbed size
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
 
-  updateMinimap(playerPos, monsters, portals, npc, remotePlayersMap, currentMap) {
-    if (!this.minimapCanvas || !this.minimapCtx || !playerPos) return;
+  // 5. Wooden Bridge (centered at x = 0, z = -2, x from -1.8 to 1.8, z from -10 to 6)
+  const bridgeX1 = cx + (-1.8 - px) * scale;
+  const bridgeZ1 = cy + (-10 - pz) * scale;
+  const bridgeWidth = 3.6 * scale;
+  const bridgeHeight = 16 * scale;
 
-    const canvas = this.minimapCanvas;
-    const ctx = this.minimapCtx;
-    const width = canvas.width;
-    const height = canvas.height;
-    const cx = width / 2;
-    const cy = height / 2;
+  ctx.fillStyle = '#7a5a3a'; // Brown wood planks color
+  ctx.fillRect(bridgeX1, bridgeZ1, bridgeWidth, bridgeHeight);
 
-    // Update coordinate text overlay
-    if (this.minimapCoords) {
-      this.minimapCoords.textContent = `X: ${Math.round(playerPos.x)}, Z: ${Math.round(playerPos.z)}`;
-    }
+  // Draw bridge lines/borders
+  ctx.strokeStyle = '#5a3d24';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bridgeX1, bridgeZ1, bridgeWidth, bridgeHeight);
 
-    ctx.clearRect(0, 0, width, height);
-
-    // Save state for circular clipping
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, cx - 1, 0, Math.PI * 2);
-    ctx.clip();
-
-    // Map base scales: World size is 70x70 (-35 to +35)
-    // Scale: pixels per game world unit (zoom level)
-    const scale = 2.8;
-    const px = playerPos.x;
-    const pz = playerPos.z;
-
-    // 1. Draw Ground (color based on current map)
-    const MAP_GROUND_COLORS = {
-      prontera: '#3a7a3a',
-      payon: '#5a4a2a',
-      glast_heim: '#2a2035',
-      mjolnir: '#7a7060',
-      abyss_lake: '#0a1020',
-    };
-    ctx.fillStyle = MAP_GROUND_COLORS[currentMap] || '#3a7a3a';
-    ctx.fillRect(0, 0, width, height);
-
-    // 2. Cave Zone (x < -6 && z < -6)
-    // Draw it in world coordinates translated to canvas
-    // Cave zone extends from -35 to -6 on x and z
-    const caveX1 = cx + (-35 - px) * scale;
-    const caveZ1 = cy + (-35 - pz) * scale;
-    const caveX2 = cx + (-6 - px) * scale;
-    const caveZ2 = cy + (-6 - pz) * scale;
-
-    ctx.fillStyle = 'rgba(20, 20, 30, 0.85)';
-    ctx.fillRect(caveX1, caveZ1, caveX2 - caveX1, caveZ2 - caveZ1);
-
-    // 3. Mountain Zone (x > 6 && z > 6)
-    // Mountain zone extends from 6 to 35 on x and z
-    const mtX1 = cx + (6 - px) * scale;
-    const mtZ1 = cy + (6 - pz) * scale;
-    const mtX2 = cx + (35 - px) * scale;
-    const mtZ2 = cy + (35 - pz) * scale;
-
-    ctx.fillStyle = 'rgba(100, 95, 90, 0.45)';
-    ctx.fillRect(mtX1, mtZ1, mtX2 - mtX1, mtZ2 - mtZ1);
-
-    // 4. Winding River
-    // Render the river by drawing connected segments in the visible viewport
-    ctx.beginPath();
-    let first = true;
-    const viewWidthUnits = width / scale;
-    const xStart = Math.max(-35, px - viewWidthUnits / 2 - 2);
-    const xEnd = Math.min(35, px + viewWidthUnits / 2 + 2);
-
-    for (let rx = xStart; rx <= xEnd; rx += 1.0) {
-      const rz = Math.sin(rx * 0.08) * 10 - 2;
-      const dx = rx - px;
-      const dz = rz - pz;
+  // 6. Draw Portals
+  if (portals && portals.length > 0) {
+    portals.forEach(portal => {
+      const pos = portal.position;
+      if (!pos) return;
+      const dx = pos.x - px;
+      const dz = pos.z - pz;
       const tx = cx + dx * scale;
       const ty = cy + dz * scale;
 
-      if (first) {
-        ctx.moveTo(tx, ty);
-        first = false;
-      } else {
-        ctx.lineTo(tx, ty);
-      }
+      // Pulsing outer ripple
+      const pulse = 4 + Math.sin(Date.now() * 0.01) * 1.5;
+      ctx.beginPath();
+      ctx.arc(tx, ty, pulse, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 225, 255, 0.3)';
+      ctx.fill();
+
+      // Portal core
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#00e1ff';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+  }
+
+  // 7. Draw NPC
+  if (npc) {
+    const pos = npc.position;
+    if (pos) {
+      const dx = pos.x - px;
+      const dz = pos.z - pz;
+      const tx = cx + dx * scale;
+      const ty = cy + dz * scale;
+
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffe040';
+      ctx.fill();
+      ctx.strokeStyle = '#120a02';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Draw small shop symbol
+      ctx.fillStyle = '#120a02';
+      ctx.font = 'bold 5px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('$', tx, ty);
     }
-    const MAP_RIVER_COLORS = {
-      prontera: '#2d6d9d',
-      payon: '#254e40',
-      glast_heim: '#1a0a2a',
-      mjolnir: '#5080a0',
-      abyss_lake: '#0a1a40',
-    };
-    ctx.strokeStyle = MAP_RIVER_COLORS[currentMap] || '#2d6d9d';
-    ctx.lineWidth = 5.5 * scale; // Width represents our 5.5 units riverbed size
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
+  }
 
-    // 5. Wooden Bridge (centered at x = 0, z = -2, x from -1.8 to 1.8, z from -10 to 6)
-    const bridgeX1 = cx + (-1.8 - px) * scale;
-    const bridgeZ1 = cy + (-10 - pz) * scale;
-    const bridgeWidth = 3.6 * scale;
-    const bridgeHeight = 16 * scale;
+  // 8. Draw Monsters
+  if (monsters && monsters.length > 0) {
+    monsters.forEach(m => {
+      if (!m.alive) return;
+      const mPos = m.getPosition();
+      if (!mPos) return;
 
-    ctx.fillStyle = '#7a5a3a'; // Brown wood planks color
-    ctx.fillRect(bridgeX1, bridgeZ1, bridgeWidth, bridgeHeight);
+      const dx = mPos.x - px;
+      const dz = mPos.z - pz;
+      const tx = cx + dx * scale;
+      const ty = cy + dz * scale;
 
-    // Draw bridge lines/borders
-    ctx.strokeStyle = '#5a3d24';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(bridgeX1, bridgeZ1, bridgeWidth, bridgeHeight);
+      const isBoss = m.type === 'ghostring' || (m.data && m.data.hp >= 500);
 
-    // 6. Draw Portals
-    if (portals && portals.length > 0) {
-      portals.forEach(portal => {
-        const pos = portal.position;
-        if (!pos) return;
-        const dx = pos.x - px;
-        const dz = pos.z - pz;
-        const tx = cx + dx * scale;
-        const ty = cy + dz * scale;
-
-        // Pulsing outer ripple
-        const pulse = 4 + Math.sin(Date.now() * 0.01) * 1.5;
+      if (isBoss) {
+        // Boss outer glow ring
         ctx.beginPath();
-        ctx.arc(tx, ty, pulse, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0, 225, 255, 0.3)';
+        ctx.arc(tx, ty, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 64, 64, 0.25)';
         ctx.fill();
-
-        // Portal core
-        ctx.beginPath();
-        ctx.arc(tx, ty, 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#00e1ff';
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = '#ff3333';
         ctx.lineWidth = 1;
         ctx.stroke();
-      });
-    }
 
-    // 7. Draw NPC
-    if (npc) {
-      const pos = npc.position;
-      if (pos) {
-        const dx = pos.x - px;
-        const dz = pos.z - pz;
-        const tx = cx + dx * scale;
-        const ty = cy + dz * scale;
-
+        // Boss core dot
         ctx.beginPath();
         ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffe040';
+        ctx.fillStyle = '#ff0030';
         ctx.fill();
-        ctx.strokeStyle = '#120a02';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Draw small shop symbol
-        ctx.fillStyle = '#120a02';
-        ctx.font = 'bold 5px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('$', tx, ty);
-      }
-    }
-
-    // 8. Draw Monsters
-    if (monsters && monsters.length > 0) {
-      monsters.forEach(m => {
-        if (!m.alive) return;
-        const mPos = m.getPosition();
-        if (!mPos) return;
-
-        const dx = mPos.x - px;
-        const dz = mPos.z - pz;
-        const tx = cx + dx * scale;
-        const ty = cy + dz * scale;
-
-        const isBoss = m.type === 'ghostring' || (m.data && m.data.hp >= 500);
-
-        if (isBoss) {
-          // Boss outer glow ring
-          ctx.beginPath();
-          ctx.arc(tx, ty, 5.5, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 64, 64, 0.25)';
-          ctx.fill();
-          ctx.strokeStyle = '#ff3333';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-
-          // Boss core dot
-          ctx.beginPath();
-          ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#ff0030';
-          ctx.fill();
-        } else {
-          // Regular monster dot
-          ctx.beginPath();
-          ctx.arc(tx, ty, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#ff4d4d'; // bright red
-          ctx.fill();
-          ctx.strokeStyle = '#601010';
-          ctx.lineWidth = 0.5;
-          ctx.stroke();
-        }
-      });
-    }
-
-    // 9. Draw Remote Players
-    if (remotePlayersMap) {
-      for (const remotePlayer of remotePlayersMap.values()) {
-        const mesh = remotePlayer.mesh;
-        if (!mesh) continue;
-        const rPos = mesh.position;
-        if (!rPos) continue;
-
-        const dx = rPos.x - px;
-        const dz = rPos.z - pz;
-        const tx = cx + dx * scale;
-        const ty = cy + dz * scale;
-
+      } else {
+        // Regular monster dot
         ctx.beginPath();
-        ctx.arc(tx, ty, 3, 0, Math.PI * 2);
-        ctx.fillStyle = '#2ecc71'; // bright green
+        ctx.arc(tx, ty, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff4d4d'; // bright red
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = '#601010';
         ctx.lineWidth = 0.5;
         ctx.stroke();
       }
-    }
-
-    // Restore clipping mask
-    ctx.restore();
-
-    // 10. Draw Player Dot AT CENTER (always centered)
-    const pulseFactor = 0.3 + 0.3 * Math.sin(Date.now() * 0.007);
-    ctx.beginPath();
-    ctx.arc(cx, cy, 3.5 + pulseFactor * 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.strokeStyle = '#00aeff';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  // ============ Trade Panel ============
-  _setupTradePanel() {
-    this.tradeTarget = null;
-    this.tradeSelectedItem = null;
-    this.activeTradeRequest = null;
-    this.tradeTimeout = null;
-
-    // Sender Panel Setup
-    const closeBtn = document.getElementById('btn-close-trade');
-    const overlay = document.getElementById('trade-panel-overlay');
-    const closeTradePanel = () => {
-      // Clear timeout & wait overlay if any active trade
-      if (this.tradeTimeout) {
-        clearTimeout(this.tradeTimeout);
-        this.tradeTimeout = null;
-      }
-      const waitOverlay = document.getElementById('trade-waiting-overlay');
-      if (waitOverlay) waitOverlay.style.display = 'none';
-
-      const panel = document.getElementById('trade-panel');
-      if (panel) panel.style.display = 'none';
-      this.tradeTarget = null;
-      this.tradeSelectedItem = null;
-    };
-    if (closeBtn) closeBtn.addEventListener('click', closeTradePanel);
-    if (overlay) overlay.addEventListener('click', closeTradePanel);
-
-    // Cancel Waiting Button
-    const cancelWaitBtn = document.getElementById('btn-cancel-waiting-trade');
-    if (cancelWaitBtn) {
-      cancelWaitBtn.addEventListener('click', async () => {
-        if (this.tradeTarget && this.characterId) {
-          const req = {
-            senderUserId: this.characterId,
-            targetUserId: this.tradeTarget.userId,
-            senderName: this.character && this.character.stats ? this.character.stats.name : 'Player'
-          };
-          await sendTradeCancelPacket(this.characterId, this.tradeTarget.userId, req);
-        }
-        closeTradePanel();
-        this.addCombatLog('🤝 ยกเลิกการรอคอยการซื้อขาย', 'system');
-      });
-    }
-
-    // Receiver Panel Setup
-    const closeConfirmBtn = document.getElementById('btn-close-trade-confirm');
-    const confirmOverlay = document.getElementById('trade-confirm-overlay');
-    const closeConfirmPanel = () => {
-      const panel = document.getElementById('trade-confirm-modal');
-      if (panel) panel.style.display = 'none';
-      this.activeTradeRequest = null;
-    };
-    if (closeConfirmBtn) closeConfirmBtn.addEventListener('click', closeConfirmPanel);
-    if (confirmOverlay) confirmOverlay.addEventListener('click', closeConfirmPanel);
-
-    // Accept & Decline Buttons
-    const acceptBtn = document.getElementById('btn-accept-trade');
-    const declineBtn = document.getElementById('btn-decline-trade');
-    if (acceptBtn) {
-      acceptBtn.addEventListener('click', () => this._acceptIncomingTrade());
-    }
-    if (declineBtn) {
-      declineBtn.addEventListener('click', () => this._declineIncomingTrade());
-    }
-
-    const executeBtn = document.getElementById('btn-execute-trade');
-    if (executeBtn) {
-      executeBtn.addEventListener('click', () => this._executeTrade());
-    }
-  }
-
-  openTradePanel(remotePlayer) {
-    if (!remotePlayer) return;
-
-    this.tradeTarget = remotePlayer;
-    this.tradeSelectedItem = null;
-
-    // Populate target info
-    const nameEl = document.getElementById('trade-target-name');
-    const levelEl = document.getElementById('trade-target-level');
-    if (nameEl) nameEl.textContent = remotePlayer.username || 'Player';
-    if (levelEl) levelEl.textContent = `Lv.${remotePlayer.level || 1}`;
-
-    // Hide wait overlay on open
-    const waitOverlay = document.getElementById('trade-waiting-overlay');
-    if (waitOverlay) waitOverlay.style.display = 'none';
-
-    // Hide form until item is selected
-    const form = document.getElementById('trade-selected-form');
-    if (form) form.style.display = 'none';
-
-    // Render sender's tradeable inventory
-    this._renderTradeInventory();
-
-    // Show modal
-    const panel = document.getElementById('trade-panel');
-    if (panel) panel.style.display = 'flex';
-  }
-
-  _renderTradeInventory() {
-    const grid = document.getElementById('trade-inventory-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    // Filter to tradeable items (quantity > 0, not equipped)
-    const tradeable = this.inventory.filter(i => {
-      if (i.quantity <= 0) return false;
-      if (i.stats && i.stats.equipped) return false;
-      return true;
-    });
-
-    if (tradeable.length === 0) {
-      grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;font-size:12px;">ไม่มีไอเทมที่สามารถส่งได้</div>';
-      return;
-    }
-
-    tradeable.forEach(item => {
-      const slot = document.createElement('div');
-      slot.className = 'inv-slot';
-      if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
-      if (this.tradeSelectedItem && this.tradeSelectedItem.item_name === item.item_name) {
-        slot.classList.add('selected');
-      }
-
-      slot.innerHTML = `
-        <span>${item.emoji || '📦'}</span>
-        <span class="inv-qty">${item.quantity}</span>
-      `;
-      slot.title = `${item.item_name} x${item.quantity}`;
-
-      slot.addEventListener('click', () => {
-        this.tradeSelectedItem = item;
-        this._renderTradeInventory();
-
-        // Show and populate form
-        const form = document.getElementById('trade-selected-form');
-        if (form) form.style.display = 'block';
-
-        const icon = document.getElementById('trade-selected-icon');
-        const name = document.getElementById('trade-selected-name');
-        const qtyInfo = document.getElementById('trade-selected-qty-info');
-        const qtyInput = document.getElementById('trade-qty-input');
-
-        if (icon) icon.textContent = item.emoji || '📦';
-        if (name) name.textContent = item.item_name;
-        if (qtyInfo) qtyInfo.textContent = `จำนวนที่มี: ${item.quantity}`;
-        if (qtyInput) {
-          qtyInput.max = item.quantity;
-          qtyInput.value = 1;
-        }
-      });
-
-      grid.appendChild(slot);
     });
   }
 
-  async _executeTrade() {
-    if (!this.tradeTarget || !this.tradeSelectedItem || !this.characterId) {
-      this.addCombatLog('❌ ไม่สามารถส่งไอเทมได้ - ไม่ได้เลือกไอเทมหรือเป้าหมาย', 'warning');
-      return;
-    }
+  // 9. Draw Remote Players
+  if (remotePlayersMap) {
+    for (const remotePlayer of remotePlayersMap.values()) {
+      const mesh = remotePlayer.mesh;
+      if (!mesh) continue;
+      const rPos = mesh.position;
+      if (!rPos) continue;
 
-    const item = this.tradeSelectedItem;
-    const qtyInput = document.getElementById('trade-qty-input');
-    const priceInput = document.getElementById('trade-price-input');
-    const quantity = Math.min(parseInt(qtyInput?.value) || 1, item.quantity);
-    const price = parseInt(priceInput?.value) || 0;
+      const dx = rPos.x - px;
+      const dz = rPos.z - pz;
+      const tx = cx + dx * scale;
+      const ty = cy + dz * scale;
 
-    if (quantity <= 0) {
-      this.addCombatLog('❌ จำนวนต้องมากกว่า 0', 'warning');
-      return;
-    }
-
-    // Show waiting spinner
-    const waitOverlay = document.getElementById('trade-waiting-overlay');
-    if (waitOverlay) waitOverlay.style.display = 'flex';
-
-    try {
-      const myName = this.character && this.character.stats ? this.character.stats.name : 'Player';
-      await sendTradeRequestPacket(
-        this.characterId,
-        myName,
-        this.tradeTarget.userId,
-        this.tradeTarget.username || 'Player',
-        item.item_name,
-        item.item_type,
-        quantity,
-        price,
-        item.stats || {}
-      );
-
-      // Start 30 seconds timeout
-      this.tradeTimeout = setTimeout(() => {
-        if (waitOverlay && waitOverlay.style.display !== 'none') {
-          waitOverlay.style.display = 'none';
-          this.addCombatLog('⏱️ คำขอการซื้อขายหมดเวลาไม่มีการตอบรับ', 'warning');
-          this.tradeTarget = null;
-          this.tradeSelectedItem = null;
-        }
-      }, 30000);
-
-    } catch (err) {
-      console.error('[Trade] Request Error:', err);
-      this.addCombatLog('❌ เกิดข้อผิดพลาดในการส่งคำขอซื้อขาย', 'warning');
-      if (waitOverlay) waitOverlay.style.display = 'none';
+      ctx.beginPath();
+      ctx.arc(tx, ty, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#2ecc71'; // bright green
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
     }
   }
 
-  receiveTradeRequest(payload) {
-    if (!payload) return;
-    this.activeTradeRequest = payload;
+  // Restore clipping mask
+  ctx.restore();
 
-    // Populate confirm modal fields
-    const senderName = document.getElementById('trade-confirm-sender-name');
-    const senderLevel = document.getElementById('trade-confirm-sender-level');
-    const itemName = document.getElementById('trade-confirm-item-name');
-    const itemQty = document.getElementById('trade-confirm-item-qty');
-    const itemIcon = document.getElementById('trade-confirm-item-icon');
-    const priceDisplay = document.getElementById('trade-confirm-price-display');
-    const acceptBtn = document.getElementById('btn-accept-trade');
+  // 10. Draw Player Dot AT CENTER (always centered)
+  const pulseFactor = 0.3 + 0.3 * Math.sin(Date.now() * 0.007);
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3.5 + pulseFactor * 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.fill();
 
-    if (senderName) senderName.textContent = payload.senderName || 'Anonymous';
-    if (senderLevel) senderLevel.style.display = 'none';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = '#00aeff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
 
-    const meta = ITEMS[payload.itemName] || {};
-    if (itemIcon) itemIcon.textContent = meta.emoji || '📦';
-    if (itemName) {
-      itemName.textContent = payload.itemName;
-      itemName.className = 'detail-name ' + `color-${meta.rarity || 'common'}`;
-    }
-    if (itemQty) itemQty.textContent = `จำนวน: x${payload.quantity}`;
+// ============ Trade Panel ============
+_setupTradePanel() {
+  this.tradeTarget = null;
+  this.tradeSelectedItem = null;
+  this.activeTradeRequest = null;
+  this.tradeTimeout = null;
 
-    if (priceDisplay) {
-      if (payload.price > 0) {
-        priceDisplay.textContent = `ราคา: ${payload.price.toLocaleString()} Zeny`;
-        priceDisplay.style.color = '#ffdd44';
-      } else {
-        priceDisplay.textContent = `ราคา: 0 Zeny (ฟรี)`;
-        priceDisplay.style.color = '#40e080';
-      }
-    }
-
-    // Check Receiver Zeny Gold
-    if (acceptBtn) {
-      const myGold = this.character && this.character.stats ? this.character.stats.gold : 0;
-      if (payload.price > myGold) {
-        acceptBtn.disabled = true;
-        acceptBtn.style.opacity = '0.5';
-        acceptBtn.textContent = 'Zeny ไม่พอ (Insufficient Zeny)';
-      } else {
-        acceptBtn.disabled = false;
-        acceptBtn.style.opacity = '1';
-        acceptBtn.textContent = '🤝 ตกลง (Accept)';
-      }
-    }
-
-    // Display the modal
-    const panel = document.getElementById('trade-confirm-modal');
-    if (panel) panel.style.display = 'flex';
-  }
-
-  receiveTradeCancel(payload) {
-    if (!payload) return;
-    if (this.activeTradeRequest && this.activeTradeRequest.senderUserId === payload.senderUserId) {
-      const panel = document.getElementById('trade-confirm-modal');
-      if (panel) panel.style.display = 'none';
-      this.activeTradeRequest = null;
-      const senderName = payload.requestPayload?.senderName || 'ผู้เล่น';
-      this.addCombatLog(`🤝 ${senderName} ได้ยกเลิกคำขอโอนไอเทมและราคาเสนอแล้ว`, 'system');
-    }
-  }
-
-  async _acceptIncomingTrade() {
-    const req = this.activeTradeRequest;
-    if (!req) return;
-
-    // Check Receiver Zeny again to make sure
-    const myGold = this.character && this.character.stats ? this.character.stats.gold : 0;
-    if (req.price > myGold) {
-      this.addCombatLog('❌ แต้ม Zeny ของคุณไม่เพียงพอสำหรับการซื้อขายนี้', 'warning');
-      return;
-    }
-
-    try {
-      // Execute receiver transaction logic
-      await executeDecentralizedReceiverTrade(
-        this.characterId,
-        req.itemName,
-        req.itemType,
-        req.quantity,
-        req.stats || {},
-        req.price
-      );
-
-      // Re-load inventory to force refresh
-      await this.loadInventoryFromDB(this.characterId);
-
-      // Deduct gold from character stats locally so HUD renders correctly immediately
-      if (this.character && this.character.stats) {
-        this.character.stats.gold = Math.max(0, this.character.stats.gold - req.price);
-        this.updateHUD(this.character.stats);
-        this.updateStats(this.character.stats);
-      }
-
-      this.addCombatLog(`🤝 ได้รับ [${req.itemName}] x${req.quantity} จาก ${req.senderName}!`, 'loot');
-
-      // Send Response accepted = true
-      await sendTradeResponsePacket(req.senderUserId, req.targetUserId, true, req);
-
-      // Close modal
-      const panel = document.getElementById('trade-confirm-modal');
-      if (panel) panel.style.display = 'none';
-      this.activeTradeRequest = null;
-
-    } catch (err) {
-      console.error('[Trade] Accept Error:', err);
-      this.addCombatLog('❌ เกิดข้อผิดพลาดในการตอบรับการซื้อขาย', 'warning');
-    }
-  }
-
-  async _declineIncomingTrade() {
-    const req = this.activeTradeRequest;
-    if (!req) return;
-
-    try {
-      // Send Response accepted = false
-      await sendTradeResponsePacket(req.senderUserId, req.targetUserId, false, req);
-
-      // Close modal
-      const panel = document.getElementById('trade-confirm-modal');
-      if (panel) panel.style.display = 'none';
-      this.activeTradeRequest = null;
-
-    } catch (err) {
-      console.error('[Trade] Decline Error:', err);
-    }
-  }
-
-  async receiveTradeResponse(payload) {
-    if (!payload) return;
-
-    // Clear timeout & wait overlay
+  // Sender Panel Setup
+  const closeBtn = document.getElementById('btn-close-trade');
+  const overlay = document.getElementById('trade-panel-overlay');
+  const closeTradePanel = () => {
+    // Clear timeout & wait overlay if any active trade
     if (this.tradeTimeout) {
       clearTimeout(this.tradeTimeout);
       this.tradeTimeout = null;
     }
-
     const waitOverlay = document.getElementById('trade-waiting-overlay');
     if (waitOverlay) waitOverlay.style.display = 'none';
 
-    // Close trade panel
     const panel = document.getElementById('trade-panel');
     if (panel) panel.style.display = 'none';
-
-    const req = payload.requestPayload;
-    if (payload.accepted) {
-      // Execute sender transaction logic
-      try {
-        await executeDecentralizedSenderTrade(
-          this.characterId,
-          req.targetName,
-          req.itemName,
-          req.itemType,
-          req.quantity,
-          req.price
-        );
-
-        // Deduct from local inventory
-        const localItem = this.inventory.find(i => i.item_name === req.itemName);
-        if (localItem) {
-          localItem.quantity -= req.quantity;
-          if (localItem.quantity <= 0) {
-            const idx = this.inventory.indexOf(localItem);
-            this.inventory.splice(idx, 1);
-          }
-        }
-
-        // Add gold to character stats locally so HUD renders correctly immediately
-        if (this.character && this.character.stats) {
-          this.character.stats.gold = (this.character.stats.gold || 0) + req.price;
-          this.updateHUD(this.character.stats);
-          this.updateStats(this.character.stats);
-        }
-
-        this.addCombatLog(`🤝 ส่ง ${req.itemName} x${req.quantity} ให้ ${req.targetName} เรียบร้อยแล้ว!`, 'loot');
-        this._renderInventory();
-
-      } catch (err) {
-        console.error('[Trade] Execute Sender Error:', err);
-      }
-    } else {
-      this.addCombatLog(`❌ ${req.targetName} ปฏิเสธการโอนไอเทมการซื้อขาย`, 'warning');
-    }
-
     this.tradeTarget = null;
     this.tradeSelectedItem = null;
+  };
+  if (closeBtn) closeBtn.addEventListener('click', closeTradePanel);
+  if (overlay) overlay.addEventListener('click', closeTradePanel);
+
+  // Cancel Waiting Button
+  const cancelWaitBtn = document.getElementById('btn-cancel-waiting-trade');
+  if (cancelWaitBtn) {
+    cancelWaitBtn.addEventListener('click', async () => {
+      if (this.tradeTarget && this.characterId) {
+        const req = {
+          senderUserId: this.characterId,
+          targetUserId: this.tradeTarget.userId,
+          senderName: this.character && this.character.stats ? this.character.stats.name : 'Player'
+        };
+        await sendTradeCancelPacket(this.characterId, this.tradeTarget.userId, req);
+      }
+      closeTradePanel();
+      this.addCombatLog('🤝 ยกเลิกการรอคอยการซื้อขาย', 'system');
+    });
   }
 
-  // ============ Daily Quest System ============
-  _setupDailyQuests() {
-    this._checkDailyQuestsReset();
+  // Receiver Panel Setup
+  const closeConfirmBtn = document.getElementById('btn-close-trade-confirm');
+  const confirmOverlay = document.getElementById('trade-confirm-overlay');
+  const closeConfirmPanel = () => {
+    const panel = document.getElementById('trade-confirm-modal');
+    if (panel) panel.style.display = 'none';
+    this.activeTradeRequest = null;
+  };
+  if (closeConfirmBtn) closeConfirmBtn.addEventListener('click', closeConfirmPanel);
+  if (confirmOverlay) confirmOverlay.addEventListener('click', closeConfirmPanel);
 
-    const btnDaily = document.getElementById('btn-daily-quests');
-    if (btnDaily) {
-      btnDaily.addEventListener('click', () => {
-        this._togglePanel('daily-quests-panel');
-        this._renderDailyQuests();
-      });
+  // Accept & Decline Buttons
+  const acceptBtn = document.getElementById('btn-accept-trade');
+  const declineBtn = document.getElementById('btn-decline-trade');
+  if (acceptBtn) {
+    acceptBtn.addEventListener('click', () => this._acceptIncomingTrade());
+  }
+  if (declineBtn) {
+    declineBtn.addEventListener('click', () => this._declineIncomingTrade());
+  }
+
+  const executeBtn = document.getElementById('btn-execute-trade');
+  if (executeBtn) {
+    executeBtn.addEventListener('click', () => this._executeTrade());
+  }
+}
+
+openTradePanel(remotePlayer) {
+  if (!remotePlayer) return;
+
+  this.tradeTarget = remotePlayer;
+  this.tradeSelectedItem = null;
+
+  // Populate target info
+  const nameEl = document.getElementById('trade-target-name');
+  const levelEl = document.getElementById('trade-target-level');
+  if (nameEl) nameEl.textContent = remotePlayer.username || 'Player';
+  if (levelEl) levelEl.textContent = `Lv.${remotePlayer.level || 1}`;
+
+  // Hide wait overlay on open
+  const waitOverlay = document.getElementById('trade-waiting-overlay');
+  if (waitOverlay) waitOverlay.style.display = 'none';
+
+  // Hide form until item is selected
+  const form = document.getElementById('trade-selected-form');
+  if (form) form.style.display = 'none';
+
+  // Render sender's tradeable inventory
+  this._renderTradeInventory();
+
+  // Show modal
+  const panel = document.getElementById('trade-panel');
+  if (panel) panel.style.display = 'flex';
+}
+
+_renderTradeInventory() {
+  const grid = document.getElementById('trade-inventory-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  // Filter to tradeable items (quantity > 0, not equipped)
+  const tradeable = this.inventory.filter(i => {
+    if (i.quantity <= 0) return false;
+    if (i.stats && i.stats.equipped) return false;
+    return true;
+  });
+
+  if (tradeable.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;font-size:12px;">ไม่มีไอเทมที่สามารถส่งได้</div>';
+    return;
+  }
+
+  tradeable.forEach(item => {
+    const slot = document.createElement('div');
+    slot.className = 'inv-slot';
+    if (item.rarity) slot.classList.add(`rarity-${item.rarity}`);
+    if (this.tradeSelectedItem && this.tradeSelectedItem.item_name === item.item_name) {
+      slot.classList.add('selected');
     }
 
-    const btnSpin = document.getElementById('btn-spin-roulette');
-    if (btnSpin) {
-      btnSpin.addEventListener('click', () => {
-        this._spinRoulette();
-      });
+    slot.innerHTML = `
+        <span>${item.emoji || '📦'}</span>
+        <span class="inv-qty">${item.quantity}</span>
+      `;
+    slot.title = `${item.item_name} x${item.quantity}`;
+
+    slot.addEventListener('click', () => {
+      this.tradeSelectedItem = item;
+      this._renderTradeInventory();
+
+      // Show and populate form
+      const form = document.getElementById('trade-selected-form');
+      if (form) form.style.display = 'block';
+
+      const icon = document.getElementById('trade-selected-icon');
+      const name = document.getElementById('trade-selected-name');
+      const qtyInfo = document.getElementById('trade-selected-qty-info');
+      const qtyInput = document.getElementById('trade-qty-input');
+
+      if (icon) icon.textContent = item.emoji || '📦';
+      if (name) name.textContent = item.item_name;
+      if (qtyInfo) qtyInfo.textContent = `จำนวนที่มี: ${item.quantity}`;
+      if (qtyInput) {
+        qtyInput.max = item.quantity;
+        qtyInput.value = 1;
+      }
+    });
+
+    grid.appendChild(slot);
+  });
+}
+
+  async _executeTrade() {
+  if (!this.tradeTarget || !this.tradeSelectedItem || !this.characterId) {
+    this.addCombatLog('❌ ไม่สามารถส่งไอเทมได้ - ไม่ได้เลือกไอเทมหรือเป้าหมาย', 'warning');
+    return;
+  }
+
+  const item = this.tradeSelectedItem;
+  const qtyInput = document.getElementById('trade-qty-input');
+  const priceInput = document.getElementById('trade-price-input');
+  const quantity = Math.min(parseInt(qtyInput?.value) || 1, item.quantity);
+  const price = parseInt(priceInput?.value) || 0;
+
+  if (quantity <= 0) {
+    this.addCombatLog('❌ จำนวนต้องมากกว่า 0', 'warning');
+    return;
+  }
+
+  // Show waiting spinner
+  const waitOverlay = document.getElementById('trade-waiting-overlay');
+  if (waitOverlay) waitOverlay.style.display = 'flex';
+
+  try {
+    const myName = this.character && this.character.stats ? this.character.stats.name : 'Player';
+    await sendTradeRequestPacket(
+      this.characterId,
+      myName,
+      this.tradeTarget.userId,
+      this.tradeTarget.username || 'Player',
+      item.item_name,
+      item.item_type,
+      quantity,
+      price,
+      item.stats || {}
+    );
+
+    // Start 30 seconds timeout
+    this.tradeTimeout = setTimeout(() => {
+      if (waitOverlay && waitOverlay.style.display !== 'none') {
+        waitOverlay.style.display = 'none';
+        this.addCombatLog('⏱️ คำขอการซื้อขายหมดเวลาไม่มีการตอบรับ', 'warning');
+        this.tradeTarget = null;
+        this.tradeSelectedItem = null;
+      }
+    }, 30000);
+
+  } catch (err) {
+    console.error('[Trade] Request Error:', err);
+    this.addCombatLog('❌ เกิดข้อผิดพลาดในการส่งคำขอซื้อขาย', 'warning');
+    if (waitOverlay) waitOverlay.style.display = 'none';
+  }
+}
+
+receiveTradeRequest(payload) {
+  if (!payload) return;
+  this.activeTradeRequest = payload;
+
+  // Populate confirm modal fields
+  const senderName = document.getElementById('trade-confirm-sender-name');
+  const senderLevel = document.getElementById('trade-confirm-sender-level');
+  const itemName = document.getElementById('trade-confirm-item-name');
+  const itemQty = document.getElementById('trade-confirm-item-qty');
+  const itemIcon = document.getElementById('trade-confirm-item-icon');
+  const priceDisplay = document.getElementById('trade-confirm-price-display');
+  const acceptBtn = document.getElementById('btn-accept-trade');
+
+  if (senderName) senderName.textContent = payload.senderName || 'Anonymous';
+  if (senderLevel) senderLevel.style.display = 'none';
+
+  const meta = ITEMS[payload.itemName] || {};
+  if (itemIcon) itemIcon.textContent = meta.emoji || '📦';
+  if (itemName) {
+    itemName.textContent = payload.itemName;
+    itemName.className = 'detail-name ' + `color-${meta.rarity || 'common'}`;
+  }
+  if (itemQty) itemQty.textContent = `จำนวน: x${payload.quantity}`;
+
+  if (priceDisplay) {
+    if (payload.price > 0) {
+      priceDisplay.textContent = `ราคา: ${payload.price.toLocaleString()} Zeny`;
+      priceDisplay.style.color = '#ffdd44';
+    } else {
+      priceDisplay.textContent = `ราคา: 0 Zeny (ฟรี)`;
+      priceDisplay.style.color = '#40e080';
     }
   }
 
-  _checkDailyQuestsReset() {
-    const today = new Date().toDateString();
-    let data = null;
+  // Check Receiver Zeny Gold
+  if (acceptBtn) {
+    const myGold = this.character && this.character.stats ? this.character.stats.gold : 0;
+    if (payload.price > myGold) {
+      acceptBtn.disabled = true;
+      acceptBtn.style.opacity = '0.5';
+      acceptBtn.textContent = 'Zeny ไม่พอ (Insufficient Zeny)';
+    } else {
+      acceptBtn.disabled = false;
+      acceptBtn.style.opacity = '1';
+      acceptBtn.textContent = '🤝 ตกลง (Accept)';
+    }
+  }
+
+  // Display the modal
+  const panel = document.getElementById('trade-confirm-modal');
+  if (panel) panel.style.display = 'flex';
+}
+
+receiveTradeCancel(payload) {
+  if (!payload) return;
+  if (this.activeTradeRequest && this.activeTradeRequest.senderUserId === payload.senderUserId) {
+    const panel = document.getElementById('trade-confirm-modal');
+    if (panel) panel.style.display = 'none';
+    this.activeTradeRequest = null;
+    const senderName = payload.requestPayload?.senderName || 'ผู้เล่น';
+    this.addCombatLog(`🤝 ${senderName} ได้ยกเลิกคำขอโอนไอเทมและราคาเสนอแล้ว`, 'system');
+  }
+}
+
+  async _acceptIncomingTrade() {
+  const req = this.activeTradeRequest;
+  if (!req) return;
+
+  // Check Receiver Zeny again to make sure
+  const myGold = this.character && this.character.stats ? this.character.stats.gold : 0;
+  if (req.price > myGold) {
+    this.addCombatLog('❌ แต้ม Zeny ของคุณไม่เพียงพอสำหรับการซื้อขายนี้', 'warning');
+    return;
+  }
+
+  try {
+    // Execute receiver transaction logic
+    await executeDecentralizedReceiverTrade(
+      this.characterId,
+      req.itemName,
+      req.itemType,
+      req.quantity,
+      req.stats || {},
+      req.price
+    );
+
+    // Re-load inventory to force refresh
+    await this.loadInventoryFromDB(this.characterId);
+
+    // Deduct gold from character stats locally so HUD renders correctly immediately
+    if (this.character && this.character.stats) {
+      this.character.stats.gold = Math.max(0, this.character.stats.gold - req.price);
+      this.updateHUD(this.character.stats);
+      this.updateStats(this.character.stats);
+    }
+
+    this.addCombatLog(`🤝 ได้รับ [${req.itemName}] x${req.quantity} จาก ${req.senderName}!`, 'loot');
+
+    // Send Response accepted = true
+    await sendTradeResponsePacket(req.senderUserId, req.targetUserId, true, req);
+
+    // Close modal
+    const panel = document.getElementById('trade-confirm-modal');
+    if (panel) panel.style.display = 'none';
+    this.activeTradeRequest = null;
+
+  } catch (err) {
+    console.error('[Trade] Accept Error:', err);
+    this.addCombatLog('❌ เกิดข้อผิดพลาดในการตอบรับการซื้อขาย', 'warning');
+  }
+}
+
+  async _declineIncomingTrade() {
+  const req = this.activeTradeRequest;
+  if (!req) return;
+
+  try {
+    // Send Response accepted = false
+    await sendTradeResponsePacket(req.senderUserId, req.targetUserId, false, req);
+
+    // Close modal
+    const panel = document.getElementById('trade-confirm-modal');
+    if (panel) panel.style.display = 'none';
+    this.activeTradeRequest = null;
+
+  } catch (err) {
+    console.error('[Trade] Decline Error:', err);
+  }
+}
+
+  async receiveTradeResponse(payload) {
+  if (!payload) return;
+
+  // Clear timeout & wait overlay
+  if (this.tradeTimeout) {
+    clearTimeout(this.tradeTimeout);
+    this.tradeTimeout = null;
+  }
+
+  const waitOverlay = document.getElementById('trade-waiting-overlay');
+  if (waitOverlay) waitOverlay.style.display = 'none';
+
+  // Close trade panel
+  const panel = document.getElementById('trade-panel');
+  if (panel) panel.style.display = 'none';
+
+  const req = payload.requestPayload;
+  if (payload.accepted) {
+    // Execute sender transaction logic
     try {
-      const stored = localStorage.getItem('zolos_daily_quests');
-      if (stored) {
-        data = JSON.parse(stored);
+      await executeDecentralizedSenderTrade(
+        this.characterId,
+        req.targetName,
+        req.itemName,
+        req.itemType,
+        req.quantity,
+        req.price
+      );
+
+      // Deduct from local inventory
+      const localItem = this.inventory.find(i => i.item_name === req.itemName);
+      if (localItem) {
+        localItem.quantity -= req.quantity;
+        if (localItem.quantity <= 0) {
+          const idx = this.inventory.indexOf(localItem);
+          this.inventory.splice(idx, 1);
+        }
       }
-    } catch (e) {
-      console.error('[Daily Quest] Failed to parse local storage:', e);
-    }
 
-    if (!data || data.lastDate !== today || !data.quests || data.quests.length < 4) {
-      const previousStreak = data ? (data.streak || 0) : 0;
-      let allCompletedYesterday = false;
-      if (data && data.quests) {
-        allCompletedYesterday = data.quests.every(q => q.current >= q.target);
+      // Add gold to character stats locally so HUD renders correctly immediately
+      if (this.character && this.character.stats) {
+        this.character.stats.gold = (this.character.stats.gold || 0) + req.price;
+        this.updateHUD(this.character.stats);
+        this.updateStats(this.character.stats);
       }
 
-      const newStreak = allCompletedYesterday ? previousStreak + 1 : 0;
+      this.addCombatLog(`🤝 ส่ง ${req.itemName} x${req.quantity} ให้ ${req.targetName} เรียบร้อยแล้ว!`, 'loot');
+      this._renderInventory();
 
-      // Select random monster
-      const monsterPool = ['Poring', 'Fabre', 'Lunatic', 'Bigfoot', 'Fly'];
-      const targetMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
-
-      // Select random consumable
-      const consumePool = ['Apple', 'Carrot', 'Red Herb', 'Yellow Herb'];
-      const targetConsumable = consumePool[Math.floor(Math.random() * consumePool.length)];
-
-      data = {
-        lastDate: today,
-        streak: newStreak,
-        rouletteSpent: false,
-        quests: [
-          {
-            id: 'hunt',
-            name: '⚔️ ล่ามอนสเตอร์ยอดนิยม',
-            desc: `กำจัดตัวมอนเตอร์ ${targetMonster} จำนวน 5 ตัว`,
-            targetName: targetMonster,
-            current: 0,
-            target: 5,
-            rewardGold: 200,
-            rewardExp: 150,
-            isClaimed: false
-          },
-          {
-            id: 'fish',
-            name: '🎣 ท้าทายยอดนักตกปลา',
-            desc: 'ตกปลาชนิดใดก็ได้จากแม่น้ำจำนวน 3 ตัว',
-            targetName: 'any',
-            current: 0,
-            target: 3,
-            rewardGold: 200,
-            rewardExp: 150,
-            isClaimed: false
-          },
-          {
-            id: 'consume',
-            name: '🥤 ผู้รักสุขภาพฟื้นพลัง',
-            desc: `ใช้งานยาฟื้นพลัง ${targetConsumable} จำนวน 3 ชิ้น`,
-            targetName: targetConsumable,
-            current: 0,
-            target: 3,
-            rewardGold: 150,
-            rewardExp: 100,
-            isClaimed: false
-          },
-          {
-            id: 'shop',
-            name: '🛍️ เยี่ยมชมร้านค้าคาฟรา',
-            desc: 'คุยกับ NPC คาฟรา เพื่อเปิดดูร้านค้า 1 ครั้ง',
-            targetName: 'any',
-            current: 0,
-            target: 1,
-            rewardGold: 100,
-            rewardExp: 80,
-            isClaimed: false
-          }
-        ]
-      };
-
-      localStorage.setItem('zolos_daily_quests', JSON.stringify(data));
-      this.addCombatLog('📜 ได้รับภารกิจรายวันชุดใหม่เรียบร้อยแล้ว! แตะที่ปุ่ม Quest เพื่อเปิดดู', 'system');
+    } catch (err) {
+      console.error('[Trade] Execute Sender Error:', err);
     }
-
-    this.dailyQuestsState = data;
+  } else {
+    this.addCombatLog(`❌ ${req.targetName} ปฏิเสธการโอนไอเทมการซื้อขาย`, 'warning');
   }
 
-  _renderDailyQuests() {
-    const listContainer = document.getElementById('quest-list-container');
-    if (!listContainer) return;
+  this.tradeTarget = null;
+  this.tradeSelectedItem = null;
+}
 
-    listContainer.innerHTML = '';
-    const state = this.dailyQuestsState;
-    if (!state || !state.quests) return;
+// ============ Daily Quest System ============
+_setupDailyQuests() {
+  this._checkDailyQuestsReset();
 
-    const streakVal = document.getElementById('val-quest-streak');
-    if (streakVal) streakVal.textContent = state.streak;
+  const btnDaily = document.getElementById('btn-daily-quests');
+  if (btnDaily) {
+    btnDaily.addEventListener('click', () => {
+      this._togglePanel('daily-quests-panel');
+      this._renderDailyQuests();
+    });
+  }
 
-    let completedCount = 0;
+  const btnSpin = document.getElementById('btn-spin-roulette');
+  if (btnSpin) {
+    btnSpin.addEventListener('click', () => {
+      this._spinRoulette();
+    });
+  }
+}
 
-    state.quests.forEach((q, idx) => {
-      const isCompleted = q.current >= q.target;
-      if (isCompleted) completedCount++;
+_checkDailyQuestsReset() {
+  const today = new Date().toDateString();
+  let data = null;
+  try {
+    const stored = localStorage.getItem('zolos_daily_quests');
+    if (stored) {
+      data = JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('[Daily Quest] Failed to parse local storage:', e);
+  }
 
-      const pct = Math.min(100, Math.floor((q.current / q.target) * 100));
+  if (!data || data.lastDate !== today || !data.quests || data.quests.length < 4) {
+    const previousStreak = data ? (data.streak || 0) : 0;
+    let allCompletedYesterday = false;
+    if (data && data.quests) {
+      allCompletedYesterday = data.quests.every(q => q.current >= q.target);
+    }
 
-      const row = document.createElement('div');
-      row.className = `quest-row ${isCompleted ? 'completed' : ''}`;
+    const newStreak = allCompletedYesterday ? previousStreak + 1 : 0;
 
-      row.innerHTML = `
+    // Select random monster
+    const monsterPool = ['Poring', 'Fabre', 'Lunatic', 'Bigfoot', 'Fly'];
+    const targetMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
+
+    // Select random consumable
+    const consumePool = ['Apple', 'Carrot', 'Red Herb', 'Yellow Herb'];
+    const targetConsumable = consumePool[Math.floor(Math.random() * consumePool.length)];
+
+    data = {
+      lastDate: today,
+      streak: newStreak,
+      rouletteSpent: false,
+      quests: [
+        {
+          id: 'hunt',
+          name: '⚔️ ล่ามอนสเตอร์ยอดนิยม',
+          desc: `กำจัดตัวมอนเตอร์ ${targetMonster} จำนวน 5 ตัว`,
+          targetName: targetMonster,
+          current: 0,
+          target: 5,
+          rewardGold: 200,
+          rewardExp: 150,
+          isClaimed: false
+        },
+        {
+          id: 'fish',
+          name: '🎣 ท้าทายยอดนักตกปลา',
+          desc: 'ตกปลาชนิดใดก็ได้จากแม่น้ำจำนวน 3 ตัว',
+          targetName: 'any',
+          current: 0,
+          target: 3,
+          rewardGold: 200,
+          rewardExp: 150,
+          isClaimed: false
+        },
+        {
+          id: 'consume',
+          name: '🥤 ผู้รักสุขภาพฟื้นพลัง',
+          desc: `ใช้งานยาฟื้นพลัง ${targetConsumable} จำนวน 3 ชิ้น`,
+          targetName: targetConsumable,
+          current: 0,
+          target: 3,
+          rewardGold: 150,
+          rewardExp: 100,
+          isClaimed: false
+        },
+        {
+          id: 'shop',
+          name: '🛍️ เยี่ยมชมร้านค้าคาฟรา',
+          desc: 'คุยกับ NPC คาฟรา เพื่อเปิดดูร้านค้า 1 ครั้ง',
+          targetName: 'any',
+          current: 0,
+          target: 1,
+          rewardGold: 100,
+          rewardExp: 80,
+          isClaimed: false
+        }
+      ]
+    };
+
+    localStorage.setItem('zolos_daily_quests', JSON.stringify(data));
+    this.addCombatLog('📜 ได้รับภารกิจรายวันชุดใหม่เรียบร้อยแล้ว! แตะที่ปุ่ม Quest เพื่อเปิดดู', 'system');
+  }
+
+  this.dailyQuestsState = data;
+}
+
+_renderDailyQuests() {
+  const listContainer = document.getElementById('quest-list-container');
+  if (!listContainer) return;
+
+  listContainer.innerHTML = '';
+  const state = this.dailyQuestsState;
+  if (!state || !state.quests) return;
+
+  const streakVal = document.getElementById('val-quest-streak');
+  if (streakVal) streakVal.textContent = state.streak;
+
+  let completedCount = 0;
+
+  state.quests.forEach((q, idx) => {
+    const isCompleted = q.current >= q.target;
+    if (isCompleted) completedCount++;
+
+    const pct = Math.min(100, Math.floor((q.current / q.target) * 100));
+
+    const row = document.createElement('div');
+    row.className = `quest-row ${isCompleted ? 'completed' : ''}`;
+
+    row.innerHTML = `
         <div class="quest-header-row">
           <span class="quest-title-text">${q.name}</span>
           <span class="quest-status-badge">${isCompleted ? 'สำเร็จ' : 'กำลังทำ'}</span>
@@ -3426,182 +3378,182 @@ export class GameUI {
         </div>
       `;
 
-      listContainer.appendChild(row);
+    listContainer.appendChild(row);
 
-      const claimBtn = row.querySelector(`#btn-claim-quest-${idx}`);
-      if (claimBtn && isCompleted && !q.isClaimed) {
-        claimBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this._claimQuestReward(idx);
-        });
+    const claimBtn = row.querySelector(`#btn-claim-quest-${idx}`);
+    if (claimBtn && isCompleted && !q.isClaimed) {
+      claimBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._claimQuestReward(idx);
+      });
+    }
+  });
+
+  const spinBtn = document.getElementById('btn-spin-roulette');
+  if (spinBtn) {
+    if (completedCount >= 3) {
+      if (state.rouletteSpent) {
+        spinBtn.textContent = '🎡 สปินแล้ววันนี้ (สุ่มใหม่ในวันพรุ่งนี้)';
+        spinBtn.disabled = true;
+      } else {
+        spinBtn.textContent = '🎡 สปินวงล้อเสี่ยงโชครับไอเทมเทพ!';
+        spinBtn.disabled = false;
       }
+    } else {
+      spinBtn.textContent = `🎡 ล็อควงล้อนำโชค (เคลียร์เควส ${completedCount}/3)`;
+      spinBtn.disabled = true;
+    }
+  }
+}
+
+_claimQuestReward(idx) {
+  const state = this.dailyQuestsState;
+  if (!state || !state.quests || !state.quests[idx]) return;
+
+  const q = state.quests[idx];
+  if (q.isClaimed || q.current < q.target) return;
+
+  q.isClaimed = true;
+  localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+
+  if (this.character && this.character.stats) {
+    this.character.stats.gold += q.rewardGold;
+    const leveledUp = this.character.addExp(q.rewardExp);
+
+    this.addCombatLog(`🎉 รับรางวัลเควส: +${q.rewardGold} Zeny และ +${q.rewardExp} EXP!`, 'gold');
+
+    if (leveledUp) {
+      if (this.soundManager && this.soundManager.playLevelUpSound) {
+        this.soundManager.playLevelUpSound();
+      }
+      this.addCombatLog(`🎉 LEVEL UP! เลเวลของคุณตอนนี้คือ ${this.character.stats.level}!`, 'levelup');
+    }
+
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
+  }
+
+  this._renderDailyQuests();
+  if (this.soundManager && this.soundManager.playUseItemSound) {
+    this.soundManager.playUseItemSound();
+  }
+}
+
+_spinRoulette() {
+  const state = this.dailyQuestsState;
+  if (!state || state.rouletteSpent) return;
+
+  const spinBtn = document.getElementById('btn-spin-roulette');
+  const display = document.getElementById('roulette-rewards-display');
+  const strip = document.getElementById('roulette-strip');
+  if (!spinBtn || !display || !strip) return;
+
+  state.rouletteSpent = true;
+  localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+  spinBtn.disabled = true;
+  spinBtn.textContent = '🎡 กำลังหมุนเสี่ยงโชค...';
+
+  // Roster of items in the pool
+  const pool = [
+    { name: 'Apple', emoji: '🍎', rarity: 'common' },
+    { name: 'Carrot', emoji: '🥕', rarity: 'common' },
+    { name: 'Red Herb', emoji: '🌿', rarity: 'common' },
+    { name: 'Yellow Elixir', emoji: '🧪', rarity: 'rare' },
+    { name: 'Emperium Crystal', emoji: '💎', rarity: 'legendary' },
+    { name: 'Ghostring Scroll', emoji: '📜', rarity: 'legendary' },
+    { name: 'Golden Deviruchi Hat', emoji: '👑', rarity: 'legendary' }
+  ];
+
+  strip.innerHTML = '';
+  const itemsCount = 35;
+  const stripItems = [];
+  for (let i = 0; i < itemsCount; i++) {
+    let item;
+    if (i === 28) {
+      const rng = Math.random();
+      if (rng < 0.05) item = pool[6]; // Golden Deviruchi Hat
+      else if (rng < 0.15) item = pool[5]; // Ghostring Scroll
+      else if (rng < 0.3) item = pool[4]; // Emperium Crystal
+      else if (rng < 0.5) item = pool[3]; // Yellow Elixir
+      else item = pool[Math.floor(Math.random() * 3)];
+    } else {
+      item = pool[Math.floor(Math.random() * pool.length)];
+    }
+    stripItems.push(item);
+
+    const itemBox = document.createElement('div');
+    itemBox.className = `roulette-item-box rarity-${item.rarity}`;
+    itemBox.innerHTML = `<span>${item.emoji}</span>`;
+    itemBox.title = item.name;
+    strip.appendChild(itemBox);
+  }
+
+  const winner = stripItems[28];
+  display.style.display = 'flex';
+  strip.style.transition = 'none';
+  strip.style.transform = 'translateX(0px)';
+
+  if (this.soundManager && this.soundManager.playUseItemSound) {
+    this.soundManager.playUseItemSound();
+  }
+
+  setTimeout(() => {
+    strip.style.transition = 'transform 3.5s cubic-bezier(0.1, 0.8, 0.1, 1)';
+    const offset = -(28 * 54) + 120;
+    strip.style.transform = `translateX(${offset}px)`;
+  }, 50);
+
+  setTimeout(() => {
+    const winBox = strip.childNodes[28];
+    if (winBox) winBox.classList.add('selected-outcome');
+
+    this.addItem({
+      name: winner.name,
+      type: winner.rarity === 'common' ? 'consumable' : (winner.name.includes('Hat') ? 'hat' : 'material'),
+      emoji: winner.emoji
     });
 
-    const spinBtn = document.getElementById('btn-spin-roulette');
-    if (spinBtn) {
-      if (completedCount >= 3) {
-        if (state.rouletteSpent) {
-          spinBtn.textContent = '🎡 สปินแล้ววันนี้ (สุ่มใหม่ในวันพรุ่งนี้)';
-          spinBtn.disabled = true;
-        } else {
-          spinBtn.textContent = '🎡 สปินวงล้อเสี่ยงโชครับไอเทมเทพ!';
-          spinBtn.disabled = false;
-        }
-      } else {
-        spinBtn.textContent = `🎡 ล็อควงล้อนำโชค (เคลียร์เควส ${completedCount}/3)`;
-        spinBtn.disabled = true;
+    this.addCombatLog(`🎡 กงล้อหมุนหยุดที่: รับไอเทมดรอปแดนสวรรค์ [${winner.emoji} ${winner.name}]!`, 'loot');
+
+    if (winner.rarity === 'legendary') {
+      if (this.soundManager && this.soundManager.playLevelUpSound) {
+        this.soundManager.playLevelUpSound();
       }
     }
-  }
 
-  _claimQuestReward(idx) {
-    const state = this.dailyQuestsState;
-    if (!state || !state.quests || !state.quests[idx]) return;
-
-    const q = state.quests[idx];
-    if (q.isClaimed || q.current < q.target) return;
-
-    q.isClaimed = true;
-    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
-
-    if (this.character && this.character.stats) {
-      this.character.stats.gold += q.rewardGold;
-      const leveledUp = this.character.addExp(q.rewardExp);
-
-      this.addCombatLog(`🎉 รับรางวัลเควส: +${q.rewardGold} Zeny และ +${q.rewardExp} EXP!`, 'gold');
-
-      if (leveledUp) {
-        if (this.soundManager && this.soundManager.playLevelUpSound) {
-          this.soundManager.playLevelUpSound();
-        }
-        this.addCombatLog(`🎉 LEVEL UP! เลเวลของคุณตอนนี้คือ ${this.character.stats.level}!`, 'levelup');
-      }
-
-      this.updateHUD(this.character.stats);
-      this.updateStats(this.character.stats);
-    }
-
+    spinBtn.textContent = '🎡 สปินแล้ววันนี้ (สุ่มใหม่ในวันพรุ่งนี้)';
     this._renderDailyQuests();
-    if (this.soundManager && this.soundManager.playUseItemSound) {
-      this.soundManager.playUseItemSound();
-    }
-  }
+  }, 3800);
+}
 
-  _spinRoulette() {
-    const state = this.dailyQuestsState;
-    if (!state || state.rouletteSpent) return;
+incrementQuestProgress(type, targetName = '') {
+  const state = this.dailyQuestsState;
+  if (!state || !state.quests) return;
 
-    const spinBtn = document.getElementById('btn-spin-roulette');
-    const display = document.getElementById('roulette-rewards-display');
-    const strip = document.getElementById('roulette-strip');
-    if (!spinBtn || !display || !strip) return;
+  let updated = false;
+  state.quests.forEach(q => {
+    if (q.id === type) {
+      if (q.targetName === 'any' || q.targetName === targetName) {
+        if (q.current < q.target) {
+          q.current++;
+          updated = true;
+          this.addCombatLog(`📈 ภารกิจ [${q.name}]: คืบหน้า ${q.current}/${q.target}`, 'system');
 
-    state.rouletteSpent = true;
-    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
-    spinBtn.disabled = true;
-    spinBtn.textContent = '🎡 กำลังหมุนเสี่ยงโชค...';
-
-    // Roster of items in the pool
-    const pool = [
-      { name: 'Apple', emoji: '🍎', rarity: 'common' },
-      { name: 'Carrot', emoji: '🥕', rarity: 'common' },
-      { name: 'Red Herb', emoji: '🌿', rarity: 'common' },
-      { name: 'Yellow Elixir', emoji: '🧪', rarity: 'rare' },
-      { name: 'Emperium Crystal', emoji: '💎', rarity: 'legendary' },
-      { name: 'Ghostring Scroll', emoji: '📜', rarity: 'legendary' },
-      { name: 'Golden Deviruchi Hat', emoji: '👑', rarity: 'legendary' }
-    ];
-
-    strip.innerHTML = '';
-    const itemsCount = 35;
-    const stripItems = [];
-    for (let i = 0; i < itemsCount; i++) {
-      let item;
-      if (i === 28) {
-        const rng = Math.random();
-        if (rng < 0.05) item = pool[6]; // Golden Deviruchi Hat
-        else if (rng < 0.15) item = pool[5]; // Ghostring Scroll
-        else if (rng < 0.3) item = pool[4]; // Emperium Crystal
-        else if (rng < 0.5) item = pool[3]; // Yellow Elixir
-        else item = pool[Math.floor(Math.random() * 3)];
-      } else {
-        item = pool[Math.floor(Math.random() * pool.length)];
-      }
-      stripItems.push(item);
-
-      const itemBox = document.createElement('div');
-      itemBox.className = `roulette-item-box rarity-${item.rarity}`;
-      itemBox.innerHTML = `<span>${item.emoji}</span>`;
-      itemBox.title = item.name;
-      strip.appendChild(itemBox);
-    }
-
-    const winner = stripItems[28];
-    display.style.display = 'flex';
-    strip.style.transition = 'none';
-    strip.style.transform = 'translateX(0px)';
-
-    if (this.soundManager && this.soundManager.playUseItemSound) {
-      this.soundManager.playUseItemSound();
-    }
-
-    setTimeout(() => {
-      strip.style.transition = 'transform 3.5s cubic-bezier(0.1, 0.8, 0.1, 1)';
-      const offset = -(28 * 54) + 120;
-      strip.style.transform = `translateX(${offset}px)`;
-    }, 50);
-
-    setTimeout(() => {
-      const winBox = strip.childNodes[28];
-      if (winBox) winBox.classList.add('selected-outcome');
-
-      this.addItem({
-        name: winner.name,
-        type: winner.rarity === 'common' ? 'consumable' : (winner.name.includes('Hat') ? 'hat' : 'material'),
-        emoji: winner.emoji
-      });
-
-      this.addCombatLog(`🎡 กงล้อหมุนหยุดที่: รับไอเทมดรอปแดนสวรรค์ [${winner.emoji} ${winner.name}]!`, 'loot');
-
-      if (winner.rarity === 'legendary') {
-        if (this.soundManager && this.soundManager.playLevelUpSound) {
-          this.soundManager.playLevelUpSound();
-        }
-      }
-
-      spinBtn.textContent = '🎡 สปินแล้ววันนี้ (สุ่มใหม่ในวันพรุ่งนี้)';
-      this._renderDailyQuests();
-    }, 3800);
-  }
-
-  incrementQuestProgress(type, targetName = '') {
-    const state = this.dailyQuestsState;
-    if (!state || !state.quests) return;
-
-    let updated = false;
-    state.quests.forEach(q => {
-      if (q.id === type) {
-        if (q.targetName === 'any' || q.targetName === targetName) {
-          if (q.current < q.target) {
-            q.current++;
-            updated = true;
-            this.addCombatLog(`📈 ภารกิจ [${q.name}]: คืบหน้า ${q.current}/${q.target}`, 'system');
-
-            if (q.current === q.target) {
-              this.addCombatLog(`✨ ภารกิจ [${q.name}] สำเร็จแล้ว! กดรับรางวัลได้เลย`, 'levelup');
-            }
+          if (q.current === q.target) {
+            this.addCombatLog(`✨ ภารกิจ [${q.name}] สำเร็จแล้ว! กดรับรางวัลได้เลย`, 'levelup');
           }
         }
       }
-    });
+    }
+  });
 
-    if (updated) {
-      localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
-      const panel = document.getElementById('daily-quests-panel');
-      if (panel && panel.style.display !== 'none') {
-        this._renderDailyQuests();
-      }
+  if (updated) {
+    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+    const panel = document.getElementById('daily-quests-panel');
+    if (panel && panel.style.display !== 'none') {
+      this._renderDailyQuests();
     }
   }
+}
 }
 

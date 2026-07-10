@@ -253,6 +253,7 @@ export class SceneManager {
 
         if (mapId === 'prontera') {
             this._createNPC();
+            this._createSellNPC();
         }
     }
 
@@ -266,6 +267,13 @@ export class SceneManager {
 
     getNPC() {
         return this.npcMesh;
+    }
+
+    getNPCs() {
+        const list = [];
+        if (this.npcMesh) list.push(this.npcMesh);
+        if (this.npcSellMesh) list.push(this.npcSellMesh);
+        return list;
     }
 
     // ============ Sky Dome ============
@@ -1936,7 +1944,192 @@ export class SceneManager {
         this.npcMesh = group;
     }
 
-    getMouseIntersection(event, monsters, npc, remotePlayersMap) {
+    _createSellNPC() {
+        const group = new THREE.Group();
+        group.name = "npcSell";
+
+        // ---- Wooden floor/deck ----
+        const floorGeo = new THREE.BoxGeometry(3.6, 0.12, 2.6);
+        const floorMat = new THREE.MeshLambertMaterial({ color: 0x5a4225 }); // slightly darker wood
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.y = 0.06;
+        floor.receiveShadow = true;
+        group.add(floor);
+
+        // ---- Four supporting pillars ----
+        const pillarGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.5);
+        const pillarMat = new THREE.MeshLambertMaterial({ color: 0x47341c });
+
+        const positions = [
+            [-1.6, 1.25, -1.1],
+            [1.6, 1.25, -1.1],
+            [-1.6, 1.25, 1.1],
+            [1.6, 1.25, 1.1]
+        ];
+
+        positions.forEach(([px, py, pz]) => {
+            const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+            pillar.position.set(px, py, pz);
+            pillar.castShadow = true;
+            group.add(pillar);
+        });
+
+        // ---- Front merchant counter table ----
+        const counterGeo = new THREE.BoxGeometry(3.6, 0.9, 0.7);
+        const counterMat = new THREE.MeshLambertMaterial({ color: 0x765532 });
+        const counter = new THREE.Mesh(counterGeo, counterMat);
+        counter.position.set(0, 0.45, 0.95);
+        counter.castShadow = true;
+        group.add(counter);
+
+        // ---- Decorative displays on counter (boxes with items) ----
+        // Mini display container box
+        const boxGeo = new THREE.BoxGeometry(0.8, 0.25, 0.5);
+        const boxMat = new THREE.MeshLambertMaterial({ color: 0x906d44 });
+
+        const boxL = new THREE.Mesh(boxGeo, boxMat);
+        boxL.position.set(-1.0, 0.92, 0.95);
+        boxL.rotation.y = 0.1;
+        group.add(boxL);
+
+        const boxR = new THREE.Mesh(boxGeo, boxMat);
+        boxR.position.set(1.0, 0.92, 0.95);
+        boxR.rotation.y = -0.1;
+        group.add(boxR);
+
+        // Gold and material representation on display
+        const item1Geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.1, metalness: 0.8 });
+        const item1 = new THREE.Mesh(item1Geo, goldMat);
+        item1.position.set(-1.0, 1.05, 0.95);
+        group.add(item1);
+
+        const item2 = new THREE.Mesh(item1Geo, new THREE.MeshPhongMaterial({ color: 0x228b22 }));
+        item2.position.set(1.0, 1.02, 0.95);
+        group.add(item2);
+
+        // ---- Golden/Yellow Striped Roof Canopy ----
+        const roofGeo = new THREE.BoxGeometry(4.0, 0.28, 3.0);
+        const roofMat = new THREE.MeshLambertMaterial({ color: 0xe5a93b }); // golden yellow
+        const roof = new THREE.Mesh(roofGeo, roofMat);
+        roof.position.set(0, 2.45, 0);
+        roof.castShadow = true;
+        group.add(roof);
+
+        // Roof trim valence
+        const valenceGeo = new THREE.BoxGeometry(4.0, 0.4, 0.08);
+        const valenceMat = new THREE.MeshLambertMaterial({ color: 0x6e4313 }); // brown trim
+
+        const valenceF = new THREE.Mesh(valenceGeo, valenceMat);
+        valenceF.position.set(0, 2.2, 1.48);
+        group.add(valenceF);
+
+        const valenceB = new THREE.Mesh(valenceGeo, valenceMat);
+        valenceB.position.set(0, 2.2, -1.48);
+        group.add(valenceB);
+
+        // ---- Lantern warm glow ----
+        const lanternGeo = new THREE.BoxGeometry(0.2, 0.3, 0.2);
+        const lanternMat = new THREE.MeshBasicMaterial({ color: 0xffe9a0 });
+        const lantern = new THREE.Mesh(lanternGeo, lanternMat);
+        lantern.position.set(-1.2, 2.2, 1.25);
+        group.add(lantern);
+
+        const lanternLight = new THREE.PointLight(0xffb84d, 1.0, 6);
+        lanternLight.position.set(-1.2, 2.0, 1.25);
+        group.add(lanternLight);
+
+        // ---- Merchant character (behind counter) ----
+        const merchantGroup = new THREE.Group();
+
+        // Merchant body (green vest)
+        const mBodyGeo = new THREE.BoxGeometry(0.55, 0.75, 0.35);
+        const mBodyMat = new THREE.MeshLambertMaterial({ color: 0x2c6b3f });
+        const mBody = new THREE.Mesh(mBodyGeo, mBodyMat);
+        mBody.position.y = 1.0;
+        mBody.castShadow = true;
+        merchantGroup.add(mBody);
+
+        // Merchant head
+        const mHeadGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+        const mHeadMat = new THREE.MeshLambertMaterial({ color: 0xf5d0a0 });
+        const mHead = new THREE.Mesh(mHeadGeo, mHeadMat);
+        mHead.position.y = 1.62;
+        mHead.castShadow = true;
+        merchantGroup.add(mHead);
+
+        // Merchant spectacles
+        const frameGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.04, 8);
+        const frameMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const lensL = new THREE.Mesh(frameGeo, frameMat);
+        lensL.rotation.x = Math.PI / 2;
+        lensL.position.set(-0.1, 1.65, 0.22);
+        merchantGroup.add(lensL);
+        const lensR = new THREE.Mesh(frameGeo, frameMat);
+        lensR.rotation.x = Math.PI / 2;
+        lensR.position.set(0.1, 1.65, 0.22);
+        merchantGroup.add(lensR);
+
+        // Merchant beard
+        const beardGeo = new THREE.BoxGeometry(0.3, 0.18, 0.1);
+        const beardMat = new THREE.MeshLambertMaterial({ color: 0x4a3c31 });
+        const beard = new THREE.Mesh(beardGeo, beardMat);
+        beard.position.set(0, 1.45, 0.18);
+        merchantGroup.add(beard);
+
+        // Merchant hat
+        const mHatGeo = new THREE.CylinderGeometry(0.3, 0.32, 0.18, 8);
+        const mHatMat = new THREE.MeshLambertMaterial({ color: 0x6e4313 });
+        const mHat = new THREE.Mesh(mHatGeo, mHatMat);
+        mHat.position.y = 1.88;
+        merchantGroup.add(mHat);
+
+        // Merchant arms
+        const mArmGeo = new THREE.BoxGeometry(0.18, 0.5, 0.18);
+        const mArmMat = new THREE.MeshLambertMaterial({ color: 0x2c6b3f });
+        const mArmL = new THREE.Mesh(mArmGeo, mArmMat);
+        mArmL.position.set(-0.4, 0.95, 0);
+        merchantGroup.add(mArmL);
+        const mArmR = new THREE.Mesh(mArmGeo, mArmMat);
+        mArmR.position.set(0.4, 0.95, 0);
+        merchantGroup.add(mArmR);
+
+        // Position merchant behind counter
+        merchantGroup.position.set(0, 0.18, 0.5);
+        group.add(merchantGroup);
+
+        // ---- Floating shop name tag ----
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 96;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(10, 40, 20, 0.7)';
+        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.fill();
+        ctx.strokeStyle = '#ebd040';
+        ctx.lineWidth = 3;
+        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.stroke();
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffdd44';
+        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 256, 60);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const nameTag = new THREE.Sprite(spriteMat);
+        nameTag.position.y = 4.4;
+        nameTag.scale.set(4.0, 0.8, 1);
+        group.add(nameTag);
+
+        // Position on dry land
+        group.position.set(8, 0, -5);
+        this.scene.add(group);
+        this.envObjects.push(group);
+        this.npcSellMesh = group;
+    }
+
+    getMouseIntersection(event, monsters, npcs, remotePlayersMap) {
         if (!this.canvas) return null;
 
         const rect = this.canvas.getBoundingClientRect();
@@ -1950,7 +2143,14 @@ export class SceneManager {
 
         if (this.groundMesh) targets.push(this.groundMesh);
         if (this.waterMesh) targets.push(this.waterMesh);
-        if (npc) targets.push(npc);
+
+        if (npcs) {
+            if (Array.isArray(npcs)) {
+                npcs.forEach(n => { if (n) targets.push(n); });
+            } else {
+                targets.push(npcs);
+            }
+        }
         if (monsters && monsters.monsters) {
             monsters.monsters.forEach(m => {
                 if (m.alive && m.mesh) {
@@ -1968,14 +2168,21 @@ export class SceneManager {
 
         const intersects = raycaster.intersectObjects(targets, true);
         if (intersects.length > 0) {
-            // Check all intersections to prioritize monsters/NPCs/Players over environment (water/ground)
             for (let i = 0; i < intersects.length; i++) {
                 const hit = intersects[i];
                 let obj = hit.object;
 
                 while (obj) {
-                    if (obj === npc) {
-                        return { type: 'npc', point: hit.point, object: npc };
+                    if (npcs) {
+                        if (Array.isArray(npcs)) {
+                            for (const n of npcs) {
+                                if (obj === n) {
+                                    return { type: 'npc', point: hit.point, object: n };
+                                }
+                            }
+                        } else if (obj === npcs) {
+                            return { type: 'npc', point: hit.point, object: npcs };
+                        }
                     }
                     if (monsters && monsters.monsters) {
                         const matchedMonster = monsters.monsters.find(m => m.mesh === obj && m.alive);
@@ -2002,7 +2209,6 @@ export class SceneManager {
                 }
             }
 
-            // If no monster/NPC/Player was hit, check for ground/water from the first intersection
             const firstHit = intersects[0];
             if (firstHit.object === this.groundMesh || firstHit.object === this.waterMesh) {
                 return { type: 'ground', point: firstHit.point };
@@ -2010,494 +2216,625 @@ export class SceneManager {
         }
 
         return null;
-    }
 
-    // ============ Core Methods ============
-    _onResize() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        this.camera.aspect = w / h;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(w, h);
-    }
 
-    getDelta() {
-        return this.clock.getDelta();
-    }
 
-    render() {
-        this.renderer.render(this.scene, this.camera);
-    }
-
-    // Follow a target position (camera follows player)
-    // stableY: use the character's baseY instead of animated mesh.position.y
-    //          to prevent camera shake from walking/running bounce animation
-    followTarget(targetPos, stableY) {
-        const offsetX = 0;
-        const offsetY = 18;
-        const offsetZ = 18;
-        const smoothing = 0.08;
-
-        // Use stableY (baseY) for camera Y to avoid bounce-induced shake
-        const followY = stableY !== undefined ? stableY : targetPos.y;
-
-        const targetCamX = targetPos.x + offsetX;
-        const targetCamY = followY + offsetY;
-        const targetCamZ = targetPos.z + offsetZ;
-
-        this.camera.position.x += (targetCamX - this.camera.position.x) * smoothing;
-        this.camera.position.y += (targetCamY - this.camera.position.y) * smoothing;
-        this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
-
-        this.camera.lookAt(targetPos.x, followY, targetPos.z);
-    }
-
-    // Check if a position is in the winding river (and not on the bridge)
-    isInWater(position) {
-        if (!this.waterMesh) return false;
-
-        // Check if on the bridge (approximate bounds)
-        // Bridge is centered at xOffset = 0, zOffset = -2
-        // Bridge planks have width 3.6 (x between -1.8 and 1.8), and span z from -10 to +6
-        if (Math.abs(position.x) < 1.8 && position.z >= -10 && position.z <= 6) {
-            return false;
+        // ============ Core Methods ============
+        _onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            this.camera.aspect = w / h;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(w, h);
         }
 
-        // River centerline: z = sin(x * 0.08) * 10 - 2
-        const riverZ = Math.sin(position.x * 0.08) * 10 - 2;
-        const distToRiver = Math.abs(position.z - riverZ);
-
-        // Riverbed cut boundary for wider river
-        return distToRiver < 5.5;
-    }
-
-    getEnvironmentAt(position) {
-        if (!position) return 'ground';
-        if (this.isInWater(position)) {
-            return 'water';
-        }
-        if (position.x < -6 && position.z < -6) {
-            return 'cave';
-        }
-        if (position.x > 6 && position.z > 6) {
-            return 'mountain';
-        }
-        return 'ground';
-    }
-
-    // World to screen position
-    worldToScreen(worldPos) {
-        const vec = worldPos.clone();
-        vec.project(this.camera);
-        return {
-            x: (vec.x * 0.5 + 0.5) * window.innerWidth,
-            y: (-vec.y * 0.5 + 0.5) * window.innerHeight
-        };
-    }
-
-    // ============ Animate per-frame ============
-    updateAnimations(dt) {
-        this.time += dt;
-
-        // Animate water waves (disabled temporarily to fix blue screen issue)
-        /*
-        if (this.waterMesh && this._waterFrameSkip === undefined) this._waterFrameSkip = 0;
-        if (this.waterMesh) {
-            this._waterFrameSkip = (this._waterFrameSkip + 1) % 2;
-            if (this._waterFrameSkip === 0) {
-                const positions = this.waterMesh.geometry.attributes.position;
-                for (let i = 0; i < positions.count; i++) {
-                    const x = positions.getX(i);
-                    const y = positions.getY(i);
-                    const wave = Math.sin(x * 2 + this.time * 2) * 0.04 +
-                        Math.cos(y * 3 + this.time * 1.5) * 0.03;
-                    positions.setZ(i, wave);
-                }
-                positions.needsUpdate = true;
-            }
-        }
-        */
-
-        // Animate voxel clouds
-        this.cloudSprites.forEach(cloud => {
-            cloud.userData.angle += cloud.userData.speed * dt;
-            cloud.position.x = Math.cos(cloud.userData.angle) * cloud.userData.radius;
-            cloud.position.z = Math.sin(cloud.userData.angle) * cloud.userData.radius;
-            // Face parallel to flight circle tangent (tangent is Z normal facing)
-            cloud.rotation.y = -cloud.userData.angle + Math.PI / 2;
-        });
-
-        // Animate wind sway on trees
-        if (this.swayingObjects) {
-            this.swayingObjects.forEach(obj => {
-                const offset = obj.position.x * 0.15 + obj.position.z * 0.15;
-                const swaySpeed = 1.6;
-                const swayStrength = 0.022;
-                obj.rotation.x = Math.sin(this.time * swaySpeed + offset) * swayStrength;
-                obj.rotation.z = Math.cos(this.time * (swaySpeed * 0.8) + offset) * (swayStrength * 0.7);
-            });
+        getDelta() {
+            return this.clock.getDelta();
         }
 
-        // Animate sunbeams shimmer
-        if (this.sunbeamGroup) {
-            this.sunbeamGroup.children.forEach((pivot, idx) => {
-                const pulse = 0.05 + Math.sin(this.time * 1.1 + idx * 1.5) * 0.035;
-                pivot.children[0].material.opacity = pulse;
-            });
+        render() {
+            this.renderer.render(this.scene, this.camera);
         }
 
-        // Animate flying birds
-        if (this.birds) {
-            this.birds.forEach(bird => {
-                const u = bird.userData;
-                u.angle += u.speed * dt;
+        // Follow a target position (camera follows player)
+        // stableY: use the character's baseY instead of animated mesh.position.y
+        //          to prevent camera shake from walking/running bounce animation
+        followTarget(targetPos, stableY) {
+            const offsetX = 0;
+            const offsetY = 18;
+            const offsetZ = 18;
+            const smoothing = 0.08;
 
-                // Fly in matching circle
-                bird.position.set(
-                    Math.cos(u.angle) * u.radius,
-                    u.height,
-                    Math.sin(u.angle) * u.radius
-                );
+            // Use stableY (baseY) for camera Y to avoid bounce-induced shake
+            const followY = stableY !== undefined ? stableY : targetPos.y;
 
-                // Tangent yaw heading matching motion
-                const tangentX = -Math.sin(u.angle);
-                const tangentZ = Math.cos(u.angle);
-                bird.rotation.y = Math.atan2(tangentX, tangentZ);
+            const targetCamX = targetPos.x + offsetX;
+            const targetCamY = followY + offsetY;
+            const targetCamZ = targetPos.z + offsetZ;
 
-                // Wing flaps
-                const flap = Math.sin(this.time * u.flapSpeed + u.flapOffset) * 0.75;
-                u.leftWing.rotation.z = -flap;
-                u.rightWing.rotation.z = flap;
-            });
+            this.camera.position.x += (targetCamX - this.camera.position.x) * smoothing;
+            this.camera.position.y += (targetCamY - this.camera.position.y) * smoothing;
+            this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
+
+            this.camera.lookAt(targetPos.x, followY, targetPos.z);
         }
 
-        // Animate portal glow
-        this.portalMeshes.forEach(portal => {
-            const scale = 1 + Math.sin(this.time * 3) * 0.05;
-            portal.children[0].scale.setScalar(scale); // ring pulse
-            portal.children[1].material.opacity = 0.3 + Math.sin(this.time * 2) * 0.15;
-        });
+        // Check if a position is in the winding river (and not on the bridge)
+        isInWater(position) {
+            if (!this.waterMesh) return false;
 
-        // Animate fishing bobber & line
-        this._updateFishingAnimations(dt);
-    }
-
-    // ============ 3D Fishing Visuals ============
-    createFishingLine(playerPos, bobberPos) {
-        this.removeFishingLine();
-
-        this._fishingGroup = new THREE.Group();
-
-        // Use dynamic bobber position if provided, otherwise fall back to defaults
-        const bobberX = bobberPos ? bobberPos.x : 2.8;
-        const bobberZ = bobberPos ? bobberPos.z : -2;
-        const bobberY = bobberPos ? (bobberPos.y || 0.05) : 0.05;
-
-        // Create curved fishing line from player hand to bobber
-        const curve = new THREE.QuadraticBezierCurve3(
-            new THREE.Vector3(playerPos.x, playerPos.y + 1.4, playerPos.z),
-            new THREE.Vector3(
-                (playerPos.x + bobberX) / 2,
-                2.5,
-                (playerPos.z + bobberZ) / 2
-            ),
-            new THREE.Vector3(bobberX, bobberY, bobberZ)
-        );
-        const points = curve.getPoints(24);
-        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-        const lineMat = new THREE.LineBasicMaterial({
-            color: 0xc0c0c0,
-            linewidth: 1,
-            transparent: true,
-            opacity: 0.85,
-        });
-        this._fishingLineMesh = new THREE.Line(lineGeo, lineMat);
-        this._fishingGroup.add(this._fishingLineMesh);
-
-        // Bobber (orange/red sphere)
-        const bobberGeo = new THREE.SphereGeometry(0.12, 8, 6);
-        const bobberMat = new THREE.MeshLambertMaterial({ color: 0xff4020 });
-        this._fishingBobber = new THREE.Mesh(bobberGeo, bobberMat);
-        this._fishingBobber.position.set(bobberX, bobberY, bobberZ);
-        this._fishingGroup.add(this._fishingBobber);
-
-        // Bobber white stripe
-        const stripeGeo = new THREE.SphereGeometry(0.13, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.4);
-        const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-        stripe.position.set(bobberX, bobberY + 0.04, bobberZ);
-        this._fishingGroup.add(stripe);
-
-        // Store metadata
-        this._fishingBobberBaseY = bobberY;
-        this._fishingPlayerPos = { ...playerPos };
-        this._fishingBiteActive = false;
-        this._fishingBiteTimer = 0;
-
-        this.scene.add(this._fishingGroup);
-    }
-
-    animateFishBite() {
-        if (!this._fishingGroup || !this._fishingBobber) return;
-
-        this._fishingBiteActive = true;
-        this._fishingBiteTimer = 0;
-
-        // Create fish mesh swimming up
-        if (this._fishingFishMesh) {
-            this._fishingGroup.remove(this._fishingFishMesh);
-        }
-        const fishGroup = new THREE.Group();
-
-        // Fish body
-        const bodyGeo = new THREE.SphereGeometry(0.15, 6, 4);
-        bodyGeo.scale(1.8, 0.8, 1);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4080ff });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        fishGroup.add(body);
-
-        // Tail fin
-        const tailGeo = new THREE.ConeGeometry(0.12, 0.2, 4);
-        const tailMat = new THREE.MeshLambertMaterial({ color: 0x3060d0 });
-        const tail = new THREE.Mesh(tailGeo, tailMat);
-        tail.position.set(-0.28, 0, 0);
-        tail.rotation.z = Math.PI / 2;
-        fishGroup.add(tail);
-
-        // Eye
-        const eyeGeo = new THREE.SphereGeometry(0.03, 4, 4);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        const eye = new THREE.Mesh(eyeGeo, eyeMat);
-        eye.position.set(0.15, 0.04, 0.08);
-        fishGroup.add(eye);
-
-        const bx = this._fishingBobber.position.x;
-        const bz = this._fishingBobber.position.z;
-        fishGroup.position.set(bx + 0.8, -0.3, bz);
-        fishGroup.rotation.y = Math.PI / 2;
-
-        this._fishingFishMesh = fishGroup;
-        this._fishingGroup.add(fishGroup);
-    }
-
-    removeFishingLine() {
-        if (this._fishingGroup) {
-            this.scene.remove(this._fishingGroup);
-            this._fishingGroup = null;
-        }
-        this._fishingLineMesh = null;
-        this._fishingBobber = null;
-        this._fishingFishMesh = null;
-        this._fishingBiteActive = false;
-    }
-
-    _updateFishingAnimations(dt) {
-        if (!this._fishingGroup || !this._fishingBobber) return;
-
-        // Idle bobber floating
-        const baseY = this._fishingBobberBaseY || 0.05;
-        const bob = Math.sin(this.time * 2.5) * 0.03;
-        this._fishingBobber.position.y = baseY + bob;
-
-        // Bite animation
-        if (this._fishingBiteActive) {
-            this._fishingBiteTimer += dt;
-            const t = this._fishingBiteTimer;
-
-            // Bobber dips down sharply
-            const dipAmount = Math.sin(t * 12) * 0.15 * Math.max(0, 1 - t * 1.5);
-            this._fishingBobber.position.y = baseY - Math.abs(dipAmount) - 0.05;
-
-            // Fish swims toward bobber
-            if (this._fishingFishMesh) {
-                const bx = this._fishingBobber.position.x;
-                const bz = this._fishingBobber.position.z;
-                const fishTargetX = bx;
-                const fishTargetZ = bz;
-
-                this._fishingFishMesh.position.x += (fishTargetX - this._fishingFishMesh.position.x) * 2.5 * dt;
-                this._fishingFishMesh.position.z += (fishTargetZ - this._fishingFishMesh.position.z) * 2.5 * dt;
-                this._fishingFishMesh.position.y = -0.15 + Math.sin(t * 8) * 0.05;
-
-                // Tail wiggle
-                this._fishingFishMesh.rotation.y = Math.PI / 2 + Math.sin(t * 10) * 0.3;
+            // Check if on the bridge (approximate bounds)
+            // Bridge is centered at xOffset = 0, zOffset = -2
+            // Bridge planks have width 3.6 (x between -1.8 and 1.8), and span z from -10 to +6
+            if (Math.abs(position.x) < 1.8 && position.z >= -10 && position.z <= 6) {
+                return false;
             }
 
-            // End bite after 1s
-            if (t > 1.0) {
-                this._fishingBiteActive = false;
-                if (this._fishingFishMesh) {
-                    this._fishingGroup.remove(this._fishingFishMesh);
-                    this._fishingFishMesh = null;
+            // River centerline: z = sin(x * 0.08) * 10 - 2
+            const riverZ = Math.sin(position.x * 0.08) * 10 - 2;
+            const distToRiver = Math.abs(position.z - riverZ);
+
+            // Riverbed cut boundary for wider river
+            return distToRiver < 5.5;
+        }
+
+        getEnvironmentAt(position) {
+            if (!position) return 'ground';
+            if (this.isInWater(position)) {
+                return 'water';
+            }
+            if (position.x < -6 && position.z < -6) {
+                return 'cave';
+            }
+            if (position.x > 6 && position.z > 6) {
+                return 'mountain';
+            }
+            return 'ground';
+        }
+
+        // World to screen position
+        worldToScreen(worldPos) {
+            const vec = worldPos.clone();
+            vec.project(this.camera);
+            return {
+                x: (vec.x * 0.5 + 0.5) * window.innerWidth,
+                y: (-vec.y * 0.5 + 0.5) * window.innerHeight
+            };
+        }
+
+        // ============ Animate per-frame ============
+        updateAnimations(dt) {
+            this.time += dt;
+
+            // Animate water waves (disabled temporarily to fix blue screen issue)
+            /*
+            if (this.waterMesh && this._waterFrameSkip === undefined) this._waterFrameSkip = 0;
+            if (this.waterMesh) {
+                this._waterFrameSkip = (this._waterFrameSkip + 1) % 2;
+                if (this._waterFrameSkip === 0) {
+                    const positions = this.waterMesh.geometry.attributes.position;
+                    for (let i = 0; i < positions.count; i++) {
+                        const x = positions.getX(i);
+                        const y = positions.getY(i);
+                        const wave = Math.sin(x * 2 + this.time * 2) * 0.04 +
+                            Math.cos(y * 3 + this.time * 1.5) * 0.03;
+                        positions.setZ(i, wave);
+                    }
+                    positions.needsUpdate = true;
                 }
             }
+            */
+
+            // Animate voxel clouds
+            this.cloudSprites.forEach(cloud => {
+                cloud.userData.angle += cloud.userData.speed * dt;
+                cloud.position.x = Math.cos(cloud.userData.angle) * cloud.userData.radius;
+                cloud.position.z = Math.sin(cloud.userData.angle) * cloud.userData.radius;
+                // Face parallel to flight circle tangent (tangent is Z normal facing)
+                cloud.rotation.y = -cloud.userData.angle + Math.PI / 2;
+            });
+
+            // Animate wind sway on trees
+            if (this.swayingObjects) {
+                this.swayingObjects.forEach(obj => {
+                    const offset = obj.position.x * 0.15 + obj.position.z * 0.15;
+                    const swaySpeed = 1.6;
+                    const swayStrength = 0.022;
+                    obj.rotation.x = Math.sin(this.time * swaySpeed + offset) * swayStrength;
+                    obj.rotation.z = Math.cos(this.time * (swaySpeed * 0.8) + offset) * (swayStrength * 0.7);
+                });
+            }
+
+            // Animate sunbeams shimmer
+            if (this.sunbeamGroup) {
+                this.sunbeamGroup.children.forEach((pivot, idx) => {
+                    const pulse = 0.05 + Math.sin(this.time * 1.1 + idx * 1.5) * 0.035;
+                    pivot.children[0].material.opacity = pulse;
+                });
+            }
+
+            // Animate flying birds
+            if (this.birds) {
+                this.birds.forEach(bird => {
+                    const u = bird.userData;
+                    u.angle += u.speed * dt;
+
+                    // Fly in matching circle
+                    bird.position.set(
+                        Math.cos(u.angle) * u.radius,
+                        u.height,
+                        Math.sin(u.angle) * u.radius
+                    );
+
+                    // Tangent yaw heading matching motion
+                    const tangentX = -Math.sin(u.angle);
+                    const tangentZ = Math.cos(u.angle);
+                    bird.rotation.y = Math.atan2(tangentX, tangentZ);
+
+                    // Wing flaps
+                    const flap = Math.sin(this.time * u.flapSpeed + u.flapOffset) * 0.75;
+                    u.leftWing.rotation.z = -flap;
+                    u.rightWing.rotation.z = flap;
+                });
+            }
+
+            // Animate portal glow
+            this.portalMeshes.forEach(portal => {
+                const scale = 1 + Math.sin(this.time * 3) * 0.05;
+                portal.children[0].scale.setScalar(scale); // ring pulse
+                portal.children[1].material.opacity = 0.3 + Math.sin(this.time * 2) * 0.15;
+            });
+
+            // Animate fishing bobber & line
+            this._updateFishingAnimations(dt);
         }
 
-        // Update the fishing line curve dynamically (throttled: every 2nd frame)
-        this._fishingLineFrame = ((this._fishingLineFrame || 0) + 1) % 2;
-        if (this._fishingLineFrame === 0 && this._fishingLineMesh && this._fishingPlayerPos) {
-            const pp = this._fishingPlayerPos;
-            const bp = this._fishingBobber.position;
+        // ============ 3D Fishing Visuals ============
+        createFishingLine(playerPos, bobberPos) {
+            this.removeFishingLine();
+
+            this._fishingGroup = new THREE.Group();
+
+            // Use dynamic bobber position if provided, otherwise fall back to defaults
+            const bobberX = bobberPos ? bobberPos.x : 2.8;
+            const bobberZ = bobberPos ? bobberPos.z : -2;
+            const bobberY = bobberPos ? (bobberPos.y || 0.05) : 0.05;
+
+            // Create curved fishing line from player hand to bobber
             const curve = new THREE.QuadraticBezierCurve3(
-                new THREE.Vector3(pp.x, (pp.y || 0) + 1.4, pp.z),
+                new THREE.Vector3(playerPos.x, playerPos.y + 1.4, playerPos.z),
                 new THREE.Vector3(
-                    (pp.x + bp.x) / 2,
-                    2.5 + Math.sin(this.time * 1.5) * 0.1,
-                    (pp.z + bp.z) / 2
+                    (playerPos.x + bobberX) / 2,
+                    2.5,
+                    (playerPos.z + bobberZ) / 2
                 ),
-                new THREE.Vector3(bp.x, bp.y, bp.z)
+                new THREE.Vector3(bobberX, bobberY, bobberZ)
             );
             const points = curve.getPoints(24);
-            this._fishingLineMesh.geometry.setFromPoints(points);
+            const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const lineMat = new THREE.LineBasicMaterial({
+                color: 0xc0c0c0,
+                linewidth: 1,
+                transparent: true,
+                opacity: 0.85,
+            });
+            this._fishingLineMesh = new THREE.Line(lineGeo, lineMat);
+            this._fishingGroup.add(this._fishingLineMesh);
+
+            // Bobber (orange/red sphere)
+            const bobberGeo = new THREE.SphereGeometry(0.12, 8, 6);
+            const bobberMat = new THREE.MeshLambertMaterial({ color: 0xff4020 });
+            this._fishingBobber = new THREE.Mesh(bobberGeo, bobberMat);
+            this._fishingBobber.position.set(bobberX, bobberY, bobberZ);
+            this._fishingGroup.add(this._fishingBobber);
+
+            // Bobber white stripe
+            const stripeGeo = new THREE.SphereGeometry(0.13, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.4);
+            const stripeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+            const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+            stripe.position.set(bobberX, bobberY + 0.04, bobberZ);
+            this._fishingGroup.add(stripe);
+
+            // Store metadata
+            this._fishingBobberBaseY = bobberY;
+            this._fishingPlayerPos = { ...playerPos };
+            this._fishingBiteActive = false;
+            this._fishingBiteTimer = 0;
+
+            this.scene.add(this._fishingGroup);
         }
-    }
 
-    _createDetailTexture() {
-        const size = 512; // Reduced from 1024 for faster startup
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
+        animateFishBite() {
+            if (!this._fishingGroup || !this._fishingBobber) return;
 
-        // Base earthy color (will be multiplied with vertex colors)
-        ctx.fillStyle = '#d8d0c0';
-        ctx.fillRect(0, 0, size, size);
+            this._fishingBiteActive = true;
+            this._fishingBiteTimer = 0;
 
-        // Layer 1: Coarse earth noise (large patches of light/dark soil)
-        for (let i = 0; i < 2000; i++) {
-            const x = Math.random() * size;
-            const y = Math.random() * size;
-            const r = 8 + Math.random() * 20;
-            const brightness = Math.random();
-            if (brightness < 0.4) {
-                ctx.fillStyle = `rgba(90, 75, 55, ${0.06 + Math.random() * 0.1})`;
-            } else if (brightness < 0.7) {
-                ctx.fillStyle = `rgba(140, 125, 95, ${0.05 + Math.random() * 0.08})`;
-            } else {
-                ctx.fillStyle = `rgba(200, 195, 170, ${0.04 + Math.random() * 0.08})`;
+            // Create fish mesh swimming up
+            if (this._fishingFishMesh) {
+                this._fishingGroup.remove(this._fishingFishMesh);
             }
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fill();
+            const fishGroup = new THREE.Group();
+
+            // Fish body
+            const bodyGeo = new THREE.SphereGeometry(0.15, 6, 4);
+            bodyGeo.scale(1.8, 0.8, 1);
+            const bodyMat = new THREE.MeshLambertMaterial({ color: 0x4080ff });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            fishGroup.add(body);
+
+            // Tail fin
+            const tailGeo = new THREE.ConeGeometry(0.12, 0.2, 4);
+            const tailMat = new THREE.MeshLambertMaterial({ color: 0x3060d0 });
+            const tail = new THREE.Mesh(tailGeo, tailMat);
+            tail.position.set(-0.28, 0, 0);
+            tail.rotation.z = Math.PI / 2;
+            fishGroup.add(tail);
+
+            // Eye
+            const eyeGeo = new THREE.SphereGeometry(0.03, 4, 4);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const eye = new THREE.Mesh(eyeGeo, eyeMat);
+            eye.position.set(0.15, 0.04, 0.08);
+            fishGroup.add(eye);
+
+            const bx = this._fishingBobber.position.x;
+            const bz = this._fishingBobber.position.z;
+            fishGroup.position.set(bx + 0.8, -0.3, bz);
+            fishGroup.rotation.y = Math.PI / 2;
+
+            this._fishingFishMesh = fishGroup;
+            this._fishingGroup.add(fishGroup);
         }
 
-        // Layer 2: Fine soil grain (tiny specks)
-        for (let i = 0; i < 20000; i++) { // Reduced from 80000 for faster startup
-            const x = Math.random() * size;
-            const y = Math.random() * size;
-            const v = Math.random();
-            if (v < 0.5) {
-                ctx.fillStyle = `rgba(60, 50, 35, ${0.03 + Math.random() * 0.09})`;
-            } else if (v < 0.8) {
-                ctx.fillStyle = `rgba(110, 100, 70, ${0.03 + Math.random() * 0.08})`;
-            } else {
-                ctx.fillStyle = `rgba(245, 240, 225, ${0.04 + Math.random() * 0.1})`;
+        removeFishingLine() {
+            if (this._fishingGroup) {
+                this.scene.remove(this._fishingGroup);
+                this._fishingGroup = null;
             }
-            const s = 1 + Math.random() * 2;
-            ctx.fillRect(x, y, s, s);
+            this._fishingLineMesh = null;
+            this._fishingBobber = null;
+            this._fishingFishMesh = null;
+            this._fishingBiteActive = false;
         }
 
-        // Layer 3: Dense grass blades (realistic thin strokes)
-        for (let i = 0; i < 12000; i++) {
-            const x = Math.random() * size;
-            const y = Math.random() * size;
-            const length = 6 + Math.random() * 16;
-            const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.7;
-            const green = 50 + Math.floor(Math.random() * 80);
-            const alpha = 0.06 + Math.random() * 0.12;
-            ctx.strokeStyle = `rgba(${20 + Math.floor(Math.random() * 30)}, ${green}, ${15 + Math.floor(Math.random() * 25)}, ${alpha})`;
-            ctx.lineWidth = 0.8 + Math.random() * 1.2;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            // Slight curve via quadratic
-            const cx = x + Math.sin(angle) * length * 0.5 + (Math.random() - 0.5) * 3;
-            const cy = y + Math.cos(angle) * length * 0.5;
-            ctx.quadraticCurveTo(cx, cy, x + Math.sin(angle) * length, y - Math.cos(angle) * length);
-            ctx.stroke();
+        _updateFishingAnimations(dt) {
+            if (!this._fishingGroup || !this._fishingBobber) return;
+
+            // Idle bobber floating
+            const baseY = this._fishingBobberBaseY || 0.05;
+            const bob = Math.sin(this.time * 2.5) * 0.03;
+            this._fishingBobber.position.y = baseY + bob;
+
+            // Bite animation
+            if (this._fishingBiteActive) {
+                this._fishingBiteTimer += dt;
+                const t = this._fishingBiteTimer;
+
+                // Bobber dips down sharply
+                const dipAmount = Math.sin(t * 12) * 0.15 * Math.max(0, 1 - t * 1.5);
+                this._fishingBobber.position.y = baseY - Math.abs(dipAmount) - 0.05;
+
+                // Fish swims toward bobber
+                if (this._fishingFishMesh) {
+                    const bx = this._fishingBobber.position.x;
+                    const bz = this._fishingBobber.position.z;
+                    const fishTargetX = bx;
+                    const fishTargetZ = bz;
+
+                    this._fishingFishMesh.position.x += (fishTargetX - this._fishingFishMesh.position.x) * 2.5 * dt;
+                    this._fishingFishMesh.position.z += (fishTargetZ - this._fishingFishMesh.position.z) * 2.5 * dt;
+                    this._fishingFishMesh.position.y = -0.15 + Math.sin(t * 8) * 0.05;
+
+                    // Tail wiggle
+                    this._fishingFishMesh.rotation.y = Math.PI / 2 + Math.sin(t * 10) * 0.3;
+                }
+
+                // End bite after 1s
+                if (t > 1.0) {
+                    this._fishingBiteActive = false;
+                    if (this._fishingFishMesh) {
+                        this._fishingGroup.remove(this._fishingFishMesh);
+                        this._fishingFishMesh = null;
+                    }
+                }
+            }
+
+            // Update the fishing line curve dynamically (throttled: every 2nd frame)
+            this._fishingLineFrame = ((this._fishingLineFrame || 0) + 1) % 2;
+            if (this._fishingLineFrame === 0 && this._fishingLineMesh && this._fishingPlayerPos) {
+                const pp = this._fishingPlayerPos;
+                const bp = this._fishingBobber.position;
+                const curve = new THREE.QuadraticBezierCurve3(
+                    new THREE.Vector3(pp.x, (pp.y || 0) + 1.4, pp.z),
+                    new THREE.Vector3(
+                        (pp.x + bp.x) / 2,
+                        2.5 + Math.sin(this.time * 1.5) * 0.1,
+                        (pp.z + bp.z) / 2
+                    ),
+                    new THREE.Vector3(bp.x, bp.y, bp.z)
+                );
+                const points = curve.getPoints(24);
+                this._fishingLineMesh.geometry.setFromPoints(points);
+            }
         }
 
-        // Layer 4: Clover/weed dark spots
-        for (let i = 0; i < 600; i++) {
-            const x = Math.random() * size;
-            const y = Math.random() * size;
-            const w = 2 + Math.random() * 5;
-            const h = w * (0.6 + Math.random() * 0.3);
-            const darkGreen = Math.random() > 0.5;
-            ctx.fillStyle = darkGreen
-                ? `rgba(30, 65, 25, ${0.06 + Math.random() * 0.08})`
-                : `rgba(100, 80, 40, ${0.05 + Math.random() * 0.07})`;
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(Math.random() * Math.PI);
-            ctx.beginPath();
-            ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
+        _createDetailTexture() {
+            const size = 512; // Reduced from 1024 for faster startup
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
 
-        // Layer 5: Mini fallen leaves and organic litter
-        const leafShades = [
-            'rgba(160, 90, 35, 0.1)', 'rgba(130, 70, 25, 0.09)',
-            'rgba(180, 120, 50, 0.08)', 'rgba(70, 95, 45, 0.07)'
-        ];
-        for (let i = 0; i < 500; i++) {
-            const lx = Math.random() * size;
-            const ly = Math.random() * size;
-            const lw = 3 + Math.random() * 5;
-            const lh = lw * (0.4 + Math.random() * 0.3);
-            ctx.fillStyle = leafShades[Math.floor(Math.random() * leafShades.length)];
-            ctx.save();
-            ctx.translate(lx, ly);
-            ctx.rotate(Math.random() * Math.PI * 2);
-            ctx.beginPath();
-            ctx.ellipse(0, 0, lw, lh, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
+            // Base earthy color (will be multiplied with vertex colors)
+            ctx.fillStyle = '#d8d0c0';
+            ctx.fillRect(0, 0, size, size);
 
-        // Layer 6: Tiny pebble dots
-        for (let i = 0; i < 1200; i++) {
-            const px = Math.random() * size;
-            const py = Math.random() * size;
-            const pr = 1 + Math.random() * 2.5;
-            const shade = 100 + Math.floor(Math.random() * 80);
-            ctx.fillStyle = `rgba(${shade}, ${shade - 10}, ${shade - 20}, ${0.1 + Math.random() * 0.15})`;
-            ctx.beginPath();
-            ctx.arc(px, py, pr, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(12, 12);
-        return texture;
-    }
-
-    _createWaterTexture() {
-        const size = 512;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-
-        // Deep water base
-        ctx.fillStyle = '#2a6090';
-        ctx.fillRect(0, 0, size, size);
-
-        // Layered caustic ripple patterns
-        for (let layer = 0; layer < 3; layer++) {
-            const count = 300 + layer * 200;
-            for (let i = 0; i < count; i++) {
+            // Layer 1: Coarse earth noise (large patches of light/dark soil)
+            for (let i = 0; i < 2000; i++) {
                 const x = Math.random() * size;
                 const y = Math.random() * size;
-                const rx = 4 + Math.random() * 12;
-                const ry = rx * (0.3 + Math.random() * 0.4);
-                const rot = Math.random() * Math.PI;
-                const alpha = 0.03 + Math.random() * 0.06;
-                ctx.fillStyle = layer < 2
-                    ? `rgba(120, 200, 255, ${alpha})`
-                    : `rgba(255, 255, 255, ${alpha * 0.7})`;
+                const r = 8 + Math.random() * 20;
+                const brightness = Math.random();
+                if (brightness < 0.4) {
+                    ctx.fillStyle = `rgba(90, 75, 55, ${0.06 + Math.random() * 0.1})`;
+                } else if (brightness < 0.7) {
+                    ctx.fillStyle = `rgba(140, 125, 95, ${0.05 + Math.random() * 0.08})`;
+                } else {
+                    ctx.fillStyle = `rgba(200, 195, 170, ${0.04 + Math.random() * 0.08})`;
+                }
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Layer 2: Fine soil grain (tiny specks)
+            for (let i = 0; i < 20000; i++) { // Reduced from 80000 for faster startup
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const v = Math.random();
+                if (v < 0.5) {
+                    ctx.fillStyle = `rgba(60, 50, 35, ${0.03 + Math.random() * 0.09})`;
+                } else if (v < 0.8) {
+                    ctx.fillStyle = `rgba(110, 100, 70, ${0.03 + Math.random() * 0.08})`;
+                } else {
+                    ctx.fillStyle = `rgba(245, 240, 225, ${0.04 + Math.random() * 0.1})`;
+                }
+                const s = 1 + Math.random() * 2;
+                ctx.fillRect(x, y, s, s);
+            }
+
+            // Layer 3: Dense grass blades (realistic thin strokes)
+            for (let i = 0; i < 12000; i++) {
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const length = 6 + Math.random() * 16;
+                const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.7;
+                const green = 50 + Math.floor(Math.random() * 80);
+                const alpha = 0.06 + Math.random() * 0.12;
+                ctx.strokeStyle = `rgba(${20 + Math.floor(Math.random() * 30)}, ${green}, ${15 + Math.floor(Math.random() * 25)}, ${alpha})`;
+                ctx.lineWidth = 0.8 + Math.random() * 1.2;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                // Slight curve via quadratic
+                const cx = x + Math.sin(angle) * length * 0.5 + (Math.random() - 0.5) * 3;
+                const cy = y + Math.cos(angle) * length * 0.5;
+                ctx.quadraticCurveTo(cx, cy, x + Math.sin(angle) * length, y - Math.cos(angle) * length);
+                ctx.stroke();
+            }
+
+            // Layer 4: Clover/weed dark spots
+            for (let i = 0; i < 600; i++) {
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const w = 2 + Math.random() * 5;
+                const h = w * (0.6 + Math.random() * 0.3);
+                const darkGreen = Math.random() > 0.5;
+                ctx.fillStyle = darkGreen
+                    ? `rgba(30, 65, 25, ${0.06 + Math.random() * 0.08})`
+                    : `rgba(100, 80, 40, ${0.05 + Math.random() * 0.07})`;
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(Math.random() * Math.PI);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Layer 5: Mini fallen leaves and organic litter
+            const leafShades = [
+                'rgba(160, 90, 35, 0.1)', 'rgba(130, 70, 25, 0.09)',
+                'rgba(180, 120, 50, 0.08)', 'rgba(70, 95, 45, 0.07)'
+            ];
+            for (let i = 0; i < 500; i++) {
+                const lx = Math.random() * size;
+                const ly = Math.random() * size;
+                const lw = 3 + Math.random() * 5;
+                const lh = lw * (0.4 + Math.random() * 0.3);
+                ctx.fillStyle = leafShades[Math.floor(Math.random() * leafShades.length)];
+                ctx.save();
+                ctx.translate(lx, ly);
+                ctx.rotate(Math.random() * Math.PI * 2);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, lw, lh, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Layer 6: Tiny pebble dots
+            for (let i = 0; i < 1200; i++) {
+                const px = Math.random() * size;
+                const py = Math.random() * size;
+                const pr = 1 + Math.random() * 2.5;
+                const shade = 100 + Math.floor(Math.random() * 80);
+                ctx.fillStyle = `rgba(${shade}, ${shade - 10}, ${shade - 20}, ${0.1 + Math.random() * 0.15})`;
+                ctx.beginPath();
+                ctx.arc(px, py, pr, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(12, 12);
+            return texture;
+        }
+
+        _createWaterTexture() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Deep water base
+            ctx.fillStyle = '#2a6090';
+            ctx.fillRect(0, 0, size, size);
+
+            // Layered caustic ripple patterns
+            for (let layer = 0; layer < 3; layer++) {
+                const count = 300 + layer * 200;
+                for (let i = 0; i < count; i++) {
+                    const x = Math.random() * size;
+                    const y = Math.random() * size;
+                    const rx = 4 + Math.random() * 12;
+                    const ry = rx * (0.3 + Math.random() * 0.4);
+                    const rot = Math.random() * Math.PI;
+                    const alpha = 0.03 + Math.random() * 0.06;
+                    ctx.fillStyle = layer < 2
+                        ? `rgba(120, 200, 255, ${alpha})`
+                        : `rgba(255, 255, 255, ${alpha * 0.7})`;
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate(rot);
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // Shimmer streaks (reflected light)
+            for (let i = 0; i < 200; i++) {
+                const x = Math.random() * size;
+                const y = Math.random() * size;
+                const len = 10 + Math.random() * 30;
+                ctx.strokeStyle = `rgba(200, 240, 255, ${0.04 + Math.random() * 0.06})`;
+                ctx.lineWidth = 1 + Math.random() * 2;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + len, y + (Math.random() - 0.5) * 6);
+                ctx.stroke();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(6, 4);
+            return texture;
+        }
+
+        _createRoofTileTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#8b2020';
+            ctx.fillRect(0, 0, 512, 512);
+
+            const rows = 16;
+            const cols = 12;
+            const rowH = 512 / rows;
+            const colW = 512 / cols;
+
+            // Draw tiles row by row (clay shingle effect)
+            for (let r = 0; r < rows; r++) {
+                const y = r * rowH;
+                const xOffset = (r % 2) * (colW / 2);
+
+                for (let c = -1; c <= cols; c++) {
+                    const x = c * colW + xOffset;
+
+                    // Shadow underneath
+                    ctx.fillStyle = '#450606';
+                    ctx.beginPath();
+                    ctx.arc(x + colW / 2, y + rowH, colW / 2 + 1, Math.PI, 0, true);
+                    ctx.fill();
+
+                    const colorValue = 0.85 + (Math.sin(r * 0.7 + c * 0.9) * 0.1);
+                    const redHex = Math.floor(139 * colorValue);
+                    const grnHex = Math.floor(32 * colorValue);
+                    ctx.fillStyle = `rgb(${redHex}, ${grnHex}, ${grnHex})`;
+
+                    ctx.beginPath();
+                    ctx.arc(x + colW / 2, y + rowH - 2, colW / 2 - 1, Math.PI, 0, true);
+                    ctx.fill();
+
+                    // Highlight rim
+                    ctx.strokeStyle = 'rgba(255, 120, 120, 0.2)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(x + colW / 2, y + rowH - 4, colW / 3, Math.PI, 0, true);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(0, y + rowH - 2, 512, 3);
+            }
+
+            // Moss & dirt
+            for (let i = 0; i < 80; i++) {
+                const mx = Math.random() * 512;
+                const my = Math.random() * 512;
+                const mr = 4 + Math.random() * 8;
+                ctx.fillStyle = Math.random() > 0.65 ? 'rgba(50, 75, 30, 0.22)' : 'rgba(15, 10, 5, 0.28)';
+                ctx.beginPath();
+                ctx.arc(mx, my, mr, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(2, 2.5);
+            return texture;
+        }
+
+        _createLeafTexture(baseColorHex, leafColorHex) {
+            const cacheKey = `${baseColorHex}-${leafColorHex}`;
+            if (this._leafTextureCache && this._leafTextureCache.has(cacheKey)) {
+                return this._leafTextureCache.get(cacheKey);
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = baseColorHex;
+            ctx.fillRect(0, 0, 256, 256);
+
+            ctx.shadowBlur = 1;
+            ctx.shadowColor = 'rgba(0,0,0,0.1)';
+
+            for (let i = 0; i < 800; i++) {
+                const x = Math.random() * 256;
+                const y = Math.random() * 256;
+                const rx = 3 + Math.random() * 5;
+                const ry = rx * (0.5 + Math.random() * 0.2);
+                const rot = Math.random() * Math.PI * 2;
+
+                const rand = Math.random();
+                if (rand < 0.45) {
+                    ctx.fillStyle = leafColorHex;
+                } else if (rand < 0.75) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+                } else {
+                    ctx.fillStyle = baseColorHex;
+                }
+
                 ctx.save();
                 ctx.translate(x, y);
                 ctx.rotate(rot);
@@ -2506,146 +2843,16 @@ export class SceneManager {
                 ctx.fill();
                 ctx.restore();
             }
-        }
 
-        // Shimmer streaks (reflected light)
-        for (let i = 0; i < 200; i++) {
-            const x = Math.random() * size;
-            const y = Math.random() * size;
-            const len = 10 + Math.random() * 30;
-            ctx.strokeStyle = `rgba(200, 240, 255, ${0.04 + Math.random() * 0.06})`;
-            ctx.lineWidth = 1 + Math.random() * 2;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + len, y + (Math.random() - 0.5) * 6);
-            ctx.stroke();
-        }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 4);
 
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(6, 4);
-        return texture;
-    }
-
-    _createRoofTileTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        ctx.fillStyle = '#8b2020';
-        ctx.fillRect(0, 0, 512, 512);
-
-        const rows = 16;
-        const cols = 12;
-        const rowH = 512 / rows;
-        const colW = 512 / cols;
-
-        // Draw tiles row by row (clay shingle effect)
-        for (let r = 0; r < rows; r++) {
-            const y = r * rowH;
-            const xOffset = (r % 2) * (colW / 2);
-
-            for (let c = -1; c <= cols; c++) {
-                const x = c * colW + xOffset;
-
-                // Shadow underneath
-                ctx.fillStyle = '#450606';
-                ctx.beginPath();
-                ctx.arc(x + colW / 2, y + rowH, colW / 2 + 1, Math.PI, 0, true);
-                ctx.fill();
-
-                const colorValue = 0.85 + (Math.sin(r * 0.7 + c * 0.9) * 0.1);
-                const redHex = Math.floor(139 * colorValue);
-                const grnHex = Math.floor(32 * colorValue);
-                ctx.fillStyle = `rgb(${redHex}, ${grnHex}, ${grnHex})`;
-
-                ctx.beginPath();
-                ctx.arc(x + colW / 2, y + rowH - 2, colW / 2 - 1, Math.PI, 0, true);
-                ctx.fill();
-
-                // Highlight rim
-                ctx.strokeStyle = 'rgba(255, 120, 120, 0.2)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(x + colW / 2, y + rowH - 4, colW / 3, Math.PI, 0, true);
-                ctx.stroke();
+            if (!this._leafTextureCache) {
+                this._leafTextureCache = new Map();
             }
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.fillRect(0, y + rowH - 2, 512, 3);
+            this._leafTextureCache.set(cacheKey, texture);
+            return texture;
         }
-
-        // Moss & dirt
-        for (let i = 0; i < 80; i++) {
-            const mx = Math.random() * 512;
-            const my = Math.random() * 512;
-            const mr = 4 + Math.random() * 8;
-            ctx.fillStyle = Math.random() > 0.65 ? 'rgba(50, 75, 30, 0.22)' : 'rgba(15, 10, 5, 0.28)';
-            ctx.beginPath();
-            ctx.arc(mx, my, mr, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(2, 2.5);
-        return texture;
     }
-
-    _createLeafTexture(baseColorHex, leafColorHex) {
-        const cacheKey = `${baseColorHex}-${leafColorHex}`;
-        if (this._leafTextureCache && this._leafTextureCache.has(cacheKey)) {
-            return this._leafTextureCache.get(cacheKey);
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-
-        ctx.fillStyle = baseColorHex;
-        ctx.fillRect(0, 0, 256, 256);
-
-        ctx.shadowBlur = 1;
-        ctx.shadowColor = 'rgba(0,0,0,0.1)';
-
-        for (let i = 0; i < 800; i++) {
-            const x = Math.random() * 256;
-            const y = Math.random() * 256;
-            const rx = 3 + Math.random() * 5;
-            const ry = rx * (0.5 + Math.random() * 0.2);
-            const rot = Math.random() * Math.PI * 2;
-
-            const rand = Math.random();
-            if (rand < 0.45) {
-                ctx.fillStyle = leafColorHex;
-            } else if (rand < 0.75) {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-            } else {
-                ctx.fillStyle = baseColorHex;
-            }
-
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(rot);
-            ctx.beginPath();
-            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(4, 4);
-
-        if (!this._leafTextureCache) {
-            this._leafTextureCache = new Map();
-        }
-        this._leafTextureCache.set(cacheKey, texture);
-        return texture;
-    }
-}
