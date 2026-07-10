@@ -145,13 +145,7 @@ export class GameUI {
     document.getElementById('btn-stats').addEventListener('click', () => this._togglePanel('stats-panel'));
     document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
 
-    const btnOpenSellShop = document.getElementById('btn-open-sell-shop');
-    if (btnOpenSellShop) {
-      btnOpenSellShop.addEventListener('click', () => {
-        this._togglePanel('sell-shop-panel');
-        this._renderSellShop();
-      });
-    }
+
 
     const btnMarket = document.getElementById('btn-market');
     if (btnMarket) {
@@ -1801,7 +1795,7 @@ export class GameUI {
     document.getElementById('sell-shop-detail-desc').textContent = item.desc || '';
     document.getElementById('sell-shop-owned-qty').textContent = `มีอยู่: ${item.quantity} ชิ้น`;
     
-    const unitPrice = Math.floor(item.price * 0.5);
+    const unitPrice = Math.floor(item.price * 0.8);
     document.getElementById('sell-shop-unit-price').textContent = unitPrice.toLocaleString();
 
     const qtyInput = document.getElementById('sell-shop-qty-input');
@@ -1819,7 +1813,7 @@ export class GameUI {
     const totalDisplay = document.getElementById('sell-shop-total-price');
     if (!qtyInput || !totalDisplay) return;
 
-    const unitPrice = Math.floor(this.selectedSellShopItem.price * 0.5);
+    const unitPrice = Math.floor(this.selectedSellShopItem.price * 0.8);
     const qty = parseInt(qtyInput.value) || 0;
     totalDisplay.textContent = (unitPrice * qty).toLocaleString();
   }
@@ -1839,7 +1833,7 @@ export class GameUI {
       return;
     }
 
-    const unitPrice = Math.floor(item.price * 0.5);
+    const unitPrice = Math.floor(item.price * 0.8);
     const totalGold = unitPrice * sellQty;
 
     // Update state

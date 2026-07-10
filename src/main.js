@@ -540,7 +540,7 @@ function handleMouseInteraction(event) {
     if (!isGameStarted) return;
     if (combatSystem && combatSystem.isFishing) return;
 
-    const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPC(), remotePlayersMap);
+    const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPCs(), remotePlayersMap);
     if (!hit) return;
 
     if (hit.type === 'monster') {
@@ -553,9 +553,15 @@ function handleMouseInteraction(event) {
         particles.createClickIndicator(hit.point, 0x60a0ff);
         if (gameUI) gameUI._showPlayerPopup(hit.object);
     } else if (hit.type === 'npc') {
-        // Open Shop when clicking NPC
-        gameUI._togglePanel('shop-panel');
-        gameUI._renderShop();
+        // Open Shop based on NPC type
+        const npcType = hit.object.userData.npcType;
+        if (npcType === 'sell') {
+            gameUI._togglePanel('sell-shop-panel');
+            gameUI._renderSellShop();
+        } else {
+            gameUI._togglePanel('shop-panel');
+            gameUI._renderShop();
+        }
         particles.createClickIndicator(hit.point, 0xffff44);
     } else if (hit.type === 'ground') {
         autoPath = hit.point;

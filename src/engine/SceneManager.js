@@ -2126,6 +2126,8 @@ export class SceneManager {
         group.position.set(8, 0, -5);
         this.scene.add(group);
         this.envObjects.push(group);
+        group.userData.isNPC = true;
+        group.userData.npcType = 'sell';
         this.npcSellMesh = group;
     }
 
