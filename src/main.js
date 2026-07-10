@@ -563,6 +563,7 @@ function handleMouseInteraction(event) {
         particles.createClickIndicator(hit.point, 0x44ff44);
     }
 }
+window.handleCanvasTap = handleMouseInteraction;
 
 // ============ Game Loop ============
 function gameLoop(time) {

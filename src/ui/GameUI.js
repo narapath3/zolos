@@ -2118,6 +2118,7 @@ export class GameUI {
 
     let joystickActive = false;
     let joystickTouchId = null;
+    let joystickStartTime = 0;
     let startX = 0;
     let startY = 0;
     const maxRadius = 45; // Max knob movement radius in pixels
@@ -2178,6 +2179,7 @@ export class GameUI {
       joystickActive = true;
       if (e.touches) joystickTouchId = e.touches[0].identifier;
 
+      joystickStartTime = performance.now();
       startX = touch.clientX;
       startY = touch.clientY;
 
@@ -2231,11 +2233,19 @@ export class GameUI {
     const handleEnd = (e) => {
       if (!joystickActive) return;
 
-      // For touch events, only end if the correct touch was released
+      // Find the touch coordinates that ended
+      let touch;
       if (e.changedTouches) {
-        const found = Array.from(e.changedTouches).find(t => t.identifier === joystickTouchId);
-        if (!found) return;
+        touch = Array.from(e.changedTouches).find(t => t.identifier === joystickTouchId);
+        if (!touch) return;
+      } else {
+        touch = e;
       }
+
+      const duration = performance.now() - joystickStartTime;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
       joystickActive = false;
       joystickTouchId = null;
@@ -2251,6 +2261,16 @@ export class GameUI {
         triggerKeyEvent('KeyS', false);
         triggerKeyEvent('KeyA', false);
         triggerKeyEvent('KeyD', false);
+      }
+
+      // Tap detection: short tap with small movement
+      if (duration < 250 && distance < 15) {
+        if (window.handleCanvasTap) {
+          window.handleCanvasTap({
+            clientX: touch.clientX,
+            clientY: touch.clientY
+          });
+        }
       }
     };
 
