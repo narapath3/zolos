@@ -75,6 +75,10 @@
 
     <!-- Top HUD -->
     <div id="hud-top">
+      <button id="btn-open-sell-shop" 
+        style="position: absolute; right: 10px; top: 10px; background: rgba(0,0,0,0.6); border: 1px solid #ffcc00; color: #ffcc00; padding: 4px 10px; border-radius: 4px; font-family: var(--font-ui); font-size: 10px; cursor: pointer; z-index: 100; display: flex; align-items: center; gap: 4px; box-shadow: 0 0 10px rgba(255,204,0,0.2);">
+        <span>💰</span> รับซื้อไอเทม (Sell Shop)
+      </button>
       <div class="player-info">
         <div class="player-name" id="hud-name">Adventurer</div>
         <div class="player-level">Lv.<span id="hud-level">1</span></div>
@@ -325,7 +329,6 @@
           <button class="shop-tab active" data-tab="all">ทั้งหมด</button>
           <button class="shop-tab" data-tab="usable">ของใช้</button>
           <button class="shop-tab" data-tab="equip">อุปกรณ์</button>
-          <button class="shop-tab" data-tab="sell" style="color: #ffcc00; font-weight: bold;">ขายไอเทม</button>
         </div>
 
         <div class="shop-grid" id="shop-grid"></div>
@@ -344,7 +347,6 @@
             <div class="detail-actions">
               <span class="detail-price"><span id="shop-price-label">ราคา</span>: <span id="shop-detail-price-val">0</span> z</span>
               <button id="btn-buy-npc-item" class="btn-use-item">ซื้อไอเทม</button>
-              <button id="btn-sell-npc-item" class="btn-use-item" style="display: none; background: #8b2020;">ขายไอเทม</button>
             </div>
           </div>
         </div>
