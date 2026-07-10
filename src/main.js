@@ -491,9 +491,9 @@ function handleMouseInteraction(event) {
         // Step 11: Monster click: red indicator
         particles.createClickIndicator(hit.point, 0xff4444);
     } else if (hit.type === 'player') {
-        // Click other player: blue indicator & open trade panel
+        // Click other player: blue indicator & open player profile popup
         particles.createClickIndicator(hit.point, 0x60a0ff);
-        if (gameUI) gameUI.openTradePanel(hit.object);
+        if (gameUI) gameUI._showPlayerPopup(hit.object);
     } else if (hit.type === 'npc') {
         // Open Shop when clicking NPC
         gameUI._togglePanel('shop-panel');
