@@ -1,0 +1,68 @@
+diff --git a/src/engine/CharacterManager.js b/src/engine/CharacterManager.js
+index ea5c107..93fc51f 100644
+--- a/src/engine/CharacterManager.js
++++ b/src/engine/CharacterManager.js
+@@ -1002,15 +1002,27 @@ export class CharacterManager {
+         if (data.glasses) this.setGlasses(data.glasses);
+         if (data.weapon) this.equipWeapon(data.weapon);
+ 
+-        // Load game settings if available
++        // Load game settings — check DB data first, then fallback to localStorage
++        let localSettings = {};
++        try {
++            const settingsKey = `zolos_settings_${this.characterId}`;
++            localSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
++        } catch (e) { /* localStorage unavailable */ }
++
+         if (data.sound_enabled !== undefined && data.sound_enabled !== null) {
+             this.gameSettings.sound_enabled = !!data.sound_enabled;
++        } else if (localSettings.sound_enabled !== undefined) {
++            this.gameSettings.sound_enabled = !!localSettings.sound_enabled;
+         }
+         if (data.graphics_quality) {
+             this.gameSettings.graphics_quality = data.graphics_quality;
++        } else if (localSettings.graphics_quality) {
++            this.gameSettings.graphics_quality = localSettings.graphics_quality;
+         }
+         if (data.fps_enabled !== undefined && data.fps_enabled !== null) {
+             this.gameSettings.fps_enabled = !!data.fps_enabled;
++        } else if (localSettings.fps_enabled !== undefined) {
++            this.gameSettings.fps_enabled = !!localSettings.fps_enabled;
+         }
+ 
+         // Ensure starting position is safe
+diff --git a/src/network/GameSync.js b/src/network/GameSync.js
+index 8cacf12..bdb314e 100644
+--- a/src/network/GameSync.js
++++ b/src/network/GameSync.js
+@@ -173,12 +173,29 @@ export async function saveCharacter(characterId, updates) {
+         return;
+     }
+ 
++    // Strip client-side settings fields that don't exist in the DB schema
++    // to prevent PGRST204 errors that would abort the entire save
++    const dbUpdates = { ...updates };
++    delete dbUpdates.fps_enabled;
++    delete dbUpdates.sound_enabled;
++    delete dbUpdates.graphics_quality;
++
+     const { error } = await supabase
+         .from('characters')
+-        .update({ ...updates, updated_at: new Date().toISOString() })
++        .update({ ...dbUpdates, updated_at: new Date().toISOString() })
+         .eq('id', characterId);
+ 
+     if (error) console.error('Save error:', error);
++
++    // Persist game settings to localStorage instead
++    try {
++        const settingsKey = `zolos_settings_${characterId}`;
++        const existingSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
++        if (updates.fps_enabled !== undefined) existingSettings.fps_enabled = updates.fps_enabled;
++        if (updates.sound_enabled !== undefined) existingSettings.sound_enabled = updates.sound_enabled;
++        if (updates.graphics_quality !== undefined) existingSettings.graphics_quality = updates.graphics_quality;
++        localStorage.setItem(settingsKey, JSON.stringify(existingSettings));
++    } catch (e) { /* localStorage unavailable */ }
+ }
+ 
+ function updateLocalLeaderboard(char) {

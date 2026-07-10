@@ -675,6 +675,32 @@
       </div>
     </div>
 
+    <!-- Friend Request Confirmation Modal -->
+    <div id="friend-confirm-modal" class="modal-popup" style="display: none;">
+      <div class="popup-overlay" id="friend-confirm-overlay"></div>
+      <div class="popup-content">
+        <div class="popup-header">
+          <span class="popup-title">⭐ คำขอเป็นเพื่อน (Friend Request)</span>
+          <button class="popup-close" id="btn-close-friend-confirm">✕</button>
+        </div>
+        <div class="popup-body">
+          <div class="player-avatar">👤</div>
+          <div class="player-detail-name" id="friend-confirm-sender-name">Player A</div>
+          <div class="player-detail-level" id="friend-confirm-sender-level">Lv.1</div>
+          <div style="text-align: center; margin-bottom: 20px; width: 100%;">
+            <div id="friend-confirm-message"
+              style="font-size: 12px; font-family: var(--font-ui); color: var(--text-dim); margin-top: 10px;">
+              ต้องการขอคุณเป็นเพื่อน
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; width: 100%;">
+            <button id="btn-accept-friend" class="btn-primary" style="flex: 1;">🤝 ตกลง (Accept)</button>
+            <button id="btn-decline-friend" class="btn-secondary" style="flex: 1;">ปฏิเสธ (Decline)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Mobile Pad Controls -->
     <div id="mobile-pad">
       <!-- Joystick (left side) -->

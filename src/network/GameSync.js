@@ -582,6 +582,20 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
                 }
             }
         })
+        .on('broadcast', { event: 'friend_request' }, ({ payload }) => {
+            if (payload && payload.targetUserId === userId) {
+                if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
+                    window.gameUI.receiveFriendRequest(payload);
+                }
+            }
+        })
+        .on('broadcast', { event: 'friend_response' }, ({ payload }) => {
+            if (payload && payload.senderUserId === userId) {
+                if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
+                    window.gameUI.receiveFriendResponse(payload);
+                }
+            }
+        })
         .subscribe(async (status, err) => {
             console.log('[Zolos] 📡 Channel status:', status, err ? 'Error: ' + err : '');
             if (status === 'SUBSCRIBED') {
@@ -1211,3 +1225,59 @@ export async function executeDecentralizedReceiverTrade(receiverCharId, itemName
     return { success: true };
 }
 
+// ============ P2P FRIEND REQUEST ============
+export async function sendFriendRequestPacket(senderName, senderLevel, targetUserId, targetName) {
+    if (isOfflineMode || !supabase) {
+        // Simulation mode: auto respond after 1s
+        setTimeout(() => {
+            if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
+                window.gameUI.receiveFriendResponse({
+                    senderUserId: currentUserId,
+                    targetUserId: targetUserId,
+                    accepted: Math.random() > 0.2,
+                    requestPayload: {
+                        senderUserId: currentUserId,
+                        senderName: senderName,
+                        senderLevel: senderLevel,
+                        targetUserId: targetUserId,
+                        targetName: targetName
+                    }
+                });
+            }
+        }, 1000);
+        return { success: true };
+    }
+
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'friend_request',
+            payload: {
+                senderUserId: currentUserId,
+                senderName: senderName,
+                senderLevel: senderLevel,
+                targetUserId: targetUserId,
+                targetName: targetName
+            }
+        });
+    }
+    return { success: true };
+}
+
+export async function sendFriendResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
+    if (isOfflineMode || !supabase) return { success: true };
+
+    if (presenceChannel && channelSubscribed) {
+        presenceChannel.send({
+            type: 'broadcast',
+            event: 'friend_response',
+            payload: {
+                senderUserId: senderUserId,
+                targetUserId: targetUserId,
+                accepted: accepted,
+                requestPayload: originalRequest
+            }
+        });
+    }
+    return { success: true };
+}

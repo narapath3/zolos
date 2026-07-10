@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket } from '../network/GameSync.js';
 
 
 export class GameUI {
@@ -920,7 +920,7 @@ export class GameUI {
     if (addFriendBtn) {
       addFriendBtn.addEventListener('click', () => {
         if (this.selectedProfilePlayer) {
-          this._toggleFriend(this.selectedProfilePlayer.username);
+          this._toggleFriend(this.selectedProfilePlayer);
         }
       });
     }
@@ -934,6 +934,34 @@ export class GameUI {
           this.updateMobileControlsVisibility();
           this.openTradePanel(this.selectedProfilePlayer);
         }
+      });
+    }
+
+    // Friend request confirmation modal buttons
+    this.activeIncomingFriendRequest = null;
+    const friendModal = document.getElementById('friend-confirm-modal');
+    const friendOverlay = document.getElementById('friend-confirm-overlay');
+    const btnAcceptFriend = document.getElementById('btn-accept-friend');
+    const btnDeclineFriend = document.getElementById('btn-decline-friend');
+    const btnCloseFriendConfirm = document.getElementById('btn-close-friend-confirm');
+
+    const closeFriendModal = () => {
+      if (friendModal) friendModal.style.display = 'none';
+      this.activeIncomingFriendRequest = null;
+      this.updateMobileControlsVisibility();
+    };
+
+    if (btnCloseFriendConfirm) btnCloseFriendConfirm.addEventListener('click', closeFriendModal);
+    if (friendOverlay) friendOverlay.addEventListener('click', closeFriendModal);
+
+    if (btnAcceptFriend) {
+      btnAcceptFriend.addEventListener('click', () => {
+        this._acceptIncomingFriendRequest();
+      });
+    }
+    if (btnDeclineFriend) {
+      btnDeclineFriend.addEventListener('click', () => {
+        this._declineIncomingFriendRequest();
       });
     }
   }
@@ -979,28 +1007,126 @@ export class GameUI {
     }
   }
 
-  _toggleFriend(username) {
-    const idx = this.friends.indexOf(username);
-    if (idx === -1) {
-      this.friends.push(username);
-      this.addCombatLog(`⭐ เพิ่ม ${username} เป็นเพื่อนสำเสร็จ`, 'system');
-    } else {
+  _toggleFriend(player) {
+    const username = player.username;
+    const isFriend = this.friends.includes(username);
+
+    if (isFriend) {
+      // Remove friend instantly (no confirmation needed from other side)
+      const idx = this.friends.indexOf(username);
       this.friends.splice(idx, 1);
       this.addCombatLog(`💔 ลบ ${username} ออกจากรายชื่อเพื่อน`, 'system');
+      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+
+      // Refresh Popup state
+      if (this.selectedProfilePlayer && this.selectedProfilePlayer.username === username) {
+        this._showPlayerPopup(this.selectedProfilePlayer);
+      }
+      // Refresh players list
+      if (this.onlinePlayers) {
+        this.updateOnlinePlayers(this.onlinePlayers);
+      }
+    } else {
+      // Send friend request — requires confirmation from the other player
+      const myName = this.character && this.character.stats ? this.character.stats.name : 'Unknown';
+      const myLevel = this.character && this.character.stats ? this.character.stats.level : 1;
+      const targetUserId = player.userId || player.user_id || username;
+
+      const addFriendBtn = document.getElementById('btn-add-friend');
+      if (addFriendBtn) {
+        addFriendBtn.innerHTML = '⌛ Pending...';
+        addFriendBtn.style.opacity = '0.6';
+        addFriendBtn.style.pointerEvents = 'none';
+      }
+
+      sendFriendRequestPacket(myName, myLevel, targetUserId, username);
+      this.addCombatLog(`✉️ ส่งคำขอเป็นเพื่อนไปยัง ${username} แล้ว`, 'system');
+    }
+  }
+
+  receiveFriendRequest(payload) {
+    if (!payload) return;
+    this.activeIncomingFriendRequest = payload;
+
+    const nameEl = document.getElementById('friend-confirm-sender-name');
+    const levelEl = document.getElementById('friend-confirm-sender-level');
+    const modal = document.getElementById('friend-confirm-modal');
+
+    if (nameEl) nameEl.textContent = payload.senderName || 'Unknown';
+    if (levelEl) levelEl.textContent = `Lv.${payload.senderLevel || '?'}`;
+    if (modal) modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+    this.addCombatLog(`📩 ${payload.senderName} ส่งคำขอเป็นเพื่อนมาหาคุณ!`, 'system');
+  }
+
+  _acceptIncomingFriendRequest() {
+    const req = this.activeIncomingFriendRequest;
+    if (!req) return;
+
+    // Add sender to our friends list
+    if (!this.friends.includes(req.senderName)) {
+      this.friends.push(req.senderName);
+      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
     }
 
-    // Save
-    localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+    // Send response back to sender
+    const myUserId = this.character && this.character.userId ? this.character.userId : req.targetUserId;
+    sendFriendResponsePacket(req.senderUserId, myUserId, true, req);
 
-    // Refresh Popup state
-    if (this.selectedProfilePlayer && this.selectedProfilePlayer.username === username) {
+    this.addCombatLog(`🤝 ยอมรับคำขอเพื่อนจาก ${req.senderName} แล้ว!`, 'system');
+
+    // Close modal
+    const modal = document.getElementById('friend-confirm-modal');
+    if (modal) modal.style.display = 'none';
+    this.activeIncomingFriendRequest = null;
+    this.updateMobileControlsVisibility();
+
+    // Refresh UI
+    if (this.onlinePlayers) this.updateOnlinePlayers(this.onlinePlayers);
+    if (this.selectedProfilePlayer && this.selectedProfilePlayer.username === req.senderName) {
+      this._showPlayerPopup(this.selectedProfilePlayer);
+    }
+  }
+
+  _declineIncomingFriendRequest() {
+    const req = this.activeIncomingFriendRequest;
+    if (!req) return;
+
+    const myUserId = this.character && this.character.userId ? this.character.userId : req.targetUserId;
+    sendFriendResponsePacket(req.senderUserId, myUserId, false, req);
+
+    this.addCombatLog(`❌ ปฏิเสธคำขอเพื่อนจาก ${req.senderName}`, 'system');
+
+    // Close modal
+    const modal = document.getElementById('friend-confirm-modal');
+    if (modal) modal.style.display = 'none';
+    this.activeIncomingFriendRequest = null;
+    this.updateMobileControlsVisibility();
+  }
+
+  receiveFriendResponse(payload) {
+    if (!payload) return;
+    const req = payload.requestPayload;
+    const targetName = req ? req.targetName : 'Unknown';
+
+    if (payload.accepted) {
+      // Add to our friends list
+      if (!this.friends.includes(targetName)) {
+        this.friends.push(targetName);
+        localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      }
+      this.addCombatLog(`🤝 ${targetName} ยอมรับคำขอเป็นเพื่อนของคุณแล้ว!`, 'system');
+    } else {
+      this.addCombatLog(`❌ ${targetName} ปฏิเสธคำขอเป็นเพื่อนของคุณ`, 'system');
+    }
+
+    // Reset button if popup is still showing this player
+    if (this.selectedProfilePlayer && this.selectedProfilePlayer.username === targetName) {
       this._showPlayerPopup(this.selectedProfilePlayer);
     }
 
     // Refresh players list
-    if (this.onlinePlayers) {
-      this.updateOnlinePlayers(this.onlinePlayers);
-    }
+    if (this.onlinePlayers) this.updateOnlinePlayers(this.onlinePlayers);
   }
 
   // ============ Chat System Logic ============
