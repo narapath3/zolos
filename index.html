@@ -325,6 +325,7 @@
           <button class="shop-tab active" data-tab="all">ทั้งหมด</button>
           <button class="shop-tab" data-tab="usable">ของใช้</button>
           <button class="shop-tab" data-tab="equip">อุปกรณ์</button>
+          <button class="shop-tab" data-tab="sell" style="color: #ffcc00; font-weight: bold;">ขายไอเทม</button>
         </div>
 
         <div class="shop-grid" id="shop-grid"></div>
@@ -341,8 +342,9 @@
             </div>
             <div id="shop-detail-desc" class="detail-desc">Description.</div>
             <div class="detail-actions">
-              <span class="detail-price">ราคา: <span id="shop-detail-price-val">0</span> z</span>
+              <span class="detail-price"><span id="shop-price-label">ราคา</span>: <span id="shop-detail-price-val">0</span> z</span>
               <button id="btn-buy-npc-item" class="btn-use-item">ซื้อไอเทม</button>
+              <button id="btn-sell-npc-item" class="btn-use-item" style="display: none; background: #8b2020;">ขายไอเทม</button>
             </div>
           </div>
         </div>
