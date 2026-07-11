@@ -6,12 +6,16 @@ const app = express();
 const server = http.createServer(app);
 
 // Configure CORS for your frontend application
+const corsOrigin = process.env.CORS_ORIGIN || '*';
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins for now, but in production, specify your frontend URL
+    origin: corsOrigin,
     methods: ["GET", "POST"],
+    credentials: true
   },
 });
+
+console.log(`[Zolos Server] CORS enabled for: ${corsOrigin}`);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
