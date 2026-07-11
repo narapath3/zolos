@@ -494,7 +494,7 @@ async function initGame(charData) {
     // Mouse move for monster/player hovering with highlight glow
     canvas.addEventListener('mousemove', (e) => {
         if (!sceneManager || !monsters || !gameUI) return;
-        const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPC(), remotePlayersMap);
+        const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPCs(), remotePlayersMap);
 
         let newHoverMesh = null;
         let emissiveColor = null;

@@ -1874,6 +1874,165 @@ export class GameUI {
   }
 
 
+  // ============ NPC Sell Shop Logic ============
+  _setupSellShopEvents() {
+    this.selectedSellShopItem = null;
+
+    const qtyInput = document.getElementById('sell-shop-qty-input');
+    if (qtyInput) {
+      qtyInput.addEventListener('input', () => this._updateSellShopDetail());
+    }
+
+    const maxBtn = document.getElementById('btn-sell-shop-max');
+    if (maxBtn) {
+      maxBtn.addEventListener('click', () => {
+        if (this.selectedSellShopItem && qtyInput) {
+          const invItem = this.inventory.find(i => i.item_name === this.selectedSellShopItem.item_name);
+          if (invItem) {
+            qtyInput.value = invItem.quantity;
+            this._updateSellShopDetail();
+          }
+        }
+      });
+    }
+
+    const confirmBtn = document.getElementById('btn-sell-shop-confirm');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => this._performSellShopAction());
+    }
+  }
+
+  _renderSellShop() {
+    const grid = document.getElementById('sell-shop-inventory-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const goldDisplay = document.getElementById('sell-shop-gold-amount');
+    if (goldDisplay && this.character) {
+      goldDisplay.textContent = this.character.stats.gold.toLocaleString();
+    }
+
+    this.inventory.forEach(item => {
+      if (item.quantity <= 0) return;
+      const itemData = ITEMS[item.item_name] || {};
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot';
+      if (itemData.rarity) slot.classList.add(`rarity-${itemData.rarity}`);
+      if (this.selectedSellShopItem && this.selectedSellShopItem.item_name === item.item_name) {
+        slot.classList.add('selected');
+      }
+
+      const basePrice = itemData.price || item.price || 10;
+      const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
+
+      slot.innerHTML = `
+        <span class="slot-emoji">${item.emoji || itemData.emoji || '📦'}</span>
+        <span class="slot-qty">${item.quantity}</span>
+        <div class="slot-price-tag" style="font-size:8px;color:#ffdd44;">${sellPrice}z</div>
+      `;
+
+      slot.addEventListener('click', () => {
+        this.selectedSellShopItem = item;
+        const qtyInput = document.getElementById('sell-shop-qty-input');
+        if (qtyInput) qtyInput.value = 1;
+        this._renderSellShop();
+        this._updateSellShopDetail();
+      });
+
+      grid.appendChild(slot);
+    });
+
+    if (!this.selectedSellShopItem) {
+      const placeholder = document.getElementById('sell-shop-detail-placeholder');
+      const content = document.getElementById('sell-shop-detail-content');
+      if (placeholder) placeholder.style.display = 'block';
+      if (content) content.style.display = 'none';
+    }
+  }
+
+  _updateSellShopDetail() {
+    const placeholder = document.getElementById('sell-shop-detail-placeholder');
+    const content = document.getElementById('sell-shop-detail-content');
+    if (!placeholder || !content) return;
+
+    if (!this.selectedSellShopItem) {
+      placeholder.style.display = 'block';
+      content.style.display = 'none';
+      return;
+    }
+
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+
+    const item = this.selectedSellShopItem;
+    const itemData = ITEMS[item.item_name] || {};
+    const basePrice = itemData.price || item.price || 10;
+    const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
+
+    document.getElementById('sell-shop-detail-icon').textContent = item.emoji || itemData.emoji || '📦';
+    document.getElementById('sell-shop-detail-name').textContent = item.item_name;
+    document.getElementById('sell-shop-detail-type').textContent = (itemData.type || item.item_type || 'etc').toUpperCase();
+    document.getElementById('sell-shop-detail-desc').textContent = itemData.desc || item.desc || 'ไม่มีคำอธิบาย';
+
+    const invItem = this.inventory.find(i => i.item_name === item.item_name);
+    const ownedQty = invItem ? invItem.quantity : 0;
+    document.getElementById('sell-shop-owned-qty').textContent = `มีอยู่: ${ownedQty} ชิ้น`;
+
+    const qtyInput = document.getElementById('sell-shop-qty-input');
+    const qty = Math.min(parseInt(qtyInput?.value) || 1, ownedQty);
+    if (qtyInput) qtyInput.max = ownedQty;
+
+    document.getElementById('sell-shop-unit-price').textContent = sellPrice.toLocaleString();
+    document.getElementById('sell-shop-total-price').textContent = (sellPrice * qty).toLocaleString();
+  }
+
+  async _performSellShopAction() {
+    if (!this.selectedSellShopItem || !this.character) return;
+
+    const item = this.selectedSellShopItem;
+    const invItem = this.inventory.find(i => i.item_name === item.item_name);
+    if (!invItem || invItem.quantity <= 0) {
+      this.addCombatLog('❌ ไม่มีไอเทมนี้ในกระเป๋า!', 'system');
+      if (this.soundManager) this.soundManager.playErrorSound?.();
+      return;
+    }
+
+    const qtyInput = document.getElementById('sell-shop-qty-input');
+    const qty = Math.min(Math.max(1, parseInt(qtyInput?.value) || 1), invItem.quantity);
+
+    const itemData = ITEMS[item.item_name] || {};
+    const basePrice = itemData.price || item.price || 10;
+    const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
+    const totalGold = sellPrice * qty;
+
+    invItem.quantity -= qty;
+    if (invItem.quantity <= 0) {
+      this.inventory = this.inventory.filter(i => i.quantity > 0);
+      this.selectedSellShopItem = null;
+    }
+
+    this.character.stats.gold += totalGold;
+
+    if (this.characterId) {
+      await saveInventoryItem(this.characterId, item.item_name, itemData.type || item.item_type || 'etc', -qty);
+      if (this.character.saveStatsToDatabase) {
+        await this.character.saveStatsToDatabase();
+      }
+    }
+
+    this.addCombatLog(`💰 ขาย ${item.emoji || '📦'} ${item.item_name} x${qty} ได้ ${totalGold.toLocaleString()} Zeny`, 'gold');
+    if (this.soundManager) {
+      if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+      else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
+    }
+
+    this._renderSellShop();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
+  }
+
+
   // ============ P2P Marketplace Logic ============
   _setupMarketEvents() {
     // Tab switching

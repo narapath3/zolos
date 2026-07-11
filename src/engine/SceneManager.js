@@ -1947,6 +1947,8 @@ export class SceneManager {
     _createSellNPC() {
         const group = new THREE.Group();
         group.name = "npcSell";
+        group.userData.isNPC = true;
+        group.userData.npcType = 'sell';
 
         // ---- Wooden floor/deck ----
         const floorGeo = new THREE.BoxGeometry(3.6, 0.12, 2.6);
