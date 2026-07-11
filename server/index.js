@@ -7,9 +7,21 @@ const server = http.createServer(app);
 
 // Configure CORS for your frontend application
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+// Support multiple origins if provided as comma-separated list
+const allowedOrigins = corsOrigin.split(',').map(o => o.trim());
+
 const io = new Server(server, {
   cors: {
-    origin: corsOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+        callback(null, true);
+      } else {
+        console.warn(`[CORS] Blocked request from origin: ${origin}`);
+        callback(null, false); // Don't throw error, just reject
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true,
     allowEIO3: true
