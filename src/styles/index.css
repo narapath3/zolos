@@ -1577,8 +1577,8 @@ body {
 /* ========== KILL COUNTER ========== */
 #kill-counter {
   position: fixed;
-  top: 16px;
-  right: 154px;
+  top: 148px;
+  right: 16px;
   z-index: 100;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1811,10 +1811,11 @@ body {
   /* Skill bar mobile tuning */
   #skill-bar {
     bottom: 74px;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 8px;
+    left: auto;
+    transform: none;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 6px;
   }
 
   .skill-slot {
@@ -2110,15 +2111,17 @@ body {
    ============================================ */
 #skill-bar {
   position: fixed;
-  bottom: 95px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 100px;
+  right: 20px;
+  left: auto;
+  transform: none;
   z-index: 100;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   background: rgba(10, 15, 30, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 8px 12px;
+  padding: 8px;
   border-radius: 8px;
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -2253,6 +2256,18 @@ body {
   color: var(--primary);
   margin-top: 2px;
   text-shadow: 1px 1px 0 #000;
+}
+
+.shop-slot .slot-qty {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 8px;
+  font-weight: 800;
+  color: #fff;
+  font-family: var(--font-pixel);
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  pointer-events: none;
 }
 
 .shop-detail-box {

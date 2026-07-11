@@ -2109,7 +2109,7 @@ export class GameUI {
       if (item.quantity <= 0) return;
       const itemData = ITEMS[item.item_name] || {};
       const slot = document.createElement('div');
-      slot.className = 'inv-slot';
+      slot.className = 'shop-slot inv-slot';
       if (itemData.rarity) slot.classList.add(`rarity-${itemData.rarity}`);
       if (this.selectedSellShopItem && this.selectedSellShopItem.item_name === item.item_name) {
         slot.classList.add('selected');

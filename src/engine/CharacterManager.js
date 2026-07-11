@@ -629,7 +629,7 @@ export class CharacterManager {
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.position.y = 2.4;
+        this.nameSprite.position.y = 2.7;
         this.nameSprite.scale.set(2, 0.5, 1);
         this.mesh.add(this.nameSprite);
     }
@@ -647,7 +647,7 @@ export class CharacterManager {
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.font = 'bold 32px Arial';
-        
+
         const words = text.split(' ');
         let line = '';
         const lines = [];
@@ -673,18 +673,18 @@ export class CharacterManager {
         const padding = 20;
         const pointerHeight = 15;
         const lineHeight = 38;
-        
+
         const bubbleWidth = maxLineWidth + padding * 2;
         const bubbleHeight = lines.length * lineHeight + padding;
-        
+
         // Ensure minimum size and scale for sharpness
         const scaleFactor = 2;
         canvas.width = (bubbleWidth + 10) * scaleFactor;
         canvas.height = (bubbleHeight + pointerHeight + 10) * scaleFactor;
-        
+
         const ctx = canvas.getContext('2d');
         ctx.scale(scaleFactor, scaleFactor);
-        
+
         const x = 5;
         const y = 5;
         const radius = 12;
@@ -697,24 +697,24 @@ export class CharacterManager {
         ctx.quadraticCurveTo(x + bubbleWidth, y, x + bubbleWidth, y + radius);
         ctx.lineTo(x + bubbleWidth, y + bubbleHeight - radius);
         ctx.quadraticCurveTo(x + bubbleWidth, y + bubbleHeight, x + bubbleWidth - radius, y + bubbleHeight);
-        
+
         // Pointer in the middle
         const px = x + bubbleWidth / 2;
         ctx.lineTo(px + 10, y + bubbleHeight);
         ctx.lineTo(px, y + bubbleHeight + pointerHeight);
         ctx.lineTo(px - 10, y + bubbleHeight);
-        
+
         ctx.lineTo(x + radius, y + bubbleHeight);
         ctx.quadraticCurveTo(x, y + bubbleHeight, x, y + bubbleHeight - radius);
         ctx.lineTo(x, y + radius);
         ctx.quadraticCurveTo(x, y, x + radius, y);
         ctx.closePath();
-        
+
         ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetY = 4;
         ctx.fill();
-        
+
         ctx.shadowColor = 'transparent';
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2.5;
@@ -725,7 +725,7 @@ export class CharacterManager {
         ctx.font = 'bold 32px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
+
         lines.forEach((l, i) => {
             ctx.fillText(l, x + bubbleWidth / 2, y + padding + i * lineHeight + lineHeight / 2 - 4);
         });
@@ -733,15 +733,15 @@ export class CharacterManager {
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
-        
+
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.chatBubble = new THREE.Sprite(spriteMat);
-        
+
         // Position and scale relative to world units
         const worldScale = 0.008;
         this.chatBubble.scale.set(canvas.width * worldScale / scaleFactor, canvas.height * worldScale / scaleFactor, 1);
         this.chatBubble.position.y = 2.8 + (this.chatBubble.scale.y / 2);
-        
+
         this.mesh.add(this.chatBubble);
 
         // Auto-remove after 5 seconds
