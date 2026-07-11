@@ -1523,7 +1523,7 @@ body {
 /* ========== COMBAT LOG ========== */
 #combat-log {
   position: fixed;
-  bottom: 80px;
+  bottom: 90px;
   left: 16px;
   z-index: 100;
   width: 320px;
@@ -3547,7 +3547,7 @@ body {
 
   /* Tablet-specific combat log placement at bottom-left */
   #combat-log {
-    bottom: 80px;
+    bottom: 90px;
     left: 10px;
     top: auto;
     right: auto;
@@ -3707,7 +3707,7 @@ body {
 
   /* Combat log above bottom bar */
   #combat-log {
-    bottom: calc(58px + env(safe-area-inset-bottom));
+    bottom: calc(74px + env(safe-area-inset-bottom));
     top: auto;
     left: 10px;
     right: auto;
