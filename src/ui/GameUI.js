@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList } from '../network/GameSync.js';
 
 
 export class GameUI {
@@ -429,7 +429,7 @@ export class GameUI {
     this.characterId = characterId;
     try {
       const rawInv = await loadInventory(characterId);
-      this.inventory = rawInv.map(i => this._enrichItem(i));
+      this.inventory = rawInv.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
 
       // Auto equip equipment on load if present in inventory
       const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
@@ -477,6 +477,100 @@ export class GameUI {
     }
     this._renderInventory();
   }
+
+  // ============ Daily Quests load/save helpers ============
+  async loadDailyQuestsFromDB(characterId) {
+    if (!characterId) return;
+    this.characterId = characterId;
+    try {
+      const localKey = `zolos_daily_quests_${characterId}`;
+      let localData = null;
+      try {
+        const stored = localStorage.getItem(localKey);
+        if (stored) localData = JSON.parse(stored);
+      } catch (e) { }
+
+      // Load from DB
+      const dbQuests = await loadDailyQuests(characterId);
+      const today = new Date().toDateString();
+
+      let selectedState = null;
+      if (dbQuests && dbQuests.lastDate === today) {
+        selectedState = dbQuests;
+      } else if (localData && localData.lastDate === today) {
+        selectedState = localData;
+      }
+
+      if (selectedState) {
+        this.dailyQuestsState = selectedState;
+        localStorage.setItem(localKey, JSON.stringify(selectedState));
+        localStorage.setItem('zolos_daily_quests', JSON.stringify(selectedState));
+        await saveDailyQuests(characterId, selectedState);
+      } else {
+        // Force refresh daily quests
+        this._checkDailyQuestsReset();
+      }
+
+      this._renderDailyQuests();
+    } catch (e) {
+      console.error('[Zolos] Failed to load daily quests from DB:', e);
+    }
+  }
+
+  async _saveDailyQuestsToDB() {
+    const state = this.dailyQuestsState;
+    if (!state) return;
+    try {
+      localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+      if (this.characterId) {
+        const localKey = `zolos_daily_quests_${this.characterId}`;
+        localStorage.setItem(localKey, JSON.stringify(state));
+        await saveDailyQuests(this.characterId, state);
+      }
+    } catch (e) {
+      console.error('[Zolos] Failed to save daily quests:', e);
+    }
+  }
+
+  // ============ Friends List load/save helpers ============
+  async loadFriendsFromDB(characterId) {
+    if (!characterId) return;
+    try {
+      const localKey = `zolos_friends_${characterId}`;
+      let localFriends = [];
+      try {
+        const stored = localStorage.getItem(localKey);
+        if (stored) localFriends = JSON.parse(stored);
+      } catch (e) { }
+
+      const dbFriends = await loadFriendsList(characterId);
+      if (dbFriends && dbFriends.length > 0) {
+        this.friends = dbFriends;
+      } else {
+        this.friends = localFriends;
+      }
+
+      localStorage.setItem(localKey, JSON.stringify(this.friends));
+      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+
+      if (this.onlinePlayers) this.updateOnlinePlayers(this.onlinePlayers);
+    } catch (e) {
+      console.error('[Zolos] Failed to load friends from DB:', e);
+    }
+  }
+
+  async _saveFriendsListToDB() {
+    if (!this.characterId) return;
+    try {
+      const localKey = `zolos_friends_${this.characterId}`;
+      localStorage.setItem(localKey, JSON.stringify(this.friends));
+      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      await saveFriendsList(this.characterId, this.friends);
+    } catch (e) {
+      console.error('[Zolos] Failed to save friends list:', e);
+    }
+  }
+
 
   async addItem(item) {
     // Check if already in local inventory
@@ -1032,7 +1126,7 @@ export class GameUI {
       const idx = this.friends.indexOf(username);
       this.friends.splice(idx, 1);
       this.addCombatLog(`💔 ลบ ${username} ออกจากรายชื่อเพื่อน`, 'system');
-      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      this._saveFriendsListToDB();
 
       // Refresh Popup state
       if (this.selectedProfilePlayer && this.selectedProfilePlayer.username === username) {
@@ -1082,7 +1176,7 @@ export class GameUI {
     // Add sender to our friends list
     if (!this.friends.includes(req.senderName)) {
       this.friends.push(req.senderName);
-      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      this._saveFriendsListToDB();
     }
 
     // Send response back to sender
@@ -1129,7 +1223,7 @@ export class GameUI {
       // Add to our friends list
       if (!this.friends.includes(targetName)) {
         this.friends.push(targetName);
-        localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+        this._saveFriendsListToDB();
       }
       this.addCombatLog(`🤝 ${targetName} ยอมรับคำขอเป็นเพื่อนของคุณแล้ว!`, 'system');
     } else {
@@ -3732,7 +3826,8 @@ export class GameUI {
     const today = new Date().toDateString();
     let data = null;
     try {
-      const stored = localStorage.getItem('zolos_daily_quests');
+      const key = this.characterId ? `zolos_daily_quests_${this.characterId}` : 'zolos_daily_quests';
+      const stored = localStorage.getItem(key) || localStorage.getItem('zolos_daily_quests');
       if (stored) {
         data = JSON.parse(stored);
       }
@@ -3809,7 +3904,8 @@ export class GameUI {
         ]
       };
 
-      localStorage.setItem('zolos_daily_quests', JSON.stringify(data));
+      this.dailyQuestsState = data;
+      this._saveDailyQuestsToDB();
       this.addCombatLog('📜 ได้รับภารกิจรายวันชุดใหม่เรียบร้อยแล้ว! แตะที่ปุ่ม Quest เพื่อเปิดดู', 'system');
     }
 
@@ -3894,7 +3990,7 @@ export class GameUI {
     if (q.isClaimed || q.current < q.target) return;
 
     q.isClaimed = true;
-    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+    this._saveDailyQuestsToDB();
 
     if (this.character && this.character.stats) {
       this.character.stats.gold += q.rewardGold;
@@ -3929,7 +4025,7 @@ export class GameUI {
     if (!spinBtn || !display || !strip) return;
 
     state.rouletteSpent = true;
-    localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+    this._saveDailyQuestsToDB();
     spinBtn.disabled = true;
     spinBtn.textContent = '🎡 กำลังหมุนเสี่ยงโชค...';
 
@@ -4028,7 +4124,7 @@ export class GameUI {
     });
 
     if (updated) {
-      localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+      this._saveDailyQuestsToDB();
       const panel = document.getElementById('daily-quests-panel');
       if (panel && panel.style.display !== 'none') {
         this._renderDailyQuests();

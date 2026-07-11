@@ -410,14 +410,21 @@ async function initGame(charData) {
     // Start auto-save
     startAutoSave(() => {
         const saveData = character.getSaveData();
+        // Auto-save daily quests and friends in the background
+        if (gameUI) {
+            gameUI._saveDailyQuestsToDB().catch(() => { });
+            gameUI._saveFriendsListToDB().catch(() => { });
+        }
         return {
             characterId: charData.id,
             updates: saveData.updates
         };
     }, 15000);
 
-    // Load Inventory from DB
+    // Load Inventory, Daily Quests, and Friends List from DB
     await gameUI.loadInventoryFromDB(charData.id);
+    await gameUI.loadDailyQuestsFromDB(charData.id);
+    await gameUI.loadFriendsFromDB(charData.id);
 
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);
@@ -432,6 +439,23 @@ async function initGame(charData) {
 
     // Setup Logout Button
     gameUI.setupLogoutButton(async () => {
+        // Save final state before logout
+        if (character && charData.id) {
+            gameUI.addCombatLog('💾 กำลังบันทึกข้อมูลตัวละคร...', 'system');
+            const saveData = character.getSaveData();
+            try {
+                const { saveCharacter, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
+                await saveCharacter(charData.id, saveData.updates);
+                if (gameUI.dailyQuestsState) {
+                    await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
+                }
+                await saveFriendsList(charData.id, gameUI.friends);
+                gameUI.addCombatLog('✅ บันทึกข้อมูลสำเร็จ', 'system');
+            } catch (e) {
+                console.error('Final state save error:', e);
+            }
+        }
+
         // 1. Stop game loop
         isGameStarted = false;
 

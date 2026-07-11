@@ -204,20 +204,20 @@ export async function saveCharacter(characterId, updates) {
     // Strip client-side settings fields that don't exist in the DB schema
     // to prevent PGRST204 errors that would abort the entire save
     const dbUpdates = { ...updates };
-    
+
     // Core stats (always in DB)
     const allowedFields = [
-        'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 
+        'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
-    
+
     // Optional appearance fields (may not be in DB yet)
     // We only include these if they are present in the updates object
     const appearanceFields = [
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
     ];
-    
+
     // Filter the updates to only include fields we know are safe or intended for DB
     const filteredUpdates = {};
     for (const key of Object.keys(dbUpdates)) {
@@ -226,12 +226,156 @@ export async function saveCharacter(characterId, updates) {
         }
     }
 
+    console.log('[Zolos] Saving character to DB. updates:', Object.keys(filteredUpdates));
     const { error } = await supabase
         .from('characters')
         .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
         .eq('id', characterId);
 
-    if (error) console.error('Save error:', error);
+    if (error) {
+        console.error('Save error:', error);
+        // Fallback for unmigrated database: retry saving only the core 100% supported fields
+        if (error.code === 'PGRST204') {
+            console.warn('[Zolos] Database schema mismatch (PGRST204). Retrying save with core columns only...');
+            const coreFields = [
+                'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
+                'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map'
+            ];
+            const coreUpdates = {};
+            for (const key of coreFields) {
+                if (filteredUpdates[key] !== undefined) {
+                    coreUpdates[key] = filteredUpdates[key];
+                }
+            }
+            const { error: retryError } = await supabase
+                .from('characters')
+                .update({ ...coreUpdates, updated_at: new Date().toISOString() })
+                .eq('id', characterId);
+            if (retryError) {
+                console.error('[Zolos] Core retry save failure:', retryError);
+            } else {
+                console.log('[Zolos] Core retry save succeeded!');
+            }
+        }
+    }
+}
+
+// ============ Daily Quests DB Sync (System Inventory Fallback) ============
+export async function saveDailyQuests(characterId, questData) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        localDb.set(`daily_quests_${characterId}`, questData);
+        return;
+    }
+
+    try {
+        const { data: existing } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('character_id', characterId)
+            .eq('item_name', 'daily_quests')
+            .eq('item_type', 'system')
+            .maybeSingle();
+
+        if (existing) {
+            await supabase
+                .from('inventory')
+                .update({ stats: questData })
+                .eq('id', existing.id);
+        } else {
+            await supabase
+                .from('inventory')
+                .insert({
+                    character_id: characterId,
+                    item_name: 'daily_quests',
+                    item_type: 'system',
+                    quantity: 1,
+                    stats: questData
+                });
+        }
+    } catch (e) {
+        console.error('[GameSync] Failed to save daily quests to DB:', e);
+    }
+}
+
+export async function loadDailyQuests(characterId) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        return localDb.get(`daily_quests_${characterId}`);
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('character_id', characterId)
+            .eq('item_name', 'daily_quests')
+            .eq('item_type', 'system')
+            .maybeSingle();
+
+        if (error) throw error;
+        return data?.stats || null;
+    } catch (e) {
+        console.error('[GameSync] Failed to load daily quests from DB:', e);
+        return null;
+    }
+}
+
+// ============ Friends List DB Sync (System Inventory Fallback) ============
+export async function saveFriendsList(characterId, friendsList) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        localDb.set(`friends_${characterId}`, friendsList);
+        return;
+    }
+
+    try {
+        const { data: existing } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('character_id', characterId)
+            .eq('item_name', 'friends_list')
+            .eq('item_type', 'system')
+            .maybeSingle();
+
+        if (existing) {
+            await supabase
+                .from('inventory')
+                .update({ stats: { list: friendsList } })
+                .eq('id', existing.id);
+        } else {
+            await supabase
+                .from('inventory')
+                .insert({
+                    character_id: characterId,
+                    item_name: 'friends_list',
+                    item_type: 'system',
+                    quantity: 1,
+                    stats: { list: friendsList }
+                });
+        }
+    } catch (e) {
+        console.error('[GameSync] Failed to save friends list to DB:', e);
+    }
+}
+
+export async function loadFriendsList(characterId) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        return localDb.get(`friends_${characterId}`) || [];
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('character_id', characterId)
+            .eq('item_name', 'friends_list')
+            .eq('item_type', 'system')
+            .maybeSingle();
+
+        if (error) throw error;
+        return data?.stats?.list || [];
+    } catch (e) {
+        console.error('[GameSync] Failed to load friends list from DB:', e);
+        return [];
+    }
 }
 
 function updateLocalLeaderboard(char) {
