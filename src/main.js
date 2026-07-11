@@ -368,6 +368,18 @@ async function initGame(charData) {
         // Step 9: Use consistent object format for chat messages
         (chatMsg) => {
             if (gameUI) gameUI.receiveChatMessage(chatMsg.username, chatMsg.message);
+
+            // Show chat bubble above character
+            if (chatMsg.userId === userId) {
+                // Local player
+                if (character) character.showChatBubble(chatMsg.message);
+            } else {
+                // Remote players
+                const rp = remotePlayersMap.get(chatMsg.userId);
+                if (rp && rp.character) {
+                    rp.character.showChatBubble(chatMsg.message);
+                }
+            }
         }
     );
 
@@ -390,6 +402,7 @@ async function initGame(charData) {
     if (gameUI) {
         gameUI.setupChatSendCallback((message) => {
             broadcastChat(userId, username, character.stats.level, message);
+            // Local bubble is now handled by the echo in broadcastChat callback
         });
     }
 

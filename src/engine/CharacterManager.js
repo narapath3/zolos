@@ -634,6 +634,90 @@ export class CharacterManager {
         this.mesh.add(this.nameSprite);
     }
 
+    showChatBubble(text) {
+        if (!text) return;
+
+        // Remove old bubble if exists
+        if (this.chatBubble) {
+            this.mesh.remove(this.chatBubble);
+            if (this.chatBubbleTimeout) clearTimeout(this.chatBubbleTimeout);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        // Text wrapping logic
+        ctx.font = 'bold 28px Arial';
+        const words = text.split(' ');
+        let line = '';
+        const lines = [];
+        const maxWidth = 480;
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            if (metrics.width > maxWidth && n > 0) {
+                lines.push(line);
+                line = words[n] + ' ';
+            } else {
+                line = testLine;
+            }
+        }
+        lines.push(line);
+
+        // Draw bubble background
+        const bubbleHeight = Math.min(110, lines.length * 35 + 20);
+        const bubbleWidth = 500;
+        const x = 6;
+        const y = 6;
+        const radius = 15;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + bubbleWidth - radius, y);
+        ctx.quadraticCurveTo(x + bubbleWidth, y, x + bubbleWidth, y + radius);
+        ctx.lineTo(x + bubbleWidth, y + bubbleHeight - radius);
+        ctx.quadraticCurveTo(x + bubbleWidth, y + bubbleHeight, x + bubbleWidth - radius, y + bubbleHeight);
+        ctx.lineTo(x + bubbleWidth / 2 + 10, y + bubbleHeight);
+        ctx.lineTo(x + bubbleWidth / 2, y + bubbleHeight + 15); // Pointer
+        ctx.lineTo(x + bubbleWidth / 2 - 10, y + bubbleHeight);
+        ctx.lineTo(x + radius, y + bubbleHeight);
+        ctx.quadraticCurveTo(x, y + bubbleHeight, x, y + bubbleHeight - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw text
+        ctx.fillStyle = '#000';
+        ctx.textAlign = 'center';
+        lines.forEach((l, i) => {
+            ctx.fillText(l.trim(), 256, 40 + i * 35);
+        });
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        this.chatBubble = new THREE.Sprite(spriteMat);
+        this.chatBubble.position.y = 3.8;
+        this.chatBubble.scale.set(4, 1, 1);
+        this.mesh.add(this.chatBubble);
+
+        // Auto-remove after 5 seconds
+        this.chatBubbleTimeout = setTimeout(() => {
+            if (this.chatBubble) {
+                this.mesh.remove(this.chatBubble);
+                this.chatBubble = null;
+            }
+        }, 5000);
+    }
+
     // Move to a target position
     moveToward(targetPoint, dt) {
         if (!this.mesh) return;

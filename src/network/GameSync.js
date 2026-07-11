@@ -506,7 +506,7 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
                     const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
                     // Step 9: Use object format
-                    chatCallback({ username: sender.username, message: msg });
+                    chatCallback({ userId: sender.userId, username: sender.username, message: msg });
                 }
             }
         }, 12000 + Math.random() * 8000);
@@ -642,7 +642,7 @@ export function broadcastChat(userId, username, level, message) {
     if (isOfflineMode || !supabase) {
         // Step 5: Echo back local message using object format
         if (chatCallback) {
-            chatCallback({ username, message });
+            chatCallback({ userId, username, message });
         }
         // Simulation for a quick response
         setTimeout(() => {
@@ -660,7 +660,7 @@ export function broadcastChat(userId, username, level, message) {
                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
                     const reply = replies[Math.floor(Math.random() * replies.length)];
                     // Step 5: Use object format
-                    chatCallback({ username: sender.username, message: reply });
+                    chatCallback({ userId: sender.userId, username: sender.username, message: reply });
                 }
             }
         }, 1500 + Math.random() * 1500);
@@ -676,7 +676,7 @@ export function broadcastChat(userId, username, level, message) {
     }
     // Step 5: Echo back local message immediately using object format
     if (chatCallback) {
-        chatCallback({ username, message });
+        chatCallback({ userId, username, message });
     }
 }
 
