@@ -101,7 +101,13 @@ export class AuthUI {
                     username,
                     isGuest: session.user.is_anonymous === true,
                 };
-                this._setStatus('Found active session for ' + username + '.', 'info');
+                
+                const { isOfflineMode } = await import('../network/SupabaseClient.js');
+                if (isOfflineMode) {
+                    this._setStatus('Found active session (OFFLINE MODE) for ' + username + '.', 'info');
+                } else {
+                    this._setStatus('Found active session for ' + username + '.', 'info');
+                }
                 this._showSessionMode(username);
             }
         } catch (e) {

@@ -204,13 +204,31 @@ export async function saveCharacter(characterId, updates) {
     // Strip client-side settings fields that don't exist in the DB schema
     // to prevent PGRST204 errors that would abort the entire save
     const dbUpdates = { ...updates };
-    delete dbUpdates.fps_enabled;
-    delete dbUpdates.sound_enabled;
-    delete dbUpdates.graphics_quality;
+    
+    // Core stats (always in DB)
+    const allowedFields = [
+        'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 
+        'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
+        'sound_enabled', 'graphics_quality', 'fps_enabled'
+    ];
+    
+    // Optional appearance fields (may not be in DB yet)
+    // We only include these if they are present in the updates object
+    const appearanceFields = [
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+    ];
+    
+    // Filter the updates to only include fields we know are safe or intended for DB
+    const filteredUpdates = {};
+    for (const key of Object.keys(dbUpdates)) {
+        if (allowedFields.includes(key) || appearanceFields.includes(key)) {
+            filteredUpdates[key] = dbUpdates[key];
+        }
+    }
 
     const { error } = await supabase
         .from('characters')
-        .update({ ...dbUpdates, updated_at: new Date().toISOString() })
+        .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
         .eq('id', characterId);
 
     if (error) console.error('Save error:', error);
