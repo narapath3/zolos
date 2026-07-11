@@ -640,6 +640,15 @@ function gameLoop(time) {
     const dt = Math.min(0.1, (time - lastTime) / 1000);
     lastTime = time;
 
+    // 1a. Dead-state guard: stop processing updates if character is dead
+    if (character && !character.isAlive()) {
+        if (particles) particles.update(dt);
+        if (combatSystem) combatSystem.update(dt);
+        sceneManager.render();
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+
     if (portalCooldown > 0) portalCooldown -= dt;
 
     // 1. Movement

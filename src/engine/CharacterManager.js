@@ -184,9 +184,19 @@ export class CharacterManager {
     }
 
     updateWeaponVisuals(itemName) {
-        // Step 3: Remove existing weapon mesh from right arm
+        // 1b. Clean scene graph: ensure old weapon mesh is fully removed
         if (this.weaponMesh) {
             this.rightArm.remove(this.weaponMesh);
+            this.weaponMesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
             this.weaponMesh = null;
         }
 
@@ -426,9 +436,19 @@ export class CharacterManager {
 
     setHat(hatName) {
         this.equippedHat = hatName || 'None';
-        // Step 3: Remove existing hatMesh from scene/mesh before building new one
+        // 1b. Clean scene graph: ensure old hat mesh is fully removed
         if (this.hatMesh) {
             this.mesh.remove(this.hatMesh);
+            this.hatMesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
             this.hatMesh = null;
         }
 
@@ -527,9 +547,19 @@ export class CharacterManager {
 
     setGlasses(glassesName) {
         this.equippedGlasses = glassesName || 'None';
-        // Step 3: Remove existing glassesMesh before building new one
+        // 1b. Clean scene graph: ensure old glasses mesh is fully removed
         if (this.glassesMesh) {
             this.mesh.remove(this.glassesMesh);
+            this.glassesMesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
             this.glassesMesh = null;
         }
 
@@ -849,12 +879,20 @@ export class CharacterManager {
 
     // Heal
     heal(amount) {
-        this.stats.hp = Math.min(this.stats.max_hp, this.stats.hp + amount);
+        // 1c. NaN HP/SP Guards
+        const healAmt = Number(amount) || 0;
+        const maxHp = Number(this.stats.max_hp) || 100;
+        const currentHp = Number(this.stats.hp) || 0;
+        this.stats.hp = Math.min(maxHp, currentHp + healAmt);
     }
 
     // Restore SP
     restoreSp(amount) {
-        this.stats.sp = Math.min(this.stats.max_sp, this.stats.sp + amount);
+        // 1c. NaN HP/SP Guards
+        const restoreAmt = Number(amount) || 0;
+        const maxSp = Number(this.stats.max_sp) || 50;
+        const currentSp = Number(this.stats.sp) || 0;
+        this.stats.sp = Math.min(maxSp, currentSp + restoreAmt);
     }
 
     // Is alive
