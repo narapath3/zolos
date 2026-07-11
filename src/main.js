@@ -283,6 +283,10 @@ async function initGame(charData) {
     if (gameUI) {
         gameUI.setupProfileSaveCallback((data) => {
             // Step 3: Ensure all equipment and appearance updates are called
+            if (data.name !== undefined) {
+                character.stats.name = data.name;
+                character.updateNameTag();
+            }
             if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
             if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
             if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
@@ -295,6 +299,7 @@ async function initGame(charData) {
             // Persist changes
             character.saveStatsToDatabase();
             // Refresh UI
+            gameUI.updateHUD(character.stats);
             gameUI.updateStats(character.stats);
         });
     }
