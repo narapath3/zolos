@@ -1280,10 +1280,55 @@ export class GameUI {
     if (chatInput) {
       chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-          sendMessage();
+          const text = chatInput.value.trim();
+          if (text) {
+            sendMessage();
+            e.stopPropagation();
+          }
         }
       });
     }
+
+    // Global hotkey: Enter to toggle/focus chat panel helper
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const activeEl = document.activeElement;
+        // Ignore if focused on other input/textarea/select/editable elements
+        if (activeEl &&
+          activeEl !== chatInput &&
+          (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable)) {
+          return;
+        }
+
+        if (!chatPanel || chatPanel.style.display === 'none') {
+          // Open panel and focus
+          this._togglePanel('chat-panel');
+          if (chatInput) {
+            setTimeout(() => {
+              chatInput.focus();
+              chatInput.select();
+            }, 50);
+          }
+          e.preventDefault();
+        } else {
+          // Panel is open
+          if (activeEl !== chatInput) {
+            // Focus if not focused
+            if (chatInput) {
+              chatInput.focus();
+              chatInput.select();
+            }
+            e.preventDefault();
+          } else {
+            // Focused and empty
+            chatPanel.style.display = 'none';
+            chatInput.blur();
+            this.updateMobileControlsVisibility();
+            e.preventDefault();
+          }
+        }
+      }
+    });
   }
 
   setupChatSendCallback(callback) {
