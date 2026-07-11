@@ -1,13 +1,16 @@
 // Game Sync — Save/Load character data to Supabase + Realtime Presence
 import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName } from './SupabaseClient.js';
+import { io } from 'socket.io-client';
 export { getDeterministicGuestName, isPlaceholderName };
 
-let presenceChannel = null;
+const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:3001';
+
+let socket = null;
 let autoSaveInterval = null;
 let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
 let mockPlayers = [];
-let channelSubscribed = false;
+
 let chatCallback = null;
 
 // Track active player info for presence updating
@@ -554,7 +557,6 @@ export async function fetchLeaderboard(category = 'level') {
 export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
     onlinePlayersCallback = onPlayersUpdate;
     chatCallback = onChatCallback;
-    channelSubscribed = false;
 
     // Store player info for later use in updatePresence/broadcast
     currentUserId = userId;
@@ -562,13 +564,12 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
     currentLevel = level;
 
     if (isOfflineMode || !supabase) {
-        // Simulate real online players
+        // Simulate real online players (existing logic)
         const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
         mockPlayers = [
             { userId: 'player_me', username, level }
         ];
 
-        // Pick 2-4 random initial mock online players
         const activeCount = 2 + Math.floor(Math.random() * 3);
         for (let i = 0; i < activeCount; i++) {
             const idx = Math.floor(Math.random() * names.length);
@@ -592,216 +593,118 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
             });
         }
 
-        // Periodic simulation (join/leave/level up/wander)
         presenceUpdateInterval = setInterval(() => {
-            // 20% chance to level up someone
             if (Math.random() < 0.2 && mockPlayers.length > 1) {
                 const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
                 mockPlayers[actorIdx].level++;
             }
 
-            // 10% chance to leave
             if (mockPlayers.length > 2 && Math.random() < 0.1) {
                 const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
                 const left = mockPlayers.splice(leaveIdx, 1)[0];
-                // Notify via online players callback
                 if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
             }
 
-            // 10% chance to join
             if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
-                const name = names.shift();
-                const newPlayer = {
+                const idx = Math.floor(Math.random() * names.length);
+                const name = names.splice(idx, 1)[0];
+                mockPlayers.push({
                     userId: 'player_' + name.toLowerCase(),
                     username: name,
-                    level: Math.max(1, Math.floor(level + (Math.random() - 0.2) * 4)),
+                    level: Math.floor(currentLevel + (Math.random() - 0.2) * 5),
                     x: (Math.random() - 0.5) * 15,
                     y: 0,
                     z: (Math.random() - 0.5) * 15,
                     rY: Math.random() * Math.PI * 2,
                     state: 'idle'
-                };
-                mockPlayers.push(newPlayer);
+                });
                 if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
-                if (onPlayerPositionUpdate) onPlayerPositionUpdate(newPlayer);
             }
 
-            // Simulate wandering movement for mock players
-            mockPlayers.forEach((p, idx) => {
-                if (p.userId === 'player_me') return;
-
-                // Move slightly
-                if (Math.random() < 0.4) {
-                    p.state = Math.random() < 0.3 ? 'attacking' : 'walking';
-                    p.x += (Math.random() - 0.5) * 2;
-                    p.z += (Math.random() - 0.5) * 2;
+            mockPlayers.forEach(p => {
+                if (p.userId !== 'player_me' && Math.random() < 0.5) {
+                    p.x += (Math.random() - 0.5) * 0.5;
+                    p.z += (Math.random() - 0.5) * 0.5;
                     p.rY = Math.random() * Math.PI * 2;
-                } else {
-                    p.state = 'idle';
-                }
-
-                if (onPlayerPositionUpdate) {
-                    onPlayerPositionUpdate(p);
+                    if (onPlayerPositionUpdate) onPlayerPositionUpdate(p);
                 }
             });
 
-            if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
-        }, 3000);
-
-        // Simulation for chat messages in offline mode
-        setInterval(() => {
-            if (chatCallback && mockPlayers.length > 1) {
-                const randomReplies = [
-                    'สวัสดีครับทุกคน! 😃',
-                    'ตีตัวอะไรกันอยู่หรอ?',
-                    'มอนในวิกินี้เยอะจัดเลยแฮะ',
-                    'บอส Ghostring โหดมากกก 😱',
-                    'หาตี้แอดเพื่อนกันหน่อย 🤝',
-                    'บอทฟาร์มชิวจัดๆ ⚡',
-                    'มีใครขายดาบ rare ไหม?',
-                    'เก็บเลเวลแป๊บนะค้าบ',
-                    'วันนี้ดวงดีจัง ดรอปการ์ดรึยังนะ 🍀'
-                ];
-                // Select a writer that isn't player_me
-                const candidates = mockPlayers.filter(p => p.userId !== 'player_me');
-                if (candidates.length > 0) {
-                    const sender = candidates[Math.floor(Math.random() * candidates.length)];
-                    const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
-                    // Step 9: Use object format
-                    chatCallback({ userId: sender.userId, username: sender.username, message: msg });
-                }
-            }
-        }, 12000 + Math.random() * 8000);
-
+            if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
+        }, 1000);
         return;
     }
 
-    // ===== ONLINE MODE =====
-    console.log('[Zolos] 🌐 Connecting to realtime channel... userId:', userId, 'username:', username);
+    // Initialize Socket.io connection
+    socket = io(SOCKET_SERVER_URL);
 
-    // Clean up any existing channel
-    if (presenceChannel) {
-        try {
-            presenceChannel.unsubscribe();
-        } catch (e) { /* ignore */ }
-        presenceChannel = null;
-    }
+    socket.on('connect', () => {
+        console.log('[Zolos] 📊 Socket.io connected');
+        socket.emit('joinGame', {
+            userId: currentUserId,
+            username: currentUsername,
+            level: currentLevel,
+            x: 0, y: 0, z: 0, rY: 0, state: 'idle'
+        });
+    });
 
-    presenceChannel = supabase.channel('online-players', {
-        config: {
-            presence: { key: userId },
-            broadcast: { self: false, ack: false }
+    socket.on('playersUpdate', (playersArray) => {
+        if (onlinePlayersCallback) onlinePlayersCallback(playersArray);
+    });
+
+    socket.on('playerUpdate', (playerData) => {
+        if (onPlayerPositionUpdate) onPlayerPositionUpdate(playerData);
+    });
+
+    socket.on('chatMessage', (messageData) => {
+        if (chatCallback) chatCallback(messageData);
+    });
+
+    socket.on('tradeRequest', (payload) => {
+        if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
+    });
+
+    socket.on('tradeResponse', (payload) => {
+        if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
+    });
+
+    socket.on('tradeCancel', (payload) => {
+        if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
+            window.gameUI.receiveTradeCancel(payload);
         }
     });
 
-    presenceChannel
-        .on('presence', { event: 'sync' }, () => {
-            const state = presenceChannel.presenceState();
-            const players = [];
-            for (const [key, values] of Object.entries(state)) {
-                if (values.length > 0) {
-                    players.push({
-                        userId: key,
-                        username: values[0].username,
-                        level: values[0].level
-                    });
-                }
-            }
-            console.log('[Zolos] 👥 Presence sync — online players:', players.length, players.map(p => p.username));
-            if (onlinePlayersCallback) onlinePlayersCallback(players);
-        })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-            console.log('[Zolos] ➕ Player joined:', key, newPresences);
-        })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-            console.log('[Zolos] ➖ Player left:', key, leftPresences);
-        })
-        .on('broadcast', { event: 'pos' }, ({ payload }) => {
-            if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
-                onPlayerPositionUpdate(payload);
-            }
-        })
-        .on('broadcast', { event: 'chat' }, ({ payload }) => {
-            // Step 9.1: ส่ง payload ทั้งก้อน
-            if (chatCallback && payload) {
-                chatCallback(payload);
-            }
-        })
-        .on('broadcast', { event: 'trade_request' }, ({ payload }) => {
-            if (payload && payload.targetUserId === userId) {
-                if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
-            }
-        })
-        .on('broadcast', { event: 'trade_response' }, ({ payload }) => {
-            if (payload && payload.senderUserId === userId) {
-                if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
-            }
-        })
-        .on('broadcast', { event: 'trade_cancel' }, ({ payload }) => {
-            if (payload && payload.targetUserId === userId) {
-                if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
-                    window.gameUI.receiveTradeCancel(payload);
-                }
-            }
-        })
-        .on('broadcast', { event: 'friend_request' }, ({ payload }) => {
-            if (payload && payload.targetUserId === userId) {
-                if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
-                    window.gameUI.receiveFriendRequest(payload);
-                }
-            }
-        })
-        .on('broadcast', { event: 'friend_response' }, ({ payload }) => {
-            if (payload && payload.senderUserId === userId) {
-                if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
-                    window.gameUI.receiveFriendResponse(payload);
-                }
-            }
-        })
-        .subscribe(async (status, err) => {
-            console.log('[Zolos] 📡 Channel status:', status, err ? 'Error: ' + err : '');
-            if (status === 'SUBSCRIBED') {
-                channelSubscribed = true;
-                console.log('[Zolos] ✅ Successfully subscribed! Tracking presence...');
-                try {
-                    await presenceChannel.track({
-                        username: username,
-                        level: level,
-                        online_at: new Date().toISOString()
-                    });
-                    console.log('[Zolos] ✅ Presence tracked successfully for:', username);
-                } catch (trackErr) {
-                    console.error('[Zolos] ❌ Failed to track presence:', trackErr);
-                }
-            } else if (status === 'CHANNEL_ERROR') {
-                channelSubscribed = false;
-                console.error('[Zolos] ❌ Channel error:', err);
-            } else if (status === 'TIMED_OUT') {
-                channelSubscribed = false;
-                console.error('[Zolos] ⏱️ Channel timed out, retrying...');
-                // Retry after 3 seconds
-                setTimeout(() => {
-                    if (presenceChannel) {
-                        presenceChannel.subscribe();
-                    }
-                }, 3000);
-            }
-        });
-}
+    socket.on('friendRequest', (payload) => {
+        if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
+            window.gameUI.receiveFriendRequest(payload);
+        }
+    });
 
-export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
-    if (isOfflineMode || !supabase || !presenceChannel || !channelSubscribed) return;
-    const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
-    if (appearance) payload.appearance = appearance;
-    presenceChannel.send({
-        type: 'broadcast',
-        event: 'pos',
-        payload
+    socket.on('friendResponse', (payload) => {
+        if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
+            window.gameUI.receiveFriendResponse(payload);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('[Zolos] 📊 Socket.io disconnected');
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('[Zolos] Socket.io connection error:', err.message);
     });
 }
 
+export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
+    if (isOfflineMode || !socket) return; // Check for socket instead of supabase
+    const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
+    if (appearance) payload.appearance = appearance;
+    
+    socket.emit("playerUpdate", payload);
+}
+
 export function broadcastChat(userId, username, level, message) {
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !socket) {
         // Step 5: Echo back local message using object format
         if (chatCallback) {
             chatCallback({ userId, username, message });
@@ -829,13 +732,8 @@ export function broadcastChat(userId, username, level, message) {
         return;
     }
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'chat',
-            payload: { userId, username, level, message }
-        });
-    }
+    socket.emit('chatMessage', { userId, username, level, message });
+    
     // Step 5: Echo back local message immediately using object format
     if (chatCallback) {
         chatCallback({ userId, username, message });
@@ -848,7 +746,7 @@ export function updatePresence(level, newUsername = null) {
         currentUsername = newUsername;
     }
 
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !socket) {
         const me = mockPlayers.find(p => p.userId === 'player_me');
         if (me) {
             me.level = level;
@@ -858,26 +756,22 @@ export function updatePresence(level, newUsername = null) {
         return;
     }
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.track({
-            username: currentUsername,
-            level: currentLevel,
-            online_at: new Date().toISOString()
-        });
-    }
+    socket.emit('playerUpdate', {
+        userId: currentUserId,
+        username: currentUsername,
+        level: currentLevel
+    });
 }
 
 export function leavePresence() {
-    channelSubscribed = false;
-
     if (presenceUpdateInterval) {
         clearInterval(presenceUpdateInterval);
         presenceUpdateInterval = null;
     }
 
-    if (presenceChannel) {
-        presenceChannel.unsubscribe();
-        presenceChannel = null;
+    if (socket) {
+        socket.disconnect();
+        socket = null;
     }
 }
 
@@ -1202,16 +1096,12 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     }
 
     // 3. Broadcast system message or chat notification in presence if seller is online
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'chat',
-            payload: {
-                userId: 'system',
-                username: '📢 ระบบตลาด',
-                level: 99,
-                message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${listing.item_name}] x${listing.quantity} จาก [${listing.seller_name}] ในราคา ${listing.price} Zeny!`
-            }
+    if (socket) {
+        socket.emit('chatMessage', {
+            userId: 'system',
+            username: '📢 ระบบตลาด',
+            level: 99,
+            message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${listing.item_name}] x${listing.quantity} จาก [${listing.seller_name}] ในราคา ${listing.price} Zeny!`
         });
     }
 
@@ -1220,7 +1110,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
 
 // ============ P2P DIRECT TRADE ============
 export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}) {
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !socket) {
         // Simulation mode: auto respond after 1.5s
         setTimeout(() => {
             if (window.gameUI) {
@@ -1246,57 +1136,43 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
         return { success: true };
     }
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'trade_request',
-            payload: {
-                senderUserId: currentUserId,
-                senderCharacterId: senderCharId,
-                senderName: senderName,
-                targetUserId: targetUserId,
-                targetName: targetName,
-                itemName: itemName,
-                itemType: itemType,
-                quantity: quantity,
-                price: price,
-                stats: stats
-            }
-        });
-    }
+    socket.emit("tradeRequest", {
+        senderUserId: currentUserId,
+        senderCharacterId: senderCharId,
+        senderName: senderName,
+        targetUserId: targetUserId,
+        targetName: targetName,
+        itemName: itemName,
+        itemType: itemType,
+        quantity: quantity,
+        price: price,
+        stats: stats
+    });
     return { success: true };
 }
 
 export async function sendTradeResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
-    if (isOfflineMode || !supabase) return { success: true };
+    if (isOfflineMode || !socket) return { success: true };
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'trade_response',
-            payload: {
-                senderUserId: senderUserId,
-                targetUserId: targetUserId,
-                accepted: accepted,
-                requestPayload: originalRequest
-            }
+    if (socket) {
+        socket.emit('tradeResponse', {
+            senderUserId: senderUserId,
+            targetUserId: targetUserId,
+            accepted: accepted,
+            requestPayload: originalRequest
         });
     }
     return { success: true };
 }
 
 export async function sendTradeCancelPacket(senderUserId, targetUserId, originalRequest) {
-    if (isOfflineMode || !supabase) return { success: true };
+    if (isOfflineMode || !socket) return { success: true };
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'trade_cancel',
-            payload: {
-                senderUserId: senderUserId,
-                targetUserId: targetUserId,
-                requestPayload: originalRequest
-            }
+    if (socket) {
+        socket.emit('tradeCancel', {
+            senderUserId: senderUserId,
+            targetUserId: targetUserId,
+            requestPayload: originalRequest
         });
     }
     return { success: true };
@@ -1332,16 +1208,12 @@ export async function executeDecentralizedSenderTrade(senderCharId, targetName, 
     }
 
     // Broadcast trade notification via chat
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'chat',
-            payload: {
-                userId: 'system',
-                username: '📢 Trade',
-                level: 99,
-                message: `${currentUsername} ส่ง [${itemName}] x${quantity} ให้ [${targetName}]${price > 0 ? ` (${price} Zeny)` : ' (ฟรี)'}!`
-            }
+    if (socket) {
+        socket.emit('chatMessage', {
+            userId: 'system',
+            username: '📢 Trade',
+            level: 99,
+            message: `${currentUsername} ส่ง [${itemName}] x${quantity} ให้ [${targetName}]${price > 0 ? ` (${price} Zeny)` : ' (ฟรี)'}!`
         });
     }
 
@@ -1389,7 +1261,7 @@ export async function executeDecentralizedReceiverTrade(receiverCharId, itemName
 
 // ============ P2P FRIEND REQUEST ============
 export async function sendFriendRequestPacket(senderName, senderLevel, targetUserId, targetName) {
-    if (isOfflineMode || !supabase) {
+    if (isOfflineMode || !socket) {
         // Simulation mode: auto respond after 1s
         setTimeout(() => {
             if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
@@ -1410,35 +1282,27 @@ export async function sendFriendRequestPacket(senderName, senderLevel, targetUse
         return { success: true };
     }
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'friend_request',
-            payload: {
-                senderUserId: currentUserId,
-                senderName: senderName,
-                senderLevel: senderLevel,
-                targetUserId: targetUserId,
-                targetName: targetName
-            }
+    if (socket) {
+        socket.emit('friendRequest', {
+            senderUserId: currentUserId,
+            senderName: senderName,
+            senderLevel: senderLevel,
+            targetUserId: targetUserId,
+            targetName: targetName
         });
     }
     return { success: true };
 }
 
 export async function sendFriendResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
-    if (isOfflineMode || !supabase) return { success: true };
+    if (isOfflineMode || !socket) return { success: true };
 
-    if (presenceChannel && channelSubscribed) {
-        presenceChannel.send({
-            type: 'broadcast',
-            event: 'friend_response',
-            payload: {
-                senderUserId: senderUserId,
-                targetUserId: targetUserId,
-                accepted: accepted,
-                requestPayload: originalRequest
-            }
+    if (socket) {
+        socket.emit('friendResponse', {
+            senderUserId: senderUserId,
+            targetUserId: targetUserId,
+            accepted: accepted,
+            requestPayload: originalRequest
         });
     }
     return { success: true };
