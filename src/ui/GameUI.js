@@ -1506,13 +1506,14 @@ export class GameUI {
 
   triggerScreenShake(isCritical = false) {
     if (!isCritical) return;
-    const container = document.getElementById('game-screen');
-    if (!container) return;
+    // Fix: Target only the 3D canvas instead of the whole UI container
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
 
     // Step 5.2: Screen Shake - Only for Critical Hit
-    container.classList.add('screen-shake-crit');
+    canvas.classList.add('screen-shake-crit');
     setTimeout(() => {
-      container.classList.remove('screen-shake-crit');
+      canvas.classList.remove('screen-shake-crit');
     }, 500);
   }
 
