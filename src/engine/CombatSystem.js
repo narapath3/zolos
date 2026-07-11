@@ -117,12 +117,15 @@ export class CombatSystem {
             if (this.character.isAlive()) {
                 const maxHp = isNaN(this.character.stats.max_hp) ? 100 : this.character.stats.max_hp;
                 const maxSp = isNaN(this.character.stats.max_sp) ? 50 : this.character.stats.max_sp;
+                // 1c. NaN HP/SP Guards: normalize current values before arithmetic
+                const currentHp = isNaN(this.character.stats.hp) ? 0 : Number(this.character.stats.hp);
+                const currentSp = isNaN(this.character.stats.sp) ? 0 : Number(this.character.stats.sp);
 
                 const hpRegen = Math.floor(maxHp * 0.02);
                 const spRegen = Math.floor(maxSp * 0.03);
 
-                this.character.stats.hp = Math.min(maxHp, this.character.stats.hp + hpRegen);
-                this.character.stats.sp = Math.min(maxSp, this.character.stats.sp + spRegen);
+                this.character.stats.hp = Math.min(maxHp, currentHp + hpRegen);
+                this.character.stats.sp = Math.min(maxSp, currentSp + spRegen);
             }
         }
 
