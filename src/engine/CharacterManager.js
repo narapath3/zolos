@@ -643,70 +643,105 @@ export class CharacterManager {
             if (this.chatBubbleTimeout) clearTimeout(this.chatBubbleTimeout);
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-
-        // Text wrapping logic
-        ctx.font = 'bold 28px Arial';
+        // Measure text for dynamic sizing
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.font = 'bold 32px Arial';
+        
         const words = text.split(' ');
         let line = '';
         const lines = [];
-        const maxWidth = 480;
+        const maxWidth = 400;
+        let maxLineWidth = 0;
 
         for (let n = 0; n < words.length; n++) {
             const testLine = line + words[n] + ' ';
-            const metrics = ctx.measureText(testLine);
+            const metrics = tempCtx.measureText(testLine);
             if (metrics.width > maxWidth && n > 0) {
-                lines.push(line);
+                lines.push(line.trim());
+                maxLineWidth = Math.max(maxLineWidth, tempCtx.measureText(line.trim()).width);
                 line = words[n] + ' ';
             } else {
                 line = testLine;
             }
         }
-        lines.push(line);
+        lines.push(line.trim());
+        maxLineWidth = Math.max(maxLineWidth, tempCtx.measureText(line.trim()).width);
+
+        // High-res canvas for sharpness
+        const canvas = document.createElement('canvas');
+        const padding = 20;
+        const pointerHeight = 15;
+        const lineHeight = 38;
+        
+        const bubbleWidth = maxLineWidth + padding * 2;
+        const bubbleHeight = lines.length * lineHeight + padding;
+        
+        // Ensure minimum size and scale for sharpness
+        const scaleFactor = 2;
+        canvas.width = (bubbleWidth + 10) * scaleFactor;
+        canvas.height = (bubbleHeight + pointerHeight + 10) * scaleFactor;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.scale(scaleFactor, scaleFactor);
+        
+        const x = 5;
+        const y = 5;
+        const radius = 12;
 
         // Draw bubble background
-        const bubbleHeight = Math.min(110, lines.length * 35 + 20);
-        const bubbleWidth = 500;
-        const x = 6;
-        const y = 6;
-        const radius = 15;
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
         ctx.beginPath();
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + bubbleWidth - radius, y);
         ctx.quadraticCurveTo(x + bubbleWidth, y, x + bubbleWidth, y + radius);
         ctx.lineTo(x + bubbleWidth, y + bubbleHeight - radius);
         ctx.quadraticCurveTo(x + bubbleWidth, y + bubbleHeight, x + bubbleWidth - radius, y + bubbleHeight);
-        ctx.lineTo(x + bubbleWidth / 2 + 10, y + bubbleHeight);
-        ctx.lineTo(x + bubbleWidth / 2, y + bubbleHeight + 15); // Pointer
-        ctx.lineTo(x + bubbleWidth / 2 - 10, y + bubbleHeight);
+        
+        // Pointer in the middle
+        const px = x + bubbleWidth / 2;
+        ctx.lineTo(px + 10, y + bubbleHeight);
+        ctx.lineTo(px, y + bubbleHeight + pointerHeight);
+        ctx.lineTo(px - 10, y + bubbleHeight);
+        
         ctx.lineTo(x + radius, y + bubbleHeight);
         ctx.quadraticCurveTo(x, y + bubbleHeight, x, y + bubbleHeight - radius);
         ctx.lineTo(x, y + radius);
         ctx.quadraticCurveTo(x, y, x + radius, y);
         ctx.closePath();
+        
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
         ctx.fill();
-
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
+        
+        ctx.shadowColor = 'transparent';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
         // Draw text
         ctx.fillStyle = '#000';
+        ctx.font = 'bold 32px Arial';
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
         lines.forEach((l, i) => {
-            ctx.fillText(l.trim(), 256, 40 + i * 35);
+            ctx.fillText(l, x + bubbleWidth / 2, y + padding + i * lineHeight + lineHeight / 2 - 4);
         });
 
         const texture = new THREE.CanvasTexture(canvas);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.chatBubble = new THREE.Sprite(spriteMat);
-        this.chatBubble.position.y = 3.8;
-        this.chatBubble.scale.set(4, 1, 1);
+        
+        // Position and scale relative to world units
+        const worldScale = 0.008;
+        this.chatBubble.scale.set(canvas.width * worldScale / scaleFactor, canvas.height * worldScale / scaleFactor, 1);
+        this.chatBubble.position.y = 2.8 + (this.chatBubble.scale.y / 2);
+        
         this.mesh.add(this.chatBubble);
 
         // Auto-remove after 5 seconds
