@@ -2122,8 +2122,8 @@ export class SceneManager {
         nameTag.scale.set(4.0, 0.8, 1);
         group.add(nameTag);
 
-        // Position on dry land
-        group.position.set(8, 0, -5);
+        // Position on dry land - slightly higher elevation and shifted
+        group.position.set(9.5, 0.45, -4.5);
         this.scene.add(group);
         this.envObjects.push(group);
         group.userData.isNPC = true;
