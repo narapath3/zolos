@@ -6,13 +6,15 @@ const app = express();
 const server = http.createServer(app);
 
 // Configure CORS for your frontend application
-const corsOrigin = process.env.CORS_ORIGIN || '*';
+const corsOrigin = process.env.CORS_ORIGIN || 'https://zolos-beta.vercel.app';
 const io = new Server(server, {
   cors: {
     origin: corsOrigin,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    allowEIO3: true
   },
+  transports: ['websocket', 'polling']
 });
 
 console.log(`[Zolos Server] CORS enabled for: ${corsOrigin}`);
