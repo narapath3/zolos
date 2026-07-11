@@ -769,6 +769,8 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+    // Sync: Inventory → Profile Editor (refresh dropdowns if open)
+    this._refreshProfileEditorEquipment();
   }
 
   // ============ Leaderboard ============
@@ -1487,6 +1489,103 @@ export class GameUI {
     this.profileSaveCallback = callback;
   }
 
+  /**
+   * Sync equipment state from Profile Editor → Inventory
+   * Called when user changes weapon/hat/glasses/armor/shield from the Profile panel.
+   * Updates inventory stats.equipped flags and persists to DB.
+   * @param {string} slotType - 'weapon'|'hat'|'glasses'|'armor'|'shield'
+   * @param {string} itemName - The item to equip, or 'None' to unequip
+   */
+  async syncEquipFromProfile(slotType, itemName) {
+    // Determine which item_types belong to this slot
+    const slotTypes = (slotType === 'weapon') ? ['weapon', 'fishing_rod'] : [slotType];
+
+    // 1. Unequip all items currently equipped in this slot
+    for (const invItem of this.inventory) {
+      if (slotTypes.includes(invItem.item_type) && invItem.stats && invItem.stats.equipped === true) {
+        invItem.stats.equipped = false;
+        if (this.characterId) {
+          await updateInventoryItemStats(this.characterId, invItem.item_name, {});
+        }
+      }
+    }
+
+    // 2. Equip the selected item (if not 'None')
+    if (itemName && itemName !== 'None') {
+      const targetItem = this.inventory.find(i => slotTypes.includes(i.item_type) && i.item_name === itemName);
+      if (targetItem) {
+        if (!targetItem.stats) targetItem.stats = {};
+        targetItem.stats.equipped = true;
+        if (this.characterId) {
+          await updateInventoryItemStats(this.characterId, targetItem.item_name, { equipped: true });
+        }
+      }
+    }
+
+    // 3. Handle fishing rod visibility
+    if (slotType === 'weapon') {
+      this.setFishingButtonVisible(itemName === 'Fishing Rod');
+    }
+  }
+
+  /**
+   * Refresh the Profile Editor equipment dropdowns to match current inventory state.
+   * Called when equipment changes from the Inventory panel to keep Profile in sync.
+   */
+  _refreshProfileEditorEquipment() {
+    const modal = document.getElementById('profile-editor-modal');
+    if (!modal || modal.style.display === 'none') return; // Only refresh if profile editor is open
+
+    const weaponSelect = document.getElementById('profile-edit-weapon');
+    const hatSelect = document.getElementById('profile-edit-hat');
+    const glassesSelect = document.getElementById('profile-edit-glasses');
+
+    // Refresh weapon dropdown
+    if (weaponSelect) {
+      weaponSelect.innerHTML = '<option value="None">👊 None / มือเปล่า</option>';
+      const emojiMap = { 'Sword': '⚔️', 'Bow': '🏹', 'Gun': '🔫', 'Fishing Rod': '🎣', 'Katana': '⚔️', 'Crossbow': '🏹', 'Silver Dagger': '🗡️', 'Heavy Warhammer': '🔨', 'Excalibur': '🗡️', 'Rudra Bow': '🏹', 'Ragnarok Blade': '🔱', 'Novice Cutter': '🔪', 'Mage Staff': '🪄' };
+      const weaponItems = (this.inventory || []).filter(i => i.item_type === 'weapon' || i.item_type === 'fishing_rod');
+      weaponItems.forEach(i => {
+        const opt = document.createElement('option');
+        opt.value = i.item_name;
+        opt.textContent = `${emojiMap[i.item_name] || '⚔️'} ${i.item_name}`;
+        weaponSelect.appendChild(opt);
+      });
+      const equippedWeapon = weaponItems.find(i => i.stats && i.stats.equipped === true);
+      weaponSelect.value = equippedWeapon ? equippedWeapon.item_name : 'None';
+    }
+
+    // Refresh hat dropdown
+    if (hatSelect) {
+      hatSelect.innerHTML = '<option value="None">❌ None / ไม่ใส่</option>';
+      const hatEmojiMap = { 'Wizard Hat': '🧙', 'Crown': '👑', 'Cowboy Hat': '🤠' };
+      const hatItems = (this.inventory || []).filter(i => i.item_type === 'hat');
+      hatItems.forEach(i => {
+        const opt = document.createElement('option');
+        opt.value = i.item_name;
+        opt.textContent = `${hatEmojiMap[i.item_name] || '🧙'} ${i.item_name}`;
+        hatSelect.appendChild(opt);
+      });
+      const equippedHat = hatItems.find(i => i.stats && i.stats.equipped === true);
+      hatSelect.value = equippedHat ? equippedHat.item_name : 'None';
+    }
+
+    // Refresh glasses dropdown
+    if (glassesSelect) {
+      glassesSelect.innerHTML = '<option value="None">❌ None / ไม่ใส่</option>';
+      const glassesEmojiMap = { 'Sunglasses': '🕶️', 'Classic Glasses': '👓' };
+      const glassesItems = (this.inventory || []).filter(i => i.item_type === 'glasses');
+      glassesItems.forEach(i => {
+        const opt = document.createElement('option');
+        opt.value = i.item_name;
+        opt.textContent = `${glassesEmojiMap[i.item_name] || '👓'} ${i.item_name}`;
+        glassesSelect.appendChild(opt);
+      });
+      const equippedGlasses = glassesItems.find(i => i.stats && i.stats.equipped === true);
+      glassesSelect.value = equippedGlasses ? equippedGlasses.item_name : 'None';
+    }
+  }
+
   // ============ Auto Farm Button ============
   setupAutoFarmButton(callback) {
     const btn = document.getElementById('btn-auto-farm');
@@ -1800,7 +1899,7 @@ export class GameUI {
     document.getElementById('sell-shop-detail-type').textContent = item.item_type.toUpperCase();
     document.getElementById('sell-shop-detail-desc').textContent = item.desc || '';
     document.getElementById('sell-shop-owned-qty').textContent = `มีอยู่: ${item.quantity} ชิ้น`;
-    
+
     const unitPrice = Math.floor(item.price * 0.8);
     document.getElementById('sell-shop-unit-price').textContent = unitPrice.toLocaleString();
 

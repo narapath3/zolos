@@ -281,7 +281,7 @@ async function initGame(charData) {
 
     // Fix C: Wire profileSaveCallback in main.js
     if (gameUI) {
-        gameUI.setupProfileSaveCallback((data) => {
+        gameUI.setupProfileSaveCallback(async (data) => {
             // Step 3: Ensure all equipment and appearance updates are called
             if (data.name !== undefined) {
                 character.stats.name = data.name;
@@ -290,15 +290,34 @@ async function initGame(charData) {
             if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
             if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
             if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
-            if (data.hat !== undefined) character.setHat(data.hat);
-            if (data.glasses !== undefined) character.setGlasses(data.glasses);
-            if (data.weapon !== undefined) character.equipWeapon(data.weapon);
-            if (data.armor !== undefined) character.equippedArmor = data.armor;
-            if (data.shield !== undefined) character.equippedShield = data.shield;
 
-            // Persist changes
-            character.saveStatsToDatabase();
-            // Refresh UI
+            // --- Sync equipment changes: Profile → Inventory ---
+            // When user changes equipment in Profile, update inventory equipped flags
+            if (data.weapon !== undefined) {
+                character.equipWeapon(data.weapon === 'None' ? null : data.weapon);
+                await gameUI.syncEquipFromProfile('weapon', data.weapon);
+            }
+            if (data.hat !== undefined) {
+                character.setHat(data.hat === 'None' ? null : data.hat);
+                await gameUI.syncEquipFromProfile('hat', data.hat);
+            }
+            if (data.glasses !== undefined) {
+                character.setGlasses(data.glasses === 'None' ? null : data.glasses);
+                await gameUI.syncEquipFromProfile('glasses', data.glasses);
+            }
+            if (data.armor !== undefined) {
+                character.equippedArmor = data.armor === 'None' ? null : data.armor;
+                await gameUI.syncEquipFromProfile('armor', data.armor);
+            }
+            if (data.shield !== undefined) {
+                character.equippedShield = data.shield === 'None' ? null : data.shield;
+                await gameUI.syncEquipFromProfile('shield', data.shield);
+            }
+
+            // Persist character appearance & stats to DB
+            await character.saveStatsToDatabase();
+            // Refresh all UI panels
+            gameUI._renderInventory();
             gameUI.updateHUD(character.stats);
             gameUI.updateStats(character.stats);
         });
