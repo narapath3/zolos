@@ -781,6 +781,13 @@ export class CharacterManager {
                 sound_enabled: this.gameSettings.sound_enabled,
                 graphics_quality: this.gameSettings.graphics_quality,
                 fps_enabled: this.gameSettings.fps_enabled,
+                // Persistence fix: Include appearance fields
+                weapon: this.equippedWeapon,
+                hat: this.equippedHat,
+                glasses: this.equippedGlasses,
+                body_color: this.bodyColor,
+                hair_color: this.hairColor,
+                pants_color: this.pantsColor
             }
         };
     }

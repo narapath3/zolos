@@ -757,6 +757,11 @@ export class GameUI {
       this.addCombatLog(`⚔️ สวมใส่ ${item.emoji} ${item.item_name} เพิ่มความแข็งแกร่ง!`, 'system');
     }
 
+    // Fix: Ensure the character row itself is updated with the new appearance/weapon
+    if (this.characterId) {
+      await this.character.saveStatsToDatabase();
+    }
+
     if (this.soundManager) {
       this.soundManager.playUseItemSound();
     }
