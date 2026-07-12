@@ -315,11 +315,19 @@ async function initGame(charData) {
             }
 
             // Persist character appearance & stats to DB
-            await character.saveStatsToDatabase();
-            if (charData.user_id) {
-                const { saveCharacterByUserId } = await import('./network/GameSync.js');
-                await saveCharacterByUserId(charData.user_id, character.getSaveData().updates);
+            try {
+                console.log('[Zolos] 💾 Profile save triggered. Saving appearance...');
+                await character.saveStatsToDatabase();
+                if (charData.user_id) {
+                    const { saveCharacterByUserId } = await import('./network/GameSync.js');
+                    await saveCharacterByUserId(charData.user_id, character.getSaveData().updates);
+                }
+                console.log('[Zolos] ✅ Profile appearance saved successfully.');
+            } catch (err) {
+                console.error('[Zolos] ❌ Profile appearance save failed:', err);
+                gameUI.addCombatLog('❌ บันทึกโปรไฟล์ล้มเหลว!', 'system');
             }
+
             // Refresh all UI panels
             gameUI._renderInventory();
             gameUI.updateHUD(character.stats);

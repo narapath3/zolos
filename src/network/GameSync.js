@@ -313,6 +313,7 @@ export async function saveCharacterByUserId(userId, updates) {
     }
 
     console.log(`[Zolos] 💾 Saving by user_id ${userId}. Fields:`, Object.keys(filteredUpdates));
+    console.log(`[Zolos] 📤 Supabase Update Payload:`, JSON.stringify(filteredUpdates));
     const { data, error } = await supabase
         .from('characters')
         .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
@@ -323,7 +324,7 @@ export async function saveCharacterByUserId(userId, updates) {
         console.error('[Zolos] ❌ saveCharacterByUserId error:', error.message, error.details, error.hint);
     } else {
         if (data && data.length > 0) {
-            console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', data.length);
+            console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', data.length, 'Data:', JSON.stringify(data[0]));
         } else {
             console.warn('[Zolos] ⚠️ saveCharacterByUserId: 0 rows updated. userId may not exist.');
         }
@@ -811,7 +812,11 @@ export function leavePresence() {
 export function sendSaveState(saveData) {
     const socket = getSocket();
     if (socket && isSocketConnected() && saveData) {
-        socket.emit('save_state', saveData);
+        // Ensure userId is present for server-side RLS-compliant saves
+        socket.emit('save_state', {
+            ...saveData,
+            userId: saveData.userId || null
+        });
     }
 }
 

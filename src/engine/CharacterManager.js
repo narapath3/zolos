@@ -926,6 +926,7 @@ export class CharacterManager {
 
         return {
             characterId: this.characterId,
+            userId: this.userId,
             updates: {
                 name: this.stats.name,
                 level: this.stats.level,
