@@ -1742,16 +1742,24 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   }
 
   .player-info {
+    background: var(--bg-dark);
+    border: 2px solid var(--gold-border);
+    border-radius: var(--radius-lg);
     padding: 8px 10px;
     min-width: 70px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
   }
 
   .player-name {
     font-size: 8px;
+    color: var(--primary);
+    text-transform: uppercase;
   }
 
   .player-level {
     font-size: 16px;
+    color: #fff;
+    font-weight: 900;
   }
 
   .bars-container {
@@ -1770,6 +1778,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   .bar-text {
     font-size: 8px;
+    color: #fff;
+    font-weight: 800;
+    text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
   }
 
   .side-panel {
@@ -1852,9 +1863,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   /* Auto farm / Fishing mobile tuning */
   #auto-farm-container {
-    bottom: 140px; /* Lifted above the skill bar to prevent overlap */
-    right: 8px;
-    gap: 8px;
+    bottom: 180px; /* Positioned well above the skill bar and HUD */
+    right: 12px;
+    gap: 10px;
   }
 
   .btn-auto,
@@ -1880,6 +1891,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     right: 8px;
     padding: 6px 10px;
     font-size: 11px;
+    background: var(--bg-dark);
+    border: 2px solid var(--gold-border);
+    border-radius: var(--radius-lg);
+    color: var(--primary);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
   }
 
   /* Minimap mobile tuning */
