@@ -76,11 +76,13 @@ export class GameUI {
     const connected = isSocketConnected();
     const socketMode = isSocketMode();
 
+    const { isOfflineMode } = await import('../network/SupabaseClient.js');
+
     if (!socketMode) {
-      this.networkDot.style.background = '#888';
-      this.networkText.textContent = 'LOCAL';
-      this.networkText.style.color = '#aaa';
-      if (this.networkStatusEl) this.networkStatusEl.style.color = '#aaa';
+      this.networkDot.style.background = isOfflineMode ? '#888' : '#40a0ff';
+      this.networkText.textContent = isOfflineMode ? 'LOCAL' : 'CLOUD';
+      this.networkText.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
     } else if (connected) {
       this.networkDot.style.background = '#0f0';
       this.networkText.textContent = 'ONLINE';

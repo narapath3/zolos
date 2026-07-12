@@ -227,14 +227,18 @@ export async function saveCharacter(characterId, updates) {
         }
     }
 
-    console.log('[Zolos] Saving character to DB. updates:', Object.keys(filteredUpdates));
-    const { error } = await supabase
+    console.log(`[Zolos] 💾 Attempting DB save for character ${characterId}. Fields:`, Object.keys(filteredUpdates));
+    const { data, error, status } = await supabase
         .from('characters')
         .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
-        .eq('id', characterId);
+        .eq('id', characterId)
+        .select();
 
     if (error) {
-        console.error('Save error:', error);
+        console.error(`[Zolos] ❌ Save error (Status ${status}):`, error.message, error.details, error.hint);
+        if (error.code === '42501') {
+            console.error('[Zolos] 🔐 RLS Policy violation: You do not have permission to update this character.');
+        }
         // Fallback for unmigrated database: retry saving only the core 100% supported fields
         if (error.code === 'PGRST204') {
             console.warn('[Zolos] Database schema mismatch (PGRST204). Retrying save with core columns only...');
@@ -255,8 +259,14 @@ export async function saveCharacter(characterId, updates) {
             if (retryError) {
                 console.error('[Zolos] Core retry save failure:', retryError);
             } else {
-                console.log('[Zolos] Core retry save succeeded!');
+                console.log('[Zolos] ✅ Core retry save succeeded!');
             }
+        }
+    } else {
+        if (data && data.length > 0) {
+            console.log('[Zolos] ✅ Save successful! Rows affected:', data.length);
+        } else {
+            console.warn('[Zolos] ⚠️ Save returned no error, but 0 rows were updated. Check if characterId exists and matches user_id.');
         }
     }
 }
