@@ -190,8 +190,12 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   pointer-events: none;
 }
 
-.btn-primary:hover::after, .btn-secondary:hover::after, .btn-guest:hover::after, .btn-start-game:hover::after {
+.btn-primary:hover::after, .btn-secondary:hover::after, .btn-guest:hover::after {
   left: 150%;
+}
+
+.btn-start-game::after {
+  display: none;
 }
 
 .btn-primary {
