@@ -88,12 +88,15 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 40px;
+  padding: clamp(24px, 5vw, 40px);
   background: var(--bg-card);
   border: 6px solid var(--gold-border);
   border-radius: var(--radius-xl);
   box-shadow: 0 12px 0 #d4a017, 0 20px 40px rgba(0,0,0,0.15);
-  width: 400px;
+  width: min(90vw, 450px);
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
   animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -110,26 +113,26 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .auth-icon-img {
-  width: 220px;
-  height: 220px;
-  margin-bottom: 12px;
+  width: clamp(140px, 40vw, 220px);
+  height: clamp(140px, 40vw, 220px);
+  margin-bottom: clamp(8px, 2vw, 12px);
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
 }
 
 .game-title-new {
   font-family: var(--font-main);
-  font-size: 48px;
+  font-size: clamp(28px, 6vw, 48px);
   font-weight: 900;
   color: var(--primary);
   text-transform: uppercase;
-  -webkit-text-stroke: 3px #804000;
-  text-shadow: 0 6px 0 #804000;
+  -webkit-text-stroke: clamp(1px, 0.5vw, 3px) #804000;
+  text-shadow: 0 clamp(3px, 1vw, 6px) 0 #804000;
   margin-bottom: 4px;
 }
 
 .game-subtitle {
   font-family: var(--font-main);
-  font-size: 14px;
+  font-size: clamp(10px, 2.5vw, 14px);
   color: var(--secondary);
   font-weight: 800;
   text-transform: uppercase;
@@ -138,9 +141,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .game-tagline {
   font-family: 'Itim', cursive;
-  font-size: 16px;
+  font-size: clamp(12px, 2.5vw, 16px);
   color: var(--text-dim);
-  margin-bottom: 24px;
+  margin-bottom: clamp(16px, 3vw, 24px);
 }
 
 .auth-form {
@@ -150,12 +153,12 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .auth-form input {
-  padding: 16px 20px;
+  padding: clamp(12px, 2vw, 16px) clamp(16px, 3vw, 20px);
   background: var(--input-bg);
   border: 3px solid var(--input-border);
   border-radius: var(--radius-lg);
   color: var(--text-dark);
-  font-size: 15px;
+  font-size: clamp(13px, 2vw, 15px);
   font-weight: 600;
   outline: none;
   transition: all 0.2s ease;
@@ -168,7 +171,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .btn-primary, .btn-secondary, .btn-guest {
-  padding: 16px 24px;
+  padding: clamp(12px, 2vw, 16px) clamp(20px, 3vw, 24px);
   border: none;
   font-family: var(--font-main);
   color: white;
@@ -176,7 +179,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   text-transform: uppercase;
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
-  font-size: 14px;
+  font-size: clamp(12px, 2vw, 14px);
   overflow: hidden; /* This ensures the shimmer is contained inside the button */
 }
 
