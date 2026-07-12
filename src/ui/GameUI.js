@@ -54,7 +54,44 @@ export class GameUI {
     this._setupTradePanel();
     this._setupMobileControls();
     this._setupDailyQuests();
+    this._setupNetworkStatus();
     window.gameUI = this;
+  }
+
+  _setupNetworkStatus() {
+    this.networkDot = document.getElementById('network-dot');
+    this.networkText = document.getElementById('network-text');
+    this.networkStatusEl = document.getElementById('network-status');
+
+    // Update every 2 seconds
+    setInterval(() => {
+      this.updateNetworkStatus();
+    }, 2000);
+  }
+
+  async updateNetworkStatus() {
+    if (!this.networkDot || !this.networkText) return;
+
+    const { isSocketConnected, isSocketMode } = await import('../network/SocketClient.js');
+    const connected = isSocketConnected();
+    const socketMode = isSocketMode();
+
+    if (!socketMode) {
+      this.networkDot.style.background = '#888';
+      this.networkText.textContent = 'LOCAL';
+      this.networkText.style.color = '#aaa';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = '#aaa';
+    } else if (connected) {
+      this.networkDot.style.background = '#0f0';
+      this.networkText.textContent = 'ONLINE';
+      this.networkText.style.color = '#0f0';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = '#0f0';
+    } else {
+      this.networkDot.style.background = '#f44';
+      this.networkText.textContent = 'OFFLINE';
+      this.networkText.style.color = '#f44';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = '#f44';
+    }
   }
 
   _setupTargetIndicator() {

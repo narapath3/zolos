@@ -561,9 +561,10 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     currentUsername = username;
     currentLevel = level;
 
-    // ===== OFFLINE MODE (Mock Players) =====
+    // ===== OFFLINE MODE (No Mock Players) =====
     if (isOfflineMode || (!isSocketMode() && !supabase)) {
-        _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+        console.log('[Zolos] 📴 Offline Mode active (no bots)');
+        if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
         return;
     }
 
@@ -578,8 +579,8 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         }
 
         if (!socket) {
-            console.warn('[Zolos] ⚠️ Socket.io connection failed, falling back to offline mode');
-            _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+            console.warn('[Zolos] ⚠️ Socket.io connection failed');
+            if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
             return;
         }
 
@@ -647,8 +648,9 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         return;
     }
 
-    // ===== FALLBACK: If Supabase exists but no socket URL — offline mock =====
-    _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+    // ===== FALLBACK: No Mock Players =====
+    console.warn('[Zolos] ⚠️ Falling back to single player mode (no bots)');
+    if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
 }
 
 export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
