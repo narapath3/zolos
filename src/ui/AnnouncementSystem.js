@@ -32,31 +32,35 @@ export class AnnouncementSystem {
     this.container.id = 'announcement-container';
     this.container.style.cssText = `
       position: fixed;
-      top: 60px;
-      left: 0;
-      right: 0;
-      height: 32px;
-      background: rgba(20, 20, 30, 0.85);
-      border-bottom: 1px solid rgba(100, 100, 120, 0.5);
+      bottom: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 800px;
+      height: 28px;
+      background: rgba(10, 10, 15, 0.7);
+      border: 1px solid rgba(255, 0, 110, 0.3);
+      border-radius: 14px;
       display: flex;
       align-items: center;
       overflow: hidden;
       z-index: 999;
-      font-family: Arial, sans-serif;
-      font-weight: normal;
-      color: #cccccc;
-      box-shadow: none;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: #00D9FF;
+      pointer-events: none;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
     `;
 
     // Create text element
     this.textElement = document.createElement('div');
     this.textElement.style.cssText = `
       white-space: nowrap;
-      padding: 0 20px;
-      font-size: 14px;
-      letter-spacing: 0.5px;
-      animation: scroll-text 20s linear infinite;
-      text-shadow: none;
+      padding: 0 30px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      animation: scroll-text 15s linear infinite;
+      text-shadow: 0 0 5px rgba(0, 217, 255, 0.5);
     `;
 
     this.container.appendChild(this.textElement);
