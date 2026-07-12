@@ -86,9 +86,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   z-index: 2;
   text-align: center;
   padding: 40px;
-  background: transparent;
-  border: none;
+  background: var(--bg-card);
+  border: 6px solid var(--gold-border);
   border-radius: var(--radius-xl);
+  box-shadow: 0 12px 0 #d4a017, 0 20px 40px rgba(0,0,0,0.15);
   width: 400px;
   animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -173,7 +174,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
   font-size: 14px;
-  overflow: hidden;
+  overflow: hidden; /* This ensures the shimmer is contained inside the button */
 }
 
 .btn-primary::after, .btn-secondary::after, .btn-guest::after, .btn-start-game::after {
