@@ -700,7 +700,8 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
 }
 
 export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
-    if (isOfflineMode || !socket) return; // Check for socket instead of supabase
+    // Step 3: Remove isOfflineMode check to allow multiplayer in Guest mode
+    if (!socket) return; 
     const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
     if (appearance) payload.appearance = appearance;
     
@@ -708,7 +709,8 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
 }
 
 export function broadcastChat(userId, username, level, message) {
-    if (isOfflineMode || !socket) {
+    // Step 3: Remove isOfflineMode check to allow multiplayer in Guest mode
+    if (!socket) {
         // Step 5: Echo back local message using object format
         if (chatCallback) {
             chatCallback({ userId, username, message });
