@@ -69,14 +69,14 @@ export class AnnouncementSystem {
         0% { transform: translateX(100%); }
         100% { transform: translateX(-100%); }
       }
-      #announcement-container {
-        display: flex !important;
+      #announcement-container.hidden {
+        display: none !important;
       }
     `;
     document.head.appendChild(style);
 
     this.isInitialized = true;
-    this.show();
+    this.hide();
   }
 
   /**
@@ -126,11 +126,11 @@ export class AnnouncementSystem {
   }
 
   /**
-   * Show the announcement container (always visible)
+   * Show the announcement container
    */
   show() {
     if (this.container) {
-      this.container.style.display = 'flex';
+      this.container.classList.remove('hidden');
     }
   }
 
@@ -139,7 +139,7 @@ export class AnnouncementSystem {
    */
   hide() {
     if (this.container) {
-      this.container.style.display = 'flex';
+      this.container.classList.add('hidden');
     }
     this.currentAnnouncement = null;
   }
