@@ -206,10 +206,11 @@ export async function saveCharacter(characterId, updates) {
     const dbUpdates = { ...updates };
 
     // Core stats (always in DB)
+    // Only include fields that actually exist in the DB schema
+    // sound_enabled, graphics_quality, fps_enabled do NOT exist in the Supabase characters table
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'sound_enabled', 'graphics_quality', 'fps_enabled',
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
     ];
 
@@ -298,10 +299,11 @@ export async function saveCharacterByUserId(userId, updates) {
         return;
     }
 
+    // Only include fields that actually exist in the DB schema
+    // sound_enabled, graphics_quality, fps_enabled do NOT exist in the Supabase characters table
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'sound_enabled', 'graphics_quality', 'fps_enabled',
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
     ];
 
