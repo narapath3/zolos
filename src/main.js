@@ -360,16 +360,24 @@ async function initGame(charData) {
             // If we receive a list, we ensure all players in it exist.
             players.forEach(p => {
                 if (p.userId === userId) return;
+                
+                // Map isolation: Only render players on the same map
+                if (p.mapId && p.mapId !== sceneManager.currentMap) {
+                    if (remotePlayersMap.has(p.userId)) {
+                        const rp = remotePlayersMap.get(p.userId);
+                        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                        remotePlayersMap.delete(p.userId);
+                    }
+                    return;
+                }
+
                 if (!remotePlayersMap.has(p.userId)) {
-                    // This will be handled by the position update callback too, 
-                    // but we can pre-initialize here if needed.
+                    // This will be handled by the position update callback too
                 }
             });
 
             // Clean up players who are NOT in the active players list anymore
-            // Note: In Socket.io mode, 'players' might be the FULL list from playersUpdate
-            // or a SINGLE player from playerJoined. We need to be careful.
-            if (players.length > 1) {
+            if (players.length > 0) {
                 const currentIds = new Set(players.map(p => p.userId));
                 for (const [id, rp] of remotePlayersMap.entries()) {
                     if (!currentIds.has(id)) {
@@ -382,6 +390,17 @@ async function initGame(charData) {
         (p) => {
             // Handle remote player position updates
             if (p.userId === userId) return;
+
+            // Map isolation: Only update/render if on the same map
+            if (p.mapId && p.mapId !== sceneManager.currentMap) {
+                if (remotePlayersMap.has(p.userId)) {
+                    const rp = remotePlayersMap.get(p.userId);
+                    if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                    remotePlayersMap.delete(p.userId);
+                }
+                return;
+            }
+
             let rp = remotePlayersMap.get(p.userId);
             if (!rp) {
                 // Create a real hero model for the remote player
@@ -409,12 +428,9 @@ async function initGame(charData) {
                 rp.character.state = p.state || 'idle';
 
                 // Step 10 Part B: Robust water detection for remote players.
-                // Re-run environment check based on received X/Z to ensure correct baseY.
                 const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
                 if (remoteEnv === 'water') {
                     rp.character.baseY = -0.5;
-                    // Force swimming state if the position is in water, 
-                    // regardless of the broadcast state (which might be 'walking' due to AUTO mode)
                     rp.character.state = 'swimming';
                 } else {
                     rp.character.baseY = 1.2;
@@ -424,25 +440,27 @@ async function initGame(charData) {
                     rp.character.applyAppearance(p.appearance);
                 }
                 // Update animations for remote player
-                rp.character.update(1 / 60); // dt not available in callback scope; use fixed step
+                rp.character.update(1 / 60);
             }
         },
         // Step 9: Use consistent object format for chat messages
         (chatMsg) => {
+            // Map isolation: Only show chat from players on the same map
+            if (chatMsg.mapId && chatMsg.mapId !== sceneManager.currentMap) return;
+
             if (gameUI) gameUI.receiveChatMessage(chatMsg.username, chatMsg.message);
 
             // Show chat bubble above character
             if (chatMsg.userId === userId) {
-                // Local player
                 if (character) character.showChatBubble(chatMsg.message);
             } else {
-                // Remote players
                 const rp = remotePlayersMap.get(chatMsg.userId);
                 if (rp && rp.character) {
                     rp.character.showChatBubble(chatMsg.message);
                 }
             }
-        }
+        },
+        sceneManager.currentMap
     );
 
     // Start auto-save
@@ -471,7 +489,7 @@ async function initGame(charData) {
     // Step 9: Wire up chat send callback
     if (gameUI) {
         gameUI.setupChatSendCallback((message) => {
-            broadcastChat(userId, username, character.stats.level, message);
+            broadcastChat(userId, username, character.stats.level, message, sceneManager.currentMap);
             // Local bubble is now handled by the echo in broadcastChat callback
         });
     }
@@ -767,6 +785,15 @@ function gameLoop(time) {
                     monsters.clearAll();
                     monsters.mapId = targetMap;
                     monsters.spawnInitial(character.stats.level);
+
+                    // Update multiplayer presence for the new map
+                    updatePresence(character.stats.level, username, targetMap);
+                    
+                    // Clear remote players from old map
+                    for (const [id, rp] of remotePlayersMap.entries()) {
+                        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                    }
+                    remotePlayersMap.clear();
                 }
             }
         });
@@ -785,7 +812,7 @@ function gameLoop(time) {
 
     const now = performance.now();
     if (now - lastBroadcastTime > 100) {
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance());
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
         lastBroadcastTime = now;
     }
 

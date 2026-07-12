@@ -93,31 +93,37 @@ io.on('connection', (socket) => {
             username: username || 'Adventurer',
             level: level || 1,
             socketId: socket.id,
+            mapId: data.mapId || 'prontera_field',
             joinedAt: Date.now(),
             lastSaveData: null
         };
+
+        // Join map-specific room
+        socket.join(`map:${playerInfo.mapId}`);
 
         onlinePlayers.set(socket.id, playerInfo);
         userSocketMap.set(userId, socket.id);
 
         console.log(`[Server] ➕ Player joined: ${username} (${userId}) — Total: ${onlinePlayers.size}`);
 
-        // Broadcast updated player list to everyone
-        broadcastPlayerList();
+        // Broadcast updated player list to everyone in this map
+        broadcastPlayerList(playerInfo.mapId);
     });
 
     // --- POSITION BROADCAST ---
     socket.on('pos', (payload) => {
         if (!payload || !payload.userId) return;
-        // Broadcast position to all OTHER clients (not sender)
-        socket.broadcast.emit('pos', payload);
+        const mapId = payload.mapId || 'prontera_field';
+        // Broadcast position to all OTHER clients in the SAME map
+        socket.to(`map:${mapId}`).emit('pos', payload);
     });
 
     // --- CHAT ---
     socket.on('chat', (payload) => {
         if (!payload) return;
-        // Broadcast chat to ALL clients (including sender for echo)
-        io.emit('chat', payload);
+        const mapId = payload.mapId || 'prontera_field';
+        // Broadcast chat to ALL clients in the SAME map
+        io.to(`map:${mapId}`).emit('chat', payload);
     });
 
     // --- PRESENCE UPDATE ---
@@ -125,9 +131,19 @@ io.on('connection', (socket) => {
         if (!data) return;
         const player = onlinePlayers.get(socket.id);
         if (player) {
+            const oldMapId = player.mapId;
             if (data.level !== undefined) player.level = data.level;
             if (data.username) player.username = data.username;
-            broadcastPlayerList();
+            
+            if (data.mapId && data.mapId !== oldMapId) {
+                socket.leave(`map:${oldMapId}`);
+                player.mapId = data.mapId;
+                socket.join(`map:${player.mapId}`);
+                broadcastPlayerList(oldMapId);
+                broadcastPlayerList(player.mapId);
+            } else {
+                broadcastPlayerList(player.mapId);
+            }
         }
     });
 
@@ -199,23 +215,35 @@ io.on('connection', (socket) => {
             onlinePlayers.delete(socket.id);
 
             // Broadcast updated player list
-            broadcastPlayerList();
+            broadcastPlayerList(player.mapId);
         }
     });
 });
 
 // ============ Helpers ============
-function broadcastPlayerList() {
-    const players = [];
+function broadcastPlayerList(mapId) {
+    if (!mapId) return;
+    
+    const playersInMap = [];
+    let globalCount = 0;
+    
     for (const [, info] of onlinePlayers) {
-        players.push({
-            userId: info.userId,
-            username: info.username,
-            level: info.level
-        });
+        globalCount++;
+        if (info.mapId === mapId) {
+            playersInMap.push({
+                userId: info.userId,
+                username: info.username,
+                level: info.level,
+                mapId: info.mapId
+            });
+        }
     }
-    io.emit('players_update', players);
-    io.emit('online_count', players.length);
+    
+    // Send map-specific list to players in that map
+    io.to(`map:${mapId}`).emit('players_update', playersInMap);
+    
+    // Global count can still be broadcast to everyone
+    io.emit('online_count', globalCount);
 }
 
 // ============ Periodic Save to Supabase ============

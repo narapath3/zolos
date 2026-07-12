@@ -255,6 +255,11 @@ export class SceneManager {
             this._createNPC();
             this._createSellNPC();
         }
+
+        // Update UI
+        if (window.gameUI) {
+            window.gameUI.setMapName(this.getCurrentMapName(), mapId);
+        }
     }
 
     getCurrentMapName() {

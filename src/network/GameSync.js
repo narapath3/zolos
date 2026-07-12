@@ -633,7 +633,7 @@ export async function fetchLeaderboard(category = 'level') {
 }
 
 // ============ Realtime Presence & Broadcast (Socket.io) ============
-export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
+export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback, currentMapId = 'prontera_field') {
     onlinePlayersCallback = onPlayersUpdate;
     chatCallback = onChatCallback;
     socketListenersAttached = false;
@@ -725,7 +725,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         }
 
         // Join the game
-        socket.emit('join', { userId, username, level });
+        socket.emit('join', { userId, username, level, mapId: currentMapId });
         console.log('[Zolos] ✅ Emitted join event to Map Server');
         return;
     }
@@ -735,19 +735,19 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
 }
 
-export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
+export function broadcastPosition(userId, username, level, position, rotationY, state, appearance, currentMapId = 'prontera_field') {
     if (isOfflineMode) return;
 
     const socket = getSocket();
     if (socket && isSocketConnected()) {
-        const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
+        const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state, mapId: currentMapId };
         if (appearance) payload.appearance = appearance;
         socket.emit('pos', payload);
         return;
     }
 }
 
-export function broadcastChat(userId, username, level, message) {
+export function broadcastChat(userId, username, level, message, currentMapId = 'prontera_field') {
     if (isOfflineMode) {
         // Echo back local message using object format
         if (chatCallback) {
@@ -777,13 +777,13 @@ export function broadcastChat(userId, username, level, message) {
 
     const socket = getSocket();
     if (socket && isSocketConnected()) {
-        socket.emit('chat', { userId, username, level, message });
+        socket.emit('chat', { userId, username, level, message, mapId: currentMapId });
         // Note: server broadcasts back to everyone (including sender) via 'chat' event
         // so we don't need to echo locally — it will come back from the server
     }
 }
 
-export function updatePresence(level, newUsername = null) {
+export function updatePresence(level, newUsername = null, currentMapId = 'prontera_field') {
     currentLevel = level;
     if (newUsername) {
         currentUsername = newUsername;
@@ -803,7 +803,8 @@ export function updatePresence(level, newUsername = null) {
     if (socket && isSocketConnected()) {
         socket.emit('update_presence', {
             level: currentLevel,
-            username: currentUsername
+            username: currentUsername,
+            mapId: currentMapId
         });
     }
 }

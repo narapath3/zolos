@@ -294,9 +294,14 @@ export class GameUI {
   }
 
   // ============ Map Name Update ============
-  setMapName(mapName) {
+  setMapName(mapName, mapId) {
     const el = document.getElementById('map-name');
     if (el) el.textContent = mapName;
+    if (mapId) {
+      this.currentMapId = mapId;
+      // Refresh online players list when map changes to filter correctly
+      this._renderOnlinePlayers();
+    }
   }
 
   // ============ HUD Updates ============
@@ -968,6 +973,9 @@ export class GameUI {
         this._renderOnlinePlayers();
       });
     });
+    
+    // Initial map ID
+    this.currentMapId = 'prontera_field';
   }
 
   updateOnlinePlayers(players) {
@@ -989,6 +997,10 @@ export class GameUI {
 
     if (this.onlineView === 'friends') {
       list = list.filter(p => friends.includes(p.username));
+    } else {
+      // Local map filtering for 'global' view
+      const currentMapId = window.gameUI?.currentMapId || 'prontera_field';
+      list = list.filter(p => !p.mapId || p.mapId === currentMapId);
     }
 
     if (list.length === 0) {
