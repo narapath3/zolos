@@ -12,30 +12,58 @@ export class AdminAnnouncementPanel {
     this.isVisible = false;
     this.panelElement = null;
     this.isAdminMode = false;
+    this.container = null;
   }
 
   /**
    * Initialize the admin announcement panel
+   * @param {HTMLElement} container - Optional container to append to. If not provided, creates a floating panel.
    */
-  init() {
+  init(container = null) {
+    this.container = container;
+    
+    // Remove existing panel if it exists
+    if (this.panelElement) {
+      this.destroy();
+    }
+
     // Create panel HTML
     const panel = document.createElement('div');
     panel.id = 'admin-announcement-panel';
-    panel.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 350px;
-      background: linear-gradient(135deg, rgba(26, 26, 46, 0.95), rgba(22, 33, 62, 0.95));
-      border: 3px solid #FF006E;
-      border-radius: 0;
-      padding: 20px;
-      z-index: 1000;
-      font-family: 'Courier New', monospace;
-      color: #00D9FF;
-      box-shadow: 0 0 30px rgba(255, 0, 110, 0.5), inset 0 0 10px rgba(0, 217, 255, 0.1);
-      display: none;
-    `;
+    
+    if (container) {
+      // Integrated style
+      panel.style.cssText = `
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        background: rgba(26, 26, 46, 0.4);
+        border: 1px solid #FF006E;
+        padding: 30px;
+        box-sizing: border-box;
+        font-family: 'Courier New', monospace;
+        color: #00D9FF;
+        display: block;
+        box-shadow: 0 0 20px rgba(255, 0, 110, 0.2);
+      `;
+    } else {
+      // Floating style (fallback)
+      panel.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 350px;
+        background: linear-gradient(135deg, rgba(26, 26, 46, 0.95), rgba(22, 33, 62, 0.95));
+        border: 3px solid #FF006E;
+        border-radius: 0;
+        padding: 20px;
+        z-index: 1000;
+        font-family: 'Courier New', monospace;
+        color: #00D9FF;
+        box-shadow: 0 0 30px rgba(255, 0, 110, 0.5), inset 0 0 10px rgba(0, 217, 255, 0.1);
+        display: none;
+      `;
+    }
 
     panel.innerHTML = `
       <div style="margin-bottom: 15px;">
@@ -67,48 +95,49 @@ export class AdminAnnouncementPanel {
         ></textarea>
       </div>
 
-      <div style="margin-bottom: 12px;">
-        <label style="display: block; font-size: 12px; margin-bottom: 5px; color: #FFBE0B;">TYPE:</label>
-        <select 
-          id="admin-announcement-type"
-          style="
-            width: 100%;
-            padding: 8px;
-            background: #0a0a1a;
-            border: 2px solid #00D9FF;
-            color: #00D9FF;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            box-sizing: border-box;
-          "
-        >
-          <option value="info">📢 INFO</option>
-          <option value="warning">⚠️ WARNING</option>
-          <option value="event">🎉 EVENT</option>
-          <option value="maintenance">🔧 MAINTENANCE</option>
-          <option value="update">📝 UPDATE</option>
-        </select>
-      </div>
-
-      <div style="margin-bottom: 12px;">
-        <label style="display: block; font-size: 12px; margin-bottom: 5px; color: #FFBE0B;">DURATION (SEC):</label>
-        <input 
-          id="admin-announcement-duration" 
-          type="number" 
-          value="8" 
-          min="3" 
-          max="60"
-          style="
-            width: 100%;
-            padding: 8px;
-            background: #0a0a1a;
-            border: 2px solid #00D9FF;
-            color: #00D9FF;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            box-sizing: border-box;
-          "
-        />
+      <div style="display: flex; gap: 15px; margin-bottom: 12px;">
+        <div style="flex: 1;">
+          <label style="display: block; font-size: 12px; margin-bottom: 5px; color: #FFBE0B;">TYPE:</label>
+          <select 
+            id="admin-announcement-type"
+            style="
+              width: 100%;
+              padding: 8px;
+              background: #0a0a1a;
+              border: 2px solid #00D9FF;
+              color: #00D9FF;
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              box-sizing: border-box;
+            "
+          >
+            <option value="info">📢 INFO</option>
+            <option value="warning">⚠️ WARNING</option>
+            <option value="event">🎉 EVENT</option>
+            <option value="maintenance">🔧 MAINTENANCE</option>
+            <option value="update">📝 UPDATE</option>
+          </select>
+        </div>
+        <div style="flex: 1;">
+          <label style="display: block; font-size: 12px; margin-bottom: 5px; color: #FFBE0B;">DURATION (SEC):</label>
+          <input 
+            id="admin-announcement-duration" 
+            type="number" 
+            value="8" 
+            min="3" 
+            max="60"
+            style="
+              width: 100%;
+              padding: 8px;
+              background: #0a0a1a;
+              border: 2px solid #00D9FF;
+              color: #00D9FF;
+              font-family: 'Courier New', monospace;
+              font-size: 12px;
+              box-sizing: border-box;
+            "
+          />
+        </div>
       </div>
 
       <div style="display: flex; gap: 10px; margin-bottom: 12px;">
@@ -162,7 +191,8 @@ export class AdminAnnouncementPanel {
         <div style="font-weight: bold; margin-bottom: 5px; color: #FFBE0B;">QUEUE:</div>
         <div id="admin-announcement-queue">No pending announcements</div>
       </div>
-
+      
+      ${!container ? `
       <div style="margin-top: 12px; text-align: center;">
         <button 
           id="admin-announce-close-btn"
@@ -180,9 +210,15 @@ export class AdminAnnouncementPanel {
           CLOSE
         </button>
       </div>
+      ` : ''}
     `;
 
-    document.body.appendChild(panel);
+    if (container) {
+      container.appendChild(panel);
+    } else {
+      document.body.appendChild(panel);
+    }
+    
     this.panelElement = panel;
 
     // Setup event listeners
@@ -200,44 +236,52 @@ export class AdminAnnouncementPanel {
     const clearBtn = document.getElementById('admin-announce-clear-btn');
     const closeBtn = document.getElementById('admin-announce-close-btn');
 
-        sendBtn.addEventListener('click', async () => {
-          const text = textInput.value.trim();
-          if (!text) {
-            alert('Please enter announcement text');
-            return;
-          }
+    if (sendBtn) {
+      sendBtn.addEventListener('click', async () => {
+        const text = textInput.value.trim();
+        if (!text) {
+          alert('Please enter announcement text');
+          return;
+        }
 
-          const type = typeSelect.value;
-          const duration = parseInt(durationInput.value) * 1000;
+        const type = typeSelect.value;
+        const duration = parseInt(durationInput.value) * 1000;
 
-          // Add to announcement system locally
-          announcementSystem.addAnnouncement(text, type, duration);
+        // Add to announcement system locally
+        announcementSystem.addAnnouncement(text, type, duration);
 
-          // Broadcast to all players via Socket.io
-          await broadcastAnnouncement(text, type, duration);
+        // Broadcast to all players via Socket.io
+        await broadcastAnnouncement(text, type, duration);
 
-          // Clear input
-          textInput.value = '';
+        // Clear input
+        textInput.value = '';
 
-          // Update queue display
-          this._updateQueueDisplay();
+        // Update queue display
+        this._updateQueueDisplay();
 
-          // Show feedback
-          this._showFeedback('✅ Announcement sent to all players!');
-        });
+        // Show feedback
+        this._showFeedback('✅ Announcement sent to all players!');
+      });
+    }
 
-    clearBtn.addEventListener('click', () => {
-      announcementSystem.clear();
-      this._updateQueueDisplay();
-      this._showFeedback('Queue cleared!');
-    });
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        announcementSystem.clear();
+        this._updateQueueDisplay();
+        this._showFeedback('Queue cleared!');
+      });
+    }
 
-    closeBtn.addEventListener('click', () => {
-      this.hide();
-    });
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        this.hide();
+      });
+    }
 
     // Update queue display on input change
-    textInput.addEventListener('input', () => this._updateQueueDisplay());
+    if (textInput) {
+      textInput.addEventListener('input', () => this._updateQueueDisplay());
+    }
   }
 
   /**
@@ -245,6 +289,8 @@ export class AdminAnnouncementPanel {
    */
   _updateQueueDisplay() {
     const queueEl = document.getElementById('admin-announcement-queue');
+    if (!queueEl) return;
+    
     const queueSize = announcementSystem.getQueueSize();
     const current = announcementSystem.getCurrent();
 

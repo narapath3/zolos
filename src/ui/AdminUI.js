@@ -409,9 +409,8 @@ export class AdminUI {
 
     async _renderAnnouncementPanel() {
         const { adminAnnouncementPanel } = await import('../ui/AdminAnnouncementPanel.js');
-        if (!adminAnnouncementPanel.panelElement) {
-            adminAnnouncementPanel.init();
-        }
+        this.content.innerHTML = '';
+        adminAnnouncementPanel.init(this.content);
         adminAnnouncementPanel.show();
     }
 
