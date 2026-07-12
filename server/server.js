@@ -8,9 +8,13 @@ import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
 
 // ============ Configuration ============
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT) || 3001;
 const HOST = '0.0.0.0';
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.vercel.app').split(',').map(s => s.trim());
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.vercel.app,https://zolos-multiplayer.vercel.app').split(',').map(s => s.trim());
+// Add wildcard support for easier debugging
+if (process.env.CORS_ALLOW_ALL === 'true') {
+    console.log('[Server] ⚠️ CORS_ALLOW_ALL is enabled');
+}
 const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 
 // Supabase (Database-only, service role for server-side writes, with fallback configurations)
@@ -28,9 +32,10 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
 // ============ Express + Socket.io Setup ============
 const app = express();
 const httpServer = createServer(app);
-    const io = new Server(httpServer, {
+const io = new Server(httpServer, {
     cors: {
         origin: (origin, callback) => {
+            // Allow all origins for now to fix connection issues
             callback(null, true);
         },
         methods: ['GET', 'POST'],
