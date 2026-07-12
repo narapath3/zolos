@@ -17,7 +17,7 @@ export class AuthUI {
         this._autoplayTrigger = null;
 
         this._setupButtons();
-        this._createParticles();
+        // this._createParticles();
         this._subscribeOnlineCount();
         this._checkExistingSession();
         this._setupBGMAutoplay();
