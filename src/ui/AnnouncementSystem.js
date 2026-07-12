@@ -32,35 +32,32 @@ export class AnnouncementSystem {
     this.container.id = 'announcement-container';
     this.container.style.cssText = `
       position: fixed;
-      bottom: 85px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 80%;
-      max-width: 800px;
-      height: 28px;
-      background: rgba(10, 10, 15, 0.7);
-      border: 1px solid rgba(255, 0, 110, 0.3);
-      border-radius: 14px;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(90deg, rgba(255, 0, 110, 0.2) 0%, rgba(10, 10, 15, 0.9) 20%, rgba(10, 10, 15, 0.9) 80%, rgba(255, 0, 110, 0.2) 100%);
+      border-bottom: 1px solid rgba(255, 0, 110, 0.4);
       display: flex;
       align-items: center;
       overflow: hidden;
-      z-index: 999;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      color: #00D9FF;
+      z-index: 10000;
+      font-family: 'Press Start 2P', cursive, Arial, sans-serif;
+      font-weight: normal;
+      color: #FFFFFF;
       pointer-events: none;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     `;
 
     // Create text element
     this.textElement = document.createElement('div');
     this.textElement.style.cssText = `
       white-space: nowrap;
-      padding: 0 30px;
-      font-size: 13px;
-      letter-spacing: 1px;
-      animation: scroll-text 15s linear infinite;
-      text-shadow: 0 0 5px rgba(0, 217, 255, 0.5);
+      padding: 0 50px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      animation: scroll-text 18s linear infinite;
+      text-shadow: 0 0 8px rgba(255, 0, 110, 0.8);
     `;
 
     this.container.appendChild(this.textElement);

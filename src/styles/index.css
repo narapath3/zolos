@@ -407,13 +407,14 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== TOP HUD ========== */
 #hud-top {
   position: fixed;
-  top: 16px;
+  top: 40px;
   left: 16px;
   z-index: 100;
   display: flex;
   align-items: flex-start;
   gap: 16px;
   animation: slideInLeft 0.5s ease-out;
+  transition: top 0.3s ease;
 }
 
 @keyframes slideInLeft {
@@ -2935,7 +2936,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== MINIMAP HUD ========== */
 #minimap-container {
   position: fixed;
-  top: 16px;
+  top: 40px;
   right: 16px;
   z-index: 100;
   display: flex;
@@ -2948,6 +2949,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   border-radius: 50%;
   backdrop-filter: blur(10px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 15px rgba(240, 192, 64, 0.15);
+  transition: top 0.3s ease;
   width: 122px;
   height: 122px;
   box-sizing: border-box;
