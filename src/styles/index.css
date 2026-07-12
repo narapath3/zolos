@@ -43,6 +43,11 @@ body {
   overflow: hidden;
   width: 100vw;
   height: 100vh;
+  cursor: url('/assets/cute_cursor_32.png'), auto;
+}
+
+button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup-tab, .online-tab, .wiki-tab, .lb-tab {
+  cursor: url('/assets/cute_cursor_32.png'), pointer;
 }
 
 /* ========== AUTH SCREEN ========== */

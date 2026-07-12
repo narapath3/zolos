@@ -611,7 +611,7 @@ async function initGame(charData) {
         }
 
         // Update cursor style
-        canvas.style.cursor = newHoverMesh ? 'pointer' : 'default';
+        canvas.style.cursor = newHoverMesh ? "url('/assets/cute_cursor_32.png'), pointer" : "url('/assets/cute_cursor_32.png'), default";
     });
 }
 
