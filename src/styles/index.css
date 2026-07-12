@@ -3554,6 +3554,13 @@ body {
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    z-index: 1700; /* Ensure menu bar is above mobile controls if they overlap */
+  }
+
+  /* Lift mobile actions above menu bar for tablet/larger mobile screens */
+  #mobile-actions {
+    bottom: calc(75px + env(safe-area-inset-bottom)) !important;
+    right: calc(15px + env(safe-area-inset-right)) !important;
   }
 
   #hud-bottom::-webkit-scrollbar {
@@ -3668,7 +3675,7 @@ body {
   }
 
   #kill-counter {
-    top: 100px;
+    top: 125px; /* Pushed down to avoid overlapping minimap header */
     right: 8px;
     padding: 4px 6px;
     font-size: 9px;
@@ -3748,6 +3755,10 @@ body {
   .minimap-canvas-wrapper {
     width: 58px;
     height: 58px;
+  }
+
+  #kill-counter {
+    top: 110px !important; /* Adjust for even smaller minimap */
   }
 
   /* HUD (HP/SP/EXP) — leave space for minimap */
