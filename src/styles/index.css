@@ -71,6 +71,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   justify-content: center;
   background: url('/src/assets/login_bg_new.png') no-repeat center center;
   background-size: cover;
+  background-position: center;
   z-index: 1000;
 }
 
