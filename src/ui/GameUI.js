@@ -103,6 +103,13 @@ export class GameUI {
     this.currentTargetMonster = null;
   }
 
+  clearTarget() {
+    if (this.targetIndicator) this.targetIndicator.style.display = 'none';
+    this.currentTargetMonster = null;
+    this.hoveredMonster = null;
+    if (this.character) this.character.targetMonster = null;
+  }
+
   updateTargetIndicator(sceneManager) {
     if (!this.targetIndicator || !sceneManager) return;
 

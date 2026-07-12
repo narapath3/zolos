@@ -685,19 +685,20 @@ window.handleCanvasTap = handleMouseInteraction;
 
 // ============ Game Loop ============
 function gameLoop(time) {
+    requestAnimationFrame(gameLoop);
     if (!isGameStarted) return;
 
-    const dt = Math.min(0.1, (time - lastTime) / 1000);
-    lastTime = time;
+    try {
+        const dt = Math.min(0.1, (time - lastTime) / 1000);
+        lastTime = time;
 
-    // 1a. Dead-state guard: stop processing updates if character is dead
-    if (character && !character.isAlive()) {
-        if (particles) particles.update(dt);
-        if (combatSystem) combatSystem.update(dt);
-        sceneManager.render();
-        requestAnimationFrame(gameLoop);
-        return;
-    }
+        // 1a. Dead-state guard: stop processing updates if character is dead
+        if (character && !character.isAlive()) {
+            if (particles) particles.update(dt);
+            if (combatSystem) combatSystem.update(dt);
+            sceneManager.render();
+            return;
+        }
 
     if (portalCooldown > 0) portalCooldown -= dt;
 
@@ -763,6 +764,23 @@ function gameLoop(time) {
                 if (targetMap) {
                     portalCooldown = 2.0;
                     autoPath = null;
+
+                    // Clear stale combat state before loading new map
+                    if (character) {
+                        character.targetMonster = null;
+                        character.state = 'idle';
+                    }
+                    if (combatSystem) {
+                        combatSystem.currentTarget = null;
+                        combatSystem.autoFarm = false;
+                        combatSystem.isFishing = false;
+                    }
+                    if (gameUI && typeof gameUI.clearTarget === 'function') {
+                        gameUI.clearTarget();
+                    }
+                    if (inputManager && typeof inputManager.reset === 'function') {
+                        inputManager.reset();
+                    }
 
                     // Set safe spawn point for new map
                     const spawn = { x: 0, y: 1.2, z: 10 };
@@ -850,8 +868,10 @@ function gameLoop(time) {
         lastMinimapTime = now;
     }
 
-    sceneManager.render();
-    requestAnimationFrame(gameLoop);
+        sceneManager.render();
+    } catch (err) {
+        console.error('[GameLoop] Error:', err);
+    }
 }
 
 // Start

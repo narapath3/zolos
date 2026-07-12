@@ -45,6 +45,12 @@ export class InputManager {
         this.onSkillHotkeyCallback = callback;
     }
 
+    reset() {
+        this.keys = {};
+        this.joystickVector = { x: 0, z: 0 };
+        this.isJoystickActive = false;
+    }
+
     /**
      * Returns a normalized movement direction vector {x, z} based on WASD keys.
      * Returns null if no movement keys are pressed.
