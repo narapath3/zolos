@@ -4310,8 +4310,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .quest-row {
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f5f5f5;
+  border: 2px solid #ddd;
   border-radius: var(--radius-sm, 6px);
   padding: 10px;
   transition: all 0.25s ease;
@@ -4320,8 +4320,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .quest-row:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(240, 192, 64, 0.2);
+  background: #efefef;
+  border-color: #f0c040;
 }
 
 .quest-row.completed {
@@ -4338,8 +4338,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .quest-title-text {
   font-size: 11px;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 800;
+  color: #000;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4350,8 +4350,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   padding: 2px 6px;
   border-radius: 4px;
   font-family: var(--font-pixel, monospace);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-dim, #8090b0);
+  background: #e0e0e0;
+  color: #333;
+  font-weight: 600;
 }
 
 .quest-row.completed .quest-status-badge {
