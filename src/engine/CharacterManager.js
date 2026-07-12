@@ -400,8 +400,9 @@ export class CharacterManager {
 
     // Set body & arm color dynamically (for username-based consistent coloring)
     setBodyColor(color) {
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x'), 16) : color;
         const oldColor = this.bodyColor;
-        this.bodyColor = color;
+        this.bodyColor = colorVal;
         if (!this.mesh) return;
         // Body is child 0, arms are children with matching material
         this.mesh.children.forEach(child => {
@@ -409,14 +410,14 @@ export class CharacterManager {
                 // Body (index 0) and arms share the old body color
                 const hex = child.material.color.getHex();
                 if (hex === 0x4060c0 || hex === oldColor) {
-                    child.material.color.setHex(color);
+                    child.material.color.setHex(colorVal);
                 }
             }
         });
     }
 
     setHairColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x'), 16) : color;
         this.hairColor = colorVal;
         if (this.hair && this.hair.material) {
             this.hair.material.color.setHex(colorVal);
@@ -424,7 +425,7 @@ export class CharacterManager {
     }
 
     setPantsColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x'), 16) : color;
         this.pantsColor = colorVal;
         if (this.leftLeg && this.leftLeg.material) {
             this.leftLeg.material.color.setHex(colorVal);
@@ -920,6 +921,9 @@ export class CharacterManager {
 
     // Get save data
     getSaveData() {
+        // Helper to convert numeric color to hex string (without 0x prefix) for DB persistence
+        const toHexStr = (h) => ('000000' + (h || 0).toString(16)).slice(-6);
+
         return {
             characterId: this.characterId,
             updates: {
@@ -943,9 +947,9 @@ export class CharacterManager {
                 weapon: this.equippedWeapon,
                 hat: this.equippedHat,
                 glasses: this.equippedGlasses,
-                body_color: this.bodyColor,
-                hair_color: this.hairColor,
-                pants_color: this.pantsColor
+                body_color: toHexStr(this.bodyColor),
+                hair_color: toHexStr(this.hairColor),
+                pants_color: toHexStr(this.pantsColor)
             }
         };
     }

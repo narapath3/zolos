@@ -209,7 +209,8 @@ export async function saveCharacter(characterId, updates) {
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'sound_enabled', 'graphics_quality', 'fps_enabled'
+        'sound_enabled', 'graphics_quality', 'fps_enabled',
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
     ];
 
     // Optional appearance fields (may not be in DB yet)

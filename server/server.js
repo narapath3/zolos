@@ -230,7 +230,8 @@ async function saveCharacterToSupabase(saveData) {
             const allowedFields = [
                 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
                 'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color',
+                'sound_enabled', 'graphics_quality', 'fps_enabled'
             ];
             const filtered = {};
             for (const key of Object.keys(updates)) {
