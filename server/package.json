@@ -1,17 +1,18 @@
 {
-  "name": "zolos_server",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "express": "^5.2.1",
-    "socket.io": "^4.8.3"
-  },
-  "description": ""
+    "name": "zolos-map-server",
+    "version": "1.0.0",
+    "description": "Zolos Map Server — Realtime WebSocket server for player sync, chat, trade & friends",
+    "type": "module",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "start:local": "node --env-file=.env server.js",
+        "dev": "node --env-file=.env --watch server.js"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.108.2",
+        "cors": "^2.8.5",
+        "express": "^5.2.1",
+        "socket.io": "^4.8.3"
+    }
 }

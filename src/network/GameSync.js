@@ -1,16 +1,13 @@
-// Game Sync — Save/Load character data to Supabase + Realtime Presence
+// Game Sync — Save/Load character data to Supabase + Realtime via Socket.io
 import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName } from './SupabaseClient.js';
-import { io } from 'socket.io-client';
+import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
 export { getDeterministicGuestName, isPlaceholderName };
 
-const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_SERVER_URL || 'http://localhost:3001';
-
-let socket = null;
 let autoSaveInterval = null;
 let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
 let mockPlayers = [];
-
+let socketListenersAttached = false;
 let chatCallback = null;
 
 // Track active player info for presence updating
@@ -553,187 +550,122 @@ export async function fetchLeaderboard(category = 'level') {
     return data || [];
 }
 
-// ============ Realtime Presence & Broadcast ============
-export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
+// ============ Realtime Presence & Broadcast (Socket.io) ============
+export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
     onlinePlayersCallback = onPlayersUpdate;
     chatCallback = onChatCallback;
+    socketListenersAttached = false;
 
     // Store player info for later use in updatePresence/broadcast
     currentUserId = userId;
     currentUsername = username;
     currentLevel = level;
 
-    // Step 3: Always attempt Socket.io connection if a server URL is provided
-    const isSocketConfigured = SOCKET_SERVER_URL && !SOCKET_SERVER_URL.includes('localhost');
-    
-    if (isOfflineMode || !supabase || !isSocketConfigured) {
-        // Only run simulation if Socket.io is not properly configured for production
-        if (!isSocketConfigured) {
-            console.log('[Zolos] 📊 Running in Offline Simulation Mode');
-            const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
-            mockPlayers = [{ userId: 'player_me', username, level }];
-
-            const activeCount = 2 + Math.floor(Math.random() * 3);
-            for (let i = 0; i < activeCount; i++) {
-                const idx = Math.floor(Math.random() * names.length);
-                const name = names.splice(idx, 1)[0];
-                mockPlayers.push({
-                    userId: 'player_' + name.toLowerCase(),
-                    username: name,
-                    level: Math.floor(level + (Math.random() - 0.2) * 5),
-                    x: (Math.random() - 0.5) * 15,
-                    y: 0,
-                    z: (Math.random() - 0.5) * 15,
-                    rY: Math.random() * Math.PI * 2,
-                    state: 'idle'
-                });
-            }
-
-            if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
-            if (onPlayerPositionUpdate) {
-                mockPlayers.forEach(p => {
-                    if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
-                });
-            }
-
-            presenceUpdateInterval = setInterval(() => {
-                if (Math.random() < 0.2 && mockPlayers.length > 1) {
-                    const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
-                    mockPlayers[actorIdx].level++;
-                }
-
-                if (mockPlayers.length > 2 && Math.random() < 0.1) {
-                    const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
-                    const left = mockPlayers.splice(leaveIdx, 1)[0];
-                    if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
-                }
-
-                if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
-                    const idx = Math.floor(Math.random() * names.length);
-                    const name = names.splice(idx, 1)[0];
-                    mockPlayers.push({
-                        userId: 'player_' + name.toLowerCase(),
-                        username: name,
-                        level: Math.floor(currentLevel + (Math.random() - 0.2) * 5),
-                        x: (Math.random() - 0.5) * 15,
-                        y: 0,
-                        z: (Math.random() - 0.5) * 15,
-                        rY: Math.random() * Math.PI * 2,
-                        state: 'idle'
-                    });
-                    if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
-                }
-
-                mockPlayers.forEach(p => {
-                    if (p.userId !== 'player_me' && Math.random() < 0.5) {
-                        p.x += (Math.random() - 0.5) * 0.5;
-                        p.z += (Math.random() - 0.5) * 0.5;
-                        p.rY = Math.random() * Math.PI * 2;
-                        if (onPlayerPositionUpdate) onPlayerPositionUpdate(p);
-                    }
-                });
-
-                if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
-            }, 1000);
-            return;
-        }
+    // ===== OFFLINE MODE (Mock Players) =====
+    if (isOfflineMode || (!isSocketMode() && !supabase)) {
+        _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+        return;
     }
 
-    // Initialize Socket.io connection
-    console.log(`[Zolos] 🔌 Attempting to connect to: ${SOCKET_SERVER_URL}`);
-    socket = io(SOCKET_SERVER_URL, {
-        transports: ['websocket', 'polling'],
-        withCredentials: true
-    });
+    // ===== SOCKET.IO MODE =====
+    if (isSocketMode()) {
+        console.log('[Zolos] 🌐 Connecting to Map Server via Socket.io... userId:', userId, 'username:', username);
 
-    socket.on('connect', () => {
-        console.log(`[Zolos] 📊 Socket.io connected to ${SOCKET_SERVER_URL} (ID: ${socket.id})`);
-        socket.emit('joinGame', {
-            userId: currentUserId,
-            username: currentUsername,
-            level: currentLevel,
-            x: 0, y: 0, z: 0, rY: 0, state: 'idle'
-        });
-    });
-
-    socket.on('playersUpdate', (playersArray) => {
-        console.log(`[Zolos] 👥 Received full players list: ${playersArray.length} players`);
-        if (onlinePlayersCallback) onlinePlayersCallback(playersArray);
-    });
-
-    socket.on('playerJoined', (playerData) => {
-        console.log(`[Zolos] ✨ Player joined: ${playerData.username} (${playerData.userId})`);
-        // Add new player to current list
-        if (onlinePlayersCallback) {
-            // This will trigger main.js to create the remote character
-            onlinePlayersCallback([playerData]);
+        // Connect if not already
+        let socket = getSocket();
+        if (!socket) {
+            socket = await connectSocket();
         }
-    });
 
-    socket.on('playerLeft', (data) => {
-        console.log(`[Zolos] 👋 Player left: ${data.userId}`);
-        if (onlinePlayersCallback) {
-            // Sending an empty update for this ID will trigger cleanup in main.js
-            onlinePlayersCallback([]); 
+        if (!socket) {
+            console.warn('[Zolos] ⚠️ Socket.io connection failed, falling back to offline mode');
+            _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+            return;
         }
-    });
 
-    socket.on('playerUpdate', (playerData) => {
-        if (onPlayerPositionUpdate) onPlayerPositionUpdate(playerData);
-    });
+        // Attach event listeners (only once)
+        if (!socketListenersAttached) {
+            socket.on('players_update', (players) => {
+                console.log('[Zolos] 👥 Players update via Socket.io:', players.length, players.map(p => p.username));
+                if (onlinePlayersCallback) onlinePlayersCallback(players);
+            });
 
-    socket.on('chatMessage', (messageData) => {
-        if (chatCallback) chatCallback(messageData);
-    });
+            socket.on('pos', (payload) => {
+                if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
+                    onPlayerPositionUpdate(payload);
+                }
+            });
 
-    socket.on('tradeRequest', (payload) => {
-        if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
-    });
+            socket.on('chat', (payload) => {
+                if (chatCallback && payload) {
+                    chatCallback(payload);
+                }
+            });
 
-    socket.on('tradeResponse', (payload) => {
-        if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
-    });
+            socket.on('trade_request', (payload) => {
+                if (payload && payload.targetUserId === userId) {
+                    if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
+                }
+            });
 
-    socket.on('tradeCancel', (payload) => {
-        if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
-            window.gameUI.receiveTradeCancel(payload);
+            socket.on('trade_response', (payload) => {
+                if (payload && payload.senderUserId === userId) {
+                    if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
+                }
+            });
+
+            socket.on('trade_cancel', (payload) => {
+                if (payload && payload.targetUserId === userId) {
+                    if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
+                        window.gameUI.receiveTradeCancel(payload);
+                    }
+                }
+            });
+
+            socket.on('friend_request', (payload) => {
+                if (payload && payload.targetUserId === userId) {
+                    if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
+                        window.gameUI.receiveFriendRequest(payload);
+                    }
+                }
+            });
+
+            socket.on('friend_response', (payload) => {
+                if (payload && payload.senderUserId === userId) {
+                    if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
+                        window.gameUI.receiveFriendResponse(payload);
+                    }
+                }
+            });
+
+            socketListenersAttached = true;
         }
-    });
 
-    socket.on('friendRequest', (payload) => {
-        if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
-            window.gameUI.receiveFriendRequest(payload);
-        }
-    });
+        // Join the game
+        socket.emit('join', { userId, username, level });
+        console.log('[Zolos] ✅ Emitted join event to Map Server');
+        return;
+    }
 
-    socket.on('friendResponse', (payload) => {
-        if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
-            window.gameUI.receiveFriendResponse(payload);
-        }
-    });
-
-    socket.on('disconnect', () => {
-        console.log('[Zolos] 📊 Socket.io disconnected');
-    });
-
-    socket.on('connect_error', (err) => {
-        console.error('[Zolos] Socket.io connection error:', err.message);
-    });
+    // ===== FALLBACK: If Supabase exists but no socket URL — offline mock =====
+    _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
 }
 
 export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
-    // Step 3: Remove isOfflineMode check to allow multiplayer in Guest mode
-    if (!socket) return; 
-    const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
-    if (appearance) payload.appearance = appearance;
-    
-    socket.emit("playerUpdate", payload);
+    if (isOfflineMode) return;
+
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
+        if (appearance) payload.appearance = appearance;
+        socket.emit('pos', payload);
+        return;
+    }
 }
 
 export function broadcastChat(userId, username, level, message) {
-    // Step 3: Remove isOfflineMode check to allow multiplayer in Guest mode
-    if (!socket) {
-        // Step 5: Echo back local message using object format
+    if (isOfflineMode) {
+        // Echo back local message using object format
         if (chatCallback) {
             chatCallback({ userId, username, message });
         }
@@ -752,7 +684,6 @@ export function broadcastChat(userId, username, level, message) {
                 if (candidates.length > 0) {
                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
                     const reply = replies[Math.floor(Math.random() * replies.length)];
-                    // Step 5: Use object format
                     chatCallback({ userId: sender.userId, username: sender.username, message: reply });
                 }
             }
@@ -760,11 +691,11 @@ export function broadcastChat(userId, username, level, message) {
         return;
     }
 
-    socket.emit('chatMessage', { userId, username, level, message });
-    
-    // Step 5: Echo back local message immediately using object format
-    if (chatCallback) {
-        chatCallback({ userId, username, message });
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('chat', { userId, username, level, message });
+        // Note: server broadcasts back to everyone (including sender) via 'chat' event
+        // so we don't need to echo locally — it will come back from the server
     }
 }
 
@@ -774,7 +705,7 @@ export function updatePresence(level, newUsername = null) {
         currentUsername = newUsername;
     }
 
-    if (isOfflineMode || !socket) {
+    if (isOfflineMode) {
         const me = mockPlayers.find(p => p.userId === 'player_me');
         if (me) {
             me.level = level;
@@ -784,32 +715,46 @@ export function updatePresence(level, newUsername = null) {
         return;
     }
 
-    socket.emit('playerUpdate', {
-        userId: currentUserId,
-        username: currentUsername,
-        level: currentLevel
-    });
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('update_presence', {
+            level: currentLevel,
+            username: currentUsername
+        });
+    }
 }
 
 export function leavePresence() {
+    socketListenersAttached = false;
+
     if (presenceUpdateInterval) {
         clearInterval(presenceUpdateInterval);
         presenceUpdateInterval = null;
     }
 
-    if (socket) {
-        socket.disconnect();
-        socket = null;
+    disconnectSocket();
+}
+
+// ============ Send save state to server (for server-side save-on-disconnect) ============
+export function sendSaveState(saveData) {
+    const socket = getSocket();
+    if (socket && isSocketConnected() && saveData) {
+        socket.emit('save_state', saveData);
     }
 }
 
 // ============ Auto-Save ============
-export function startAutoSave(getStateCallback, intervalMs = 15000) {
+export function startAutoSave(getStateCallback, intervalMs = 180000) {
+    // Default: 3 minutes (180000ms) instead of 15s
     stopAutoSave();
     autoSaveInterval = setInterval(async () => {
         const state = getStateCallback();
         if (state && state.characterId) {
+            // Save directly to Supabase
             await saveCharacter(state.characterId, state.updates);
+
+            // Also send state to Socket server for save-on-disconnect backup
+            sendSaveState(state);
         }
     }, intervalMs);
 }
@@ -1123,9 +1068,10 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
         }
     }
 
-    // 3. Broadcast system message or chat notification in presence if seller is online
-    if (socket) {
-        socket.emit('chatMessage', {
+    // 3. Broadcast system message via Socket.io chat
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('chat', {
             userId: 'system',
             username: '📢 ระบบตลาด',
             level: 99,
@@ -1138,7 +1084,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
 
 // ============ P2P DIRECT TRADE ============
 export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}) {
-    if (isOfflineMode || !socket) {
+    if (isOfflineMode) {
         // Simulation mode: auto respond after 1.5s
         setTimeout(() => {
             if (window.gameUI) {
@@ -1164,26 +1110,30 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
         return { success: true };
     }
 
-    socket.emit("tradeRequest", {
-        senderUserId: currentUserId,
-        senderCharacterId: senderCharId,
-        senderName: senderName,
-        targetUserId: targetUserId,
-        targetName: targetName,
-        itemName: itemName,
-        itemType: itemType,
-        quantity: quantity,
-        price: price,
-        stats: stats
-    });
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('trade_request', {
+            senderUserId: currentUserId,
+            senderCharacterId: senderCharId,
+            senderName: senderName,
+            targetUserId: targetUserId,
+            targetName: targetName,
+            itemName: itemName,
+            itemType: itemType,
+            quantity: quantity,
+            price: price,
+            stats: stats
+        });
+    }
     return { success: true };
 }
 
 export async function sendTradeResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
-    if (isOfflineMode || !socket) return { success: true };
+    if (isOfflineMode) return { success: true };
 
-    if (socket) {
-        socket.emit('tradeResponse', {
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('trade_response', {
             senderUserId: senderUserId,
             targetUserId: targetUserId,
             accepted: accepted,
@@ -1194,10 +1144,11 @@ export async function sendTradeResponsePacket(senderUserId, targetUserId, accept
 }
 
 export async function sendTradeCancelPacket(senderUserId, targetUserId, originalRequest) {
-    if (isOfflineMode || !socket) return { success: true };
+    if (isOfflineMode) return { success: true };
 
-    if (socket) {
-        socket.emit('tradeCancel', {
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('trade_cancel', {
             senderUserId: senderUserId,
             targetUserId: targetUserId,
             requestPayload: originalRequest
@@ -1235,9 +1186,10 @@ export async function executeDecentralizedSenderTrade(senderCharId, targetName, 
         }
     }
 
-    // Broadcast trade notification via chat
-    if (socket) {
-        socket.emit('chatMessage', {
+    // Broadcast trade notification via Socket.io chat
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('chat', {
             userId: 'system',
             username: '📢 Trade',
             level: 99,
@@ -1289,7 +1241,7 @@ export async function executeDecentralizedReceiverTrade(receiverCharId, itemName
 
 // ============ P2P FRIEND REQUEST ============
 export async function sendFriendRequestPacket(senderName, senderLevel, targetUserId, targetName) {
-    if (isOfflineMode || !socket) {
+    if (isOfflineMode) {
         // Simulation mode: auto respond after 1s
         setTimeout(() => {
             if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
@@ -1310,8 +1262,9 @@ export async function sendFriendRequestPacket(senderName, senderLevel, targetUse
         return { success: true };
     }
 
-    if (socket) {
-        socket.emit('friendRequest', {
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('friend_request', {
             senderUserId: currentUserId,
             senderName: senderName,
             senderLevel: senderLevel,
@@ -1323,10 +1276,11 @@ export async function sendFriendRequestPacket(senderName, senderLevel, targetUse
 }
 
 export async function sendFriendResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
-    if (isOfflineMode || !socket) return { success: true };
+    if (isOfflineMode) return { success: true };
 
-    if (socket) {
-        socket.emit('friendResponse', {
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('friend_response', {
             senderUserId: senderUserId,
             targetUserId: targetUserId,
             accepted: accepted,
@@ -1334,4 +1288,116 @@ export async function sendFriendResponsePacket(senderUserId, targetUserId, accep
         });
     }
     return { success: true };
+}
+
+// ============ Offline Mock Presence (unchanged) ============
+function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
+    // Simulate real online players
+    const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
+    mockPlayers = [
+        { userId: 'player_me', username, level }
+    ];
+
+    // Pick 2-4 random initial mock online players
+    const activeCount = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < activeCount; i++) {
+        const idx = Math.floor(Math.random() * names.length);
+        const name = names.splice(idx, 1)[0];
+        mockPlayers.push({
+            userId: 'player_' + name.toLowerCase(),
+            username: name,
+            level: Math.floor(level + (Math.random() - 0.2) * 5),
+            x: (Math.random() - 0.5) * 15,
+            y: 0,
+            z: (Math.random() - 0.5) * 15,
+            rY: Math.random() * Math.PI * 2,
+            state: 'idle'
+        });
+    }
+
+    if (onPlayersUpdate) onPlayersUpdate(mockPlayers);
+    if (onPlayerPositionUpdate) {
+        mockPlayers.forEach(p => {
+            if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
+        });
+    }
+
+    // Periodic simulation (join/leave/level up/wander)
+    presenceUpdateInterval = setInterval(() => {
+        // 20% chance to level up someone
+        if (Math.random() < 0.2 && mockPlayers.length > 1) {
+            const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
+            mockPlayers[actorIdx].level++;
+        }
+
+        // 10% chance to leave
+        if (mockPlayers.length > 2 && Math.random() < 0.1) {
+            const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
+            mockPlayers.splice(leaveIdx, 1);
+            if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
+        }
+
+        // 10% chance to join
+        if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
+            const name = names.shift();
+            const newPlayer = {
+                userId: 'player_' + name.toLowerCase(),
+                username: name,
+                level: Math.max(1, Math.floor(level + (Math.random() - 0.2) * 4)),
+                x: (Math.random() - 0.5) * 15,
+                y: 0,
+                z: (Math.random() - 0.5) * 15,
+                rY: Math.random() * Math.PI * 2,
+                state: 'idle'
+            };
+            mockPlayers.push(newPlayer);
+            if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
+            if (onPlayerPositionUpdate) onPlayerPositionUpdate(newPlayer);
+        }
+
+        // Simulate wandering movement for mock players
+        mockPlayers.forEach((p) => {
+            if (p.userId === 'player_me') return;
+
+            // Move slightly
+            if (Math.random() < 0.4) {
+                p.state = Math.random() < 0.3 ? 'attacking' : 'walking';
+                p.x += (Math.random() - 0.5) * 2;
+                p.z += (Math.random() - 0.5) * 2;
+                p.rY = Math.random() * Math.PI * 2;
+            } else {
+                p.state = 'idle';
+            }
+
+            if (onPlayerPositionUpdate) {
+                onPlayerPositionUpdate(p);
+            }
+        });
+
+        if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
+    }, 3000);
+
+    // Simulation for chat messages in offline mode
+    setInterval(() => {
+        if (onChatCallback && mockPlayers.length > 1) {
+            const randomReplies = [
+                'สวัสดีครับทุกคน! 😃',
+                'ตีตัวอะไรกันอยู่หรอ?',
+                'มอนในวิกินี้เยอะจัดเลยแฮะ',
+                'บอส Ghostring โหดมากกก 😱',
+                'หาตี้แอดเพื่อนกันหน่อย 🤝',
+                'บอทฟาร์มชิวจัดๆ ⚡',
+                'มีใครขายดาบ rare ไหม?',
+                'เก็บเลเวลแป๊บนะค้าบ',
+                'วันนี้ดวงดีจัง ดรอปการ์ดรึยังนะ 🍀'
+            ];
+            // Select a writer that isn't player_me
+            const candidates = mockPlayers.filter(p => p.userId !== 'player_me');
+            if (candidates.length > 0) {
+                const sender = candidates[Math.floor(Math.random() * candidates.length)];
+                const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
+                onChatCallback({ userId: sender.userId, username: sender.username, message: msg });
+            }
+        }
+    }, 12000 + Math.random() * 8000);
 }

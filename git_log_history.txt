@@ -1,0 +1,59 @@
+commit b1b5c10421068d716c6e5963e91d617c7efdc391
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 14:58:25 2026 +0700
+
+    Auto-sync update
+
+commit 1d96a6eeb76351e95181feef51b3a59fcdf32300
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 14:40:11 2026 +0700
+
+    Auto-sync update
+
+commit d565e84212aab6b635fc15c992e216024d4e632d
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 14:33:27 2026 +0700
+
+    Auto-sync update
+
+commit cfa5cd7bad2cbdbf0ae602318b0c8e04cd7f1a30
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 13:20:37 2026 +0700
+
+    fix: resolve right-side HUD element overlaps on desktop
+
+commit 81764cadcf753888a2a8cab9e42b2318d9fa5686
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 12:59:58 2026 +0700
+
+    fix: settings persistence, name tag position, sell shop UI
+
+commit e62eaef9048695236c6d36901d11747a604ccdf8
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 10:32:36 2026 +0700
+
+    feat: implement database realtime sync for daily quests and friends list, and adding save-before-logout
+
+commit 04881fba6a7fcc1318c522ce99e3377b011da9cc
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 09:52:50 2026 +0700
+
+    sync inventory and profile updates
+
+commit 743c67513c55e7a947bf0188d01a008794902ed5
+Author: Admin <admin@zolos.dev>
+Date:   Sat Jul 11 09:11:20 2026 +0700
+
+    merge: resolve conflicts and integrate Item Sell Shop UI and NPC
+
+commit a504b016a65e4f7e7fe287220a847c50e188f105
+Author: Manus Agent <bot@manus.ai>
+Date:   Sat Jul 11 01:39:47 2026 +0000
+
+    Fix database persistence and schema mismatch issues
+
+commit fd7ab8114854e63bf1de073ff5bf50ac25507d00
+Author: Manus Agent <manus@agent.com>
+Date:   Sat Jul 11 01:18:39 2026 +0000
+
+    Fix persistence for character name and profile settings

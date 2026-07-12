@@ -1,0 +1,860 @@
+diff --git a/.env.example b/.env.example
+index bb16f24..545bd81 100644
+--- a/.env.example
++++ b/.env.example
+@@ -1,2 +1,3 @@
+ VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+ VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
++VITE_SOCKET_URL=
+diff --git a/package.json b/package.json
+index 319eb44..2bd9de5 100644
+--- a/package.json
++++ b/package.json
+@@ -15,6 +15,7 @@
+   "dependencies": {
+     "@supabase/supabase-js": "^2.108.2",
+     "pg": "^8.22.0",
++    "socket.io-client": "^4.8.1",
+     "three": "^0.185.0"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/src/network/GameSync.js b/src/network/GameSync.js
+index 6818050..b2eb529 100644
+--- a/src/network/GameSync.js
++++ b/src/network/GameSync.js
+@@ -1,13 +1,13 @@
+-// Game Sync — Save/Load character data to Supabase + Realtime Presence
++// Game Sync — Save/Load character data to Supabase + Realtime via Socket.io
+ import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName } from './SupabaseClient.js';
++import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
+ export { getDeterministicGuestName, isPlaceholderName };
+ 
+-let presenceChannel = null;
+ let autoSaveInterval = null;
+ let onlinePlayersCallback = null;
+ let presenceUpdateInterval = null;
+ let mockPlayers = [];
+-let channelSubscribed = false;
++let socketListenersAttached = false;
+ let chatCallback = null;
+ 
+ // Track active player info for presence updating
+@@ -550,259 +550,122 @@ export async function fetchLeaderboard(category = 'level') {
+     return data || [];
+ }
+ 
+-// ============ Realtime Presence & Broadcast ============
+-export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
++// ============ Realtime Presence & Broadcast (Socket.io) ============
++export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
+     onlinePlayersCallback = onPlayersUpdate;
+     chatCallback = onChatCallback;
+-    channelSubscribed = false;
++    socketListenersAttached = false;
+ 
+     // Store player info for later use in updatePresence/broadcast
+     currentUserId = userId;
+     currentUsername = username;
+     currentLevel = level;
+ 
+-    if (isOfflineMode || !supabase) {
+-        // Simulate real online players
+-        const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
+-        mockPlayers = [
+-            { userId: 'player_me', username, level }
+-        ];
+-
+-        // Pick 2-4 random initial mock online players
+-        const activeCount = 2 + Math.floor(Math.random() * 3);
+-        for (let i = 0; i < activeCount; i++) {
+-            const idx = Math.floor(Math.random() * names.length);
+-            const name = names.splice(idx, 1)[0];
+-            mockPlayers.push({
+-                userId: 'player_' + name.toLowerCase(),
+-                username: name,
+-                level: Math.floor(level + (Math.random() - 0.2) * 5),
+-                x: (Math.random() - 0.5) * 15,
+-                y: 0,
+-                z: (Math.random() - 0.5) * 15,
+-                rY: Math.random() * Math.PI * 2,
+-                state: 'idle'
+-            });
+-        }
++    // ===== OFFLINE MODE (Mock Players) =====
++    if (isOfflineMode || (!isSocketMode() && !supabase)) {
++        _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
++        return;
++    }
+ 
+-        if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
+-        if (onPlayerPositionUpdate) {
+-            mockPlayers.forEach(p => {
+-                if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
+-            });
++    // ===== SOCKET.IO MODE =====
++    if (isSocketMode()) {
++        console.log('[Zolos] 🌐 Connecting to Map Server via Socket.io... userId:', userId, 'username:', username);
++
++        // Connect if not already
++        let socket = getSocket();
++        if (!socket) {
++            socket = await connectSocket();
+         }
+ 
+-        // Periodic simulation (join/leave/level up/wander)
+-        presenceUpdateInterval = setInterval(() => {
+-            // 20% chance to level up someone
+-            if (Math.random() < 0.2 && mockPlayers.length > 1) {
+-                const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
+-                mockPlayers[actorIdx].level++;
+-            }
++        if (!socket) {
++            console.warn('[Zolos] ⚠️ Socket.io connection failed, falling back to offline mode');
++            _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
++            return;
++        }
+ 
+-            // 10% chance to leave
+-            if (mockPlayers.length > 2 && Math.random() < 0.1) {
+-                const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
+-                const left = mockPlayers.splice(leaveIdx, 1)[0];
+-                // Notify via online players callback
+-                if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
+-            }
++        // Attach event listeners (only once)
++        if (!socketListenersAttached) {
++            socket.on('players_update', (players) => {
++                console.log('[Zolos] 👥 Players update via Socket.io:', players.length, players.map(p => p.username));
++                if (onlinePlayersCallback) onlinePlayersCallback(players);
++            });
+ 
+-            // 10% chance to join
+-            if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
+-                const name = names.shift();
+-                const newPlayer = {
+-                    userId: 'player_' + name.toLowerCase(),
+-                    username: name,
+-                    level: Math.max(1, Math.floor(level + (Math.random() - 0.2) * 4)),
+-                    x: (Math.random() - 0.5) * 15,
+-                    y: 0,
+-                    z: (Math.random() - 0.5) * 15,
+-                    rY: Math.random() * Math.PI * 2,
+-                    state: 'idle'
+-                };
+-                mockPlayers.push(newPlayer);
+-                if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
+-                if (onPlayerPositionUpdate) onPlayerPositionUpdate(newPlayer);
+-            }
++            socket.on('pos', (payload) => {
++                if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
++                    onPlayerPositionUpdate(payload);
++                }
++            });
+ 
+-            // Simulate wandering movement for mock players
+-            mockPlayers.forEach((p, idx) => {
+-                if (p.userId === 'player_me') return;
++            socket.on('chat', (payload) => {
++                if (chatCallback && payload) {
++                    chatCallback(payload);
++                }
++            });
+ 
+-                // Move slightly
+-                if (Math.random() < 0.4) {
+-                    p.state = Math.random() < 0.3 ? 'attacking' : 'walking';
+-                    p.x += (Math.random() - 0.5) * 2;
+-                    p.z += (Math.random() - 0.5) * 2;
+-                    p.rY = Math.random() * Math.PI * 2;
+-                } else {
+-                    p.state = 'idle';
++            socket.on('trade_request', (payload) => {
++                if (payload && payload.targetUserId === userId) {
++                    if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
+                 }
++            });
+ 
+-                if (onPlayerPositionUpdate) {
+-                    onPlayerPositionUpdate(p);
++            socket.on('trade_response', (payload) => {
++                if (payload && payload.senderUserId === userId) {
++                    if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
+                 }
+             });
+ 
+-            if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
+-        }, 3000);
++            socket.on('trade_cancel', (payload) => {
++                if (payload && payload.targetUserId === userId) {
++                    if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
++                        window.gameUI.receiveTradeCancel(payload);
++                    }
++                }
++            });
+ 
+-        // Simulation for chat messages in offline mode
+-        setInterval(() => {
+-            if (chatCallback && mockPlayers.length > 1) {
+-                const randomReplies = [
+-                    'สวัสดีครับทุกคน! 😃',
+-                    'ตีตัวอะไรกันอยู่หรอ?',
+-                    'มอนในวิกินี้เยอะจัดเลยแฮะ',
+-                    'บอส Ghostring โหดมากกก 😱',
+-                    'หาตี้แอดเพื่อนกันหน่อย 🤝',
+-                    'บอทฟาร์มชิวจัดๆ ⚡',
+-                    'มีใครขายดาบ rare ไหม?',
+-                    'เก็บเลเวลแป๊บนะค้าบ',
+-                    'วันนี้ดวงดีจัง ดรอปการ์ดรึยังนะ 🍀'
+-                ];
+-                // Select a writer that isn't player_me
+-                const candidates = mockPlayers.filter(p => p.userId !== 'player_me');
+-                if (candidates.length > 0) {
+-                    const sender = candidates[Math.floor(Math.random() * candidates.length)];
+-                    const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
+-                    // Step 9: Use object format
+-                    chatCallback({ userId: sender.userId, username: sender.username, message: msg });
++            socket.on('friend_request', (payload) => {
++                if (payload && payload.targetUserId === userId) {
++                    if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
++                        window.gameUI.receiveFriendRequest(payload);
++                    }
+                 }
+-            }
+-        }, 12000 + Math.random() * 8000);
++            });
+ 
+-        return;
+-    }
++            socket.on('friend_response', (payload) => {
++                if (payload && payload.senderUserId === userId) {
++                    if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
++                        window.gameUI.receiveFriendResponse(payload);
++                    }
++                }
++            });
+ 
+-    // ===== ONLINE MODE =====
+-    console.log('[Zolos] 🌐 Connecting to realtime channel... userId:', userId, 'username:', username);
++            socketListenersAttached = true;
++        }
+ 
+-    // Clean up any existing channel
+-    if (presenceChannel) {
+-        try {
+-            presenceChannel.unsubscribe();
+-        } catch (e) { /* ignore */ }
+-        presenceChannel = null;
++        // Join the game
++        socket.emit('join', { userId, username, level });
++        console.log('[Zolos] ✅ Emitted join event to Map Server');
++        return;
+     }
+ 
+-    presenceChannel = supabase.channel('online-players', {
+-        config: {
+-            presence: { key: userId },
+-            broadcast: { self: false, ack: false }
+-        }
+-    });
+-
+-    presenceChannel
+-        .on('presence', { event: 'sync' }, () => {
+-            const state = presenceChannel.presenceState();
+-            const players = [];
+-            for (const [key, values] of Object.entries(state)) {
+-                if (values.length > 0) {
+-                    players.push({
+-                        userId: key,
+-                        username: values[0].username,
+-                        level: values[0].level
+-                    });
+-                }
+-            }
+-            console.log('[Zolos] 👥 Presence sync — online players:', players.length, players.map(p => p.username));
+-            if (onlinePlayersCallback) onlinePlayersCallback(players);
+-        })
+-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+-            console.log('[Zolos] ➕ Player joined:', key, newPresences);
+-        })
+-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+-            console.log('[Zolos] ➖ Player left:', key, leftPresences);
+-        })
+-        .on('broadcast', { event: 'pos' }, ({ payload }) => {
+-            if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
+-                onPlayerPositionUpdate(payload);
+-            }
+-        })
+-        .on('broadcast', { event: 'chat' }, ({ payload }) => {
+-            // Step 9.1: ส่ง payload ทั้งก้อน
+-            if (chatCallback && payload) {
+-                chatCallback(payload);
+-            }
+-        })
+-        .on('broadcast', { event: 'trade_request' }, ({ payload }) => {
+-            if (payload && payload.targetUserId === userId) {
+-                if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
+-            }
+-        })
+-        .on('broadcast', { event: 'trade_response' }, ({ payload }) => {
+-            if (payload && payload.senderUserId === userId) {
+-                if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
+-            }
+-        })
+-        .on('broadcast', { event: 'trade_cancel' }, ({ payload }) => {
+-            if (payload && payload.targetUserId === userId) {
+-                if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
+-                    window.gameUI.receiveTradeCancel(payload);
+-                }
+-            }
+-        })
+-        .on('broadcast', { event: 'friend_request' }, ({ payload }) => {
+-            if (payload && payload.targetUserId === userId) {
+-                if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
+-                    window.gameUI.receiveFriendRequest(payload);
+-                }
+-            }
+-        })
+-        .on('broadcast', { event: 'friend_response' }, ({ payload }) => {
+-            if (payload && payload.senderUserId === userId) {
+-                if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
+-                    window.gameUI.receiveFriendResponse(payload);
+-                }
+-            }
+-        })
+-        .subscribe(async (status, err) => {
+-            console.log('[Zolos] 📡 Channel status:', status, err ? 'Error: ' + err : '');
+-            if (status === 'SUBSCRIBED') {
+-                channelSubscribed = true;
+-                console.log('[Zolos] ✅ Successfully subscribed! Tracking presence...');
+-                try {
+-                    await presenceChannel.track({
+-                        username: username,
+-                        level: level,
+-                        online_at: new Date().toISOString()
+-                    });
+-                    console.log('[Zolos] ✅ Presence tracked successfully for:', username);
+-                } catch (trackErr) {
+-                    console.error('[Zolos] ❌ Failed to track presence:', trackErr);
+-                }
+-            } else if (status === 'CHANNEL_ERROR') {
+-                channelSubscribed = false;
+-                console.error('[Zolos] ❌ Channel error:', err);
+-            } else if (status === 'TIMED_OUT') {
+-                channelSubscribed = false;
+-                console.error('[Zolos] ⏱️ Channel timed out, retrying...');
+-                // Retry after 3 seconds
+-                setTimeout(() => {
+-                    if (presenceChannel) {
+-                        presenceChannel.subscribe();
+-                    }
+-                }, 3000);
+-            }
+-        });
++    // ===== FALLBACK: If Supabase exists but no socket URL — offline mock =====
++    _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+ }
+ 
+ export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
+-    if (isOfflineMode || !supabase || !presenceChannel || !channelSubscribed) return;
+-    const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
+-    if (appearance) payload.appearance = appearance;
+-    presenceChannel.send({
+-        type: 'broadcast',
+-        event: 'pos',
+-        payload
+-    });
++    if (isOfflineMode) return;
++
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
++        if (appearance) payload.appearance = appearance;
++        socket.emit('pos', payload);
++        return;
++    }
+ }
+ 
+ export function broadcastChat(userId, username, level, message) {
+-    if (isOfflineMode || !supabase) {
+-        // Step 5: Echo back local message using object format
++    if (isOfflineMode) {
++        // Echo back local message using object format
+         if (chatCallback) {
+             chatCallback({ userId, username, message });
+         }
+@@ -821,7 +684,6 @@ export function broadcastChat(userId, username, level, message) {
+                 if (candidates.length > 0) {
+                     const sender = candidates[Math.floor(Math.random() * candidates.length)];
+                     const reply = replies[Math.floor(Math.random() * replies.length)];
+-                    // Step 5: Use object format
+                     chatCallback({ userId: sender.userId, username: sender.username, message: reply });
+                 }
+             }
+@@ -829,16 +691,11 @@ export function broadcastChat(userId, username, level, message) {
+         return;
+     }
+ 
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'chat',
+-            payload: { userId, username, level, message }
+-        });
+-    }
+-    // Step 5: Echo back local message immediately using object format
+-    if (chatCallback) {
+-        chatCallback({ userId, username, message });
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('chat', { userId, username, level, message });
++        // Note: server broadcasts back to everyone (including sender) via 'chat' event
++        // so we don't need to echo locally — it will come back from the server
+     }
+ }
+ 
+@@ -848,7 +705,7 @@ export function updatePresence(level, newUsername = null) {
+         currentUsername = newUsername;
+     }
+ 
+-    if (isOfflineMode || !supabase) {
++    if (isOfflineMode) {
+         const me = mockPlayers.find(p => p.userId === 'player_me');
+         if (me) {
+             me.level = level;
+@@ -858,36 +715,46 @@ export function updatePresence(level, newUsername = null) {
+         return;
+     }
+ 
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.track({
+-            username: currentUsername,
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('update_presence', {
+             level: currentLevel,
+-            online_at: new Date().toISOString()
++            username: currentUsername
+         });
+     }
+ }
+ 
+ export function leavePresence() {
+-    channelSubscribed = false;
++    socketListenersAttached = false;
+ 
+     if (presenceUpdateInterval) {
+         clearInterval(presenceUpdateInterval);
+         presenceUpdateInterval = null;
+     }
+ 
+-    if (presenceChannel) {
+-        presenceChannel.unsubscribe();
+-        presenceChannel = null;
++    disconnectSocket();
++}
++
++// ============ Send save state to server (for server-side save-on-disconnect) ============
++export function sendSaveState(saveData) {
++    const socket = getSocket();
++    if (socket && isSocketConnected() && saveData) {
++        socket.emit('save_state', saveData);
+     }
+ }
+ 
+ // ============ Auto-Save ============
+-export function startAutoSave(getStateCallback, intervalMs = 15000) {
++export function startAutoSave(getStateCallback, intervalMs = 180000) {
++    // Default: 3 minutes (180000ms) instead of 15s
+     stopAutoSave();
+     autoSaveInterval = setInterval(async () => {
+         const state = getStateCallback();
+         if (state && state.characterId) {
++            // Save directly to Supabase
+             await saveCharacter(state.characterId, state.updates);
++
++            // Also send state to Socket server for save-on-disconnect backup
++            sendSaveState(state);
+         }
+     }, intervalMs);
+ }
+@@ -1201,17 +1068,14 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
+         }
+     }
+ 
+-    // 3. Broadcast system message or chat notification in presence if seller is online
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'chat',
+-            payload: {
+-                userId: 'system',
+-                username: '📢 ระบบตลาด',
+-                level: 99,
+-                message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${listing.item_name}] x${listing.quantity} จาก [${listing.seller_name}] ในราคา ${listing.price} Zeny!`
+-            }
++    // 3. Broadcast system message via Socket.io chat
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('chat', {
++            userId: 'system',
++            username: '📢 ระบบตลาด',
++            level: 99,
++            message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${listing.item_name}] x${listing.quantity} จาก [${listing.seller_name}] ในราคา ${listing.price} Zeny!`
+         });
+     }
+ 
+@@ -1220,7 +1084,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
+ 
+ // ============ P2P DIRECT TRADE ============
+ export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}) {
+-    if (isOfflineMode || !supabase) {
++    if (isOfflineMode) {
+         // Simulation mode: auto respond after 1.5s
+         setTimeout(() => {
+             if (window.gameUI) {
+@@ -1246,57 +1110,48 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
+         return { success: true };
+     }
+ 
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'trade_request',
+-            payload: {
+-                senderUserId: currentUserId,
+-                senderCharacterId: senderCharId,
+-                senderName: senderName,
+-                targetUserId: targetUserId,
+-                targetName: targetName,
+-                itemName: itemName,
+-                itemType: itemType,
+-                quantity: quantity,
+-                price: price,
+-                stats: stats
+-            }
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('trade_request', {
++            senderUserId: currentUserId,
++            senderCharacterId: senderCharId,
++            senderName: senderName,
++            targetUserId: targetUserId,
++            targetName: targetName,
++            itemName: itemName,
++            itemType: itemType,
++            quantity: quantity,
++            price: price,
++            stats: stats
+         });
+     }
+     return { success: true };
+ }
+ 
+ export async function sendTradeResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
+-    if (isOfflineMode || !supabase) return { success: true };
+-
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'trade_response',
+-            payload: {
+-                senderUserId: senderUserId,
+-                targetUserId: targetUserId,
+-                accepted: accepted,
+-                requestPayload: originalRequest
+-            }
++    if (isOfflineMode) return { success: true };
++
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('trade_response', {
++            senderUserId: senderUserId,
++            targetUserId: targetUserId,
++            accepted: accepted,
++            requestPayload: originalRequest
+         });
+     }
+     return { success: true };
+ }
+ 
+ export async function sendTradeCancelPacket(senderUserId, targetUserId, originalRequest) {
+-    if (isOfflineMode || !supabase) return { success: true };
+-
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'trade_cancel',
+-            payload: {
+-                senderUserId: senderUserId,
+-                targetUserId: targetUserId,
+-                requestPayload: originalRequest
+-            }
++    if (isOfflineMode) return { success: true };
++
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('trade_cancel', {
++            senderUserId: senderUserId,
++            targetUserId: targetUserId,
++            requestPayload: originalRequest
+         });
+     }
+     return { success: true };
+@@ -1331,17 +1186,14 @@ export async function executeDecentralizedSenderTrade(senderCharId, targetName,
+         }
+     }
+ 
+-    // Broadcast trade notification via chat
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'chat',
+-            payload: {
+-                userId: 'system',
+-                username: '📢 Trade',
+-                level: 99,
+-                message: `${currentUsername} ส่ง [${itemName}] x${quantity} ให้ [${targetName}]${price > 0 ? ` (${price} Zeny)` : ' (ฟรี)'}!`
+-            }
++    // Broadcast trade notification via Socket.io chat
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('chat', {
++            userId: 'system',
++            username: '📢 Trade',
++            level: 99,
++            message: `${currentUsername} ส่ง [${itemName}] x${quantity} ให้ [${targetName}]${price > 0 ? ` (${price} Zeny)` : ' (ฟรี)'}!`
+         });
+     }
+ 
+@@ -1389,7 +1241,7 @@ export async function executeDecentralizedReceiverTrade(receiverCharId, itemName
+ 
+ // ============ P2P FRIEND REQUEST ============
+ export async function sendFriendRequestPacket(senderName, senderLevel, targetUserId, targetName) {
+-    if (isOfflineMode || !supabase) {
++    if (isOfflineMode) {
+         // Simulation mode: auto respond after 1s
+         setTimeout(() => {
+             if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
+@@ -1410,36 +1262,142 @@ export async function sendFriendRequestPacket(senderName, senderLevel, targetUse
+         return { success: true };
+     }
+ 
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'friend_request',
+-            payload: {
+-                senderUserId: currentUserId,
+-                senderName: senderName,
+-                senderLevel: senderLevel,
+-                targetUserId: targetUserId,
+-                targetName: targetName
+-            }
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('friend_request', {
++            senderUserId: currentUserId,
++            senderName: senderName,
++            senderLevel: senderLevel,
++            targetUserId: targetUserId,
++            targetName: targetName
+         });
+     }
+     return { success: true };
+ }
+ 
+ export async function sendFriendResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
+-    if (isOfflineMode || !supabase) return { success: true };
+-
+-    if (presenceChannel && channelSubscribed) {
+-        presenceChannel.send({
+-            type: 'broadcast',
+-            event: 'friend_response',
+-            payload: {
+-                senderUserId: senderUserId,
+-                targetUserId: targetUserId,
+-                accepted: accepted,
+-                requestPayload: originalRequest
+-            }
++    if (isOfflineMode) return { success: true };
++
++    const socket = getSocket();
++    if (socket && isSocketConnected()) {
++        socket.emit('friend_response', {
++            senderUserId: senderUserId,
++            targetUserId: targetUserId,
++            accepted: accepted,
++            requestPayload: originalRequest
+         });
+     }
+     return { success: true };
+ }
++
++// ============ Offline Mock Presence (unchanged) ============
++function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
++    // Simulate real online players
++    const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
++    mockPlayers = [
++        { userId: 'player_me', username, level }
++    ];
++
++    // Pick 2-4 random initial mock online players
++    const activeCount = 2 + Math.floor(Math.random() * 3);
++    for (let i = 0; i < activeCount; i++) {
++        const idx = Math.floor(Math.random() * names.length);
++        const name = names.splice(idx, 1)[0];
++        mockPlayers.push({
++            userId: 'player_' + name.toLowerCase(),
++            username: name,
++            level: Math.floor(level + (Math.random() - 0.2) * 5),
++            x: (Math.random() - 0.5) * 15,
++            y: 0,
++            z: (Math.random() - 0.5) * 15,
++            rY: Math.random() * Math.PI * 2,
++            state: 'idle'
++        });
++    }
++
++    if (onPlayersUpdate) onPlayersUpdate(mockPlayers);
++    if (onPlayerPositionUpdate) {
++        mockPlayers.forEach(p => {
++            if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
++        });
++    }
++
++    // Periodic simulation (join/leave/level up/wander)
++    presenceUpdateInterval = setInterval(() => {
++        // 20% chance to level up someone
++        if (Math.random() < 0.2 && mockPlayers.length > 1) {
++            const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
++            mockPlayers[actorIdx].level++;
++        }
++
++        // 10% chance to leave
++        if (mockPlayers.length > 2 && Math.random() < 0.1) {
++            const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
++            mockPlayers.splice(leaveIdx, 1);
++            if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
++        }
++
++        // 10% chance to join
++        if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
++            const name = names.shift();
++            const newPlayer = {
++                userId: 'player_' + name.toLowerCase(),
++                username: name,
++                level: Math.max(1, Math.floor(level + (Math.random() - 0.2) * 4)),
++                x: (Math.random() - 0.5) * 15,
++                y: 0,
++                z: (Math.random() - 0.5) * 15,
++                rY: Math.random() * Math.PI * 2,
++                state: 'idle'
++            };
++            mockPlayers.push(newPlayer);
++            if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
++            if (onPlayerPositionUpdate) onPlayerPositionUpdate(newPlayer);
++        }
++
++        // Simulate wandering movement for mock players
++        mockPlayers.forEach((p) => {
++            if (p.userId === 'player_me') return;
++
++            // Move slightly
++            if (Math.random() < 0.4) {
++                p.state = Math.random() < 0.3 ? 'attacking' : 'walking';
++                p.x += (Math.random() - 0.5) * 2;
++                p.z += (Math.random() - 0.5) * 2;
++                p.rY = Math.random() * Math.PI * 2;
++            } else {
++                p.state = 'idle';
++            }
++
++            if (onPlayerPositionUpdate) {
++                onPlayerPositionUpdate(p);
++            }
++        });
++
++        if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
++    }, 3000);
++
++    // Simulation for chat messages in offline mode
++    setInterval(() => {
++        if (onChatCallback && mockPlayers.length > 1) {
++            const randomReplies = [
++                'สวัสดีครับทุกคน! 😃',
++                'ตีตัวอะไรกันอยู่หรอ?',
++                'มอนในวิกินี้เยอะจัดเลยแฮะ',
++                'บอส Ghostring โหดมากกก 😱',
++                'หาตี้แอดเพื่อนกันหน่อย 🤝',
++                'บอทฟาร์มชิวจัดๆ ⚡',
++                'มีใครขายดาบ rare ไหม?',
++                'เก็บเลเวลแป๊บนะค้าบ',
++                'วันนี้ดวงดีจัง ดรอปการ์ดรึยังนะ 🍀'
++            ];
++            // Select a writer that isn't player_me
++            const candidates = mockPlayers.filter(p => p.userId !== 'player_me');
++            if (candidates.length > 0) {
++                const sender = candidates[Math.floor(Math.random() * candidates.length)];
++                const msg = randomReplies[Math.floor(Math.random() * randomReplies.length)];
++                onChatCallback({ userId: sender.userId, username: sender.username, message: msg });
++            }
++        }
++    }, 12000 + Math.random() * 8000);
++}
+diff --git a/src/network/SupabaseClient.js b/src/network/SupabaseClient.js
+index 93b33fe..cb930a4 100644
+--- a/src/network/SupabaseClient.js
++++ b/src/network/SupabaseClient.js
+@@ -191,6 +191,45 @@ export function clearActiveSession() {
+ 
+ // ============ Realtime Online Count (Auth Screen) ============
+ export function subscribeOnlineCount(callback) {
++  // Check if Socket.io is enabled
++  const socketUrl = (env.VITE_SOCKET_URL || '').trim();
++  const isSocketEnabled = socketUrl && socketUrl !== 'undefined';
++
++  if (isSocketEnabled) {
++    let cleanup = null;
++
++    // Load SocketClient dynamically to prevent circular dependencies or premature connection
++    import('./SocketClient.js').then(async ({ connectSocket, getSocket, isSocketConnected }) => {
++      let socket = getSocket();
++      if (!socket) {
++        socket = await connectSocket();
++      }
++
++      if (socket) {
++        const handler = (count) => {
++          callback(count);
++        };
++        socket.on('online_count', handler);
++
++        // Send a request to get the initial count if socket is already connected
++        if (isSocketConnected()) {
++          // The server sends online_count on connect and updates,
++          // but we can request or trigger it here if needed.
++        }
++
++        cleanup = () => {
++          socket.off('online_count', handler);
++        };
++      }
++    }).catch(err => {
++      console.warn('[SupabaseClient] Failed to load socket client for online count:', err);
++    });
++
++    return () => {
++      if (cleanup) cleanup();
++    };
++  }
++
+   if (isOfflineMode || !supabase) {
+     // Simulate a fluctuating online count for offline mode
+     let fakeCount = 1 + Math.floor(Math.random() * 4);
+@@ -223,3 +262,4 @@ export function subscribeOnlineCount(callback) {
+   };
+ }
+ 
++

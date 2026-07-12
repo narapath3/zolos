@@ -191,6 +191,45 @@ export function clearActiveSession() {
 
 // ============ Realtime Online Count (Auth Screen) ============
 export function subscribeOnlineCount(callback) {
+  // Check if Socket.io is enabled
+  const socketUrl = (env.VITE_SOCKET_URL || '').trim();
+  const isSocketEnabled = socketUrl && socketUrl !== 'undefined';
+
+  if (isSocketEnabled) {
+    let cleanup = null;
+
+    // Load SocketClient dynamically to prevent circular dependencies or premature connection
+    import('./SocketClient.js').then(async ({ connectSocket, getSocket, isSocketConnected }) => {
+      let socket = getSocket();
+      if (!socket) {
+        socket = await connectSocket();
+      }
+
+      if (socket) {
+        const handler = (count) => {
+          callback(count);
+        };
+        socket.on('online_count', handler);
+
+        // Send a request to get the initial count if socket is already connected
+        if (isSocketConnected()) {
+          // The server sends online_count on connect and updates,
+          // but we can request or trigger it here if needed.
+        }
+
+        cleanup = () => {
+          socket.off('online_count', handler);
+        };
+      }
+    }).catch(err => {
+      console.warn('[SupabaseClient] Failed to load socket client for online count:', err);
+    });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }
+
   if (isOfflineMode || !supabase) {
     // Simulate a fluctuating online count for offline mode
     let fakeCount = 1 + Math.floor(Math.random() * 4);
@@ -222,4 +261,5 @@ export function subscribeOnlineCount(callback) {
     try { mainChannel.unsubscribe(); } catch (e) { /* ignore */ }
   };
 }
+
 
