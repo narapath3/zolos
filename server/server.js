@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // ============ Configuration ============
 const PORT = process.env.PORT || 3001;
+const HOST = '0.0.0.0';
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.vercel.app').split(',').map(s => s.trim());
 const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 
@@ -320,8 +321,8 @@ setInterval(async () => {
 }, SAVE_INTERVAL_MS);
 
 // ============ Start Server ============
-httpServer.listen(PORT, () => {
-    console.log(`[Server] 🚀 Zolos Map Server running on port ${PORT}`);
+httpServer.listen(PORT, HOST, () => {
+    console.log(`[Server] 🚀 Zolos Map Server running on ${HOST}:${PORT}`);
     console.log(`[Server] 📡 CORS origins: ${CORS_ORIGINS.join(', ')}`);
     console.log(`[Server] 💾 Save interval: ${SAVE_INTERVAL_MS / 1000}s`);
     console.log(`[Server] 🗄️  Supabase: ${supabase ? 'Connected' : 'Disabled'}`);
