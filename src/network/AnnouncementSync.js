@@ -12,7 +12,7 @@ import { getSocket, isSocketConnected } from './SocketClient.js';
  * @param {string} type - Type of announcement (info, warning, event, etc.)
  * @param {number} duration - Display duration in milliseconds
  */
-export async function broadcastAnnouncement(text, type = 'info', duration = 8000) {
+export async function broadcastAnnouncement(text, type = 'info', duration = 8000, interval = 0) {
   const socket = getSocket();
   if (!socket || !isSocketConnected()) {
     console.warn('[AnnouncementSync] Socket not connected, announcement will only show locally');
@@ -24,10 +24,11 @@ export async function broadcastAnnouncement(text, type = 'info', duration = 8000
       text,
       type,
       duration,
+      interval,
       timestamp: Date.now(),
       sender: 'admin'
     });
-    console.log('[AnnouncementSync] ✅ Announcement broadcasted:', text);
+    console.log('[AnnouncementSync] ✅ Announcement broadcasted:', text, 'Interval:', interval, 'min');
     return true;
   } catch (err) {
     console.error('[AnnouncementSync] ❌ Failed to broadcast announcement:', err);

@@ -140,6 +140,31 @@ export class AdminAnnouncementPanel {
         </div>
       </div>
 
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; margin-bottom: 5px; color: #FFBE0B;">REPEAT INTERVAL:</label>
+        <select 
+          id="admin-announcement-interval"
+          style="
+            width: 100%;
+            padding: 8px;
+            background: #0a0a1a;
+            border: 2px solid #FFBE0B;
+            color: #FFBE0B;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            box-sizing: border-box;
+          "
+        >
+          <option value="0">OFF (Send Once)</option>
+          <option value="1">Every 1 Minute</option>
+          <option value="3">Every 3 Minutes</option>
+          <option value="5">Every 5 Minutes</option>
+          <option value="10">Every 10 Minutes</option>
+          <option value="20">Every 20 Minutes</option>
+          <option value="30">Every 30 Minutes</option>
+        </select>
+      </div>
+
       <div style="display: flex; gap: 10px; margin-bottom: 12px;">
         <button 
           id="admin-announce-btn"
@@ -232,6 +257,7 @@ export class AdminAnnouncementPanel {
     const textInput = document.getElementById('admin-announcement-text');
     const typeSelect = document.getElementById('admin-announcement-type');
     const durationInput = document.getElementById('admin-announcement-duration');
+    const intervalSelect = document.getElementById('admin-announcement-interval');
     const sendBtn = document.getElementById('admin-announce-btn');
     const clearBtn = document.getElementById('admin-announce-clear-btn');
     const closeBtn = document.getElementById('admin-announce-close-btn');
@@ -246,12 +272,26 @@ export class AdminAnnouncementPanel {
 
         const type = typeSelect.value;
         const duration = parseInt(durationInput.value) * 1000;
+        const interval = parseInt(intervalSelect.value);
 
         // Add to announcement system locally
         announcementSystem.addAnnouncement(text, type, duration);
 
+        // Handle offline recurring announcement if not in socket mode
+        const { isSocketMode } = await import('../network/SocketClient.js');
+        if (!isSocketMode() && interval > 0) {
+            const intervalMs = interval * 60 * 1000;
+            if (this.localIntervals && this.localIntervals[text]) {
+                clearInterval(this.localIntervals[text]);
+            }
+            if (!this.localIntervals) this.localIntervals = {};
+            this.localIntervals[text] = setInterval(() => {
+                announcementSystem.addAnnouncement(text, type, duration);
+            }, intervalMs);
+        }
+
         // Broadcast to all players via Socket.io
-        await broadcastAnnouncement(text, type, duration);
+        await broadcastAnnouncement(text, type, duration, interval);
 
         // Clear input
         textInput.value = '';
@@ -267,8 +307,13 @@ export class AdminAnnouncementPanel {
     if (clearBtn) {
       clearBtn.addEventListener('click', () => {
         announcementSystem.clear();
+        // Clear all recurring intervals
+        if (this.localIntervals) {
+          Object.values(this.localIntervals).forEach(interval => clearInterval(interval));
+          this.localIntervals = {};
+        }
         this._updateQueueDisplay();
-        this._showFeedback('Queue cleared!');
+        this._showFeedback('Queue and recurring alerts cleared!');
       });
     }
 

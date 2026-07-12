@@ -201,13 +201,41 @@ io.on('connection', (socket) => {
 
     // --- ADMIN ANNOUNCEMENT ---
     socket.on('admin:announcement', (data) => {
-        // Broadcast announcement to ALL connected clients
+        // Broadcast announcement to ALL connected clients immediately
         io.emit('admin:announcement', data);
         console.log('[Server] Admin announcement broadcasted:', data.text);
+
+        // Handle recurring intervals if specified
+        if (data.interval && data.interval > 0) {
+            const intervalMs = data.interval * 60 * 1000;
+            console.log(`[Server] Scheduling recurring announcement every ${data.interval} minutes`);
+            
+            // Clear any existing interval for the same text to avoid duplicates
+            if (socket.announcementIntervals && socket.announcementIntervals[data.text]) {
+                clearInterval(socket.announcementIntervals[data.text]);
+            }
+            
+            if (!socket.announcementIntervals) socket.announcementIntervals = {};
+            
+            socket.announcementIntervals[data.text] = setInterval(() => {
+                io.emit('admin:announcement', {
+                    ...data,
+                    timestamp: Date.now(),
+                    isRecurring: true
+                });
+                console.log('[Server] Recurring announcement broadcasted:', data.text);
+            }, intervalMs);
+        }
     });
 
     // --- DISCONNECT ---
     socket.on('disconnect', async (reason) => {
+        // Clear all recurring announcement intervals for this socket
+        if (socket.announcementIntervals) {
+            Object.values(socket.announcementIntervals).forEach(interval => clearInterval(interval));
+            socket.announcementIntervals = null;
+        }
+
         const player = onlinePlayers.get(socket.id);
         if (player) {
             console.log(`[Server] ➖ Player left: ${player.username} (${player.userId}) — reason: ${reason}`);
