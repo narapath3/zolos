@@ -975,7 +975,7 @@ export class GameUI {
     });
     
     // Initial map ID
-    this.currentMapId = 'prontera_field';
+    this.currentMapId = 'prontera';
   }
 
   updateOnlinePlayers(players) {
@@ -999,7 +999,7 @@ export class GameUI {
       list = list.filter(p => friends.includes(p.username));
     } else {
       // Local map filtering for 'global' view
-      const currentMapId = window.gameUI?.currentMapId || 'prontera_field';
+      const currentMapId = window.gameUI?.currentMapId || 'prontera';
       list = list.filter(p => !p.mapId || p.mapId === currentMapId);
     }
 

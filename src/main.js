@@ -355,37 +355,25 @@ async function initGame(charData) {
             // Update online players list
             if (gameUI) gameUI.updateOnlinePlayers(players);
 
-            // If players is empty, it's a "clean up" signal or a specific player left
-            // However, Socket.io sends incremental updates now.
-            // If we receive a list, we ensure all players in it exist.
+            // Handle map isolation and cleanup
+            const currentIds = new Set(players.map(p => p.userId));
+            for (const [id, rp] of remotePlayersMap.entries()) {
+                if (!currentIds.has(id)) {
+                    sceneManager.scene.remove(rp.mesh);
+                    remotePlayersMap.delete(id);
+                }
+            }
+
             players.forEach(p => {
                 if (p.userId === userId) return;
-                
-                // Map isolation: Only render players on the same map
                 if (p.mapId && p.mapId !== sceneManager.currentMap) {
                     if (remotePlayersMap.has(p.userId)) {
                         const rp = remotePlayersMap.get(p.userId);
                         if (rp.mesh) sceneManager.scene.remove(rp.mesh);
                         remotePlayersMap.delete(p.userId);
                     }
-                    return;
-                }
-
-                if (!remotePlayersMap.has(p.userId)) {
-                    // This will be handled by the position update callback too
                 }
             });
-
-            // Clean up players who are NOT in the active players list anymore
-            if (players.length > 0) {
-                const currentIds = new Set(players.map(p => p.userId));
-                for (const [id, rp] of remotePlayersMap.entries()) {
-                    if (!currentIds.has(id)) {
-                        sceneManager.scene.remove(rp.mesh);
-                        remotePlayersMap.delete(id);
-                    }
-                }
-            }
         },
         (p) => {
             // Handle remote player position updates
@@ -781,19 +769,24 @@ function gameLoop(time) {
                     character.baseY = spawn.y;
                     character.mesh.position.set(spawn.x, spawn.y, spawn.z);
 
+                    console.log(`[Warp] Starting warp to ${targetMap}`);
                     sceneManager.loadMap(targetMap);
+                    console.log(`[Warp] Map ${targetMap} loaded`);
                     monsters.clearAll();
                     monsters.mapId = targetMap;
                     monsters.spawnInitial(character.stats.level);
+                    console.log(`[Warp] Monsters spawned`);
 
                     // Update multiplayer presence for the new map
                     updatePresence(character.stats.level, username, targetMap);
+                    console.log(`[Warp] Presence updated`);
                     
                     // Clear remote players from old map
                     for (const [id, rp] of remotePlayersMap.entries()) {
                         if (rp.mesh) sceneManager.scene.remove(rp.mesh);
                     }
                     remotePlayersMap.clear();
+                    console.log(`[Warp] Remote players cleared`);
                 }
             }
         });
