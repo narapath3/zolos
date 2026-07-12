@@ -79,7 +79,8 @@ async function initAuth() {
     authUI = new AuthUI((sessionData) => {
         userId = sessionData.userId;
         username = sessionData.username;
-        showCharacterSelect();
+        // Pass guest flag to character select
+        showCharacterSelect(sessionData.isGuest);
     });
 }
 
@@ -229,6 +230,16 @@ async function initGame(charData) {
     gameUI = new GameUI(character, soundManager, combatSystem);
     window.gameUI = gameUI;
     gameUI.particles = particles;
+
+    // Set guest mode state
+    gameUI.setGuestMode(charData.isGuest === true);
+
+    // Setup bind account callback
+    gameUI.setupBindAccountCallback(async (email, password) => {
+        const { bindAccount } = await import('./network/SupabaseClient.js');
+        await bindAccount(email, password);
+        charData.isGuest = false; // Update local state
+    });
 
     // Setup skill clicks
     gameUI.setupSkillClicks((skillId) => {
@@ -604,11 +615,12 @@ async function initGame(charData) {
     });
 }
 
-async function showCharacterSelect() {
+async function showCharacterSelect(isGuest = false) {
     // For now, load default character or create screen
     try {
         const char = await loadCharacter(userId);
         if (char) {
+            char.isGuest = isGuest;
             initGame(char);
         } else {
             // Fallback for new characters if loadCharacter didn't create one

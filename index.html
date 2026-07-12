@@ -680,6 +680,24 @@
                 <span style="font-size: 13px; color: var(--text); font-weight: 500;">Show Performance Stats (FPS)</span>
               </div>
             </div>
+
+            <!-- Guest Account Linking Section -->
+            <div id="settings-guest-link-section" class="form-group" style="margin-top: 24px; padding-top: 18px; border-top: 1px dashed rgba(255,255,255,0.1); display: none;">
+              <label style="display: block; margin-bottom: 10px; color: var(--primary); font-weight: bold;">🔗 Bind Account / ผูกบัญชีถาวร</label>
+              <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4;">
+                ผูกบัญชี Guest ของคุณด้วย Email และ Password เพื่อป้องกันตัวละครหายและสามารถเข้าสู่ระบบจากเครื่องอื่นได้
+              </p>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <input type="email" id="link-account-email" placeholder="อีเมล (Email)" 
+                  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px;" />
+              </div>
+              <div class="form-group" style="margin-bottom: 15px;">
+                <input type="password" id="link-account-password" placeholder="รหัสผ่าน (Password)" 
+                  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px;" />
+              </div>
+              <button id="btn-link-account" class="btn-primary" style="width: 100%; padding: 10px; background: #40e080 !important; border-color: #30c070 !important; color: #000; font-weight: bold;">⚔️ Bind Account / ยืนยันการผูกบัญชี</button>
+              <div id="link-account-status" style="margin-top: 10px; font-size: 11px; text-align: center; min-height: 15px;"></div>
+            </div>
           </div>
 
           <div class="popup-actions" style="margin-top: 20px; display: flex; gap: 10px;">

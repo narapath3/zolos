@@ -181,6 +181,20 @@ export async function getProfile(userId) {
   return data;
 }
 
+export async function bindAccount(email, password) {
+  if (isOfflineMode || !supabase) {
+    throw new Error('Cannot bind account in Offline Mode');
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    email,
+    password
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export function saveActiveSession(userId) {
   localDb.set('active_session_user_id', userId);
 }

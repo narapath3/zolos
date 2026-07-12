@@ -1444,6 +1444,59 @@ export class GameUI {
     const tabSettingsPane = document.getElementById('tab-content-settings');
 
     if (tabProfileBtn && tabSettingsBtn && tabProfilePane && tabSettingsPane) {
+      // Bind Account logic
+      const bindBtn = document.getElementById('btn-link-account');
+      const bindEmail = document.getElementById('link-account-email');
+      const bindPass = document.getElementById('link-account-password');
+      const bindStatus = document.getElementById('link-account-status');
+
+      if (bindBtn) {
+        bindBtn.addEventListener('click', async () => {
+          const email = bindEmail?.value.trim();
+          const password = bindPass?.value.trim();
+
+          if (!email || !password) {
+            if (bindStatus) {
+              bindStatus.textContent = 'กรุณากรอกอีเมลและรหัสผ่าน';
+              bindStatus.style.color = '#ff6080';
+            }
+            return;
+          }
+
+          if (password.length < 6) {
+            if (bindStatus) {
+              bindStatus.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+              bindStatus.style.color = '#ff6080';
+            }
+            return;
+          }
+
+          if (bindStatus) {
+            bindStatus.textContent = 'กำลังผูกบัญชี...';
+            bindStatus.style.color = '#60a0ff';
+          }
+
+          try {
+            if (this.bindAccountCallback) {
+              await this.bindAccountCallback(email, password);
+              if (bindStatus) {
+                bindStatus.textContent = '✅ ผูกบัญชีสำเร็จ! กรุณาจำอีเมลและรหัสผ่านไว้';
+                bindStatus.style.color = '#40e080';
+              }
+              // Hide section after success after a delay
+              setTimeout(() => {
+                this.setGuestMode(false);
+              }, 3000);
+            }
+          } catch (err) {
+            if (bindStatus) {
+              bindStatus.textContent = `❌ ผิดพลาด: ${err.message}`;
+              bindStatus.style.color = '#ff6080';
+            }
+          }
+        });
+      }
+
       tabProfileBtn.addEventListener('click', (e) => {
         e.preventDefault();
         tabProfilePane.style.display = 'block';
@@ -1665,6 +1718,18 @@ export class GameUI {
 
   setupProfileSaveCallback(callback) {
     this.profileSaveCallback = callback;
+  }
+
+  setupBindAccountCallback(callback) {
+    this.bindAccountCallback = callback;
+  }
+
+  setGuestMode(isGuest) {
+    this.isGuest = isGuest;
+    const guestSection = document.getElementById('settings-guest-link-section');
+    if (guestSection) {
+      guestSection.style.display = isGuest ? 'block' : 'none';
+    }
   }
 
   /**
