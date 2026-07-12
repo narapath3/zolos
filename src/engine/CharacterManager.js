@@ -928,6 +928,7 @@ export class CharacterManager {
             characterId: this.characterId,
             userId: this.userId,
             updates: {
+                id: this.characterId, // Include ID in updates for fallback identification
                 name: this.stats.name,
                 level: this.stats.level,
                 exp: this.stats.exp,

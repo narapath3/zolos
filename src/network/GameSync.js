@@ -314,19 +314,28 @@ export async function saveCharacterByUserId(userId, updates) {
 
     console.log(`[Zolos] 💾 Saving by user_id ${userId}. Fields:`, Object.keys(filteredUpdates));
     console.log(`[Zolos] 📤 Supabase Update Payload:`, JSON.stringify(filteredUpdates));
-    const { data, error } = await supabase
+    
+    // Use basic update without .select() to avoid potential RLS read issues during update
+    const { error, count } = await supabase
         .from('characters')
-        .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .select();
+        .update({ ...filteredUpdates, updated_at: new Date().toISOString() }, { count: 'exact' })
+        .eq('user_id', userId);
 
     if (error) {
         console.error('[Zolos] ❌ saveCharacterByUserId error:', error.message, error.details, error.hint);
     } else {
-        if (data && data.length > 0) {
-            console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', data.length, 'Data:', JSON.stringify(data[0]));
+        if (count > 0) {
+            console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', count);
         } else {
-            console.warn('[Zolos] ⚠️ saveCharacterByUserId: 0 rows updated. userId may not exist.');
+            console.warn('[Zolos] ⚠️ saveCharacterByUserId: 0 rows updated. userId may not exist or RLS blocked the update.');
+            
+            // Fallback: try saving by characterId if user_id update affected 0 rows
+            // This handles cases where user_id might be missing or incorrect in the state
+            const charId = updates.characterId || updates.id;
+            if (charId) {
+                console.log(`[Zolos] 🔄 Retrying save by characterId: ${charId}`);
+                await saveCharacter(charId, filteredUpdates);
+            }
         }
     }
 }
