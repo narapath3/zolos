@@ -27,7 +27,7 @@ export class AnnouncementSystem {
   init() {
     if (this.isInitialized) return;
 
-    // Create container
+    // Create container - simple minimal ticker bar
     this.container = document.createElement('div');
     this.container.id = 'announcement-container';
     this.container.style.cssText = `
@@ -35,17 +35,17 @@ export class AnnouncementSystem {
       top: 60px;
       left: 0;
       right: 0;
-      height: 40px;
-      background: linear-gradient(90deg, rgba(255, 0, 110, 0.9), rgba(0, 217, 255, 0.9), rgba(255, 190, 11, 0.9));
-      border-bottom: 3px solid #FF006E;
+      height: 32px;
+      background: rgba(20, 20, 30, 0.85);
+      border-bottom: 1px solid rgba(100, 100, 120, 0.5);
       display: flex;
       align-items: center;
       overflow: hidden;
       z-index: 999;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      color: #0a0a1a;
-      box-shadow: 0 0 20px rgba(255, 0, 110, 0.5);
+      font-family: Arial, sans-serif;
+      font-weight: normal;
+      color: #cccccc;
+      box-shadow: none;
     `;
 
     // Create text element
@@ -53,10 +53,10 @@ export class AnnouncementSystem {
     this.textElement.style.cssText = `
       white-space: nowrap;
       padding: 0 20px;
-      font-size: 16px;
-      letter-spacing: 2px;
+      font-size: 14px;
+      letter-spacing: 0.5px;
       animation: scroll-text 20s linear infinite;
-      text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+      text-shadow: none;
     `;
 
     this.container.appendChild(this.textElement);
@@ -69,14 +69,14 @@ export class AnnouncementSystem {
         0% { transform: translateX(100%); }
         100% { transform: translateX(-100%); }
       }
-      #announcement-container.hidden {
-        display: none;
+      #announcement-container {
+        display: flex !important;
       }
     `;
     document.head.appendChild(style);
 
     this.isInitialized = true;
-    this.hide();
+    this.show();
   }
 
   /**
@@ -87,7 +87,7 @@ export class AnnouncementSystem {
    */
   addAnnouncement(text, type = 'info', duration = 8000) {
     const announcement = {
-      text: `>>> ${text.toUpperCase()} <<<`,
+      text: text,
       type,
       duration,
       timestamp: Date.now(),
@@ -126,11 +126,11 @@ export class AnnouncementSystem {
   }
 
   /**
-   * Show the announcement container
+   * Show the announcement container (always visible)
    */
   show() {
     if (this.container) {
-      this.container.classList.remove('hidden');
+      this.container.style.display = 'flex';
     }
   }
 
@@ -139,7 +139,7 @@ export class AnnouncementSystem {
    */
   hide() {
     if (this.container) {
-      this.container.classList.add('hidden');
+      this.container.style.display = 'flex';
     }
     this.currentAnnouncement = null;
   }
