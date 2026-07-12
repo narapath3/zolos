@@ -11,6 +11,8 @@ import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
 import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { AdminUI } from './ui/AdminUI.js';
+import { AnnouncementSystem } from './ui/AnnouncementSystem.js';
+import { AdminAnnouncementPanel } from './ui/AdminAnnouncementPanel.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -231,6 +233,21 @@ async function initGame(charData) {
     gameUI = new GameUI(character, soundManager, combatSystem);
     window.gameUI = gameUI;
     gameUI.particles = particles;
+
+    // Initialize Announcement System
+    const announcementSystem = new AnnouncementSystem();
+    announcementSystem.init();
+    window.announcementSystem = announcementSystem;
+
+    // Setup announcement listeners for Socket.io broadcasts
+    const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
+    setupAnnouncementListeners((announcementData) => {
+      announcementSystem.addAnnouncement(
+        announcementData.text,
+        announcementData.type || 'info',
+        announcementData.duration || 8000
+      );
+    });
 
     // Set guest mode state
     gameUI.setGuestMode(charData.isGuest === true);
