@@ -27,6 +27,17 @@ export class AuthUI {
         this._charnameEl = document.getElementById('auth-charname');
         this._loginBtn = document.getElementById('btn-login');
         this._registerBtn = document.getElementById('btn-register');
+        this._startBtn = document.getElementById('btn-start-game');
+        this._splashEl = document.getElementById('auth-splash');
+        this._formWrapperEl = document.getElementById('auth-form-wrapper');
+
+        if (this._startBtn) {
+            this._startBtn.addEventListener('click', () => {
+                this._splashEl.style.display = 'none';
+                this._formWrapperEl.style.display = 'block';
+                this._formWrapperEl.classList.add('fade-in');
+            });
+        }
 
         this._loginBtn.addEventListener('click', () => {
             if (this._sessionData) {

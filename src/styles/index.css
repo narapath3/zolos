@@ -263,6 +263,59 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   transform: translateY(-2px) scale(1.02);
 }
 
+.btn-start-game {
+  padding: 16px 40px;
+  background: linear-gradient(135deg, #ffd700, #f0a020);
+  color: #120a02;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 800;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  box-shadow: 
+    0 0 20px rgba(240, 192, 64, 0.5),
+    0 0 40px rgba(240, 192, 64, 0.2);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  letter-spacing: 2px;
+  margin: 20px 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-start-game:hover {
+  transform: scale(1.1);
+  box-shadow: 
+    0 0 30px rgba(240, 192, 64, 0.7),
+    0 0 60px rgba(240, 192, 64, 0.4);
+}
+
+.btn-start-game::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transform: rotate(45deg);
+  animation: startShine 3s infinite;
+}
+
+@keyframes startShine {
+  0% { left: -150%; }
+  100% { left: 150%; }
+}
+
+.fade-in {
+  animation: simpleFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes simpleFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .auth-divider {
   display: flex;
   align-items: center;
