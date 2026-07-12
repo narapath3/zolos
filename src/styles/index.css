@@ -69,7 +69,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: flex;
   align-items: center;
   justify-content: center;
-  background: url('/src/assets/login_bg_new.png') no-repeat center center;
+  background: linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15)), url('/src/assets/login_bg_new.png') no-repeat center center;
   background-size: cover;
   background-position: center;
   z-index: 1000;
@@ -128,7 +128,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .game-tagline {
-  font-size: 12px;
+  font-family: 'Itim', cursive;
+  font-size: 16px;
   color: var(--text-dim);
   margin-bottom: 24px;
 }
