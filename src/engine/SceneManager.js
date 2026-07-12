@@ -1925,11 +1925,14 @@ export class SceneManager {
         ctx.roundRect(128, 16, 768, 96, 24);
         ctx.stroke();
         // Text
-        ctx.font = 'bold 48px "Helvetica Neue", Helvetica, Arial, sans-serif'; // More stable font stack
-        ctx.textAlign = 'center';
+        ctx.font = 'bold 48px "Helvetica Neue", Helvetica, Arial, sans-serif';
+        ctx.textAlign = 'left'; // Use left alignment and manual offset for more control in Safari
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffd040';
-        ctx.fillText('🏪 ร้านค้า', 512, 64);
+        // Manually center by measuring or using a safe offset
+        // '🏪 ร้านค้า' is approx 240px wide at 48px font. 
+        // Canvas is 1024, center is 512. 512 - 120 = 392.
+        ctx.fillText('🏪 ร้านค้า', 410, 64);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
@@ -2114,10 +2117,12 @@ export class SceneManager {
         ctx.roundRect(64, 16, 896, 96, 24);
         ctx.stroke();
         ctx.font = 'bold 42px "Helvetica Neue", Helvetica, Arial, sans-serif';
-        ctx.textAlign = 'center';
+        ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffdd44';
-        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 512, 64);
+        // '💰 รับซื้อไอเทม (Sell Shop)' is approx 450px wide.
+        // 512 - 225 = 287. Using 280 for safety.
+        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 280, 64);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
