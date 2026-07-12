@@ -1582,10 +1582,7 @@ export class GameUI {
         tabSettingsPane.style.display = 'none';
         tabProfileBtn.classList.add('active-tab');
         tabSettingsBtn.classList.remove('active-tab');
-        tabProfileBtn.style.borderBottomColor = 'var(--primary)';
-        tabProfileBtn.style.color = 'var(--primary)';
-        tabSettingsBtn.style.borderBottomColor = 'transparent';
-        tabSettingsBtn.style.color = 'var(--text-dim)';
+        // Handled by CSS .active-tab class
       });
 
       tabSettingsBtn.addEventListener('click', (e) => {
@@ -1594,10 +1591,7 @@ export class GameUI {
         tabSettingsPane.style.display = 'block';
         tabProfileBtn.classList.remove('active-tab');
         tabSettingsBtn.classList.add('active-tab');
-        tabSettingsBtn.style.borderBottomColor = 'var(--primary)';
-        tabSettingsBtn.style.color = 'var(--primary)';
-        tabProfileBtn.style.borderBottomColor = 'transparent';
-        tabProfileBtn.style.color = 'var(--text-dim)';
+        // Handled by CSS .active-tab class
 
         // Sync config values when opening
         const soundCheckbox = document.getElementById('settings-sound-enabled');
@@ -1680,7 +1674,7 @@ export class GameUI {
       editLayoutBtn.addEventListener('click', () => {
         const isEditing = this.layoutManager.toggleEditMode();
         editLayoutBtn.textContent = isEditing ? '✅ Save Layout (บันทึกตำแหน่ง)' : '🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)';
-        editLayoutBtn.style.background = isEditing ? '#40e080 !important' : 'var(--primary) !important';
+        // editLayoutBtn.style.background = isEditing ? '#40e080 !important' : 'var(--primary) !important';
         
         if (isEditing) {
           // Close settings panel so user can see the UI
