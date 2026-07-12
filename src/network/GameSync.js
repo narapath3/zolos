@@ -563,76 +563,80 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
     currentUsername = username;
     currentLevel = level;
 
-    if (isOfflineMode || !supabase) {
-        // Simulate real online players (existing logic)
-        const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
-        mockPlayers = [
-            { userId: 'player_me', username, level }
-        ];
+    // Step 3: Always attempt Socket.io connection if a server URL is provided
+    const isSocketConfigured = SOCKET_SERVER_URL && !SOCKET_SERVER_URL.includes('localhost');
+    
+    if (isOfflineMode || !supabase || !isSocketConfigured) {
+        // Only run simulation if Socket.io is not properly configured for production
+        if (!isSocketConfigured) {
+            console.log('[Zolos] 📊 Running in Offline Simulation Mode');
+            const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
+            mockPlayers = [{ userId: 'player_me', username, level }];
 
-        const activeCount = 2 + Math.floor(Math.random() * 3);
-        for (let i = 0; i < activeCount; i++) {
-            const idx = Math.floor(Math.random() * names.length);
-            const name = names.splice(idx, 1)[0];
-            mockPlayers.push({
-                userId: 'player_' + name.toLowerCase(),
-                username: name,
-                level: Math.floor(level + (Math.random() - 0.2) * 5),
-                x: (Math.random() - 0.5) * 15,
-                y: 0,
-                z: (Math.random() - 0.5) * 15,
-                rY: Math.random() * Math.PI * 2,
-                state: 'idle'
-            });
-        }
-
-        if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
-        if (onPlayerPositionUpdate) {
-            mockPlayers.forEach(p => {
-                if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
-            });
-        }
-
-        presenceUpdateInterval = setInterval(() => {
-            if (Math.random() < 0.2 && mockPlayers.length > 1) {
-                const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
-                mockPlayers[actorIdx].level++;
-            }
-
-            if (mockPlayers.length > 2 && Math.random() < 0.1) {
-                const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
-                const left = mockPlayers.splice(leaveIdx, 1)[0];
-                if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
-            }
-
-            if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
+            const activeCount = 2 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < activeCount; i++) {
                 const idx = Math.floor(Math.random() * names.length);
                 const name = names.splice(idx, 1)[0];
                 mockPlayers.push({
                     userId: 'player_' + name.toLowerCase(),
                     username: name,
-                    level: Math.floor(currentLevel + (Math.random() - 0.2) * 5),
+                    level: Math.floor(level + (Math.random() - 0.2) * 5),
                     x: (Math.random() - 0.5) * 15,
                     y: 0,
                     z: (Math.random() - 0.5) * 15,
                     rY: Math.random() * Math.PI * 2,
                     state: 'idle'
                 });
-                if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
             }
 
-            mockPlayers.forEach(p => {
-                if (p.userId !== 'player_me' && Math.random() < 0.5) {
-                    p.x += (Math.random() - 0.5) * 0.5;
-                    p.z += (Math.random() - 0.5) * 0.5;
-                    p.rY = Math.random() * Math.PI * 2;
-                    if (onPlayerPositionUpdate) onPlayerPositionUpdate(p);
-                }
-            });
-
             if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
-        }, 1000);
-        return;
+            if (onPlayerPositionUpdate) {
+                mockPlayers.forEach(p => {
+                    if (p.userId !== 'player_me') onPlayerPositionUpdate(p);
+                });
+            }
+
+            presenceUpdateInterval = setInterval(() => {
+                if (Math.random() < 0.2 && mockPlayers.length > 1) {
+                    const actorIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
+                    mockPlayers[actorIdx].level++;
+                }
+
+                if (mockPlayers.length > 2 && Math.random() < 0.1) {
+                    const leaveIdx = 1 + Math.floor(Math.random() * (mockPlayers.length - 1));
+                    const left = mockPlayers.splice(leaveIdx, 1)[0];
+                    if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
+                }
+
+                if (mockPlayers.length < 5 && Math.random() < 0.1 && names.length > 0) {
+                    const idx = Math.floor(Math.random() * names.length);
+                    const name = names.splice(idx, 1)[0];
+                    mockPlayers.push({
+                        userId: 'player_' + name.toLowerCase(),
+                        username: name,
+                        level: Math.floor(currentLevel + (Math.random() - 0.2) * 5),
+                        x: (Math.random() - 0.5) * 15,
+                        y: 0,
+                        z: (Math.random() - 0.5) * 15,
+                        rY: Math.random() * Math.PI * 2,
+                        state: 'idle'
+                    });
+                    if (onlinePlayersCallback) onlinePlayersCallback([...mockPlayers]);
+                }
+
+                mockPlayers.forEach(p => {
+                    if (p.userId !== 'player_me' && Math.random() < 0.5) {
+                        p.x += (Math.random() - 0.5) * 0.5;
+                        p.z += (Math.random() - 0.5) * 0.5;
+                        p.rY = Math.random() * Math.PI * 2;
+                        if (onPlayerPositionUpdate) onPlayerPositionUpdate(p);
+                    }
+                });
+
+                if (onlinePlayersCallback) onlinePlayersCallback(mockPlayers);
+            }, 1000);
+            return;
+        }
     }
 
     // Initialize Socket.io connection
