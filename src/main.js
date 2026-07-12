@@ -22,6 +22,7 @@ import {
     stopAutoSave,
     broadcastPosition,
     broadcastChat,
+    updatePresence,
     getDeterministicGuestName,
     isPlaceholderName,
 } from './network/GameSync.js';
@@ -391,6 +392,9 @@ async function initGame(charData) {
 
             let rp = remotePlayersMap.get(p.userId);
             if (!rp) {
+                // Step 12: Wait for valid position before creating remote mesh to prevent "stuck at portal" visuals
+                if (p.x === undefined || p.z === undefined) return;
+
                 // Create a real hero model for the remote player
                 const remoteChar = new CharacterManager(sceneManager.scene);
                 let rName = p.username;
@@ -409,8 +413,12 @@ async function initGame(charData) {
             }
 
             // Update position and appearance
-            rp.mesh.position.set(p.x, p.y, p.z);
-            rp.mesh.rotation.y = p.rY;
+            if (p.x !== undefined && p.y !== undefined && p.z !== undefined) {
+                rp.mesh.position.set(p.x, p.y, p.z);
+            }
+            if (p.rY !== undefined) {
+                rp.mesh.rotation.y = p.rY;
+            }
 
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
@@ -798,6 +806,19 @@ function gameLoop(time) {
                     // Update multiplayer presence for the new map
                     updatePresence(character.stats.level, username, targetMap);
                     console.log(`[Warp] Presence updated`);
+
+                    // Immediately broadcast position on the new map so others see us at the spawn point
+                    broadcastPosition(
+                        userId,
+                        username,
+                        character.stats.level,
+                        character.getPosition(),
+                        character.mesh.rotation.y,
+                        character.state,
+                        character.getAppearance(),
+                        targetMap
+                    );
+                    console.log(`[Warp] Initial position broadcasted for new map`);
                     
                     // Clear remote players from old map
                     for (const [id, rp] of remotePlayersMap.entries()) {
