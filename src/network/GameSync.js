@@ -271,6 +271,65 @@ export async function saveCharacter(characterId, updates) {
     }
 }
 
+/**
+ * Save character data to Supabase using user_id instead of character row id.
+ * This is necessary to satisfy RLS policies that check auth.uid() = user_id.
+ * @param {string} userId - The Supabase auth user UUID
+ * @param {Object} updates - Fields to update
+ */
+export async function saveCharacterByUserId(userId, updates) {
+    // Persist game settings to localStorage first
+    try {
+        const settingsKey = `zolos_settings_${userId}`;
+        const existingSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+        if (updates.fps_enabled !== undefined) existingSettings.fps_enabled = updates.fps_enabled;
+        if (updates.sound_enabled !== undefined) existingSettings.sound_enabled = updates.sound_enabled;
+        if (updates.graphics_quality !== undefined) existingSettings.graphics_quality = updates.graphics_quality;
+        localStorage.setItem(settingsKey, JSON.stringify(existingSettings));
+    } catch (e) { /* localStorage unavailable */ }
+
+    if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
+        const char = localDb.get(`char_${userId}`);
+        if (char) {
+            const merged = { ...char, ...updates, updated_at: new Date().toISOString() };
+            localDb.set(`char_${userId}`, merged);
+            updateLocalLeaderboard(merged);
+        }
+        return;
+    }
+
+    const allowedFields = [
+        'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
+        'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
+        'sound_enabled', 'graphics_quality', 'fps_enabled',
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+    ];
+
+    const filteredUpdates = {};
+    for (const key of Object.keys(updates)) {
+        if (allowedFields.includes(key)) {
+            filteredUpdates[key] = updates[key];
+        }
+    }
+
+    console.log(`[Zolos] 💾 Saving by user_id ${userId}. Fields:`, Object.keys(filteredUpdates));
+    const { data, error } = await supabase
+        .from('characters')
+        .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .select();
+
+    if (error) {
+        console.error('[Zolos] ❌ saveCharacterByUserId error:', error.message, error.details, error.hint);
+    } else {
+        if (data && data.length > 0) {
+            console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', data.length);
+        } else {
+            console.warn('[Zolos] ⚠️ saveCharacterByUserId: 0 rows updated. userId may not exist.');
+        }
+    }
+}
+
 // ============ Daily Quests DB Sync (System Inventory Fallback) ============
 export async function saveDailyQuests(characterId, questData) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
@@ -764,7 +823,11 @@ export function startAutoSave(getStateCallback, intervalMs = 180000) {
         const state = getStateCallback();
         if (state && state.characterId) {
             // Save directly to Supabase
-            await saveCharacter(state.characterId, state.updates);
+            if (state.userId) {
+                await saveCharacterByUserId(state.userId, state.updates);
+            } else {
+                await saveCharacter(state.characterId, state.updates);
+            }
 
             // Also send state to Socket server for save-on-disconnect backup
             sendSaveState(state);

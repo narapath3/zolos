@@ -400,7 +400,7 @@ export class CharacterManager {
 
     // Set body & arm color dynamically (for username-based consistent coloring)
     setBodyColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x'), 16) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         const oldColor = this.bodyColor;
         this.bodyColor = colorVal;
         if (!this.mesh) return;
@@ -417,7 +417,7 @@ export class CharacterManager {
     }
 
     setHairColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x'), 16) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         this.hairColor = colorVal;
         if (this.hair && this.hair.material) {
             this.hair.material.color.setHex(colorVal);
@@ -425,7 +425,7 @@ export class CharacterManager {
     }
 
     setPantsColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x'), 16) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         this.pantsColor = colorVal;
         if (this.leftLeg && this.leftLeg.material) {
             this.leftLeg.material.color.setHex(colorVal);
@@ -1143,6 +1143,7 @@ export class CharacterManager {
     loadStats(data) {
         if (!data) return;
         this.characterId = data.id;
+        this.userId = data.user_id || null;
 
         let name = data.name;
         if (!name || isPlaceholderName(name)) {
@@ -1225,7 +1226,11 @@ export class CharacterManager {
     async saveStatsToDatabase() {
         if (!this.characterId) return;
         const { updates } = this.getSaveData();
-        const { saveCharacter } = await import('../network/GameSync.js');
-        await saveCharacter(this.characterId, updates);
+        const { saveCharacter, saveCharacterByUserId } = await import('../network/GameSync.js');
+        if (this.userId && !this.userId.startsWith('guest_') && !this.userId.startsWith('local_')) {
+            await saveCharacterByUserId(this.userId, updates);
+        } else {
+            await saveCharacter(this.characterId, updates);
+        }
     }
 }

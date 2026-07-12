@@ -316,6 +316,10 @@ async function initGame(charData) {
 
             // Persist character appearance & stats to DB
             await character.saveStatsToDatabase();
+            if (charData.user_id) {
+                const { saveCharacterByUserId } = await import('./network/GameSync.js');
+                await saveCharacterByUserId(charData.user_id, character.getSaveData().updates);
+            }
             // Refresh all UI panels
             gameUI._renderInventory();
             gameUI.updateHUD(character.stats);
@@ -432,6 +436,7 @@ async function initGame(charData) {
         }
         return {
             characterId: charData.id,
+            userId: charData.user_id,
             updates: saveData.updates
         };
     }, 15000);
@@ -459,8 +464,12 @@ async function initGame(charData) {
             gameUI.addCombatLog('💾 กำลังบันทึกข้อมูลตัวละคร...', 'system');
             const saveData = character.getSaveData();
             try {
-                const { saveCharacter, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
-                await saveCharacter(charData.id, saveData.updates);
+                const { saveCharacter, saveCharacterByUserId, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
+                if (charData.user_id) {
+                    await saveCharacterByUserId(charData.user_id, saveData.updates);
+                } else {
+                    await saveCharacter(charData.id, saveData.updates);
+                }
                 if (gameUI.dailyQuestsState) {
                     await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
                 }
