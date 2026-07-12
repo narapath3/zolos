@@ -1581,7 +1581,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== KILL COUNTER ========== */
 #kill-counter {
   position: fixed;
-  top: 174px;
+  top: 220px;
   right: 16px;
   z-index: 100;
   background: var(--bg-dark);
@@ -2139,7 +2139,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
    ============================================ */
 #skill-bar {
   position: fixed;
-  top: 220px;
+  top: 280px;
   right: 16px;
   left: auto;
   bottom: auto;
