@@ -4341,9 +4341,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .quest-desc-text {
-  font-size: 9.5px;
-  color: var(--text-dim, #8090b0);
+  font-size: 10px;
+  color: #222;
+  font-weight: 600;
   margin-bottom: 8px;
+  line-height: 1.4;
 }
 
 .quest-progress-container {
@@ -4376,7 +4378,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .quest-progress-text {
   font-size: 8px;
   font-family: var(--font-pixel, monospace);
-  color: var(--text-dark);
+  color: #000;
+  font-weight: 800;
   min-width: 32px;
   text-align: right;
 }
