@@ -58,8 +58,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   align-items: center;
   justify-content: center;
   background:
-    linear-gradient(rgba(10, 14, 26, 0.5), rgba(7, 10, 20, 0.85)),
-    url('/src/assets/login_bg.png') no-repeat center center;
+    linear-gradient(rgba(10, 14, 26, 0.3), rgba(7, 10, 20, 0.7)),
+    url('/src/assets/login_bg_new.png') no-repeat center center;
   background-size: cover;
   z-index: 1000;
 }
@@ -105,17 +105,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 40px 48px;
-  background: rgba(14, 18, 36, 0.78);
-  border: 1px solid rgba(240, 192, 64, 0.35);
-  border-radius: 20px;
-  backdrop-filter: blur(25px);
+  padding: 32px 40px;
+  background: rgba(10, 14, 26, 0.65);
+  border: 1px solid rgba(240, 192, 64, 0.25);
+  border-radius: 24px;
+  backdrop-filter: blur(15px);
   box-shadow:
     var(--shadow),
-    0 0 80px rgba(100, 140, 255, 0.15),
-    0 0 160px rgba(240, 192, 64, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  min-width: 420px;
+    0 0 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  width: 380px;
   animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -133,110 +132,34 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 /* ========== RO-STYLE LOGO ========== */
 .auth-logo {
-  margin-bottom: 28px;
-}
-
-.logo-emblem {
+  margin-bottom: 24px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 8px;
 }
 
-.logo-wing {
-  font-size: 32px;
-  animation: wingFloat 3s ease-in-out infinite;
-  filter: drop-shadow(0 0 12px var(--primary)) drop-shadow(0 0 24px rgba(240, 192, 64, 0.4));
+.auth-icon-img {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 0 15px rgba(240, 192, 64, 0.4));
+  animation: logoPulse 4s ease-in-out infinite;
 }
 
-.logo-wing.left {
-  animation-delay: 0s;
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(240, 192, 64, 0.4)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(240, 192, 64, 0.6)); }
 }
 
-.logo-wing.right {
-  animation-delay: 1.5s;
-}
-
-@keyframes wingFloat {
-
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  50% {
-    transform: translateY(-6px) scale(1.1);
-  }
-}
-
-.logo-text-wrap {
-  position: relative;
-  overflow: hidden;
-  padding: 4px 0;
-}
-
-.game-title {
+.game-title-new {
   font-family: var(--font-pixel);
-  font-size: 52px;
-  letter-spacing: 10px;
-  position: relative;
-  /* Multi-layer metallic gold text */
-  background: linear-gradient(180deg,
-      #fff8e0 0%,
-      #f0c040 20%,
-      #c88020 40%,
-      #f0c040 50%,
-      #ffe680 60%,
-      #c88020 80%,
-      #a06010 100%);
-  background-size: 100% 200%;
+  font-size: 38px;
+  letter-spacing: 6px;
+  background: linear-gradient(180deg, #fff8e0, #f0c040, #c88020);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: metalShimmer 4s ease-in-out infinite;
-  filter: drop-shadow(0 2px 0 #804000) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
-  text-shadow: none;
-}
-
-@keyframes metalShimmer {
-
-  0%,
-  100% {
-    background-position: 0% 0%;
-  }
-
-  50% {
-    background-position: 0% 100%;
-  }
-}
-
-.logo-shine {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(90deg,
-      transparent 0%,
-      rgba(255, 248, 220, 0.3) 40%,
-      rgba(255, 255, 255, 0.5) 50%,
-      rgba(255, 248, 220, 0.3) 60%,
-      transparent 100%);
-  animation: shinePass 4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes shinePass {
-
-  0%,
-  70% {
-    left: -100%;
-  }
-
-  100% {
-    left: 200%;
-  }
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+  margin-bottom: 4px;
 }
 
 .game-subtitle {
