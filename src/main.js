@@ -332,12 +332,27 @@ async function initGame(charData) {
             // Update online players list
             if (gameUI) gameUI.updateOnlinePlayers(players);
 
-            // Clean up players who left
-            const currentIds = new Set(players.map(p => p.userId));
-            for (const [id, rp] of remotePlayersMap.entries()) {
-                if (!currentIds.has(id)) {
-                    sceneManager.scene.remove(rp.mesh);
-                    remotePlayersMap.delete(id);
+            // If players is empty, it's a "clean up" signal or a specific player left
+            // However, Socket.io sends incremental updates now.
+            // If we receive a list, we ensure all players in it exist.
+            players.forEach(p => {
+                if (p.userId === userId) return;
+                if (!remotePlayersMap.has(p.userId)) {
+                    // This will be handled by the position update callback too, 
+                    // but we can pre-initialize here if needed.
+                }
+            });
+
+            // Clean up players who are NOT in the active players list anymore
+            // Note: In Socket.io mode, 'players' might be the FULL list from playersUpdate
+            // or a SINGLE player from playerJoined. We need to be careful.
+            if (players.length > 1) {
+                const currentIds = new Set(players.map(p => p.userId));
+                for (const [id, rp] of remotePlayersMap.entries()) {
+                    if (!currentIds.has(id)) {
+                        sceneManager.scene.remove(rp.mesh);
+                        remotePlayersMap.delete(id);
+                    }
                 }
             }
         },

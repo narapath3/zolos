@@ -640,10 +640,14 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
     }
 
     // Initialize Socket.io connection
-    socket = io(SOCKET_SERVER_URL);
+    console.log(`[Zolos] 🔌 Attempting to connect to: ${SOCKET_SERVER_URL}`);
+    socket = io(SOCKET_SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        withCredentials: true
+    });
 
     socket.on('connect', () => {
-        console.log('[Zolos] 📊 Socket.io connected');
+        console.log(`[Zolos] 📊 Socket.io connected to ${SOCKET_SERVER_URL} (ID: ${socket.id})`);
         socket.emit('joinGame', {
             userId: currentUserId,
             username: currentUsername,
@@ -653,7 +657,25 @@ export function joinPresence(userId, username, level, onPlayersUpdate, onPlayerP
     });
 
     socket.on('playersUpdate', (playersArray) => {
+        console.log(`[Zolos] 👥 Received full players list: ${playersArray.length} players`);
         if (onlinePlayersCallback) onlinePlayersCallback(playersArray);
+    });
+
+    socket.on('playerJoined', (playerData) => {
+        console.log(`[Zolos] ✨ Player joined: ${playerData.username} (${playerData.userId})`);
+        // Add new player to current list
+        if (onlinePlayersCallback) {
+            // This will trigger main.js to create the remote character
+            onlinePlayersCallback([playerData]);
+        }
+    });
+
+    socket.on('playerLeft', (data) => {
+        console.log(`[Zolos] 👋 Player left: ${data.userId}`);
+        if (onlinePlayersCallback) {
+            // Sending an empty update for this ID will trigger cleanup in main.js
+            onlinePlayersCallback([]); 
+        }
     });
 
     socket.on('playerUpdate', (playerData) => {
