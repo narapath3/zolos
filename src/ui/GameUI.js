@@ -2182,6 +2182,7 @@ export class GameUI {
   _renderSellShop() {
     const grid = document.getElementById('sell-shop-inventory-grid');
     if (!grid) return;
+    grid.style.cssText = 'width:100%;box-sizing:border-box;';
     grid.innerHTML = '';
 
     const goldDisplay = document.getElementById('sell-shop-gold-amount');
