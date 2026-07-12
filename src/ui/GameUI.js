@@ -2403,6 +2403,18 @@ export class GameUI {
       });
     }
 
+    // Category filter
+    this.marketCategory = 'all';
+    const catBtns = document.querySelectorAll('.market-cat-btn');
+    catBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        catBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.marketCategory = btn.getAttribute('data-cat');
+        this._renderMarket();
+      });
+    });
+
     // List button
     const listBtn = document.getElementById('btn-market-list-action');
     if (listBtn) {
@@ -2438,9 +2450,11 @@ export class GameUI {
       const query = (document.getElementById('market-search-input')?.value || '').toLowerCase().trim();
 
       const listings = await fetchMarketListings();
-      const filtered = listings.filter(l =>
-        l.item_name.toLowerCase().includes(query)
-      );
+      const filtered = listings.filter(l => {
+        const matchesQuery = l.item_name.toLowerCase().includes(query);
+        const matchesCategory = this.marketCategory === 'all' || l.item_type === this.marketCategory;
+        return matchesQuery && matchesCategory;
+      });
 
       if (filtered.length === 0) {
         grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;grid-column: span 5;">ไม่มีไอเทมที่วางขายในขณะนี้</div>';
