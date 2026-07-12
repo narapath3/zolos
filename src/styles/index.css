@@ -101,8 +101,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .auth-icon-img {
-  width: 120px;
-  height: 120px;
+  width: 220px;
+  height: 220px;
   margin-bottom: 12px;
   filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
 }
