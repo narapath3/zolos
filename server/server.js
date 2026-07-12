@@ -27,9 +27,11 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
 // ============ Express + Socket.io Setup ============
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
+    const io = new Server(httpServer, {
     cors: {
-        origin: CORS_ORIGINS,
+        origin: (origin, callback) => {
+            callback(null, true);
+        },
         methods: ['GET', 'POST'],
         credentials: true
     },
