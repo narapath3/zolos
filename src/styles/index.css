@@ -355,26 +355,27 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .player-info {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 16px;
-  backdrop-filter: blur(10px);
+  background: var(--bg-dark);
+  border: 2px solid var(--gold-border);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
   text-align: center;
-  min-width: 100px;
+  min-width: 90px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 .player-name {
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 9px;
   color: var(--primary);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  text-transform: uppercase;
 }
 
 .player-level {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
 }
 
 .bars-container {
@@ -436,20 +437,21 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
   letter-spacing: 0.5px;
 }
 
 /* ========== AUTO FARM BUTTON ========== */
 #auto-farm-container {
   position: fixed;
-  bottom: 100px;
-  right: 20px;
+  bottom: 120px;
+  right: 24px;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 15px;
   align-items: center;
 }
 
@@ -1579,16 +1581,17 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   top: 174px;
   right: 16px;
   z-index: 100;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--bg-dark);
+  border: 2px solid var(--gold-border);
+  border-radius: var(--radius-lg);
   padding: 8px 14px;
-  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--font-pixel);
   font-size: 11px;
+  color: var(--primary);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 .kill-icon {
