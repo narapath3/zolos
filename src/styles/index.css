@@ -1997,18 +1997,20 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .stats-bar-label {
-  color: var(--text-dim);
+  color: var(--text-dark);
+  font-weight: 600;
 }
 
 .stats-bar-val {
-  color: #ffffff;
+  color: var(--text-dark);
+  font-weight: 700;
 }
 
 .stats-bar-bg {
   height: 10px;
   border-radius: 5px;
-  background: rgba(10, 15, 30, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
   overflow: hidden;
   position: relative;
 }
@@ -2041,8 +2043,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .stats-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-sm);
   padding: 14px;
   display: flex;
@@ -2081,8 +2083,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .stats-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
   transform: translateY(-2px);
 }
 
@@ -2099,14 +2101,15 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .stats-card-title {
   font-family: var(--font-pixel);
   font-size: 8px;
-  color: var(--text-dim);
+  color: var(--text-dark);
+  opacity: 0.7;
   text-transform: uppercase;
 }
 
 .stats-card-value {
   font-size: 18px;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--text-dark);
   margin-top: 2px;
 }
 
