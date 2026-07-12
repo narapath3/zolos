@@ -1,5 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList } from '../network/GameSync.js';
+import { LayoutManager } from './LayoutManager.js';
 
 
 export class GameUI {
@@ -55,6 +56,7 @@ export class GameUI {
     this._setupMobileControls();
     this._setupDailyQuests();
     this._setupNetworkStatus();
+    this.layoutManager = new LayoutManager(this);
     window.gameUI = this;
   }
 
@@ -1671,6 +1673,33 @@ export class GameUI {
         }
       });
     }
+
+    // Layout Manager listeners
+    const editLayoutBtn = document.getElementById('btn-edit-layout');
+    if (editLayoutBtn) {
+      editLayoutBtn.addEventListener('click', () => {
+        const isEditing = this.layoutManager.toggleEditMode();
+        editLayoutBtn.textContent = isEditing ? '✅ Save Layout (บันทึกตำแหน่ง)' : '🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)';
+        editLayoutBtn.style.background = isEditing ? '#40e080 !important' : 'var(--primary) !important';
+        
+        if (isEditing) {
+          // Close settings panel so user can see the UI
+          if (modal) modal.style.display = 'none';
+          this.updateMobileControlsVisibility();
+        }
+      });
+    }
+
+    const resetLayoutBtn = document.getElementById('btn-reset-layout');
+    if (resetLayoutBtn) {
+      resetLayoutBtn.addEventListener('click', () => {
+        if (confirm('คุณต้องการรีเซ็ตตำแหน่ง UI ทั้งหมดเป็นค่าเริ่มต้นใช่หรือไม่?')) {
+          this.layoutManager.resetLayout();
+        }
+      });
+    }
+
+
 
     const openEditor = () => {
       // Default to profile tab on open

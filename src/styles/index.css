@@ -1908,7 +1908,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   /* Auto farm / Fishing mobile tuning */
   #auto-farm-container {
-    bottom: 74px;
+    bottom: 140px; /* Lifted above the skill bar to prevent overlap */
     right: 8px;
     gap: 8px;
   }
@@ -3644,7 +3644,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   #auto-farm-container {
     bottom: auto;
-    top: 80px;
+    top: 10px; /* Moved higher to avoid overlapping with potential top-left elements */
     left: 10px;
     right: auto;
     flex-direction: row;
@@ -4853,4 +4853,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
   }
+}
+
+/* Layout Editing Styles */
+.layout-editing {
+  outline: 2px dashed var(--primary) !important;
+  outline-offset: 4px !important;
+  background: rgba(64, 224, 128, 0.1) !important;
+  transition: none !important;
+}
+
+.layout-editing * {
+  pointer-events: none !important;
 }
