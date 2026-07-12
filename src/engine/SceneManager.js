@@ -1912,30 +1912,30 @@ export class SceneManager {
 
         // ---- Floating shop name tag ----
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 96;
+        canvas.width = 1024; // Double resolution for better clarity and overflow protection
+        canvas.height = 128;
         const ctx = canvas.getContext('2d');
         // Background
         ctx.fillStyle = 'rgba(40, 20, 10, 0.7)';
-        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.roundRect(128, 16, 768, 96, 24);
         ctx.fill();
         // Border
         ctx.strokeStyle = '#c8a050';
-        ctx.lineWidth = 3;
-        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.lineWidth = 6;
+        ctx.roundRect(128, 16, 768, 96, 24);
         ctx.stroke();
         // Text
-        ctx.font = 'bold 32px sans-serif'; // Use sans-serif for better cross-platform Thai rendering
+        ctx.font = 'bold 48px "Helvetica Neue", Helvetica, Arial, sans-serif'; // More stable font stack
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle'; // Center vertically more reliably
+        ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffd040';
-        ctx.fillText('🏪 ร้านค้า', 256, 48);
+        ctx.fillText('🏪 ร้านค้า', 512, 64);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameTag = new THREE.Sprite(spriteMat);
         nameTag.position.y = 4.4;
-        nameTag.scale.set(3.5, 0.7, 1);
+        nameTag.scale.set(5.0, 0.625, 1); // Adjusted scale for wider canvas
         group.add(nameTag);
 
         // ---- Position the entire shop on dry land ----
@@ -2103,27 +2103,27 @@ export class SceneManager {
 
         // ---- Floating shop name tag ----
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 96;
+        canvas.width = 1024; // Higher width to prevent clipping
+        canvas.height = 128;
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = 'rgba(10, 40, 20, 0.7)';
-        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.roundRect(64, 16, 896, 96, 24);
         ctx.fill();
         ctx.strokeStyle = '#ebd040';
-        ctx.lineWidth = 3;
-        ctx.roundRect(8, 8, 496, 80, 12);
+        ctx.lineWidth = 6;
+        ctx.roundRect(64, 16, 896, 96, 24);
         ctx.stroke();
-        ctx.font = 'bold 28px sans-serif'; // Slightly smaller and use sans-serif for Thai compatibility
+        ctx.font = 'bold 42px "Helvetica Neue", Helvetica, Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffdd44';
-        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 256, 48);
+        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 512, 64);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameTag = new THREE.Sprite(spriteMat);
         nameTag.position.y = 4.4;
-        nameTag.scale.set(4.0, 0.8, 1);
+        nameTag.scale.set(6.0, 0.75, 1); // Wider sprite scale to match wider canvas
         group.add(nameTag);
 
         // Position on dry land - slightly higher elevation and shifted
