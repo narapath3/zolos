@@ -11,7 +11,7 @@ let isConnected = false;
  */
 function getSocketUrl() {
     const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
-    const url = (env.VITE_SOCKET_URL || '').trim();
+    const url = (env.VITE_SOCKET_URL || env.VITE_SOCKET_SERVER_URL || '').trim();
     if (!url || url === 'undefined') return null;
     return url;
 }

@@ -6,7 +6,7 @@ This guide explains how to configure environment variables in Vercel for the Zol
 
 ### 1. Socket.io Server URL
 
-**Variable Name**: `VITE_SOCKET_SERVER_URL`
+**Variable Name**: `VITE_SOCKET_URL`
 
 **Value**: Your Railway server URL (e.g., `https://zolos-socket-server.railway.app`)
 
@@ -14,7 +14,7 @@ This guide explains how to configure environment variables in Vercel for the Zol
 
 **Example**:
 ```
-VITE_SOCKET_SERVER_URL=https://zolos-socket-server.railway.app
+VITE_SOCKET_URL=https://zolos-socket-server.railway.app
 ```
 
 ### 2. Supabase Configuration
@@ -51,7 +51,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 4. Click **Environment Variables** in the left sidebar
 5. Click **Add New** button
 6. Enter:
-   - **Name**: `VITE_SOCKET_SERVER_URL`
+   - **Name**: `VITE_SOCKET_URL`
    - **Value**: `https://zolos-socket-server.railway.app` (replace with your actual URL)
    - **Environments**: Select `Production`, `Preview`, and `Development`
 7. Click **Save**
@@ -67,7 +67,7 @@ npm install -g vercel
 vercel link
 
 # Add environment variable
-vercel env add VITE_SOCKET_SERVER_URL
+vercel env add VITE_SOCKET_URL
 
 # When prompted, enter the value:
 # https://zolos-socket-server.railway.app
@@ -82,19 +82,19 @@ vercel deploy --prod
 ## Environment Variables by Deployment Stage
 
 ### Production
-- `VITE_SOCKET_SERVER_URL`: Your Railway production server
+- `VITE_SOCKET_URL`: Your Railway production server
 - `VITE_SUPABASE_URL`: Production Supabase URL
 - `VITE_SUPABASE_ANON_KEY`: Production Supabase key
 
 ### Preview (Staging)
-- `VITE_SOCKET_SERVER_URL`: Can point to staging server or production
+- `VITE_SOCKET_URL`: Can point to staging server or production
 - `VITE_SUPABASE_URL`: Can point to staging or production database
 - `VITE_SUPABASE_ANON_KEY`: Corresponding key
 
 ### Development (Local)
 - Create a `.env.local` file in the project root:
 ```
-VITE_SOCKET_SERVER_URL=http://localhost:3000
+VITE_SOCKET_URL=http://localhost:3000
 VITE_SUPABASE_URL=https://hxvxifghgqwgjbcliqjx.supabase.co
 VITE_SUPABASE_ANON_KEY=your-key-here
 ```
@@ -105,7 +105,7 @@ In the Zolos frontend code, environment variables are accessed via `import.meta.
 
 ```javascript
 // src/network/GameSync.js
-const socketServerUrl = import.meta.env.VITE_SOCKET_SERVER_URL;
+const socketServerUrl = import.meta.env.VITE_SOCKET_URL;
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -125,7 +125,7 @@ After deploying with new environment variables:
 1. Open your Zolos game
 2. Open browser DevTools (F12)
 3. Go to **Console** tab
-4. Type: `import.meta.env.VITE_SOCKET_SERVER_URL`
+4. Type: `import.meta.env.VITE_SOCKET_URL`
 5. You should see your Railway server URL
 
 ## Troubleshooting
@@ -157,7 +157,7 @@ After deploying with new environment variables:
 **Solution**:
 1. Verify the Railway server URL is correct and accessible
 2. Check CORS settings in `server/index.js`
-3. Ensure `VITE_SOCKET_SERVER_URL` matches the Railway domain exactly
+3. Ensure `VITE_SOCKET_URL` matches the Railway domain exactly
 4. Check browser console for specific error messages
 
 ## Security Best Practices
@@ -172,7 +172,7 @@ After deploying with new environment variables:
 
 | Variable | Required | Example | Notes |
 |----------|----------|---------|-------|
-| `VITE_SOCKET_SERVER_URL` | Yes | `https://zolos-socket-server.railway.app` | Must be HTTPS in production |
+| `VITE_SOCKET_URL` | Yes | `https://zolos-socket-server.railway.app` | Must be HTTPS in production |
 | `VITE_SUPABASE_URL` | Yes | `https://hxvxifghgqwgjbcliqjx.supabase.co` | From Supabase dashboard |
 | `VITE_SUPABASE_ANON_KEY` | Yes | `eyJhbGc...` | From Supabase dashboard |
 

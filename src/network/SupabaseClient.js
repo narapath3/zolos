@@ -192,7 +192,7 @@ export function clearActiveSession() {
 // ============ Realtime Online Count (Auth Screen) ============
 export function subscribeOnlineCount(callback) {
   // Check if Socket.io is enabled
-  const socketUrl = (env.VITE_SOCKET_URL || '').trim();
+  const socketUrl = (env.VITE_SOCKET_URL || env.VITE_SOCKET_SERVER_URL || '').trim();
   const isSocketEnabled = socketUrl && socketUrl !== 'undefined';
 
   if (isSocketEnabled) {
