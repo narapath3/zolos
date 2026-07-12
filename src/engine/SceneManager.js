@@ -1925,10 +1925,11 @@ export class SceneManager {
         ctx.roundRect(8, 8, 496, 80, 12);
         ctx.stroke();
         // Text
-        ctx.font = 'bold 36px Arial';
+        ctx.font = 'bold 32px sans-serif'; // Use sans-serif for better cross-platform Thai rendering
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle'; // Center vertically more reliably
         ctx.fillStyle = '#ffd040';
-        ctx.fillText('🏪 ร้านค้า', 256, 60);
+        ctx.fillText('🏪 ร้านค้า', 256, 48);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
@@ -2112,10 +2113,11 @@ export class SceneManager {
         ctx.lineWidth = 3;
         ctx.roundRect(8, 8, 496, 80, 12);
         ctx.stroke();
-        ctx.font = 'bold 32px Arial';
+        ctx.font = 'bold 28px sans-serif'; // Slightly smaller and use sans-serif for Thai compatibility
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillStyle = '#ffdd44';
-        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 256, 60);
+        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 256, 48);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
