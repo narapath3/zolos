@@ -408,10 +408,11 @@ export class AdminUI {
     }
 
     async _renderAnnouncementPanel() {
-        const { AdminAnnouncementPanel } = await import('../ui/AdminAnnouncementPanel.js');
-        const panel = new AdminAnnouncementPanel();
-        panel.init();
-        panel.show();
+        const { adminAnnouncementPanel } = await import('../ui/AdminAnnouncementPanel.js');
+        if (!adminAnnouncementPanel.panelElement) {
+            adminAnnouncementPanel.init();
+        }
+        adminAnnouncementPanel.show();
     }
 
     _renderUserList() {

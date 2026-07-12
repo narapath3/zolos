@@ -199,6 +199,13 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- ADMIN ANNOUNCEMENT ---
+    socket.on('admin:announcement', (data) => {
+        // Broadcast announcement to ALL connected clients
+        io.emit('admin:announcement', data);
+        console.log('[Server] Admin announcement broadcasted:', data.text);
+    });
+
     // --- DISCONNECT ---
     socket.on('disconnect', async (reason) => {
         const player = onlinePlayers.get(socket.id);

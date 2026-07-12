@@ -11,8 +11,7 @@ import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
 import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { AdminUI } from './ui/AdminUI.js';
-import { AnnouncementSystem } from './ui/AnnouncementSystem.js';
-import { AdminAnnouncementPanel } from './ui/AdminAnnouncementPanel.js';
+import { announcementSystem } from './ui/AnnouncementSystem.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -235,19 +234,8 @@ async function initGame(charData) {
     gameUI.particles = particles;
 
     // Initialize Announcement System
-    const announcementSystem = new AnnouncementSystem();
     announcementSystem.init();
     window.announcementSystem = announcementSystem;
-
-    // Setup announcement listeners for Socket.io broadcasts
-    const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
-    setupAnnouncementListeners((announcementData) => {
-      announcementSystem.addAnnouncement(
-        announcementData.text,
-        announcementData.type || 'info',
-        announcementData.duration || 8000
-      );
-    });
 
     // Set guest mode state
     gameUI.setGuestMode(charData.isGuest === true);
@@ -369,7 +357,7 @@ async function initGame(charData) {
         userId,
         username,
         character.stats.level,
-        (players) => {
+        async (players) => {
             // Update online players list
             if (gameUI) gameUI.updateOnlinePlayers(players);
 
@@ -392,6 +380,22 @@ async function initGame(charData) {
                     }
                 }
             });
+
+            // Setup announcement listeners for Socket.io broadcasts (after socket is connected)
+            try {
+                const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
+                setupAnnouncementListeners((announcementData) => {
+                    if (window.announcementSystem) {
+                        window.announcementSystem.addAnnouncement(
+                            announcementData.text,
+                            announcementData.type || 'info',
+                            announcementData.duration || 8000
+                        );
+                    }
+                });
+            } catch (err) {
+                console.warn('[Zolos] Failed to setup announcement listeners:', err);
+            }
         },
         (p) => {
             // Handle remote player position updates
