@@ -1863,9 +1863,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   /* Auto farm / Fishing mobile tuning */
   #auto-farm-container {
-    bottom: 180px; /* Positioned well above the skill bar and HUD */
-    right: 12px;
-    gap: 10px;
+    bottom: 180px !important; /* Positioned well above the skill bar and HUD */
+    top: auto !important;
+    left: auto !important;
+    right: 12px !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    z-index: 100 !important;
   }
 
   .btn-auto,
@@ -3599,13 +3603,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   }
 
   #auto-farm-container {
-    bottom: auto;
-    top: 10px; /* Moved higher to avoid overlapping with potential top-left elements */
-    left: 10px;
-    right: auto;
-    flex-direction: row;
-    gap: 8px;
-    z-index: 1600;
+    bottom: 180px !important; /* Override: position above skill bar on tablet */
+    top: auto !important;
+    left: auto !important;
+    right: 12px !important;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 100;
   }
 
   .btn-auto,
