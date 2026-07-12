@@ -1000,35 +1000,87 @@ export class GameUI {
     if (!body) return;
 
     const friends = this.friends || [];
-    let list = this.onlinePlayers || [];
+    const onlinePlayers = this.onlinePlayers || [];
+    const onlineUsernames = new Set(onlinePlayers.map(p => p.username));
+    
+    let list = [];
+    let onlineCount = 0;
 
     if (this.onlineView === 'friends') {
-      list = list.filter(p => friends.includes(p.username));
+      // 1. Online friends
+      const onlineFriends = onlinePlayers.filter(p => friends.includes(p.username));
+      onlineCount = onlineFriends.length;
+      list = [...onlineFriends];
+      
+      // 2. Offline friends
+      friends.forEach(friendName => {
+        if (!onlineUsernames.has(friendName)) {
+          list.push({
+            username: friendName,
+            level: '?',
+            isOffline: true
+          });
+        }
+      });
+      
+      // Sort: Online first, then alphabetical
+      list.sort((a, b) => {
+        if (!!a.isOffline !== !!b.isOffline) return a.isOffline ? 1 : -1;
+        return a.username.localeCompare(b.username);
+      });
     } else {
-      // Local map filtering for 'global' view
+      // Global view
       const currentMapId = window.gameUI?.currentMapId || 'prontera';
-      list = list.filter(p => !p.mapId || p.mapId === currentMapId);
+      const onlineInMap = onlinePlayers.filter(p => !p.mapId || p.mapId === currentMapId);
+      onlineCount = onlineInMap.length;
+      list = [...onlineInMap];
+      
+      // Append offline friends who are not in the list
+      const listUsernames = new Set(list.map(p => p.username));
+      friends.forEach(friendName => {
+        if (!onlineUsernames.has(friendName) && !listUsernames.has(friendName)) {
+          list.push({
+            username: friendName,
+            level: '?',
+            isOffline: true,
+            isFriendOnly: true
+          });
+        }
+      });
+      
+      // Sort: Online first, then alphabetical
+      list.sort((a, b) => {
+        if (!!a.isOffline !== !!b.isOffline) return a.isOffline ? 1 : -1;
+        return a.username.localeCompare(b.username);
+      });
     }
 
     if (list.length === 0) {
       const emptyMsg = this.onlineView === 'friends'
-        ? 'ยังไม่มีเพื่อนออนไลน์ — แตะชื่อผู้เล่นใน Global เพื่อเพิ่มเพื่อน'
+        ? 'คุณยังไม่มีรายชื่อเพื่อน — แตะชื่อผู้เล่นใน Global เพื่อเพิ่มเพื่อน'
         : 'No players online';
       body.innerHTML = `<div style="text-align:center;color:var(--text-dim);padding:20px;font-size:10px">${emptyMsg}</div>`;
       return;
     }
 
     // Header
-    let html = `<div class="online-count-badge">${this.onlineView === 'friends' ? '⭐' : '🌐'} ${list.length} ${this.onlineView === 'friends' ? 'friends' : 'players'} online</div>`;
+    const icon = this.onlineView === 'friends' ? '⭐' : '🌐';
+    const totalCount = list.length;
+    let html = `<div class="online-count-badge">${icon} ${onlineCount} online / ${totalCount} total</div>`;
 
     html += list.map(p => {
       const isFriend = friends.includes(p.username);
       const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
+      const offlineStyle = p.isOffline ? 'opacity:0.5;filter:grayscale(100%);pointer-events:auto;' : '';
+      const dotColor = p.isOffline ? '#888' : '#0f0';
+      const nameColor = p.isOffline ? '#888' : 'inherit';
+      const badgeStyle = p.isOffline ? 'background:#333;color:#666;border-color:#444;' : '';
+      
       return `
-        <div class="player-row" data-username="${p.username}">
-          <span class="online-dot"></span>
-          <span>${p.username}${starHtml}</span>
-          <span class="player-level-badge">Lv.${p.level}</span>
+        <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
+          <span class="online-dot" style="background-color:${dotColor}"></span>
+          <span style="color:${nameColor}">${p.username}${starHtml}</span>
+          <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>
         </div>
       `;
     }).join('');
@@ -1075,6 +1127,12 @@ export class GameUI {
       body.addEventListener('click', (e) => {
         const row = e.target.closest('.player-row');
         if (!row) return;
+        
+        // Skip if player is offline
+        if (row.getAttribute('data-offline') === 'true') {
+          return;
+        }
+
         const targetUsername = row.getAttribute('data-username');
         if (!this.onlinePlayers) return;
         const player = this.onlinePlayers.find(p => p.username === targetUsername);
