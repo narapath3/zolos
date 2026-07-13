@@ -1,5 +1,11 @@
 // ZOLOS — Idle RPG Online
 // Main Entry Point
+
+// Build version banner — bump BUILD_VERSION on notable fixes so we can
+// instantly tell from the console which bundle a client is running.
+const BUILD_VERSION = '2026-07-14.1 (int-color-save)';
+console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
+window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
 import { CharacterManager } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';

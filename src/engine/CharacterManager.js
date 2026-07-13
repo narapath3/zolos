@@ -400,7 +400,9 @@ export class CharacterManager {
 
     // Set body & arm color dynamically (for username-based consistent coloring)
     setBodyColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
+        let colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
+        // Guard: never let NaN/undefined poison the color (it would persist as 0 = black)
+        if (!Number.isFinite(colorVal)) colorVal = this.bodyColor ?? 0x4060c0;
         const oldColor = this.bodyColor;
         this.bodyColor = colorVal;
         if (!this.mesh) return;
@@ -417,7 +419,8 @@ export class CharacterManager {
     }
 
     setHairColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
+        let colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
+        if (!Number.isFinite(colorVal)) colorVal = this.hairColor ?? 0xc04040;
         this.hairColor = colorVal;
         if (this.hair && this.hair.material) {
             this.hair.material.color.setHex(colorVal);
@@ -425,7 +428,8 @@ export class CharacterManager {
     }
 
     setPantsColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
+        let colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
+        if (!Number.isFinite(colorVal)) colorVal = this.pantsColor ?? 0x3a3a5a;
         this.pantsColor = colorVal;
         if (this.leftLeg && this.leftLeg.material) {
             this.leftLeg.material.color.setHex(colorVal);
