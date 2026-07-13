@@ -274,6 +274,13 @@ async function initGame(charData) {
         sceneManager.scene
     );
 
+    // In-game BGM: stream via hidden YouTube embed (see YouTubeBGM.js)
+    import('./engine/YouTubeBGM.js').then(({ youtubeBGM }) => {
+        window.youtubeBGM = youtubeBGM;
+        youtubeBGM.setEnabled(character?.gameSettings?.sound_enabled !== false);
+        youtubeBGM.start();
+    });
+
     // Apply persisted game settings
     if (character && character.gameSettings) {
         if (soundManager) {

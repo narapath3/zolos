@@ -1627,6 +1627,10 @@ export class GameUI {
             this.soundManager.playUseItemSound();
           }
         }
+        // Keep the YouTube BGM in sync with the sound setting
+        if (window.youtubeBGM) {
+          window.youtubeBGM.setEnabled(e.target.checked);
+        }
         if (this.character && this.character.gameSettings) {
           this.character.gameSettings.sound_enabled = e.target.checked;
           this.character.saveStatsToDatabase();
