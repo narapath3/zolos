@@ -221,6 +221,10 @@ export class SceneManager {
         this.swayingObjects = [];
         this.birds = [];
 
+        this.cherryTreePositions = [];
+        this.sakuraPetals = null;
+        this.fishes = [];
+
         this.currentMap = mapId;
 
         // Update scene colors
@@ -247,6 +251,10 @@ export class SceneManager {
         } else {
             this._createEnvironment(config);
         }
+
+        // Ambient life: sakura petals from cherry trees, fish in the river
+        this._createSakuraPetals();
+        this._createFish(config);
 
         this._createPortals(mapId);
         this._createBirds();
@@ -658,6 +666,10 @@ export class SceneManager {
         // Large river water plane centered around z = -2, length 80, width 32
         const waterGeo = new THREE.PlaneGeometry(80, 40, 80, 30);
         const waterTex = this._createWaterTexture();
+        // Flowing water: scroll the caustic texture along the river each frame
+        waterTex.wrapS = THREE.RepeatWrapping;
+        waterTex.wrapT = THREE.RepeatWrapping;
+        this.waterFlowTex = waterTex;
         const waterMat = new THREE.MeshPhongMaterial({
             color: config.waterColor,
             map: waterTex,
@@ -707,6 +719,98 @@ export class SceneManager {
 
         // Bridge over the winding river at x = 0, z = -2
         this._createBridge(0, -2);
+    }
+
+    // ============ Ambient Life: Sakura Petals ============
+    // Small pink quads drifting down from every cherry-tree canopy, looping forever.
+    _createSakuraPetals() {
+        if (!this.cherryTreePositions || this.cherryTreePositions.length === 0) return;
+
+        const petalsPerTree = 12;
+        const total = Math.min(this.cherryTreePositions.length * petalsPerTree, 180);
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array(total * 3);
+        const data = [];
+
+        for (let i = 0; i < total; i++) {
+            const tree = this.cherryTreePositions[i % this.cherryTreePositions.length];
+            const d = {
+                treeX: tree.x,
+                treeZ: tree.z,
+                // spawn spread around the canopy
+                offX: (Math.random() - 0.5) * 2.4,
+                offZ: (Math.random() - 0.5) * 2.4,
+                topY: 3.2 + Math.random() * 1.4,
+                fallSpeed: 0.35 + Math.random() * 0.35,
+                swayAmp: 0.25 + Math.random() * 0.35,
+                swayFreq: 1.2 + Math.random() * 1.2,
+                phase: Math.random() * Math.PI * 2,
+                // stagger initial heights so petals don't fall in sync
+                y: 0,
+            };
+            d.y = Math.random() * d.topY;
+            data.push(d);
+            positions[i * 3] = d.treeX + d.offX;
+            positions[i * 3 + 1] = d.y;
+            positions[i * 3 + 2] = d.treeZ + d.offZ;
+        }
+
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const mat = new THREE.PointsMaterial({
+            color: 0xffc2d1,
+            size: 0.14,
+            transparent: true,
+            opacity: 0.9,
+            depthWrite: false,
+        });
+        const points = new THREE.Points(geo, mat);
+        points.frustumCulled = false;
+        this.scene.add(points);
+        this.envObjects.push(points);
+        this.sakuraPetals = { points, data };
+    }
+
+    // ============ Ambient Life: River Fish ============
+    // Small fish swim along the winding river; occasionally one leaps out with a flip.
+    _createFish(config) {
+        const fishColors = [0xe08040, 0xc0c8d0, 0x88b0d8, 0xd0a030];
+        const count = 6;
+
+        for (let i = 0; i < count; i++) {
+            const group = new THREE.Group();
+            const color = fishColors[i % fishColors.length];
+            const mat = new THREE.MeshLambertMaterial({ color });
+
+            // Body: squashed cone pointing forward
+            const body = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.45, 6), mat);
+            body.rotation.x = Math.PI / 2; // point along +Z
+            group.add(body);
+            // Tail fin
+            const tail = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.2, 4), mat);
+            tail.rotation.x = -Math.PI / 2;
+            tail.position.z = -0.28;
+            group.add(tail);
+
+            const u = {
+                x: -25 + Math.random() * 50,
+                dir: Math.random() < 0.5 ? 1 : -1,
+                speed: 0.8 + Math.random() * 1.0,
+                zOff: (Math.random() - 0.5) * 3.5,
+                swimY: -0.55,
+                // jumping
+                jumpTimer: 3 + Math.random() * 9,
+                jumpT: -1, // -1 = not jumping, else 0..1 progress
+                jumpDur: 0.9,
+                tail,
+                wigglePhase: Math.random() * Math.PI * 2,
+            };
+            group.userData = u;
+            group.position.set(u.x, u.swimY, Math.sin(u.x * 0.08) * 10 - 2 + u.zOff);
+
+            this.scene.add(group);
+            this.envObjects.push(group);
+            this.fishes.push(group);
+        }
     }
 
     _createBridge(x, z) {
@@ -905,6 +1009,8 @@ export class SceneManager {
                 break;
             }
             case 'cherry': {
+                // Record position so sakura petals can fall from this tree
+                if (this.cherryTreePositions) this.cherryTreePositions.push({ x, z });
                 // Slender trunk
                 const trunkGeo = new THREE.CylinderGeometry(0.12, 0.2, 3, 6);
                 const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8a5a3a });
@@ -2341,6 +2447,74 @@ export class SceneManager {
             }
         }
         */
+
+        // Flowing water: scroll the caustic texture along the river
+        if (this.waterFlowTex) {
+            this.waterFlowTex.offset.x += dt * 0.025;
+            this.waterFlowTex.offset.y += dt * 0.008;
+        }
+
+        // Sakura petals drifting down from cherry trees
+        if (this.sakuraPetals) {
+            const { points, data } = this.sakuraPetals;
+            const pos = points.geometry.attributes.position;
+            for (let i = 0; i < data.length; i++) {
+                const d = data[i];
+                d.y -= d.fallSpeed * dt;
+                if (d.y <= 0.05) {
+                    // Respawn at canopy with a fresh horizontal offset
+                    d.y = d.topY;
+                    d.offX = (Math.random() - 0.5) * 2.4;
+                    d.offZ = (Math.random() - 0.5) * 2.4;
+                    d.phase = Math.random() * Math.PI * 2;
+                }
+                const sway = Math.sin(this.time * d.swayFreq + d.phase) * d.swayAmp;
+                const drift = Math.cos(this.time * d.swayFreq * 0.6 + d.phase) * d.swayAmp * 0.6;
+                pos.setXYZ(i, d.treeX + d.offX + sway, d.y, d.treeZ + d.offZ + drift);
+            }
+            pos.needsUpdate = true;
+        }
+
+        // Fish swimming along the river, occasionally leaping
+        if (this.fishes && this.fishes.length) {
+            for (const fish of this.fishes) {
+                const u = fish.userData;
+
+                // Move along the river's x axis; z follows the winding curve
+                u.x += u.dir * u.speed * dt;
+                if (u.x > 27) { u.x = 27; u.dir = -1; }
+                if (u.x < -27) { u.x = -27; u.dir = 1; }
+                const riverZ = Math.sin(u.x * 0.08) * 10 - 2 + u.zOff;
+
+                let y = u.swimY;
+                let pitch = 0;
+
+                if (u.jumpT >= 0) {
+                    // Mid-jump: parabolic arc + forward flip
+                    u.jumpT += dt / u.jumpDur;
+                    if (u.jumpT >= 1) {
+                        u.jumpT = -1;
+                        u.jumpTimer = 4 + Math.random() * 10;
+                    } else {
+                        const t = u.jumpT;
+                        y = u.swimY + Math.sin(t * Math.PI) * 1.1;
+                        pitch = -Math.sin(t * Math.PI * 2) * 0.9;
+                    }
+                } else {
+                    u.jumpTimer -= dt;
+                    if (u.jumpTimer <= 0) u.jumpT = 0;
+                    // gentle bobbing while swimming
+                    y = u.swimY + Math.sin(this.time * 2 + u.wigglePhase) * 0.05;
+                }
+
+                fish.position.set(u.x, y, riverZ);
+                // Face swim direction (fish model points +Z; heading is along x)
+                fish.rotation.y = u.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+                fish.rotation.x = pitch;
+                // Tail wiggle
+                if (u.tail) u.tail.rotation.y = Math.sin(this.time * 8 + u.wigglePhase) * 0.5;
+            }
+        }
 
         // Animate voxel clouds
         this.cloudSprites.forEach(cloud => {
