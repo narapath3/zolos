@@ -4,12 +4,12 @@
    ============================================ */
 
 :root {
-  --bg-dark: #0a0e1a;
-  --bg-card: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.9);
-  --bg-panel: #ffffff;
-  --bg-input: #f0f4ff;
-  --bg-item: rgba(0, 0, 0, 0.03);
+  --bg-dark: #060912;
+  --bg-card: rgba(12, 18, 32, 0.9);
+  --bg-glass: rgba(16, 24, 45, 0.7);
+  --bg-panel: rgba(6, 9, 18, 0.95);
+  --bg-input: rgba(0, 0, 0, 0.4);
+  --bg-item: rgba(255, 255, 255, 0.05);
   --primary: #f0c040;
   --primary-deep: #d4a017;
   --primary-glow: rgba(240, 192, 64, 0.4);
@@ -25,23 +25,24 @@
   --sp-bg: #102040;
   --exp-color: #40e080;
   --exp-bg: #103020;
-  --text: #e0e8ff;
-  --text-dark: #102040;
-  --text-dim: #8090b0;
-  --border: rgba(100, 140, 255, 0.2);
-  --shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  --text: #ffffff;
+  --text-dark: #060912;
+  --text-dim: #b0c0e0;
+  --border: rgba(100, 140, 255, 0.25);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
   --font-pixel: 'Press Start 2P', monospace;
   --font-main: 'Fredoka One', cursive;
   --font-ui: 'Inter', system-ui, sans-serif;
   --radius: 12px;
-  --radius-sm: 8px;
+  --radius-sm: 10px;
   --radius-xl: 40px;
   --radius-lg: 16px;
   --gold-light: #ffe680;
   --gold-deep: #c88020;
   --gold-glow: rgba(255, 200, 60, 0.6);
-  --input-bg: #f0f4ff;
-  --input-border: #d0d8ff;
+  --input-bg: rgba(0, 0, 0, 0.3);
+  --input-border: rgba(255, 255, 255, 0.1);
   --gold-border: #f0c040;
 }
 
@@ -59,6 +60,7 @@ body {
   width: 100vw;
   height: 100vh;
   cursor: url('/assets/cute_cursor_32.png'), auto;
+  text-rendering: optimizeLegibility;
 }
 
 button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup-tab, .online-tab, .wiki-tab, .lb-tab {
@@ -391,8 +393,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .btn-change-account {
-  background: rgba(0, 0, 0, 0.05);
-  border: 2px dashed var(--input-border);
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed rgba(255,255,255,0.15);
   color: var(--text-dim);
   font-family: var(--font-main);
   font-size: 12px;
@@ -408,7 +410,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .btn-change-account:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.5);
   color: var(--secondary);
   border-color: var(--secondary);
 }
@@ -829,11 +831,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   z-index: 200;
   width: 380px;
   max-height: 75vh;
-  background: var(--bg-card);
+  background: var(--bg-panel);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid transparent;
-  background-clip: padding-box;
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   animation: panelOpen 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.15);
@@ -847,12 +848,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   inset: 0;
   border-radius: var(--radius-lg);
   padding: 1px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(100, 140, 255, 0.3));
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.3), transparent, rgba(96, 160, 255, 0.3));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+  opacity: 0.5;
 }
 
 @keyframes panelOpen {
@@ -872,8 +874,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--primary);
-  background: linear-gradient(to bottom, rgba(240, 192, 64, 0.08), transparent);
+  border-bottom: 1px solid rgba(240, 192, 64, 0.3);
+  background: linear-gradient(to bottom, rgba(240,192,64,0.1), transparent);
   width: 100%;
   box-sizing: border-box;
 }
@@ -889,7 +891,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .panel-close {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-dim);
   font-size: 16px;
@@ -903,7 +905,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .panel-close:hover {
-  background: rgba(255, 96, 128, 0.2);
+  background: rgba(255, 96, 128, 0.15);
   color: var(--accent);
   border-color: var(--accent);
   transform: scale(1.05);
@@ -915,7 +917,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   overflow-x: hidden;
   max-height: calc(70vh - 60px);
   scrollbar-width: thin;
-  scrollbar-color: var(--primary) transparent;
+  scrollbar-color: rgba(240, 192, 64, 0.5) transparent;
 }
 
 .panel-body::-webkit-scrollbar {
@@ -966,16 +968,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--primary-glow);
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--primary);
   border-radius: 20px;
   padding: 14px;
   margin-bottom: 20px;
   font-family: var(--font-pixel);
   font-size: 14px;
   color: var(--primary);
-  text-shadow: 0 0 8px var(--primary-glow);
-  box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+  text-shadow: 0 0 10px rgba(240,192,64,0.6);
+  box-shadow: 0 0 20px rgba(0,0,0,0.4), inset 0 0 15px rgba(0,0,0,0.5);
 }
 
 /* RO-style Inventory Tabs */
@@ -995,7 +997,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
   -webkit-grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
   gap: 6px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.4);
   padding: 8px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1017,8 +1019,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
   display: -webkit-flex;
   display: flex;
@@ -1034,7 +1036,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
   overflow: hidden;
   -webkit-overflow-scrolling: touch;
   isolation: isolate;
@@ -1053,9 +1055,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .inv-slot:hover,
 .inventory-slot:hover {
   border-color: var(--secondary);
-  background: rgba(96, 160, 255, 0.1);
-  transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(96, 160, 255, 0.3);
+  background: rgba(96,160,255,0.1);
+  box-shadow: 0 0 15px rgba(96,160,255,0.3);
   z-index: 2;
 }
 
@@ -1169,14 +1170,15 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* RO-style Item Detail Box */
 .item-detail-box {
   margin-top: 14px;
-  background: rgba(15, 20, 32, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius-sm);
   padding: 10px;
   min-height: 90px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
 }
 
 .detail-placeholder {
@@ -1354,11 +1356,22 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .market-search input {
   width: 100%;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius-sm);
-  color: var(--text);
+  color: #ffffff;
   font-size: 11px;
+  transition: all 0.3s ease;
+}
+
+.market-search input::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+.market-search input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 15px var(--gold-glow);
+  outline: none;
 }
 
 .market-categories {
@@ -1429,15 +1442,15 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .market-item-row:nth-child(even) {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255,255,255,0.02);
 }
 
 .market-item-row:nth-child(odd) {
-  background: rgba(0, 0, 0, 0.1);
+  background: transparent;
 }
 
 .market-item-row:hover {
-  background: rgba(96, 160, 255, 0.08);
+  background: rgba(96,160,255,0.05);
   box-shadow: inset 0 0 10px rgba(96, 160, 255, 0.1);
 }
 
@@ -1481,7 +1494,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .btn-market-buy {
-  background: linear-gradient(180deg, #40e080, #20a050);
+  background: linear-gradient(135deg, var(--success), var(--success-deep));
   border: none;
   border-radius: 20px;
   color: #fff;
@@ -1501,7 +1514,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .btn-market-cancel {
-  background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   border: none;
   border-radius: 20px;
   color: #fff;
@@ -1529,7 +1542,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .market-sell-form {
   margin-top: auto;
   padding: 10px;
-  background: rgba(15, 20, 32, 0.98);
+  background: rgba(0,0,0,0.7);
   border: 1px solid rgba(240, 192, 64, 0.2);
   border-radius: var(--radius-sm);
   box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.4);
@@ -1580,10 +1593,17 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .form-group input {
   padding: 5px 8px;
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 4px;
   color: var(--text);
   font-size: 11px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 10px var(--gold-glow);
+  outline: none;
 }
 
 
@@ -2077,7 +2097,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: flex;
   align-items: center;
   gap: 16px;
-  background: linear-gradient(135deg, rgba(20, 30, 60, 0.7), rgba(10, 15, 30, 0.9));
+  background: linear-gradient(135deg, rgba(12, 18, 32, 0.8), rgba(6, 9, 18, 0.95));
   border: 1px solid rgba(240, 192, 64, 0.25);
   border-radius: var(--radius);
   padding: 16px;
@@ -2160,20 +2180,20 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .stats-bar-label {
-  color: var(--text-dark);
+  color: var(--text);
   font-weight: 600;
 }
 
 .stats-bar-val {
-  color: var(--text-dark);
+  color: var(--text);
   font-weight: 700;
 }
 
 .stats-bar-bg {
   height: 10px;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
   position: relative;
 }
@@ -2206,8 +2226,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .stats-card {
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-sm);
   padding: 14px;
   display: flex;
@@ -2246,8 +2266,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .stats-card:hover {
-  background: rgba(0, 0, 0, 0.06);
-  border-color: rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
   transform: translateY(-2px);
 }
 
@@ -2264,7 +2284,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .stats-card-title {
   font-family: var(--font-pixel);
   font-size: 8px;
-  color: var(--text-dark);
+  color: var(--text-dim);
   opacity: 0.7;
   text-transform: uppercase;
 }
@@ -2272,7 +2292,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .stats-card-value {
   font-size: 18px;
   font-weight: 800;
-  color: var(--text-dark);
+  color: var(--text);
   margin-top: 2px;
 }
 
@@ -2370,10 +2390,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
   gap: 8px;
-  background: var(--bg-item);
+  background: rgba(0,0,0,0.4);
   padding: 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255,255,255,0.05);
   max-height: 200px;
   overflow-y: auto;
   margin-top: 10px;
@@ -2389,7 +2409,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* shop-slot is now handled by shared .inv-slot, .inventory-slot, .shop-slot block */
 
 .shop-slot {
-  background: rgba(30, 20, 10, 0.4) !important;
+  background: rgba(0,0,0,0.6) !important;
 }
 
 .shop-slot:hover {
@@ -2445,12 +2465,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .shop-detail-box {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 6px;
   padding: 12px;
   margin-top: 12px;
   min-height: 120px;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
 }
 
 .shop-detail-placeholder {
@@ -2556,7 +2577,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
   gap: 12px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.4);
   padding: 12px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -2639,8 +2660,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .wiki-detail-box {
-  background: var(--bg-item);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius-sm);
   padding: 12px;
   min-height: 140px;
@@ -2651,7 +2672,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   overflow-y: auto;
   width: 100%;
   box-sizing: border-box;
-  color: var(--text-dark);
+  color: var(--text);
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
 }
 
 /* Detail specific styling */
@@ -2680,11 +2702,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .wiki-drop-item {
   display: flex;
   justify-content: space-between;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.3);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 11px;
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 /* ========== ITEM RARITIES ========== */
@@ -2875,7 +2897,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   z-index: 2;
   overflow: hidden;
   animation: panelOpen 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.2);
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 .popup-header {
@@ -3011,7 +3033,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .chat-msg-text {
-  color: #e0e8ff;
+  color: #ffffff;
 }
 
 .chat-input-row {
@@ -4483,8 +4505,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .quest-row {
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
-  border: 2px solid #ddd;
+  background: rgba(0,0,0,0.3);
+  border: 2px solid rgba(255,255,255,0.08);
   border-radius: var(--radius-sm, 6px);
   padding: 10px;
   transition: all 0.25s ease;
@@ -4493,13 +4515,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .quest-row:hover {
-  background: #efefef;
+  background: rgba(255,255,255,0.05);
   border-color: #f0c040;
 }
 
 .quest-row.completed {
   border-color: rgba(64, 255, 128, 0.3);
-  background: rgba(64, 255, 128, 0.02);
+  background: rgba(64, 255, 128, 0.05);
 }
 
 .quest-header-row {
@@ -4512,7 +4534,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .quest-title-text {
   font-size: 11px;
   font-weight: 800;
-  color: #000;
+  color: #ffffff;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4523,8 +4545,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   padding: 2px 6px;
   border-radius: 4px;
   font-family: var(--font-pixel, monospace);
-  background: #e0e0e0;
-  color: #333;
+  background: rgba(0,0,0,0.5);
+  color: var(--text-dim);
   font-weight: 600;
 }
 
@@ -4536,7 +4558,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .quest-desc-text {
   font-size: 10px;
-  color: #222;
+  color: var(--text-dim);
   font-weight: 600;
   margin-bottom: 8px;
   line-height: 1.4;
@@ -4551,11 +4573,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .quest-progress-bg {
   flex: 1;
   height: 8px;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.4);
   border-radius: 4px;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .quest-progress-fill {
@@ -4572,7 +4594,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .quest-progress-text {
   font-size: 8px;
   font-family: var(--font-pixel, monospace);
-  color: #000;
+  color: #ffffff;
   font-weight: 800;
   min-width: 32px;
   text-align: right;
@@ -4584,7 +4606,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   align-items: center;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.05);
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
 }
 
 .quest-reward-span {
