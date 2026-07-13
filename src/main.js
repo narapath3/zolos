@@ -114,10 +114,9 @@ async function initGame(charData) {
         inputManager = new InputManager();
         character.inputManager = inputManager;
 
-        // Setup skill hotkeys
-        inputManager.setupSkillHotkey((skillId) => {
-            if (combatSystem) combatSystem.useSkill(skillId);
-        });
+        // Skill hotkeys (1/2/3) are handled by the window keydown listener
+        // below, which routes to gameUI.castSkill(). Do not register a second
+        // handler here to avoid double-casting.
     });
 
     character = new CharacterManager(sceneManager.scene);

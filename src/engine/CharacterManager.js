@@ -842,10 +842,13 @@ export class CharacterManager {
             this.stats.level++;
             leveledUp = true;
 
-            // Apply stat gains to base values
+            // Apply stat gains to base values.
+            // NOTE: getStatGains() returns { max_hp, max_sp, atk, def } — read those
+            // exact keys. A previous version read gains.hp / gains.sp (undefined),
+            // so base HP/SP never grew on level up.
             const gains = getStatGains(this.stats.level);
-            this.stats._baseMaxHp = (Number(this.stats._baseMaxHp) || 100) + (Number(gains.hp) || 0);
-            this.stats._baseMaxSp = (Number(this.stats._baseMaxSp) || 50) + (Number(gains.sp) || 0);
+            this.stats._baseMaxHp = (Number(this.stats._baseMaxHp) || 100) + (Number(gains.max_hp) || 0);
+            this.stats._baseMaxSp = (Number(this.stats._baseMaxSp) || 50) + (Number(gains.max_sp) || 0);
             this.stats._baseAtk = (Number(this.stats._baseAtk) || 10) + (Number(gains.atk) || 0);
             this.stats._baseDef = (Number(this.stats._baseDef) || 5) + (Number(gains.def) || 0);
 
@@ -933,11 +936,16 @@ export class CharacterManager {
                 level: this.stats.level,
                 exp: this.stats.exp,
                 hp: this.stats.hp,
-                max_hp: this.stats.max_hp,
+                // Persist BASE max_hp (without equipment bonus) — the getter adds
+                // the armor bonus back on load, so saving the computed value would
+                // inflate max_hp by the armor bonus every save/load cycle.
+                max_hp: this.stats._baseMaxHp !== undefined ? this.stats._baseMaxHp : this.stats.max_hp,
                 sp: this.stats.sp,
                 max_sp: this.stats._baseMaxSp !== undefined ? this.stats._baseMaxSp : this.stats.max_sp,
                 atk: this.stats._baseAtk !== undefined ? this.stats._baseAtk : this.stats.atk,
-                def: this.stats.def,
+                // Persist BASE def (without armor/shield bonus) — same inflation
+                // reason as max_hp above.
+                def: this.stats._baseDef !== undefined ? this.stats._baseDef : this.stats.def,
                 gold: this.stats.gold,
                 total_kills: this.stats.total_kills,
                 play_time: this.stats.play_time,
