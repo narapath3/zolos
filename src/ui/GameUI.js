@@ -1073,15 +1073,15 @@ export class GameUI {
     html += list.map(p => {
       const isFriend = friends.includes(p.username);
       const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
-      const offlineStyle = p.isOffline ? 'opacity:0.5;filter:grayscale(100%);pointer-events:auto;' : '';
-      const dotColor = p.isOffline ? '#888' : '#0f0';
-      const nameColor = p.isOffline ? '#888' : 'inherit';
-      const badgeStyle = p.isOffline ? 'background:#333;color:#666;border-color:#444;' : '';
+      const offlineStyle = p.isOffline ? 'opacity:0.6;filter:grayscale(100%);pointer-events:auto;' : '';
+      const dotColor = p.isOffline ? '#666' : '#40e080';
+      const nameColor = p.isOffline ? '#b0c0e0' : '#ffffff';
+      const badgeStyle = p.isOffline ? 'background:rgba(0,0,0,0.5);color:#888;border-color:rgba(255,255,255,0.1);' : 'background:rgba(0,0,0,0.6);color:#ffffff;border-color:var(--primary-glow);';
       
       return `
         <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
           <span class="online-dot" style="background-color:${dotColor}"></span>
-          <span style="color:${nameColor}">${p.username}${starHtml}</span>
+          <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
           <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>
         </div>
       `;
