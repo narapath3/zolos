@@ -33,9 +33,13 @@
 
       <!-- Login Form (Initially Hidden) -->
       <div id="auth-form-wrapper" style="display: none;">
+        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account / Logout</button>
         <div class="auth-form" id="login-form">
           <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
-          <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+          <div style="display: flex; flex-direction: column;">
+            <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+            <button id="btn-forgot-password" class="btn-forgot-pw">Forgot Password?</button>
+          </div>
           <input type="text" id="auth-charname" placeholder="🎮 Character Name" autocomplete="off"
             style="display: none;" />
           <button id="btn-login" class="btn-primary">⚔️ Login</button>

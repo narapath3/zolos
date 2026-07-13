@@ -157,11 +157,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   background: var(--input-bg);
   border: 3px solid var(--input-border);
   border-radius: var(--radius-lg);
-  color: var(--text-dark);
+  color: #060912;
   font-size: clamp(13px, 2vw, 15px);
-  font-weight: 600;
+  font-weight: 700;
   outline: none;
   transition: all 0.2s ease;
+}
+
+.auth-form input::placeholder {
+  color: #102040;
+  opacity: 0.8;
 }
 
 .auth-form input:focus {
@@ -174,13 +179,18 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   padding: clamp(12px, 2vw, 16px) clamp(20px, 3vw, 24px);
   border: none;
   font-family: var(--font-main);
-  color: white;
+  color: #ffffff;
   font-weight: 900;
   text-transform: uppercase;
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
   font-size: clamp(12px, 2vw, 14px);
   overflow: hidden; /* This ensures the shimmer is contained inside the button */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.btn-guest {
+  font-size: clamp(14px, 2.5vw, 18px) !important;
 }
 
 .btn-primary::after, .btn-secondary::after, .btn-guest::after, .btn-start-game::after {
@@ -228,6 +238,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .btn-primary:hover, .btn-secondary:hover, .btn-guest:hover {
   transform: translateY(2px);
   border-bottom-width: 4px;
+  filter: brightness(1.05);
 }
 
 .btn-primary:active, .btn-secondary:active, .btn-guest:active {
@@ -270,7 +281,49 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   color: var(--text-dim);
   font-size: 14px;
   font-family: var(--font-main);
-  margin: 8px 0;
+  margin: 12px 0;
+}
+
+.btn-forgot-pw {
+  background: none;
+  border: none;
+  color: var(--secondary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: -8px;
+  margin-bottom: 8px;
+  align-self: flex-end;
+  transition: color 0.2s;
+}
+
+.btn-forgot-pw:hover {
+  color: var(--primary);
+}
+
+.btn-change-account {
+  background: rgba(0, 0, 0, 0.05);
+  border: 2px dashed var(--input-border);
+  color: var(--text-dim);
+  font-family: var(--font-main);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 30px;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-change-account:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--secondary);
+  border-color: var(--secondary);
 }
 
 .auth-divider::before, .auth-divider::after {

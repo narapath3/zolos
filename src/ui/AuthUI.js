@@ -30,6 +30,8 @@ export class AuthUI {
         this._startBtn = document.getElementById('btn-start-game');
         this._splashEl = document.getElementById('auth-splash');
         this._formWrapperEl = document.getElementById('auth-form-wrapper');
+        this._changeAccountBtn = document.getElementById('btn-change-account');
+        this._forgotPwBtn = document.getElementById('btn-forgot-password');
 
         if (this._startBtn) {
             this._startBtn.addEventListener('click', () => {
@@ -59,6 +61,16 @@ export class AuthUI {
             }
         });
 
+        if (this._changeAccountBtn) {
+            this._changeAccountBtn.addEventListener('click', () => this._handleSignOut());
+        }
+
+        if (this._forgotPwBtn) {
+            this._forgotPwBtn.addEventListener('click', () => {
+                this._setStatus('Please contact admin or check Supabase for password reset.', 'info');
+            });
+        }
+
         document.getElementById('btn-guest').addEventListener('click', () => this._handleGuest());
 
         // Enter key support
@@ -79,6 +91,7 @@ export class AuthUI {
     _setMode(isRegister) {
         this._isRegisterMode = isRegister;
         this._charnameEl.style.display = isRegister ? '' : 'none';
+        if (this._forgotPwBtn) this._forgotPwBtn.style.display = isRegister ? 'none' : 'block';
         if (!isRegister) this._charnameEl.value = '';
         this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 Register';
         this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ Login';
@@ -128,11 +141,12 @@ export class AuthUI {
 
     _showSessionMode(username) {
         document.getElementById('auth-username').style.display = 'none';
-        document.getElementById('auth-password').style.display = 'none';
+        document.getElementById('auth-password').parentElement.style.display = 'none';
         if (this._charnameEl) this._charnameEl.style.display = 'none';
+        if (this._changeAccountBtn) this._changeAccountBtn.style.display = 'inline-flex';
 
         this._loginBtn.textContent = `⚔️ Enter Game as ${username}`;
-        this._registerBtn.textContent = '🚪 Switch Account';
+        this._registerBtn.style.display = 'none';
 
         const guestBtn = document.getElementById('btn-guest');
         if (guestBtn) guestBtn.style.display = 'none';
@@ -167,9 +181,11 @@ export class AuthUI {
 
         // Restore normal inputs and buttons
         document.getElementById('auth-username').style.display = '';
-        document.getElementById('auth-password').style.display = '';
+        document.getElementById('auth-password').parentElement.style.display = 'flex';
         document.getElementById('auth-username').value = '';
         document.getElementById('auth-password').value = '';
+        if (this._changeAccountBtn) this._changeAccountBtn.style.display = 'none';
+        if (this._forgotPwBtn) this._forgotPwBtn.style.display = 'block';
 
         const guestBtn = document.getElementById('btn-guest');
         if (guestBtn) guestBtn.style.display = '';
@@ -180,6 +196,7 @@ export class AuthUI {
         // Restore register button to default
         this._isRegisterMode = false;
         this._loginBtn.textContent = '⚔️ Login';
+        this._registerBtn.style.display = '';
         this._registerBtn.textContent = '📜 Register';
         this._setStatus('', 'info');
     }
