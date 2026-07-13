@@ -17,7 +17,7 @@ export class AuthUI {
         this._autoplayTrigger = null;
 
         this._setupButtons();
-        // this._createParticles();
+        this._createParticles();
         this._subscribeOnlineCount();
         this._checkExistingSession();
         this._setupBGMAutoplay();
@@ -101,12 +101,20 @@ export class AuthUI {
 
     _createParticles() {
         const container = document.getElementById('auth-particles');
-        for (let i = 0; i < 30; i++) {
+        if (!container) return;
+        container.innerHTML = '';
+        for (let i = 0; i < 50; i++) {
             const p = document.createElement('div');
             p.className = 'particle';
             p.style.left = Math.random() * 100 + '%';
-            p.style.animationDelay = Math.random() * 8 + 's';
-            p.style.animationDuration = (6 + Math.random() * 6) + 's';
+            const duration = 10 + Math.random() * 20;
+            const delay = Math.random() * 20;
+            p.style.setProperty('--duration', `${duration}s`);
+            p.style.animationDelay = `${-delay}s`;
+            p.style.opacity = Math.random();
+            const size = 2 + Math.random() * 4;
+            p.style.width = `${size}px`;
+            p.style.height = `${size}px`;
             container.appendChild(p);
         }
     }
