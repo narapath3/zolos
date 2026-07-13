@@ -126,20 +126,22 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: clamp(24px, 5vw, 40px);
+  padding: clamp(16px, 5vw, 40px);
   background: rgba(12, 18, 32, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 2px solid rgba(240, 192, 64, 0.3);
-  border-radius: 32px;
+  border-radius: clamp(16px, 3vw, 32px);
   box-shadow: 
     0 25px 50px -12px rgba(0, 0, 0, 0.5),
     0 0 30px rgba(240, 192, 64, 0.1),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);
-  width: min(90vw, 450px);
-  max-width: 90vw;
+  width: min(92vw, 450px);
+  max-width: 92vw;
   max-height: 90vh;
+  min-height: fit-content;
   overflow-y: auto;
+  margin: 0 auto;
   animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -164,16 +166,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .auth-logo {
-  margin-bottom: 24px;
+  margin-bottom: clamp(12px, 3vw, 24px);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .auth-icon-img {
-  width: clamp(140px, 40vw, 220px);
-  height: clamp(140px, 40vw, 220px);
-  margin-bottom: clamp(8px, 2vw, 12px);
+  width: clamp(80px, 30vw, 220px);
+  height: clamp(80px, 30vw, 220px);
+  margin-bottom: clamp(6px, 2vw, 12px);
   filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
   animation: floatLogo 4s ease-in-out infinite;
 }
@@ -185,7 +187,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .game-title-new {
   font-family: var(--font-main);
-  font-size: clamp(32px, 8vw, 56px);
+  font-size: clamp(24px, 8vw, 56px);
   font-weight: 900;
   color: #ffffff;
   text-transform: uppercase;
@@ -195,17 +197,22 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
   margin-bottom: 4px;
   letter-spacing: 2px;
+  line-height: 1.1;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .game-subtitle {
   font-family: var(--font-main);
-  font-size: clamp(12px, 3vw, 16px);
+  font-size: clamp(10px, 3vw, 16px);
   color: #60a0ff;
   font-weight: 800;
   text-transform: uppercase;
   margin-bottom: 8px;
-  letter-spacing: 4px;
+  letter-spacing: clamp(2px, 1vw, 4px);
   text-shadow: 0 0 10px rgba(96, 160, 255, 0.5);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .game-tagline {
@@ -219,20 +226,22 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(10px, 3vw, 16px);
 }
 
 .auth-form input {
-  padding: clamp(12px, 2vw, 16px) clamp(16px, 3vw, 20px);
+  padding: clamp(10px, 2.5vw, 16px) clamp(14px, 3vw, 20px);
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   color: #ffffff;
-  font-size: clamp(13px, 2vw, 15px);
+  font-size: clamp(12px, 2.5vw, 15px);
   font-weight: 600;
   outline: none;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .auth-form input::placeholder {
@@ -251,7 +260,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 
 .btn-primary, .btn-secondary, .btn-guest {
-  padding: clamp(14px, 2.5vw, 18px) clamp(24px, 4vw, 32px);
+  padding: clamp(12px, 3vw, 18px) clamp(20px, 5vw, 32px);
   border: none;
   font-family: var(--font-main);
   color: #ffffff;
@@ -259,16 +268,18 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   text-transform: uppercase;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   position: relative;
-  font-size: clamp(14px, 2vw, 16px);
+  font-size: clamp(13px, 3vw, 16px);
   overflow: hidden;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   cursor: pointer;
   border-radius: 16px;
   z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .btn-guest {
-  font-size: clamp(16px, 2.5vw, 20px) !important;
+  font-size: clamp(14px, 3vw, 20px) !important;
 }
 
 .btn-primary::before, .btn-secondary::before, .btn-guest::before {
@@ -339,16 +350,20 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   color: white;
   font-weight: 900;
   text-transform: uppercase;
-  font-size: 28px;
-  padding: 20px 48px;
+  font-size: clamp(18px, 5vw, 28px);
+  padding: clamp(12px, 3vw, 20px) clamp(24px, 8vw, 48px);
   border-radius: 50px;
   border: none;
-  border-bottom: 10px solid #b08010;
+  border-bottom: clamp(5px, 1.5vw, 10px) solid #b08010;
   box-shadow: 0 15px 30px rgba(240,192,64,0.5), inset 0 2px 5px rgba(255,255,255,0.4);
-  -webkit-text-stroke: 2px #804000;
-  margin: 20px 0;
+  -webkit-text-stroke: clamp(1px, 0.3vw, 2px) #804000;
+  margin: clamp(12px, 3vw, 20px) 0;
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 360px;
+  word-break: break-word;
 }
 
 .btn-start-game:hover {
@@ -364,11 +379,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .auth-divider {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: clamp(8px, 3vw, 16px);
   color: rgba(255, 255, 255, 0.3);
-  font-size: 12px;
+  font-size: clamp(10px, 2.5vw, 12px);
   font-family: var(--font-main);
-  margin: 20px 0;
+  margin: clamp(12px, 3vw, 20px) 0;
   text-transform: uppercase;
   letter-spacing: 2px;
 }
@@ -431,21 +446,23 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .online-count {
-  margin-top: 24px;
-  font-size: 14px;
+  margin-top: clamp(12px, 3vw, 24px);
+  font-size: clamp(11px, 3vw, 14px);
   color: #ffffff;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: clamp(6px, 2vw, 10px);
   background: rgba(0, 0, 0, 0.3);
-  padding: 8px 20px;
+  padding: clamp(6px, 2vw, 8px) clamp(12px, 4vw, 20px);
   border-radius: 20px;
   width: fit-content;
+  max-width: 100%;
   margin-left: auto;
   margin-right: auto;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
 }
 
 .pulse-dot {
@@ -1893,10 +1910,94 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     font-size: 22px;
   }
 
+  /* Login screen: fit perfectly on small screens */
   .auth-container {
     min-width: auto;
-    margin: 16px;
-    padding: 24px;
+    margin: 12px;
+    padding: 18px;
+    width: min(94vw, 380px);
+    max-width: 94vw;
+    border-radius: 20px;
+    max-height: 92vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(70px, 28vw, 140px);
+    height: clamp(70px, 28vw, 140px);
+  }
+
+  .game-title-new {
+    font-size: clamp(22px, 7vw, 40px);
+    letter-spacing: 1px;
+  }
+
+  .game-subtitle {
+    font-size: clamp(9px, 2.5vw, 13px);
+    letter-spacing: 2px;
+  }
+
+  .game-tagline {
+    font-size: clamp(11px, 2.5vw, 14px);
+    margin-bottom: 16px;
+  }
+
+  .auth-form {
+    gap: 10px;
+  }
+
+  .auth-form input {
+    padding: 10px 14px;
+    font-size: 13px;
+    border-radius: 12px;
+  }
+
+  .btn-primary, .btn-secondary, .btn-guest {
+    padding: 12px 16px;
+    font-size: 13px;
+    border-radius: 12px;
+  }
+
+  .btn-guest {
+    font-size: 15px !important;
+  }
+
+  .btn-start-game {
+    font-size: 18px;
+    padding: 12px 20px;
+    border-bottom-width: 5px;
+    max-width: 280px;
+  }
+
+  .auth-divider {
+    gap: 8px;
+    font-size: 10px;
+    margin: 12px 0;
+  }
+
+  .btn-forgot-pw {
+    font-size: 11px;
+  }
+
+  .btn-change-account {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+
+  .online-count {
+    font-size: 11px;
+    padding: 6px 12px;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .auth-status {
+    font-size: 12px;
+    margin-top: 12px;
   }
 
   #hud-top {
@@ -3972,6 +4073,309 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     width: 100%;
     box-sizing: border-box;
     isolation: isolate;
+  }
+}
+
+/* Extra small phones: iPhone SE, Galaxy A series */
+@media (max-width: 375px) {
+  .auth-container {
+    margin: 8px;
+    padding: 14px;
+    width: min(96vw, 340px);
+    max-width: 96vw;
+    border-radius: 16px;
+    max-height: 94vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(60px, 25vw, 100px);
+    height: clamp(60px, 25vw, 100px);
+    margin-bottom: 4px;
+  }
+
+  .game-title-new {
+    font-size: clamp(18px, 7vw, 30px);
+    letter-spacing: 0;
+    margin-bottom: 2px;
+  }
+
+  .game-subtitle {
+    font-size: clamp(8px, 2.5vw, 11px);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .game-tagline {
+    font-size: clamp(10px, 2.5vw, 12px);
+    margin-bottom: 12px;
+  }
+
+  .auth-logo {
+    margin-bottom: 8px;
+  }
+
+  .auth-form {
+    gap: 8px;
+  }
+
+  .auth-form input {
+    padding: 9px 12px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+
+  .btn-primary, .btn-secondary, .btn-guest {
+    padding: 10px 14px;
+    font-size: 12px;
+    border-radius: 10px;
+  }
+
+  .btn-start-game {
+    font-size: 16px;
+    padding: 10px 16px;
+    border-bottom-width: 4px;
+    max-width: 240px;
+    margin: 8px 0;
+  }
+
+  .auth-divider {
+    gap: 6px;
+    font-size: 9px;
+    margin: 8px 0;
+  }
+
+  .btn-forgot-pw {
+    font-size: 10px;
+    margin-top: -4px;
+    margin-bottom: 6px;
+  }
+
+  .btn-change-account {
+    font-size: 9px;
+    padding: 5px 10px;
+    margin-bottom: 10px;
+  }
+
+  .online-count {
+    font-size: 10px;
+    padding: 5px 10px;
+    gap: 4px;
+    margin-top: 10px;
+    border-radius: 16px;
+  }
+
+  .pulse-dot {
+    width: 7px;
+    height: 7px;
+  }
+
+  .auth-status {
+    font-size: 10px;
+    margin-top: 8px;
+    min-height: 16px;
+  }
+
+  .particle {
+    width: 3px;
+    height: 3px;
+  }
+}
+
+/* Small phones: iPhone 12 mini, Galaxy S20 */
+@media (min-width: 376px) and (max-width: 480px) {
+  .auth-container {
+    margin: 10px;
+    padding: 16px;
+    width: min(94vw, 360px);
+    max-width: 94vw;
+    border-radius: 18px;
+    max-height: 93vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(70px, 26vw, 120px);
+    height: clamp(70px, 26vw, 120px);
+  }
+
+  .game-title-new {
+    font-size: clamp(20px, 7vw, 34px);
+    letter-spacing: 1px;
+  }
+
+  .game-subtitle {
+    font-size: clamp(9px, 2.5vw, 12px);
+    letter-spacing: 2px;
+  }
+
+  .game-tagline {
+    font-size: clamp(11px, 2.5vw, 13px);
+    margin-bottom: 14px;
+  }
+
+  .auth-form {
+    gap: 9px;
+  }
+
+  .auth-form input {
+    padding: 9px 13px;
+    font-size: 12px;
+    border-radius: 11px;
+  }
+
+  .btn-primary, .btn-secondary, .btn-guest {
+    padding: 11px 15px;
+    font-size: 12px;
+    border-radius: 11px;
+  }
+
+  .btn-start-game {
+    font-size: 17px;
+    padding: 11px 18px;
+    border-bottom-width: 5px;
+    max-width: 260px;
+    margin: 10px 0;
+  }
+
+  .auth-divider {
+    gap: 8px;
+    font-size: 10px;
+    margin: 10px 0;
+  }
+
+  .btn-forgot-pw {
+    font-size: 10px;
+  }
+
+  .btn-change-account {
+    font-size: 10px;
+    padding: 6px 11px;
+  }
+
+  .online-count {
+    font-size: 11px;
+    padding: 5px 11px;
+    gap: 5px;
+    margin-top: 12px;
+  }
+}
+
+/* Landscape phones: handle short height screens */
+@media (max-width: 768px) and (orientation: landscape) {
+  #auth-screen {
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+
+  .auth-container {
+    max-height: 85vh;
+    width: min(55vw, 450px);
+    padding: clamp(10px, 3vw, 20px);
+    margin: 0 auto;
+    border-radius: 16px;
+  }
+
+  .auth-icon-img {
+    width: clamp(50px, 12vw, 100px);
+    height: clamp(50px, 12vw, 100px);
+    margin-bottom: 4px;
+  }
+
+  .game-title-new {
+    font-size: clamp(18px, 4vw, 32px);
+  }
+
+  .game-subtitle {
+    font-size: clamp(8px, 2vw, 11px);
+  }
+
+  .game-tagline {
+    font-size: clamp(10px, 2vw, 12px);
+    margin-bottom: 8px;
+  }
+
+  .auth-form {
+    gap: 6px;
+  }
+
+  .auth-form input {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .btn-primary, .btn-secondary, .btn-guest {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .btn-start-game {
+    font-size: 14px;
+    padding: 8px 14px;
+    border-bottom-width: 3px;
+    margin: 6px 0;
+  }
+
+  .auth-divider {
+    margin: 6px 0;
+    font-size: 9px;
+  }
+
+  .online-count {
+    margin-top: 6px;
+    font-size: 10px;
+    padding: 4px 10px;
+  }
+
+  .btn-change-account {
+    margin-bottom: 6px;
+  }
+
+  .auth-status {
+    margin-top: 6px;
+  }
+}
+
+/* Very small landscape phones */
+@media (max-width: 480px) and (orientation: landscape) {
+  .auth-container {
+    width: min(65vw, 350px);
+    padding: 8px;
+    max-height: 82vh;
+    border-radius: 12px;
+  }
+
+  .auth-icon-img {
+    width: clamp(40px, 10vw, 70px);
+    height: clamp(40px, 10vw, 70px);
+  }
+
+  .game-title-new {
+    font-size: clamp(14px, 4vw, 22px);
+  }
+
+  .game-subtitle {
+    font-size: clamp(7px, 1.5vw, 9px);
+  }
+
+  .game-tagline {
+    font-size: 9px;
+    margin-bottom: 6px;
+  }
+
+  .auth-form input {
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+
+  .btn-primary, .btn-secondary, .btn-guest {
+    padding: 7px 10px;
+    font-size: 10px;
+  }
+
+  .btn-start-game {
+    font-size: 13px;
+    padding: 7px 12px;
+    border-bottom-width: 3px;
+    margin: 5px 0;
   }
 }
 
