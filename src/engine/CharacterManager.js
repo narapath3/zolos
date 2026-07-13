@@ -924,9 +924,6 @@ export class CharacterManager {
 
     // Get save data
     getSaveData() {
-        // Helper to convert numeric color to hex string (without 0x prefix) for DB persistence
-        const toHexStr = (h) => ('000000' + (h || 0).toString(16)).slice(-6);
-
         return {
             characterId: this.characterId,
             userId: this.userId,
@@ -957,9 +954,12 @@ export class CharacterManager {
                 weapon: this.equippedWeapon,
                 hat: this.equippedHat,
                 glasses: this.equippedGlasses,
-                body_color: toHexStr(this.bodyColor),
-                hair_color: toHexStr(this.hairColor),
-                pants_color: toHexStr(this.pantsColor)
+                // DB columns body_color/hair_color/pants_color are INTEGER — persist
+                // the raw numeric color (e.g. 0x4060c0). Saving a hex string here made
+                // the whole UPDATE fail (invalid integer), so nothing persisted.
+                body_color: (this.bodyColor | 0),
+                hair_color: (this.hairColor | 0),
+                pants_color: (this.pantsColor | 0)
             }
         };
     }
