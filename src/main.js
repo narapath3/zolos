@@ -565,27 +565,14 @@ async function initGame(charData) {
             console.error('Logout Supabase error:', e);
         }
 
-        // 6. Reset UI
-        document.getElementById('game-screen').style.display = 'none';
-        document.getElementById('auth-screen').style.display = 'flex';
-
-        // Close Admin UI on logout
-        if (window.adminUI) {
-            if (typeof window.adminUI.close === 'function') {
-                window.adminUI.close();
-            } else {
-                window.adminUI.isOpen = false;
-                if (window.adminUI.container) {
-                    window.adminUI.container.style.display = 'none';
-                }
-            }
-        }
-
-        // 7. Re-show auth screen with fresh state
-        if (authUI) {
-            authUI._sessionData = null;
-            authUI.show();
-        }
+        // 6. Full page reload for a clean slate.
+        // Re-entering the game without reloading leaks the previous session:
+        // the old requestAnimationFrame chain keeps running (each re-login adds
+        // another parallel loop → severe stutter), a new WebGL renderer is
+        // created on the same canvas each time, and window/canvas/UI event
+        // listeners get bound again (double skill casts, double saves).
+        // Reloading guarantees all of it is torn down.
+        window.location.reload();
     });
 
     // Setup HUD & Initial Stats
@@ -596,7 +583,11 @@ async function initGame(charData) {
 
     isGameStarted = true;
     lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
+    // Guard: never start a second parallel rAF chain (would double all updates)
+    if (!window.__zolosLoopStarted) {
+        window.__zolosLoopStarted = true;
+        requestAnimationFrame(gameLoop);
+    }
 
     // Input listeners — Shift key for sprinting
     window.addEventListener('keydown', (e) => {
