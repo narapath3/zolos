@@ -683,31 +683,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   z-index: 200;
   width: 380px;
   max-height: 75vh;
-  background: var(--bg-card);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid transparent;
-  background-clip: padding-box;
-  position: relative;
+  background: var(--bg-panel);
+  border: 3px solid var(--gold-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: 0 8px 0 #d4a017, 0 15px 35px rgba(0, 0, 0, 0.2);
   animation: panelOpen 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.15);
   overflow: hidden;
-  color: var(--text);
-}
-
-.side-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-lg);
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(100, 140, 255, 0.3));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+  color: var(--text-dark);
 }
 
 @keyframes panelOpen {
@@ -726,42 +708,36 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--primary);
-  background: linear-gradient(to bottom, rgba(240, 192, 64, 0.08), transparent);
+  padding: 14px 20px;
+  border-bottom: 2px solid var(--bg-dark);
+  background: var(--bg-dark);
   width: 100%;
   box-sizing: border-box;
 }
 
 .panel-header h3 {
   font-family: var(--font-pixel);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--primary);
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 1px;
-  text-shadow: 0 0 8px var(--primary-glow);
 }
 
 .panel-close {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: none;
+  border: none;
   color: var(--text-dim);
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
 .panel-close:hover {
   background: rgba(255, 96, 128, 0.2);
   color: var(--accent);
-  border-color: var(--accent);
-  transform: scale(1.05);
 }
 
 .panel-body {
@@ -769,23 +745,6 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   overflow-y: auto;
   overflow-x: hidden;
   max-height: calc(70vh - 60px);
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary) transparent;
-}
-
-.panel-body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.panel-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.panel-body::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 10px;
-  border: 2px solid transparent;
-  background-clip: content-box;
 }
 
 /* Stats */
@@ -884,9 +843,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(30, 40, 60, 0.95), rgba(15, 20, 30, 1));
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
   display: -webkit-flex;
   display: flex;
   -webkit-align-items: center;
@@ -897,11 +856,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   flex-direction: column;
   font-size: 28px;
   position: relative;
-  transition: all 0.3s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 4px 8px rgba(0, 0, 0, 0.4);
   overflow: hidden;
   -webkit-overflow-scrolling: touch;
   isolation: isolate;
@@ -919,18 +878,22 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .inv-slot:hover,
 .inventory-slot:hover {
-  border-color: var(--secondary);
-  background: rgba(96, 160, 255, 0.1);
+  border-color: rgba(240, 192, 64, 0.5);
+  background: linear-gradient(135deg, rgba(45, 55, 85, 0.9), rgba(25, 30, 50, 0.95));
   transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(96, 160, 255, 0.3);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 8px rgba(240, 192, 64, 0.2);
   z-index: 2;
 }
 
 .inv-slot.selected,
 .inventory-slot.selected {
   border-color: var(--primary) !important;
-  background: rgba(240, 192, 64, 0.15) !important;
-  box-shadow: 0 0 15px var(--gold-glow), inset 0 0 10px rgba(240, 192, 64, 0.2);
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.15), rgba(20, 25, 40, 0.95)) !important;
+  box-shadow:
+    0 0 12px rgba(240, 192, 64, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.15);
 }
 
 .inv-slot .inv-qty,
@@ -964,29 +927,25 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .inv-slot.equipped {
-  border-color: var(--primary) !important;
-  background: rgba(240, 192, 64, 0.1) !important;
-  box-shadow: 0 0 10px var(--primary-glow), inset 0 0 5px var(--primary-glow);
+  border-color: #40e080 !important;
+  background: rgba(64, 224, 128, 0.08) !important;
+  box-shadow: 0 0 8px rgba(64, 224, 128, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 /* Rarity Slots Border Glows */
-.inv-slot.rarity-common {
-  border-color: rgba(255, 255, 255, 0.3) !important;
-}
-
 .inv-slot.rarity-uncommon {
-  border-color: #40e080 !important;
-  box-shadow: 0 0 10px rgba(64, 224, 128, 0.3);
+  border-color: #28a745 !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(40, 167, 69, 0.35);
 }
 
 .inv-slot.rarity-rare {
-  border-color: #60a0ff !important;
-  box-shadow: 0 0 12px rgba(96, 160, 255, 0.4);
+  border-color: #007bff !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 10px rgba(0, 123, 255, 0.45);
 }
 
 .inv-slot.rarity-epic {
-  border-color: #c060ff !important;
-  box-shadow: 0 0 15px rgba(192, 96, 255, 0.5);
+  border-color: #a335ee !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(163, 53, 238, 0.55);
 }
 
 .inv-slot.rarity-legendary {
@@ -998,24 +957,30 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 @keyframes legendaryShimmer {
-  0%, 100% {
-    border-color: #f0c040;
-    box-shadow: 0 0 15px rgba(240, 192, 64, 0.6);
+
+  0%,
+  100% {
+    border-color: #ff8000;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 0 10px rgba(255, 128, 0, 0.5);
   }
+
   50% {
-    border-color: #ffe680;
-    box-shadow: 0 0 25px rgba(255, 230, 128, 0.9);
+    border-color: #ffe000;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 20px rgba(255, 224, 0, 0.8);
   }
 }
 
 @keyframes mythicShimmer {
-  0%, 100% {
-    border-color: #ff4040;
-    box-shadow: 0 0 15px rgba(255, 64, 64, 0.6);
+
+  0%,
+  100% {
+    border-color: #ff3f3f;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 0 12px rgba(255, 63, 63, 0.6);
   }
+
   50% {
-    border-color: #ff8080;
-    box-shadow: 0 0 30px rgba(255, 128, 128, 0.9);
+    border-color: #ff3fee;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3), 0 0 25px rgba(255, 63, 238, 0.9);
   }
 }
 
@@ -1334,43 +1299,39 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .btn-market-buy {
-  background: linear-gradient(180deg, #40e080, #20a050);
-  border: none;
-  border-radius: 20px;
+  background: linear-gradient(180deg, #40e080 0%, #20a060 100%);
+  border: 1px solid #106030;
+  border-radius: 4px;
   color: #fff;
   font-family: var(--font-pixel);
   font-size: 8px;
-  padding: 6px 12px;
+  padding: 4px 6px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: all 0.15s;
   text-align: center;
 }
 
 .btn-market-buy:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 15px rgba(64, 224, 128, 0.6);
-  filter: brightness(1.1);
+  background: linear-gradient(180deg, #60f0a0 0%, #30c080 100%);
+  border-color: #20a060;
 }
 
 .btn-market-cancel {
-  background: linear-gradient(180deg, var(--accent), var(--accent-deep));
-  border: none;
-  border-radius: 20px;
+  background: linear-gradient(180deg, #ff4040 0%, #c02020 100%);
+  border: 1px solid #801010;
+  border-radius: 4px;
   color: #fff;
   font-family: var(--font-pixel);
   font-size: 8px;
-  padding: 6px 12px;
+  padding: 4px 6px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: all 0.15s;
   text-align: center;
 }
 
 .btn-market-cancel:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 15px rgba(255, 96, 128, 0.6);
-  filter: brightness(1.1);
+  background: linear-gradient(180deg, #ff6060 0%, #e03030 100%);
+  border-color: #c02020;
 }
 
 .market-sell-instructions {
@@ -2307,60 +2268,42 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 /* shop-slot is now handled by shared .inv-slot, .inventory-slot, .shop-slot block */
 
-.shop-slot {
-  background: rgba(30, 20, 10, 0.4) !important;
-}
-
 .shop-slot:hover {
-  border-color: var(--primary) !important;
-  background: rgba(240, 192, 64, 0.1) !important;
+  border-color: rgba(240, 192, 64, 0.5);
+  background: linear-gradient(135deg, rgba(45, 55, 85, 0.9), rgba(25, 30, 50, 0.95));
   transform: translateY(-2px);
-  box-shadow: 0 0 15px var(--gold-glow);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(240, 192, 64, 0.2);
   z-index: 2;
 }
 
 .shop-slot.selected {
-  border-color: var(--gold-light) !important;
-  background: rgba(240, 192, 64, 0.2) !important;
-  box-shadow: 0 0 20px var(--gold-glow);
+  border-color: var(--primary) !important;
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.15), rgba(20, 25, 40, 0.95)) !important;
+  box-shadow: 0 0 12px rgba(240, 192, 64, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.15);
 }
 
 .shop-slot .slot-emoji {
-  font-size: 36px;
-  margin-bottom: 4px;
-  filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
+  font-size: 22px;
 }
 
 .shop-slot .slot-price-tag {
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
-  padding: 2px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--primary-glow);
   font-family: var(--font-pixel);
-  font-size: 8px;
+  font-size: 7px;
   color: var(--primary);
-  text-shadow: 0 0 4px rgba(0,0,0,0.8);
-  white-space: nowrap;
+  margin-top: 2px;
+  text-shadow: 1px 1px 0 #000;
 }
 
 .shop-slot .slot-qty {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 9px;
+  top: 2px;
+  right: 4px;
+  font-size: 8px;
   font-weight: 800;
   color: #fff;
-  background: var(--secondary);
-  padding: 1px 4px;
-  border-radius: 4px;
   font-family: var(--font-pixel);
-  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
   pointer-events: none;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .shop-detail-box {
@@ -2392,38 +2335,38 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== WIKI PANEL STYLES ========== */
 .wiki-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 8px;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
 }
 
 .wiki-tab {
   flex: 1;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
   color: var(--text-dim);
   font-family: var(--font-pixel);
-  font-size: 9px;
-  padding: 8px 12px;
+  font-size: 10px;
+  padding: 8px 0;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s;
   text-align: center;
 }
 
 .wiki-tab:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text);
-  border-color: var(--primary-glow);
 }
 
 .wiki-tab.active {
-  background: linear-gradient(135deg, var(--primary), var(--gold-deep));
-  border-color: var(--primary);
-  color: #000;
+  background: rgba(240, 192, 64, 0.15);
+  border-color: rgba(240, 192, 64, 0.4);
+  color: var(--primary);
   font-weight: bold;
-  box-shadow: 0 0 15px var(--gold-glow);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .wiki-search-box {
@@ -2432,25 +2375,21 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .wiki-search-box input {
   width: 100%;
-  padding: 10px 16px 10px 36px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 20px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
   color: #fff;
-  font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
-  transition: all 0.3s ease;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23f0c040' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: 12px center;
+  transition: all 0.2s;
   box-sizing: border-box;
 }
 
 .wiki-search-box input:focus {
   border-color: var(--primary);
-  background-color: rgba(0, 0, 0, 0.6);
-  box-shadow: 0 0 15px var(--gold-glow);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 8px var(--primary-glow);
 }
 
 .wiki-main-container {
@@ -2464,38 +2403,23 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .wiki-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: 12px;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  background: var(--bg-item);
+  padding: 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  max-height: 250px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  max-height: 200px;
   overflow-y: auto;
   width: 100%;
   box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary) transparent;
-}
-
-.wiki-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.wiki-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.wiki-list::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 10px;
 }
 
 /* For list items of Wiki */
 .wiki-slot {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(30, 40, 60, 0.95), rgba(15, 20, 30, 1));
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4755,16 +4679,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .inventory-slot.rarity-common,
 .shop-slot.rarity-common,
 .trade-item-slot.rarity-common {
-  border-color: rgba(255, 255, 255, 0.3) !important;
-  box-shadow: none;
+  border-color: rgba(128, 128, 128, 0.6) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(128, 128, 128, 0.3);
 }
 
 .inv-slot.rarity-common:hover,
 .inventory-slot.rarity-common:hover,
 .shop-slot.rarity-common:hover,
 .trade-item-slot.rarity-common:hover {
-  border-color: rgba(255, 255, 255, 0.5) !important;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  border-color: rgba(128, 128, 128, 0.8) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(128, 128, 128, 0.5);
 }
 
 /* Uncommon (Green) */
@@ -4772,16 +4696,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .inventory-slot.rarity-uncommon,
 .shop-slot.rarity-uncommon,
 .trade-item-slot.rarity-uncommon {
-  border-color: #40e080 !important;
-  box-shadow: 0 0 8px rgba(64, 224, 128, 0.3);
+  border-color: rgba(0, 200, 100, 0.6) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(0, 200, 100, 0.3);
 }
 
 .inv-slot.rarity-uncommon:hover,
 .inventory-slot.rarity-uncommon:hover,
 .shop-slot.rarity-uncommon:hover,
 .trade-item-slot.rarity-uncommon:hover {
-  border-color: #40e080 !important;
-  box-shadow: 0 0 15px rgba(64, 224, 128, 0.5);
+  border-color: rgba(0, 200, 100, 0.8) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(0, 200, 100, 0.5);
 }
 
 /* Rare (Blue) */
@@ -4789,16 +4713,16 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .inventory-slot.rarity-rare,
 .shop-slot.rarity-rare,
 .trade-item-slot.rarity-rare {
-  border-color: #60a0ff !important;
-  box-shadow: 0 0 10px rgba(96, 160, 255, 0.4);
+  border-color: rgba(64, 160, 255, 0.6) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(64, 160, 255, 0.3);
 }
 
 .inv-slot.rarity-rare:hover,
 .inventory-slot.rarity-rare:hover,
 .shop-slot.rarity-rare:hover,
 .trade-item-slot.rarity-rare:hover {
-  border-color: #60a0ff !important;
-  box-shadow: 0 0 18px rgba(96, 160, 255, 0.6);
+  border-color: rgba(64, 160, 255, 0.8) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(64, 160, 255, 0.5);
 }
 
 /* Epic (Purple) */
@@ -4806,46 +4730,33 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .inventory-slot.rarity-epic,
 .shop-slot.rarity-epic,
 .trade-item-slot.rarity-epic {
-  border-color: #c060ff !important;
-  box-shadow: 0 0 12px rgba(192, 96, 255, 0.5);
+  border-color: rgba(160, 80, 255, 0.6) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(160, 80, 255, 0.3);
 }
 
 .inv-slot.rarity-epic:hover,
 .inventory-slot.rarity-epic:hover,
 .shop-slot.rarity-epic:hover,
 .trade-item-slot.rarity-epic:hover {
-  border-color: #c060ff !important;
-  box-shadow: 0 0 20px rgba(192, 96, 255, 0.7);
+  border-color: rgba(160, 80, 255, 0.8) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(160, 80, 255, 0.5);
 }
 
-/* Legendary (Gold) */
+/* Legendary (Orange/Gold) */
 .inv-slot.rarity-legendary,
 .inventory-slot.rarity-legendary,
 .shop-slot.rarity-legendary,
 .trade-item-slot.rarity-legendary {
-  animation: legendaryShimmer 2s ease-in-out infinite !important;
+  border-color: rgba(255, 160, 0, 0.6) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 8px rgba(255, 160, 0, 0.3);
 }
 
 .inv-slot.rarity-legendary:hover,
 .inventory-slot.rarity-legendary:hover,
 .shop-slot.rarity-legendary:hover,
 .trade-item-slot.rarity-legendary:hover {
-  animation: legendaryShimmer 1s ease-in-out infinite !important;
-}
-
-/* Mythic (Red) */
-.inv-slot.rarity-mythic,
-.inventory-slot.rarity-mythic,
-.shop-slot.rarity-mythic,
-.trade-item-slot.rarity-mythic {
-  animation: mythicShimmer 1.5s ease-in-out infinite !important;
-}
-
-.inv-slot.rarity-mythic:hover,
-.inventory-slot.rarity-mythic:hover,
-.shop-slot.rarity-mythic:hover,
-.trade-item-slot.rarity-mythic:hover {
-  animation: mythicShimmer 0.8s ease-in-out infinite !important;
+  border-color: rgba(255, 160, 0, 0.8) !important;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 0 12px rgba(255, 160, 0, 0.5);
 }
 
 /* ========== SAFARI / WEBKIT iOS FIX ========== */
