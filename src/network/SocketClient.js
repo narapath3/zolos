@@ -34,6 +34,7 @@ export async function connectSocket() {
         console.log('[SocketClient] No VITE_SOCKET_URL — running in offline/Supabase mode');
         return null;
     }
+    console.log('[SocketClient] Connecting to:', url);
 
     // Dynamic import: try bundled first, then CDN fallback
     let ioModule;

@@ -206,10 +206,12 @@ export async function saveCharacter(characterId, updates) {
     const dbUpdates = { ...updates };
 
     // Core stats (always in DB)
+    // Only include fields that actually exist in the DB schema
+    // sound_enabled, graphics_quality, fps_enabled do NOT exist in the Supabase characters table
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'sound_enabled', 'graphics_quality', 'fps_enabled'
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
     ];
 
     // Optional appearance fields (may not be in DB yet)
@@ -226,14 +228,18 @@ export async function saveCharacter(characterId, updates) {
         }
     }
 
-    console.log('[Zolos] Saving character to DB. updates:', Object.keys(filteredUpdates));
-    const { error } = await supabase
+    console.log(`[Zolos] 💾 Attempting DB save for character ${characterId}. Fields:`, Object.keys(filteredUpdates));
+    const { data, error, status } = await supabase
         .from('characters')
         .update({ ...filteredUpdates, updated_at: new Date().toISOString() })
-        .eq('id', characterId);
+        .eq('id', characterId)
+        .select();
 
     if (error) {
-        console.error('Save error:', error);
+        console.error(`[Zolos] ❌ Save error (Status ${status}):`, error.message, error.details, error.hint);
+        if (error.code === '42501') {
+            console.error('[Zolos] 🔐 RLS Policy violation: You do not have permission to update this character.');
+        }
         // Fallback for unmigrated database: retry saving only the core 100% supported fields
         if (error.code === 'PGRST204') {
             console.warn('[Zolos] Database schema mismatch (PGRST204). Retrying save with core columns only...');
@@ -254,7 +260,83 @@ export async function saveCharacter(characterId, updates) {
             if (retryError) {
                 console.error('[Zolos] Core retry save failure:', retryError);
             } else {
-                console.log('[Zolos] Core retry save succeeded!');
+                console.log('[Zolos] ✅ Core retry save succeeded!');
+            }
+        }
+    } else {
+        if (data && data.length > 0) {
+            console.log('[Zolos] ✅ Save successful! Rows affected:', data.length);
+        } else {
+            console.warn('[Zolos] ⚠️ Save returned no error, but 0 rows were updated. Check if characterId exists and matches user_id.');
+        }
+    }
+}
+
+/**
+ * Save character data to Supabase using user_id instead of character row id.
+ * This is necessary to satisfy RLS policies that check auth.uid() = user_id.
+ * @param {string} userId - The Supabase auth user UUID
+ * @param {Object} updates - Fields to update
+ */
+export async function saveCharacterByUserId(userId, updates) {
+    // Persist game settings to localStorage first
+    try {
+        const settingsKey = `zolos_settings_${userId}`;
+        const existingSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+        if (updates.fps_enabled !== undefined) existingSettings.fps_enabled = updates.fps_enabled;
+        if (updates.sound_enabled !== undefined) existingSettings.sound_enabled = updates.sound_enabled;
+        if (updates.graphics_quality !== undefined) existingSettings.graphics_quality = updates.graphics_quality;
+        localStorage.setItem(settingsKey, JSON.stringify(existingSettings));
+    } catch (e) { /* localStorage unavailable */ }
+
+    if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
+        const char = localDb.get(`char_${userId}`);
+        if (char) {
+            const merged = { ...char, ...updates, updated_at: new Date().toISOString() };
+            localDb.set(`char_${userId}`, merged);
+            updateLocalLeaderboard(merged);
+        }
+        return;
+    }
+
+    // Only include fields that actually exist in the DB schema
+    // sound_enabled, graphics_quality, fps_enabled do NOT exist in the Supabase characters table
+    const allowedFields = [
+        'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
+        'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+    ];
+
+    const filteredUpdates = {};
+    for (const key of Object.keys(updates)) {
+        if (allowedFields.includes(key)) {
+            filteredUpdates[key] = updates[key];
+        }
+    }
+
+    console.log(`[Zolos] 💾 Saving by user_id ${userId}. Fields:`, Object.keys(filteredUpdates));
+    console.log(`[Zolos] 📤 Supabase Update Payload:`, JSON.stringify(filteredUpdates));
+    
+    // Use basic update without .select() to avoid potential RLS read issues during update
+    const { error, count } = await supabase
+        .from('characters')
+        .update({ ...filteredUpdates, updated_at: new Date().toISOString() }, { count: 'exact' })
+        .eq('user_id', userId);
+
+    if (error) {
+        console.error('[Zolos] ❌ saveCharacterByUserId error:', error.message, error.details, error.hint);
+    } else {
+        if (count > 0) {
+            console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', count);
+        } else {
+            console.warn('[Zolos] ⚠️ saveCharacterByUserId: 0 rows updated. userId may not exist or RLS blocked the update.');
+            
+            // Fallback: try saving by characterId if user_id update affected 0 rows
+            // This handles cases where user_id might be missing or incorrect in the state
+            const charId = updates.characterId || updates.id;
+            if (charId) {
+                console.log(`[Zolos] 🔄 Retrying save by characterId: ${charId}`);
+                await saveCharacter(charId, filteredUpdates);
             }
         }
     }
@@ -551,7 +633,7 @@ export async function fetchLeaderboard(category = 'level') {
 }
 
 // ============ Realtime Presence & Broadcast (Socket.io) ============
-export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
+export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback, currentMapId = 'prontera') {
     onlinePlayersCallback = onPlayersUpdate;
     chatCallback = onChatCallback;
     socketListenersAttached = false;
@@ -561,9 +643,10 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     currentUsername = username;
     currentLevel = level;
 
-    // ===== OFFLINE MODE (Mock Players) =====
+    // ===== OFFLINE MODE (No Mock Players) =====
     if (isOfflineMode || (!isSocketMode() && !supabase)) {
-        _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+        console.log('[Zolos] 📴 Offline Mode active (no bots)');
+        if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
         return;
     }
 
@@ -578,8 +661,8 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         }
 
         if (!socket) {
-            console.warn('[Zolos] ⚠️ Socket.io connection failed, falling back to offline mode');
-            _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+            console.warn('[Zolos] ⚠️ Socket.io connection failed');
+            if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
             return;
         }
 
@@ -642,28 +725,29 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         }
 
         // Join the game
-        socket.emit('join', { userId, username, level });
+        socket.emit('join', { userId, username, level, mapId: currentMapId });
         console.log('[Zolos] ✅ Emitted join event to Map Server');
         return;
     }
 
-    // ===== FALLBACK: If Supabase exists but no socket URL — offline mock =====
-    _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback);
+    // ===== FALLBACK: No Mock Players =====
+    console.warn('[Zolos] ⚠️ Falling back to single player mode (no bots)');
+    if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
 }
 
-export function broadcastPosition(userId, username, level, position, rotationY, state, appearance) {
+export function broadcastPosition(userId, username, level, position, rotationY, state, appearance, currentMapId = 'prontera') {
     if (isOfflineMode) return;
 
     const socket = getSocket();
     if (socket && isSocketConnected()) {
-        const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state };
+        const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state, mapId: currentMapId };
         if (appearance) payload.appearance = appearance;
         socket.emit('pos', payload);
         return;
     }
 }
 
-export function broadcastChat(userId, username, level, message) {
+export function broadcastChat(userId, username, level, message, currentMapId = 'prontera') {
     if (isOfflineMode) {
         // Echo back local message using object format
         if (chatCallback) {
@@ -693,13 +777,13 @@ export function broadcastChat(userId, username, level, message) {
 
     const socket = getSocket();
     if (socket && isSocketConnected()) {
-        socket.emit('chat', { userId, username, level, message });
+        socket.emit('chat', { userId, username, level, message, mapId: currentMapId });
         // Note: server broadcasts back to everyone (including sender) via 'chat' event
         // so we don't need to echo locally — it will come back from the server
     }
 }
 
-export function updatePresence(level, newUsername = null) {
+export function updatePresence(level, newUsername = null, currentMapId = 'prontera') {
     currentLevel = level;
     if (newUsername) {
         currentUsername = newUsername;
@@ -719,7 +803,8 @@ export function updatePresence(level, newUsername = null) {
     if (socket && isSocketConnected()) {
         socket.emit('update_presence', {
             level: currentLevel,
-            username: currentUsername
+            username: currentUsername,
+            mapId: currentMapId
         });
     }
 }
@@ -739,7 +824,11 @@ export function leavePresence() {
 export function sendSaveState(saveData) {
     const socket = getSocket();
     if (socket && isSocketConnected() && saveData) {
-        socket.emit('save_state', saveData);
+        // Ensure userId is present for server-side RLS-compliant saves
+        socket.emit('save_state', {
+            ...saveData,
+            userId: saveData.userId || null
+        });
     }
 }
 
@@ -751,7 +840,11 @@ export function startAutoSave(getStateCallback, intervalMs = 180000) {
         const state = getStateCallback();
         if (state && state.characterId) {
             // Save directly to Supabase
-            await saveCharacter(state.characterId, state.updates);
+            if (state.userId) {
+                await saveCharacterByUserId(state.userId, state.updates);
+            } else {
+                await saveCharacter(state.characterId, state.updates);
+            }
 
             // Also send state to Socket server for save-on-disconnect backup
             sendSaveState(state);

@@ -11,6 +11,7 @@ import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
 import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { AdminUI } from './ui/AdminUI.js';
+import { announcementSystem } from './ui/AnnouncementSystem.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -22,6 +23,7 @@ import {
     stopAutoSave,
     broadcastPosition,
     broadcastChat,
+    updatePresence,
     getDeterministicGuestName,
     isPlaceholderName,
 } from './network/GameSync.js';
@@ -79,7 +81,8 @@ async function initAuth() {
     authUI = new AuthUI((sessionData) => {
         userId = sessionData.userId;
         username = sessionData.username;
-        showCharacterSelect();
+        // Pass guest flag to character select
+        showCharacterSelect(sessionData.isGuest);
     });
 }
 
@@ -230,6 +233,20 @@ async function initGame(charData) {
     window.gameUI = gameUI;
     gameUI.particles = particles;
 
+    // Initialize Announcement System
+    announcementSystem.init();
+    window.announcementSystem = announcementSystem;
+
+    // Set guest mode state
+    gameUI.setGuestMode(charData.isGuest === true);
+
+    // Setup bind account callback
+    gameUI.setupBindAccountCallback(async (email, password) => {
+        const { bindAccount } = await import('./network/SupabaseClient.js');
+        await bindAccount(email, password);
+        charData.isGuest = false; // Update local state
+    });
+
     // Setup skill clicks
     gameUI.setupSkillClicks((skillId) => {
         gameUI.castSkill(skillId);
@@ -315,7 +332,19 @@ async function initGame(charData) {
             }
 
             // Persist character appearance & stats to DB
-            await character.saveStatsToDatabase();
+            try {
+                console.log('[Zolos] 💾 Profile save triggered. Saving appearance...');
+                await character.saveStatsToDatabase();
+                if (charData.user_id) {
+                    const { saveCharacterByUserId } = await import('./network/GameSync.js');
+                    await saveCharacterByUserId(charData.user_id, character.getSaveData().updates);
+                }
+                console.log('[Zolos] ✅ Profile appearance saved successfully.');
+            } catch (err) {
+                console.error('[Zolos] ❌ Profile appearance save failed:', err);
+                gameUI.addCombatLog('❌ บันทึกโปรไฟล์ล้มเหลว!', 'system');
+            }
+
             // Refresh all UI panels
             gameUI._renderInventory();
             gameUI.updateHUD(character.stats);
@@ -328,39 +357,65 @@ async function initGame(charData) {
         userId,
         username,
         character.stats.level,
-        (players) => {
+        async (players) => {
             // Update online players list
             if (gameUI) gameUI.updateOnlinePlayers(players);
 
-            // If players is empty, it's a "clean up" signal or a specific player left
-            // However, Socket.io sends incremental updates now.
-            // If we receive a list, we ensure all players in it exist.
+            // Handle map isolation and cleanup
+            const currentIds = new Set(players.map(p => p.userId));
+            for (const [id, rp] of remotePlayersMap.entries()) {
+                if (!currentIds.has(id)) {
+                    sceneManager.scene.remove(rp.mesh);
+                    remotePlayersMap.delete(id);
+                }
+            }
+
             players.forEach(p => {
                 if (p.userId === userId) return;
-                if (!remotePlayersMap.has(p.userId)) {
-                    // This will be handled by the position update callback too, 
-                    // but we can pre-initialize here if needed.
+                if (p.mapId && p.mapId !== sceneManager.currentMap) {
+                    if (remotePlayersMap.has(p.userId)) {
+                        const rp = remotePlayersMap.get(p.userId);
+                        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                        remotePlayersMap.delete(p.userId);
+                    }
                 }
             });
 
-            // Clean up players who are NOT in the active players list anymore
-            // Note: In Socket.io mode, 'players' might be the FULL list from playersUpdate
-            // or a SINGLE player from playerJoined. We need to be careful.
-            if (players.length > 1) {
-                const currentIds = new Set(players.map(p => p.userId));
-                for (const [id, rp] of remotePlayersMap.entries()) {
-                    if (!currentIds.has(id)) {
-                        sceneManager.scene.remove(rp.mesh);
-                        remotePlayersMap.delete(id);
+            // Setup announcement listeners for Socket.io broadcasts (after socket is connected)
+            try {
+                const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
+                setupAnnouncementListeners((announcementData) => {
+                    if (window.announcementSystem) {
+                        window.announcementSystem.addAnnouncement(
+                            announcementData.text,
+                            announcementData.type || 'info',
+                            announcementData.duration || 8000
+                        );
                     }
-                }
+                });
+            } catch (err) {
+                console.warn('[Zolos] Failed to setup announcement listeners:', err);
             }
         },
         (p) => {
             // Handle remote player position updates
             if (p.userId === userId) return;
+
+            // Map isolation: Only update/render if on the same map
+            if (p.mapId && p.mapId !== sceneManager.currentMap) {
+                if (remotePlayersMap.has(p.userId)) {
+                    const rp = remotePlayersMap.get(p.userId);
+                    if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                    remotePlayersMap.delete(p.userId);
+                }
+                return;
+            }
+
             let rp = remotePlayersMap.get(p.userId);
             if (!rp) {
+                // Step 12: Wait for valid position before creating remote mesh to prevent "stuck at portal" visuals
+                if (p.x === undefined || p.z === undefined) return;
+
                 // Create a real hero model for the remote player
                 const remoteChar = new CharacterManager(sceneManager.scene);
                 let rName = p.username;
@@ -379,19 +434,20 @@ async function initGame(charData) {
             }
 
             // Update position and appearance
-            rp.mesh.position.set(p.x, p.y, p.z);
-            rp.mesh.rotation.y = p.rY;
+            if (p.x !== undefined && p.y !== undefined && p.z !== undefined) {
+                rp.mesh.position.set(p.x, p.y, p.z);
+            }
+            if (p.rY !== undefined) {
+                rp.mesh.rotation.y = p.rY;
+            }
 
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
 
                 // Step 10 Part B: Robust water detection for remote players.
-                // Re-run environment check based on received X/Z to ensure correct baseY.
                 const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
                 if (remoteEnv === 'water') {
                     rp.character.baseY = -0.5;
-                    // Force swimming state if the position is in water, 
-                    // regardless of the broadcast state (which might be 'walking' due to AUTO mode)
                     rp.character.state = 'swimming';
                 } else {
                     rp.character.baseY = 1.2;
@@ -401,25 +457,27 @@ async function initGame(charData) {
                     rp.character.applyAppearance(p.appearance);
                 }
                 // Update animations for remote player
-                rp.character.update(1 / 60); // dt not available in callback scope; use fixed step
+                rp.character.update(1 / 60);
             }
         },
         // Step 9: Use consistent object format for chat messages
         (chatMsg) => {
+            // Map isolation: Only show chat from players on the same map
+            if (chatMsg.mapId && chatMsg.mapId !== sceneManager.currentMap) return;
+
             if (gameUI) gameUI.receiveChatMessage(chatMsg.username, chatMsg.message);
 
             // Show chat bubble above character
             if (chatMsg.userId === userId) {
-                // Local player
                 if (character) character.showChatBubble(chatMsg.message);
             } else {
-                // Remote players
                 const rp = remotePlayersMap.get(chatMsg.userId);
                 if (rp && rp.character) {
                     rp.character.showChatBubble(chatMsg.message);
                 }
             }
-        }
+        },
+        sceneManager.currentMap
     );
 
     // Start auto-save
@@ -432,6 +490,7 @@ async function initGame(charData) {
         }
         return {
             characterId: charData.id,
+            userId: charData.user_id,
             updates: saveData.updates
         };
     }, 15000);
@@ -447,7 +506,7 @@ async function initGame(charData) {
     // Step 9: Wire up chat send callback
     if (gameUI) {
         gameUI.setupChatSendCallback((message) => {
-            broadcastChat(userId, username, character.stats.level, message);
+            broadcastChat(userId, username, character.stats.level, message, sceneManager.currentMap);
             // Local bubble is now handled by the echo in broadcastChat callback
         });
     }
@@ -459,8 +518,12 @@ async function initGame(charData) {
             gameUI.addCombatLog('💾 กำลังบันทึกข้อมูลตัวละคร...', 'system');
             const saveData = character.getSaveData();
             try {
-                const { saveCharacter, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
-                await saveCharacter(charData.id, saveData.updates);
+                const { saveCharacter, saveCharacterByUserId, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
+                if (charData.user_id) {
+                    await saveCharacterByUserId(charData.user_id, saveData.updates);
+                } else {
+                    await saveCharacter(charData.id, saveData.updates);
+                }
                 if (gameUI.dailyQuestsState) {
                     await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
                 }
@@ -583,15 +646,16 @@ async function initGame(charData) {
         }
 
         // Update cursor style
-        canvas.style.cursor = newHoverMesh ? 'pointer' : 'default';
+        canvas.style.cursor = newHoverMesh ? "url('/assets/cute_cursor_32.png'), pointer" : "url('/assets/cute_cursor_32.png'), default";
     });
 }
 
-async function showCharacterSelect() {
+async function showCharacterSelect(isGuest = false) {
     // For now, load default character or create screen
     try {
         const char = await loadCharacter(userId);
         if (char) {
+            char.isGuest = isGuest;
             initGame(char);
         } else {
             // Fallback for new characters if loadCharacter didn't create one
@@ -650,19 +714,20 @@ window.handleCanvasTap = handleMouseInteraction;
 
 // ============ Game Loop ============
 function gameLoop(time) {
+    requestAnimationFrame(gameLoop);
     if (!isGameStarted) return;
 
-    const dt = Math.min(0.1, (time - lastTime) / 1000);
-    lastTime = time;
+    try {
+        const dt = Math.min(0.1, (time - lastTime) / 1000);
+        lastTime = time;
 
-    // 1a. Dead-state guard: stop processing updates if character is dead
-    if (character && !character.isAlive()) {
-        if (particles) particles.update(dt);
-        if (combatSystem) combatSystem.update(dt);
-        sceneManager.render();
-        requestAnimationFrame(gameLoop);
-        return;
-    }
+        // 1a. Dead-state guard: stop processing updates if character is dead
+        if (character && !character.isAlive()) {
+            if (particles) particles.update(dt);
+            if (combatSystem) combatSystem.update(dt);
+            sceneManager.render();
+            return;
+        }
 
     if (portalCooldown > 0) portalCooldown -= dt;
 
@@ -729,15 +794,59 @@ function gameLoop(time) {
                     portalCooldown = 2.0;
                     autoPath = null;
 
+                    // Clear stale combat state before loading new map
+                    if (character) {
+                        character.targetMonster = null;
+                        character.state = 'idle';
+                    }
+                    if (combatSystem) {
+                        combatSystem.currentTarget = null;
+                        combatSystem.autoFarm = false;
+                        combatSystem.isFishing = false;
+                    }
+                    if (gameUI && typeof gameUI.clearTarget === 'function') {
+                        gameUI.clearTarget();
+                    }
+                    if (inputManager && typeof inputManager.reset === 'function') {
+                        inputManager.reset();
+                    }
+
                     // Set safe spawn point for new map
                     const spawn = { x: 0, y: 1.2, z: 10 };
                     character.baseY = spawn.y;
                     character.mesh.position.set(spawn.x, spawn.y, spawn.z);
 
+                    console.log(`[Warp] Starting warp to ${targetMap}`);
                     sceneManager.loadMap(targetMap);
+                    console.log(`[Warp] Map ${targetMap} loaded`);
                     monsters.clearAll();
                     monsters.mapId = targetMap;
                     monsters.spawnInitial(character.stats.level);
+                    console.log(`[Warp] Monsters spawned`);
+
+                    // Update multiplayer presence for the new map
+                    updatePresence(character.stats.level, username, targetMap);
+                    console.log(`[Warp] Presence updated`);
+
+                    // Immediately broadcast position on the new map so others see us at the spawn point
+                    broadcastPosition(
+                        userId,
+                        username,
+                        character.stats.level,
+                        character.getPosition(),
+                        character.mesh.rotation.y,
+                        character.state,
+                        character.getAppearance(),
+                        targetMap
+                    );
+                    console.log(`[Warp] Initial position broadcasted for new map`);
+                    
+                    // Clear remote players from old map
+                    for (const [id, rp] of remotePlayersMap.entries()) {
+                        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                    }
+                    remotePlayersMap.clear();
+                    console.log(`[Warp] Remote players cleared`);
                 }
             }
         });
@@ -756,7 +865,7 @@ function gameLoop(time) {
 
     const now = performance.now();
     if (now - lastBroadcastTime > 100) {
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance());
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
         lastBroadcastTime = now;
     }
 
@@ -801,8 +910,10 @@ function gameLoop(time) {
         lastMinimapTime = now;
     }
 
-    sceneManager.render();
-    requestAnimationFrame(gameLoop);
+        sceneManager.render();
+    } catch (err) {
+        console.error('[GameLoop] Error:', err);
+    }
 }
 
 // Start

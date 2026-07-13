@@ -1,4 +1,4 @@
-import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount, getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
+import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount, getDeterministicGuestName, isPlaceholderName, sendPasswordResetEmail } from '../network/SupabaseClient.js';
 
 export class AuthUI {
     constructor(onAuthSuccess) {
@@ -7,6 +7,7 @@ export class AuthUI {
         this.statusEl = document.getElementById('auth-status');
         this._unsubOnlineCount = null;
         this._isRegisterMode = false;
+        this._isForgotPwMode = false;
         this._sessionData = null;
 
         // BGM initialization
@@ -27,12 +28,25 @@ export class AuthUI {
         this._charnameEl = document.getElementById('auth-charname');
         this._loginBtn = document.getElementById('btn-login');
         this._registerBtn = document.getElementById('btn-register');
+        this._startBtn = document.getElementById('btn-start-game');
+        this._splashEl = document.getElementById('auth-splash');
+        this._formWrapperEl = document.getElementById('auth-form-wrapper');
+        this._changeAccountBtn = document.getElementById('btn-change-account');
+        this._forgotPwBtn = document.getElementById('btn-forgot-password');
+
+        if (this._startBtn) {
+            this._startBtn.addEventListener('click', () => {
+                this._splashEl.style.display = 'none';
+                this._formWrapperEl.style.display = 'block';
+                this._formWrapperEl.classList.add('fade-in');
+            });
+        }
 
         this._loginBtn.addEventListener('click', () => {
             if (this._sessionData) {
                 this._enterGameWithSession();
-            } else if (this._isRegisterMode) {
-                this._setMode(false);
+            } else if (this._isRegisterMode || this._isForgotPwMode) {
+                this._setMode('login');
             } else {
                 this._handleLogin();
             }
@@ -42,11 +56,25 @@ export class AuthUI {
             if (this._sessionData) {
                 this._handleSignOut();
             } else if (!this._isRegisterMode) {
-                this._setMode(true);
+                this._setMode('register');
             } else {
                 this._handleRegister();
             }
         });
+
+        if (this._changeAccountBtn) {
+            this._changeAccountBtn.addEventListener('click', () => this._handleSignOut());
+        }
+
+        if (this._forgotPwBtn) {
+            this._forgotPwBtn.addEventListener('click', () => {
+                if (this._isForgotPwMode) {
+                    this._handleForgotPassword();
+                } else {
+                    this._setMode('forgot');
+                }
+            });
+        }
 
         document.getElementById('btn-guest').addEventListener('click', () => this._handleGuest());
 
@@ -65,24 +93,84 @@ export class AuthUI {
         });
     }
 
-    _setMode(isRegister) {
-        this._isRegisterMode = isRegister;
-        this._charnameEl.style.display = isRegister ? '' : 'none';
-        if (!isRegister) this._charnameEl.value = '';
-        this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 Register';
-        this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ Login';
-        this._setStatus(isRegister ? 'Choose your character name!' : '', 'info');
-        if (isRegister) this._charnameEl.focus();
+    _setMode(mode) {
+        // mode can be: 'login', 'register', 'forgot'
+        this._isRegisterMode = mode === 'register';
+        this._isForgotPwMode = mode === 'forgot';
+
+        const usernameInput = document.getElementById('auth-username');
+        const passwordWrapper = document.getElementById('auth-password').parentElement;
+
+        if (mode === 'forgot') {
+            this._charnameEl.style.display = 'none';
+            passwordWrapper.style.display = 'none';
+            usernameInput.placeholder = 'Enter your email';
+            
+            this._loginBtn.textContent = '← Back to Login';
+            this._registerBtn.style.display = 'none';
+            this._forgotPwBtn.textContent = '🚀 Send Reset Link';
+            this._forgotPwBtn.classList.remove('btn-forgot-pw');
+            this._forgotPwBtn.classList.add('btn-secondary');
+            this._forgotPwBtn.style.marginTop = '10px';
+            this._forgotPwBtn.style.textDecoration = 'none';
+            this._forgotPwBtn.style.alignSelf = 'center';
+            this._forgotPwBtn.style.width = '100%';
+
+            this._setStatus('Enter your email to reset password', 'info');
+            
+            const dividers = document.querySelectorAll('.auth-divider');
+            const guestBtn = document.getElementById('btn-guest');
+            dividers.forEach(el => el.style.display = 'none');
+            if (guestBtn) guestBtn.style.display = 'none';
+
+            usernameInput.focus();
+        } else {
+            const isRegister = mode === 'register';
+            this._charnameEl.style.display = isRegister ? '' : 'none';
+            passwordWrapper.style.display = 'flex';
+            usernameInput.placeholder = 'Email or Username';
+            
+            if (this._forgotPwBtn) {
+                this._forgotPwBtn.style.display = isRegister ? 'none' : 'block';
+                this._forgotPwBtn.textContent = 'Forgot Password?';
+                this._forgotPwBtn.classList.add('btn-forgot-pw');
+                this._forgotPwBtn.classList.remove('btn-secondary');
+                this._forgotPwBtn.style.marginTop = '';
+                this._forgotPwBtn.style.textDecoration = '';
+                this._forgotPwBtn.style.alignSelf = '';
+                this._forgotPwBtn.style.width = '';
+            }
+            
+            this._registerBtn.style.display = 'block';
+            
+            const dividers = document.querySelectorAll('.auth-divider');
+            const guestBtn = document.getElementById('btn-guest');
+            dividers.forEach(el => el.style.display = '');
+            if (guestBtn) guestBtn.style.display = '';
+            this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 Register';
+            this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ Login';
+            
+            this._setStatus(isRegister ? 'Choose your character name!' : '', 'info');
+            if (isRegister) this._charnameEl.focus();
+        }
     }
 
     _createParticles() {
         const container = document.getElementById('auth-particles');
-        for (let i = 0; i < 30; i++) {
+        if (!container) return;
+        container.innerHTML = '';
+        for (let i = 0; i < 50; i++) {
             const p = document.createElement('div');
             p.className = 'particle';
             p.style.left = Math.random() * 100 + '%';
-            p.style.animationDelay = Math.random() * 8 + 's';
-            p.style.animationDuration = (6 + Math.random() * 6) + 's';
+            const duration = 10 + Math.random() * 20;
+            const delay = Math.random() * 20;
+            p.style.setProperty('--duration', `${duration}s`);
+            p.style.animationDelay = `${-delay}s`;
+            p.style.opacity = Math.random();
+            const size = 2 + Math.random() * 4;
+            p.style.width = `${size}px`;
+            p.style.height = `${size}px`;
             container.appendChild(p);
         }
     }
@@ -117,11 +205,12 @@ export class AuthUI {
 
     _showSessionMode(username) {
         document.getElementById('auth-username').style.display = 'none';
-        document.getElementById('auth-password').style.display = 'none';
+        document.getElementById('auth-password').parentElement.style.display = 'none';
         if (this._charnameEl) this._charnameEl.style.display = 'none';
+        if (this._changeAccountBtn) this._changeAccountBtn.style.display = 'inline-flex';
 
         this._loginBtn.textContent = `⚔️ Enter Game as ${username}`;
-        this._registerBtn.textContent = '🚪 Switch Account';
+        this._registerBtn.style.display = 'none';
 
         const guestBtn = document.getElementById('btn-guest');
         if (guestBtn) guestBtn.style.display = 'none';
@@ -156,9 +245,11 @@ export class AuthUI {
 
         // Restore normal inputs and buttons
         document.getElementById('auth-username').style.display = '';
-        document.getElementById('auth-password').style.display = '';
+        document.getElementById('auth-password').parentElement.style.display = 'flex';
         document.getElementById('auth-username').value = '';
         document.getElementById('auth-password').value = '';
+        if (this._changeAccountBtn) this._changeAccountBtn.style.display = 'none';
+        if (this._forgotPwBtn) this._forgotPwBtn.style.display = 'block';
 
         const guestBtn = document.getElementById('btn-guest');
         if (guestBtn) guestBtn.style.display = '';
@@ -169,8 +260,26 @@ export class AuthUI {
         // Restore register button to default
         this._isRegisterMode = false;
         this._loginBtn.textContent = '⚔️ Login';
+        this._registerBtn.style.display = '';
         this._registerBtn.textContent = '📜 Register';
         this._setStatus('', 'info');
+    }
+
+    async _handleForgotPassword() {
+        const email = document.getElementById('auth-username').value.trim();
+        if (!email || !email.includes('@')) {
+            this._setStatus('Please enter a valid email address', 'error');
+            return;
+        }
+
+        this._setStatus('Sending reset link...', 'info');
+        try {
+            await sendPasswordResetEmail(email);
+            this._setStatus('Reset link sent! Please check your email.', 'success');
+            setTimeout(() => this._setMode('login'), 3000);
+        } catch (e) {
+            this._setStatus(e.message || 'Failed to send reset link', 'error');
+        }
     }
 
     async _handleLogin() {

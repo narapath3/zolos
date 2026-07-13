@@ -1,5 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList } from '../network/GameSync.js';
+import { LayoutManager } from './LayoutManager.js';
 
 
 export class GameUI {
@@ -54,7 +55,47 @@ export class GameUI {
     this._setupTradePanel();
     this._setupMobileControls();
     this._setupDailyQuests();
+    this._setupNetworkStatus();
+    this.layoutManager = new LayoutManager(this);
     window.gameUI = this;
+  }
+
+  _setupNetworkStatus() {
+    this.networkDot = document.getElementById('network-dot');
+    this.networkText = document.getElementById('network-text');
+    this.networkStatusEl = document.getElementById('network-status');
+
+    // Update every 2 seconds
+    setInterval(() => {
+      this.updateNetworkStatus();
+    }, 2000);
+  }
+
+  async updateNetworkStatus() {
+    if (!this.networkDot || !this.networkText) return;
+
+    const { isSocketConnected, isSocketMode } = await import('../network/SocketClient.js');
+    const connected = isSocketConnected();
+    const socketMode = isSocketMode();
+
+    const { isOfflineMode } = await import('../network/SupabaseClient.js');
+
+    if (!socketMode) {
+      this.networkDot.style.background = isOfflineMode ? '#888' : '#40a0ff';
+      this.networkText.textContent = isOfflineMode ? 'LOCAL' : 'CLOUD';
+      this.networkText.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
+    } else if (connected) {
+      this.networkDot.style.background = '#0f0';
+      this.networkText.textContent = 'ONLINE';
+      this.networkText.style.color = '#0f0';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = '#0f0';
+    } else {
+      this.networkDot.style.background = '#f44';
+      this.networkText.textContent = 'OFFLINE';
+      this.networkText.style.color = '#f44';
+      if (this.networkStatusEl) this.networkStatusEl.style.color = '#f44';
+    }
   }
 
   _setupTargetIndicator() {
@@ -62,6 +103,13 @@ export class GameUI {
     this.targetName = document.getElementById('target-name');
     this.targetHpFill = document.getElementById('target-hp-fill');
     this.currentTargetMonster = null;
+  }
+
+  clearTarget() {
+    if (this.targetIndicator) this.targetIndicator.style.display = 'none';
+    this.currentTargetMonster = null;
+    this.hoveredMonster = null;
+    if (this.character) this.character.targetMonster = null;
   }
 
   updateTargetIndicator(sceneManager) {
@@ -255,9 +303,14 @@ export class GameUI {
   }
 
   // ============ Map Name Update ============
-  setMapName(mapName) {
+  setMapName(mapName, mapId) {
     const el = document.getElementById('map-name');
     if (el) el.textContent = mapName;
+    if (mapId) {
+      this.currentMapId = mapId;
+      // Refresh online players list when map changes to filter correctly
+      this._renderOnlinePlayers();
+    }
   }
 
   // ============ HUD Updates ============
@@ -929,6 +982,9 @@ export class GameUI {
         this._renderOnlinePlayers();
       });
     });
+    
+    // Initial map ID
+    this.currentMapId = 'prontera';
   }
 
   updateOnlinePlayers(players) {
@@ -946,31 +1002,87 @@ export class GameUI {
     if (!body) return;
 
     const friends = this.friends || [];
-    let list = this.onlinePlayers || [];
+    const onlinePlayers = this.onlinePlayers || [];
+    const onlineUsernames = new Set(onlinePlayers.map(p => p.username));
+    
+    let list = [];
+    let onlineCount = 0;
 
     if (this.onlineView === 'friends') {
-      list = list.filter(p => friends.includes(p.username));
+      // 1. Online friends
+      const onlineFriends = onlinePlayers.filter(p => friends.includes(p.username));
+      onlineCount = onlineFriends.length;
+      list = [...onlineFriends];
+      
+      // 2. Offline friends
+      friends.forEach(friendName => {
+        if (!onlineUsernames.has(friendName)) {
+          list.push({
+            username: friendName,
+            level: '?',
+            isOffline: true
+          });
+        }
+      });
+      
+      // Sort: Online first, then alphabetical
+      list.sort((a, b) => {
+        if (!!a.isOffline !== !!b.isOffline) return a.isOffline ? 1 : -1;
+        return a.username.localeCompare(b.username);
+      });
+    } else {
+      // Global view
+      const currentMapId = window.gameUI?.currentMapId || 'prontera';
+      const onlineInMap = onlinePlayers.filter(p => !p.mapId || p.mapId === currentMapId);
+      onlineCount = onlineInMap.length;
+      list = [...onlineInMap];
+      
+      // Append offline friends who are not in the list
+      const listUsernames = new Set(list.map(p => p.username));
+      friends.forEach(friendName => {
+        if (!onlineUsernames.has(friendName) && !listUsernames.has(friendName)) {
+          list.push({
+            username: friendName,
+            level: '?',
+            isOffline: true,
+            isFriendOnly: true
+          });
+        }
+      });
+      
+      // Sort: Online first, then alphabetical
+      list.sort((a, b) => {
+        if (!!a.isOffline !== !!b.isOffline) return a.isOffline ? 1 : -1;
+        return a.username.localeCompare(b.username);
+      });
     }
 
     if (list.length === 0) {
       const emptyMsg = this.onlineView === 'friends'
-        ? 'ยังไม่มีเพื่อนออนไลน์ — แตะชื่อผู้เล่นใน Global เพื่อเพิ่มเพื่อน'
+        ? 'คุณยังไม่มีรายชื่อเพื่อน — แตะชื่อผู้เล่นใน Global เพื่อเพิ่มเพื่อน'
         : 'No players online';
       body.innerHTML = `<div style="text-align:center;color:var(--text-dim);padding:20px;font-size:10px">${emptyMsg}</div>`;
       return;
     }
 
     // Header
-    let html = `<div class="online-count-badge">${this.onlineView === 'friends' ? '⭐' : '🌐'} ${list.length} ${this.onlineView === 'friends' ? 'friends' : 'players'} online</div>`;
+    const icon = this.onlineView === 'friends' ? '⭐' : '🌐';
+    const totalCount = list.length;
+    let html = `<div class="online-count-badge">${icon} ${onlineCount} online / ${totalCount} total</div>`;
 
     html += list.map(p => {
       const isFriend = friends.includes(p.username);
       const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
+      const offlineStyle = p.isOffline ? 'opacity:0.6;filter:grayscale(100%);pointer-events:auto;' : '';
+      const dotColor = p.isOffline ? '#666' : '#40e080';
+      const nameColor = p.isOffline ? '#b0c0e0' : '#ffffff';
+      const badgeStyle = p.isOffline ? 'background:rgba(0,0,0,0.5);color:#888;border-color:rgba(255,255,255,0.1);' : 'background:rgba(0,0,0,0.6);color:#ffffff;border-color:var(--primary-glow);';
+      
       return `
-        <div class="player-row" data-username="${p.username}">
-          <span class="online-dot"></span>
-          <span>${p.username}${starHtml}</span>
-          <span class="player-level-badge">Lv.${p.level}</span>
+        <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
+          <span class="online-dot" style="background-color:${dotColor}"></span>
+          <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
+          <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>
         </div>
       `;
     }).join('');
@@ -1017,6 +1129,12 @@ export class GameUI {
       body.addEventListener('click', (e) => {
         const row = e.target.closest('.player-row');
         if (!row) return;
+        
+        // Skip if player is offline
+        if (row.getAttribute('data-offline') === 'true') {
+          return;
+        }
+
         const targetUsername = row.getAttribute('data-username');
         if (!this.onlinePlayers) return;
         const player = this.onlinePlayers.find(p => p.username === targetUsername);
@@ -1405,16 +1523,66 @@ export class GameUI {
     const tabSettingsPane = document.getElementById('tab-content-settings');
 
     if (tabProfileBtn && tabSettingsBtn && tabProfilePane && tabSettingsPane) {
+      // Bind Account logic
+      const bindBtn = document.getElementById('btn-link-account');
+      const bindEmail = document.getElementById('link-account-email');
+      const bindPass = document.getElementById('link-account-password');
+      const bindStatus = document.getElementById('link-account-status');
+
+      if (bindBtn) {
+        bindBtn.addEventListener('click', async () => {
+          const email = bindEmail?.value.trim();
+          const password = bindPass?.value.trim();
+
+          if (!email || !password) {
+            if (bindStatus) {
+              bindStatus.textContent = 'กรุณากรอกอีเมลและรหัสผ่าน';
+              bindStatus.style.color = '#ff6080';
+            }
+            return;
+          }
+
+          if (password.length < 6) {
+            if (bindStatus) {
+              bindStatus.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+              bindStatus.style.color = '#ff6080';
+            }
+            return;
+          }
+
+          if (bindStatus) {
+            bindStatus.textContent = 'กำลังผูกบัญชี...';
+            bindStatus.style.color = '#60a0ff';
+          }
+
+          try {
+            if (this.bindAccountCallback) {
+              await this.bindAccountCallback(email, password);
+              if (bindStatus) {
+                bindStatus.textContent = '✅ ผูกบัญชีสำเร็จ! กรุณาจำอีเมลและรหัสผ่านไว้';
+                bindStatus.style.color = '#40e080';
+              }
+              // Hide section after success after a delay
+              setTimeout(() => {
+                this.setGuestMode(false);
+              }, 3000);
+            }
+          } catch (err) {
+            if (bindStatus) {
+              bindStatus.textContent = `❌ ผิดพลาด: ${err.message}`;
+              bindStatus.style.color = '#ff6080';
+            }
+          }
+        });
+      }
+
       tabProfileBtn.addEventListener('click', (e) => {
         e.preventDefault();
         tabProfilePane.style.display = 'block';
         tabSettingsPane.style.display = 'none';
         tabProfileBtn.classList.add('active-tab');
         tabSettingsBtn.classList.remove('active-tab');
-        tabProfileBtn.style.borderBottomColor = 'var(--primary)';
-        tabProfileBtn.style.color = 'var(--primary)';
-        tabSettingsBtn.style.borderBottomColor = 'transparent';
-        tabSettingsBtn.style.color = 'var(--text-dim)';
+        // Handled by CSS .active-tab class
       });
 
       tabSettingsBtn.addEventListener('click', (e) => {
@@ -1423,10 +1591,7 @@ export class GameUI {
         tabSettingsPane.style.display = 'block';
         tabProfileBtn.classList.remove('active-tab');
         tabSettingsBtn.classList.add('active-tab');
-        tabSettingsBtn.style.borderBottomColor = 'var(--primary)';
-        tabSettingsBtn.style.color = 'var(--primary)';
-        tabProfileBtn.style.borderBottomColor = 'transparent';
-        tabProfileBtn.style.color = 'var(--text-dim)';
+        // Handled by CSS .active-tab class
 
         // Sync config values when opening
         const soundCheckbox = document.getElementById('settings-sound-enabled');
@@ -1502,6 +1667,33 @@ export class GameUI {
         }
       });
     }
+
+    // Layout Manager listeners
+    const editLayoutBtn = document.getElementById('btn-edit-layout');
+    if (editLayoutBtn) {
+      editLayoutBtn.addEventListener('click', () => {
+        const isEditing = this.layoutManager.toggleEditMode();
+        editLayoutBtn.textContent = isEditing ? '✅ Save Layout (บันทึกตำแหน่ง)' : '🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)';
+        // editLayoutBtn.style.background = isEditing ? '#40e080 !important' : 'var(--primary) !important';
+        
+        if (isEditing) {
+          // Close settings panel so user can see the UI
+          if (modal) modal.style.display = 'none';
+          this.updateMobileControlsVisibility();
+        }
+      });
+    }
+
+    const resetLayoutBtn = document.getElementById('btn-reset-layout');
+    if (resetLayoutBtn) {
+      resetLayoutBtn.addEventListener('click', () => {
+        if (confirm('คุณต้องการรีเซ็ตตำแหน่ง UI ทั้งหมดเป็นค่าเริ่มต้นใช่หรือไม่?')) {
+          this.layoutManager.resetLayout();
+        }
+      });
+    }
+
+
 
     const openEditor = () => {
       // Default to profile tab on open
@@ -1626,6 +1818,18 @@ export class GameUI {
 
   setupProfileSaveCallback(callback) {
     this.profileSaveCallback = callback;
+  }
+
+  setupBindAccountCallback(callback) {
+    this.bindAccountCallback = callback;
+  }
+
+  setGuestMode(isGuest) {
+    this.isGuest = isGuest;
+    const guestSection = document.getElementById('settings-guest-link-section');
+    if (guestSection) {
+      guestSection.style.display = isGuest ? 'block' : 'none';
+    }
   }
 
   /**
@@ -2143,6 +2347,7 @@ export class GameUI {
   _renderSellShop() {
     const grid = document.getElementById('sell-shop-inventory-grid');
     if (!grid) return;
+    grid.style.cssText = 'width:100%;box-sizing:border-box;';
     grid.innerHTML = '';
 
     const goldDisplay = document.getElementById('sell-shop-gold-amount');
@@ -2298,6 +2503,18 @@ export class GameUI {
       });
     }
 
+    // Category filter
+    this.marketCategory = 'all';
+    const catBtns = document.querySelectorAll('.market-cat-btn');
+    catBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        catBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.marketCategory = btn.getAttribute('data-cat');
+        this._renderMarket();
+      });
+    });
+
     // List button
     const listBtn = document.getElementById('btn-market-list-action');
     if (listBtn) {
@@ -2333,9 +2550,11 @@ export class GameUI {
       const query = (document.getElementById('market-search-input')?.value || '').toLowerCase().trim();
 
       const listings = await fetchMarketListings();
-      const filtered = listings.filter(l =>
-        l.item_name.toLowerCase().includes(query)
-      );
+      const filtered = listings.filter(l => {
+        const matchesQuery = l.item_name.toLowerCase().includes(query);
+        const matchesCategory = this.marketCategory === 'all' || l.item_type === this.marketCategory;
+        return matchesQuery && matchesCategory;
+      });
 
       if (filtered.length === 0) {
         grid.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;grid-column: span 5;">ไม่มีไอเทมที่วางขายในขณะนี้</div>';

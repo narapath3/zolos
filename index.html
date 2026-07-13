@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@300;400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Fredoka+One&family=Itim&family=Inter:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="/src/styles/index.css" />
 </head>
@@ -19,28 +19,36 @@
 <body>
   <!-- Auth Screen -->
   <div id="auth-screen">
+    <div id="auth-particles"></div>
     <div class="auth-container">
       <div class="auth-logo">
-        <div class="logo-emblem">
-          <span class="logo-wing left">⚔️</span>
-          <div class="logo-text-wrap">
-            <h1 class="game-title">ZOLOS</h1>
-            <div class="logo-shine"></div>
-          </div>
-          <span class="logo-wing right">🛡️</span>
-        </div>
-        <p class="game-subtitle">— Idle RPG Online —</p>
+        <img src="/src/assets/zolos_icon.png" alt="Zolos Icon" class="auth-icon-img" />
+        <h1 class="game-title-new">ZOLOS</h1>
+        <p class="game-subtitle">Idle RPG Online</p>
         <p class="game-tagline">เข้าสู่โลกแห่งการผจญภัย</p>
       </div>
-      <div class="auth-form" id="login-form">
-        <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
-        <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
-        <input type="text" id="auth-charname" placeholder="🎮 Character Name" autocomplete="off"
-          style="display: none;" />
-        <button id="btn-login" class="btn-primary">⚔️ Login</button>
-        <button id="btn-register" class="btn-secondary">📜 Register</button>
-        <div class="auth-divider"><span>or</span></div>
-        <button id="btn-guest" class="btn-guest">🎮 Play as Guest</button>
+
+      <!-- Start Game Splash -->
+      <div id="auth-splash">
+        <button id="btn-start-game" class="btn-start-game">⚔️ START GAME</button>
+      </div>
+
+      <!-- Login Form (Initially Hidden) -->
+      <div id="auth-form-wrapper" style="display: none;">
+        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account / Logout</button>
+        <div class="auth-form" id="login-form">
+          <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
+          <div style="display: flex; flex-direction: column;">
+            <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+            <button id="btn-forgot-password" class="btn-forgot-pw">Forgot Password?</button>
+          </div>
+          <input type="text" id="auth-charname" placeholder="🎮 Character Name" autocomplete="off"
+            style="display: none;" />
+          <button id="btn-login" class="btn-primary">⚔️ Login</button>
+          <button id="btn-register" class="btn-secondary">📜 Register</button>
+          <div class="auth-divider"><span>or</span></div>
+          <button id="btn-guest" class="btn-guest">🎮 Play as Guest</button>
+        </div>
       </div>
       <div class="auth-status" id="auth-status"></div>
       <div class="online-count">
@@ -48,7 +56,7 @@
         <span id="online-players-auth">0</span> adventurers online
       </div>
     </div>
-    <div class="auth-particles" id="auth-particles"></div>
+    
   </div>
 
   <!-- Game Screen -->
@@ -109,6 +117,13 @@
         <div class="minimap-direction south">S</div>
         <div class="minimap-direction west">W</div>
       </div>
+    </div>
+
+    <!-- Network Status Indicator -->
+    <div id="network-status"
+      style="position:fixed;top:4px;right:75px;background:rgba(0,0,0,0.55);color:#ff4444;font-family:monospace;font-size:11px;padding:2px 7px;border-radius:4px;z-index:9999;pointer-events:none;display:flex;align-items:center;gap:5px;">
+      <span style="width:6px;height:6px;border-radius:50%;background:#ff4444;display:inline-block;" id="network-dot"></span>
+      <span id="network-text">OFFLINE</span>
     </div>
 
     <!-- FPS Counter -->
@@ -265,6 +280,15 @@
           <div class="market-search">
             <input type="text" id="market-search-input" placeholder="🔍 ค้นหาไอเทมตั้งขาย..." autocomplete="off">
           </div>
+          
+          <div class="market-categories">
+            <button class="market-cat-btn active" data-cat="all">ทั้งหมด</button>
+            <button class="market-cat-btn" data-cat="weapon">อาวุธ</button>
+            <button class="market-cat-btn" data-cat="armor">ชุดเกราะ</button>
+            <button class="market-cat-btn" data-cat="consumable">ใช้ไป</button>
+            <button class="market-cat-btn" data-cat="material">วัตถุดิบ</button>
+          </div>
+
           <div class="market-grid-container">
             <div class="market-list-header">
               <span>Item</span>
@@ -485,35 +509,24 @@
         <button class="panel-close" data-close="daily-quests-panel">✕</button>
       </div>
       <div class="panel-body">
-        <div class="quest-summary"
-          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: rgba(0, 0, 0, 0.2); padding: 8px; border-radius: 6px; border: 1px dashed rgba(255, 255, 255, 0.1);">
-          <div class="quest-streak" style="font-weight: bold; color: var(--gold, #ffd700);">🔥 Streak: <span
-              id="val-quest-streak">0</span> Days</div>
-          <div class="quest-reset" style="font-size: 10px; color: var(--text-dim);">Reset at midnight (Local)</div>
+        <div class="quest-summary">
+          <div class="quest-streak">🔥 Streak: <span id="val-quest-streak">0</span> Days</div>
+          <div class="quest-reset">Reset at midnight (Local)</div>
         </div>
 
-        <div id="quest-list-container" class="quest-list-container"
-          style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+        <div id="quest-list-container" class="quest-list-container">
           <!-- Rendered programmatically -->
         </div>
 
-        <div class="roulette-section"
-          style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 12px; text-align: center;">
-          <h4 style="margin: 0 0 8px 0; font-size: 11px; color: var(--secondary)">🎡 Spin Lucky Roulette
-            (สำเร็จอย่างน้อย 3 เควส)
-          </h4>
-          <button id="btn-spin-roulette" class="btn-primary" style="width: 100%;" disabled>🎡 Spin Lucky Roulette (0/3
-            Quests)</button>
+        <div class="roulette-section">
+          <h4>🎡 Spin Lucky Roulette (สำเร็จอย่างน้อย 3 เควส)</h4>
+          <button id="btn-spin-roulette" class="btn-primary" disabled>🎡 Spin Lucky Roulette (0/3 Quests)</button>
 
-          <div id="roulette-rewards-display" class="roulette-rewards-display"
-            style="display: none; margin-top: 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; position: relative; overflow: hidden; height: 50px;">
-            <div id="roulette-strip" class="roulette-strip"
-              style="display: flex; gap: 10px; position: absolute; left: 10px; transition: transform 3s cubic-bezier(0.1, 0.8, 0.1, 1); width: max-content;">
+          <div id="roulette-rewards-display" class="roulette-rewards-display">
+            <div id="roulette-strip" class="roulette-strip">
               <!-- Spinning rewards will be displayed dynamically -->
             </div>
-            <div class="roulette-pointer"
-              style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: 12px; color: #ffd700; text-shadow: 0 0 4px #000; animation: pointerBounce 0.5s infinite alternate; z-index: 10;">
-              ▼</div>
+            <div class="roulette-pointer">▼</div>
           </div>
         </div>
       </div>
@@ -568,25 +581,18 @@
     <!-- Profile Editor Popup Modal -->
     <div id="profile-editor-modal" class="modal-popup" style="display: none;">
       <div class="popup-overlay" id="profile-editor-overlay"></div>
-      <div class="popup-content profile-editor-content"
-        style="max-height: 80vh; display: flex; flex-direction: column;">
+      <div class="popup-content profile-editor-content">
         <div class="popup-header">
-          <span class="popup-title">⚙️ Settings & Profile / ตั้งค่าและข้อมูล</span>
+          <span class="popup-title">⚙️ Settings & Profile</span>
           <button class="popup-close" id="btn-close-profile-editor">✕</button>
         </div>
 
-        <!-- Tab selector headers -->
-        <div class="popup-tabs"
-          style="display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15);">
-          <button id="tab-btn-profile" class="popup-tab active-tab"
-            style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid var(--primary); color: var(--primary); font-family: var(--font-ui); font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s;">👤
-            Profile / ตัวละคร</button>
-          <button id="tab-btn-settings" class="popup-tab"
-            style="flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); font-family: var(--font-ui); font-size: 11px; font-weight: bold; cursor: pointer; transition: all 0.2s;">⚙️
-            Game Config / ตั้งค่าระบบ</button>
+        <div class="popup-tabs">
+          <button id="tab-btn-profile" class="popup-tab active-tab">👤 Profile</button>
+          <button id="tab-btn-settings" class="popup-tab">⚙️ Settings</button>
         </div>
 
-        <div class="popup-body" style="overflow-y: auto; flex: 1; padding: 20px;">
+        <div class="popup-body">
           <!-- Tab 1: Profile -->
           <div id="tab-content-profile" class="tab-pane">
             <div class="form-group">
@@ -672,6 +678,33 @@
                   style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
                 <span style="font-size: 13px; color: var(--text); font-weight: 500;">Show Performance Stats (FPS)</span>
               </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 18px;">
+              <label style="display: block; margin-bottom: 6px;">🎨 UI Layout / ปรับแต่งตำแหน่ง UI</label>
+              <div style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                <button id="btn-edit-layout" class="btn-primary" style="width: 100%; padding: 8px; font-size: 12px; background: var(--primary) !important; color: #000;">🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)</button>
+                <button id="btn-reset-layout" class="btn-secondary" style="width: 100%; padding: 8px; font-size: 11px;">🔄 Reset to Default (คืนค่าเริ่มต้น)</button>
+                <p style="font-size: 10px; color: var(--text-dim); margin-top: 4px; text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง และกดปุ่มเดิมเพื่อบันทึก</p>
+              </div>
+            </div>
+
+            <!-- Guest Account Linking Section -->
+            <div id="settings-guest-link-section" class="form-group" style="margin-top: 24px; padding-top: 18px; border-top: 1px dashed rgba(255,255,255,0.1); display: none;">
+              <label style="display: block; margin-bottom: 10px; color: var(--primary); font-weight: bold;">🔗 Bind Account / ผูกบัญชีถาวร</label>
+              <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4;">
+                ผูกบัญชี Guest ของคุณด้วย Email และ Password เพื่อป้องกันตัวละครหายและสามารถเข้าสู่ระบบจากเครื่องอื่นได้
+              </p>
+              <div class="form-group" style="margin-bottom: 12px;">
+                <input type="email" id="link-account-email" placeholder="อีเมล (Email)" 
+                  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px;" />
+              </div>
+              <div class="form-group" style="margin-bottom: 15px;">
+                <input type="password" id="link-account-password" placeholder="รหัสผ่าน (Password)" 
+                  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px;" />
+              </div>
+              <button id="btn-link-account" class="btn-primary" style="width: 100%; padding: 10px; background: #40e080 !important; border-color: #30c070 !important; color: #000; font-weight: bold;">⚔️ Bind Account / ยืนยันการผูกบัญชี</button>
+              <div id="link-account-status" style="margin-top: 10px; font-size: 11px; text-align: center; min-height: 15px;"></div>
             </div>
           </div>
 

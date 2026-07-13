@@ -400,8 +400,9 @@ export class CharacterManager {
 
     // Set body & arm color dynamically (for username-based consistent coloring)
     setBodyColor(color) {
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         const oldColor = this.bodyColor;
-        this.bodyColor = color;
+        this.bodyColor = colorVal;
         if (!this.mesh) return;
         // Body is child 0, arms are children with matching material
         this.mesh.children.forEach(child => {
@@ -409,14 +410,14 @@ export class CharacterManager {
                 // Body (index 0) and arms share the old body color
                 const hex = child.material.color.getHex();
                 if (hex === 0x4060c0 || hex === oldColor) {
-                    child.material.color.setHex(color);
+                    child.material.color.setHex(colorVal);
                 }
             }
         });
     }
 
     setHairColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         this.hairColor = colorVal;
         if (this.hair && this.hair.material) {
             this.hair.material.color.setHex(colorVal);
@@ -424,7 +425,7 @@ export class CharacterManager {
     }
 
     setPantsColor(color) {
-        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', '0x')) : color;
+        const colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         this.pantsColor = colorVal;
         if (this.leftLeg && this.leftLeg.material) {
             this.leftLeg.material.color.setHex(colorVal);
@@ -920,9 +921,14 @@ export class CharacterManager {
 
     // Get save data
     getSaveData() {
+        // Helper to convert numeric color to hex string (without 0x prefix) for DB persistence
+        const toHexStr = (h) => ('000000' + (h || 0).toString(16)).slice(-6);
+
         return {
             characterId: this.characterId,
+            userId: this.userId,
             updates: {
+                id: this.characterId, // Include ID in updates for fallback identification
                 name: this.stats.name,
                 level: this.stats.level,
                 exp: this.stats.exp,
@@ -943,9 +949,9 @@ export class CharacterManager {
                 weapon: this.equippedWeapon,
                 hat: this.equippedHat,
                 glasses: this.equippedGlasses,
-                body_color: this.bodyColor,
-                hair_color: this.hairColor,
-                pants_color: this.pantsColor
+                body_color: toHexStr(this.bodyColor),
+                hair_color: toHexStr(this.hairColor),
+                pants_color: toHexStr(this.pantsColor)
             }
         };
     }
@@ -1139,6 +1145,7 @@ export class CharacterManager {
     loadStats(data) {
         if (!data) return;
         this.characterId = data.id;
+        this.userId = data.user_id || null;
 
         let name = data.name;
         if (!name || isPlaceholderName(name)) {
@@ -1221,7 +1228,11 @@ export class CharacterManager {
     async saveStatsToDatabase() {
         if (!this.characterId) return;
         const { updates } = this.getSaveData();
-        const { saveCharacter } = await import('../network/GameSync.js');
-        await saveCharacter(this.characterId, updates);
+        const { saveCharacter, saveCharacterByUserId } = await import('../network/GameSync.js');
+        if (this.userId && !this.userId.startsWith('guest_') && !this.userId.startsWith('local_')) {
+            await saveCharacterByUserId(this.userId, updates);
+        } else {
+            await saveCharacter(this.characterId, updates);
+        }
     }
 }

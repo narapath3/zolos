@@ -8,8 +8,13 @@ import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
 
 // ============ Configuration ============
-const PORT = process.env.PORT || 3001;
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.vercel.app').split(',').map(s => s.trim());
+const PORT = parseInt(process.env.PORT) || 3001;
+const HOST = '0.0.0.0';
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.vercel.app,https://zolos-multiplayer.vercel.app').split(',').map(s => s.trim());
+// Add wildcard support for easier debugging
+if (process.env.CORS_ALLOW_ALL === 'true') {
+    console.log('[Server] ⚠️ CORS_ALLOW_ALL is enabled');
+}
 const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 
 // Supabase (Database-only, service role for server-side writes, with fallback configurations)
@@ -29,7 +34,10 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: CORS_ORIGINS,
+        origin: (origin, callback) => {
+            // Allow all origins for now to fix connection issues
+            callback(null, true);
+        },
         methods: ['GET', 'POST'],
         credentials: true
     },
@@ -85,31 +93,37 @@ io.on('connection', (socket) => {
             username: username || 'Adventurer',
             level: level || 1,
             socketId: socket.id,
+            mapId: data.mapId || 'prontera_field',
             joinedAt: Date.now(),
             lastSaveData: null
         };
+
+        // Join map-specific room
+        socket.join(`map:${playerInfo.mapId}`);
 
         onlinePlayers.set(socket.id, playerInfo);
         userSocketMap.set(userId, socket.id);
 
         console.log(`[Server] ➕ Player joined: ${username} (${userId}) — Total: ${onlinePlayers.size}`);
 
-        // Broadcast updated player list to everyone
-        broadcastPlayerList();
+        // Broadcast updated player list to everyone in this map
+        broadcastPlayerList(playerInfo.mapId);
     });
 
     // --- POSITION BROADCAST ---
     socket.on('pos', (payload) => {
         if (!payload || !payload.userId) return;
-        // Broadcast position to all OTHER clients (not sender)
-        socket.broadcast.emit('pos', payload);
+        const mapId = payload.mapId || 'prontera_field';
+        // Broadcast position to all OTHER clients in the SAME map
+        socket.to(`map:${mapId}`).emit('pos', payload);
     });
 
     // --- CHAT ---
     socket.on('chat', (payload) => {
         if (!payload) return;
-        // Broadcast chat to ALL clients (including sender for echo)
-        io.emit('chat', payload);
+        const mapId = payload.mapId || 'prontera_field';
+        // Broadcast chat to ALL clients in the SAME map
+        io.to(`map:${mapId}`).emit('chat', payload);
     });
 
     // --- PRESENCE UPDATE ---
@@ -117,9 +131,19 @@ io.on('connection', (socket) => {
         if (!data) return;
         const player = onlinePlayers.get(socket.id);
         if (player) {
+            const oldMapId = player.mapId;
             if (data.level !== undefined) player.level = data.level;
             if (data.username) player.username = data.username;
-            broadcastPlayerList();
+            
+            if (data.mapId && data.mapId !== oldMapId) {
+                socket.leave(`map:${oldMapId}`);
+                player.mapId = data.mapId;
+                socket.join(`map:${player.mapId}`);
+                broadcastPlayerList(oldMapId);
+                broadcastPlayerList(player.mapId);
+            } else {
+                broadcastPlayerList(player.mapId);
+            }
         }
     });
 
@@ -175,8 +199,43 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- ADMIN ANNOUNCEMENT ---
+    socket.on('admin:announcement', (data) => {
+        // Broadcast announcement to ALL connected clients immediately
+        io.emit('admin:announcement', data);
+        console.log('[Server] Admin announcement broadcasted:', data.text);
+
+        // Handle recurring intervals if specified
+        if (data.interval && data.interval > 0) {
+            const intervalMs = data.interval * 60 * 1000;
+            console.log(`[Server] Scheduling recurring announcement every ${data.interval} minutes`);
+            
+            // Clear any existing interval for the same text to avoid duplicates
+            if (socket.announcementIntervals && socket.announcementIntervals[data.text]) {
+                clearInterval(socket.announcementIntervals[data.text]);
+            }
+            
+            if (!socket.announcementIntervals) socket.announcementIntervals = {};
+            
+            socket.announcementIntervals[data.text] = setInterval(() => {
+                io.emit('admin:announcement', {
+                    ...data,
+                    timestamp: Date.now(),
+                    isRecurring: true
+                });
+                console.log('[Server] Recurring announcement broadcasted:', data.text);
+            }, intervalMs);
+        }
+    });
+
     // --- DISCONNECT ---
     socket.on('disconnect', async (reason) => {
+        // Clear all recurring announcement intervals for this socket
+        if (socket.announcementIntervals) {
+            Object.values(socket.announcementIntervals).forEach(interval => clearInterval(interval));
+            socket.announcementIntervals = null;
+        }
+
         const player = onlinePlayers.get(socket.id);
         if (player) {
             console.log(`[Server] ➖ Player left: ${player.username} (${player.userId}) — reason: ${reason}`);
@@ -191,23 +250,35 @@ io.on('connection', (socket) => {
             onlinePlayers.delete(socket.id);
 
             // Broadcast updated player list
-            broadcastPlayerList();
+            broadcastPlayerList(player.mapId);
         }
     });
 });
 
 // ============ Helpers ============
-function broadcastPlayerList() {
-    const players = [];
+function broadcastPlayerList(mapId) {
+    if (!mapId) return;
+    
+    const playersInMap = [];
+    let globalCount = 0;
+    
     for (const [, info] of onlinePlayers) {
-        players.push({
-            userId: info.userId,
-            username: info.username,
-            level: info.level
-        });
+        globalCount++;
+        if (info.mapId === mapId) {
+            playersInMap.push({
+                userId: info.userId,
+                username: info.username,
+                level: info.level,
+                mapId: info.mapId
+            });
+        }
     }
-    io.emit('players_update', players);
-    io.emit('online_count', players.length);
+    
+    // Send map-specific list to players in that map
+    io.to(`map:${mapId}`).emit('players_update', playersInMap);
+    
+    // Global count can still be broadcast to everyone
+    io.emit('online_count', globalCount);
 }
 
 // ============ Periodic Save to Supabase ============
@@ -222,7 +293,8 @@ async function saveCharacterToSupabase(saveData) {
             const allowedFields = [
                 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
                 'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color',
+                'sound_enabled', 'graphics_quality', 'fps_enabled'
             ];
             const filtered = {};
             for (const key of Object.keys(updates)) {
@@ -318,8 +390,8 @@ setInterval(async () => {
 }, SAVE_INTERVAL_MS);
 
 // ============ Start Server ============
-httpServer.listen(PORT, () => {
-    console.log(`[Server] 🚀 Zolos Map Server running on port ${PORT}`);
+httpServer.listen(PORT, HOST, () => {
+    console.log(`[Server] 🚀 Zolos Map Server running on ${HOST}:${PORT}`);
     console.log(`[Server] 📡 CORS origins: ${CORS_ORIGINS.join(', ')}`);
     console.log(`[Server] 💾 Save interval: ${SAVE_INTERVAL_MS / 1000}s`);
     console.log(`[Server] 🗄️  Supabase: ${supabase ? 'Connected' : 'Disabled'}`);

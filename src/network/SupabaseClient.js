@@ -181,12 +181,40 @@ export async function getProfile(userId) {
   return data;
 }
 
+export async function bindAccount(email, password) {
+  if (isOfflineMode || !supabase) {
+    throw new Error('Cannot bind account in Offline Mode');
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    email,
+    password
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export function saveActiveSession(userId) {
   localDb.set('active_session_user_id', userId);
 }
 
 export function clearActiveSession() {
   localDb.set('active_session_user_id', null);
+}
+
+export async function sendPasswordResetEmail(email) {
+  if (isOfflineMode || !supabase) {
+    // Simulated reset for offline mode
+    return { success: true, message: 'Password reset link sent to ' + email + ' (Simulated)' };
+  }
+
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin,
+  });
+
+  if (error) throw error;
+  return { success: true, data };
 }
 
 // ============ Realtime Online Count (Auth Screen) ============

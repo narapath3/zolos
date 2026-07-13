@@ -339,8 +339,10 @@ export class AdminUI {
 
         const userTab = this._createTabBtn('👥 Players', 'users');
         const itemTab = this._createTabBtn('📦 Items', 'items');
+        const announcementTab = this._createTabBtn('📢 Announcements', 'announcements');
         tabs.appendChild(userTab);
         tabs.appendChild(itemTab);
+        tabs.appendChild(announcementTab);
 
         this.content = document.createElement('div');
         this.content.style.cssText = 'flex: 1; overflow-y: auto; padding: 20px; background: rgba(10, 10, 20, 0.5);';
@@ -384,9 +386,10 @@ export class AdminUI {
     _updateTabs() {
         const btns = this.container.querySelectorAll('button');
         btns.forEach(b => {
-            if (b.innerText.includes('Players') || b.innerText.includes('Items')) {
+            if (b.innerText.includes('Players') || b.innerText.includes('Items') || b.innerText.includes('Announcements')) {
                 const isActive = (b.innerText.includes('Players') && this.currentTab === 'users') ||
-                    (b.innerText.includes('Items') && this.currentTab === 'items');
+                    (b.innerText.includes('Items') && this.currentTab === 'items') ||
+                    (b.innerText.includes('Announcements') && this.currentTab === 'announcements');
                 b.style.color = isActive ? '#ffd700' : '#aaa';
                 b.style.borderBottomColor = isActive ? '#ffd700' : 'transparent';
             }
@@ -399,7 +402,16 @@ export class AdminUI {
             this._renderUserList();
         } else if (this.currentTab === 'items') {
             this._renderItemList();
+        } else if (this.currentTab === 'announcements') {
+            this._renderAnnouncementPanel();
         }
+    }
+
+    async _renderAnnouncementPanel() {
+        const { adminAnnouncementPanel } = await import('../ui/AdminAnnouncementPanel.js');
+        this.content.innerHTML = '';
+        adminAnnouncementPanel.init(this.content);
+        adminAnnouncementPanel.show();
     }
 
     _renderUserList() {

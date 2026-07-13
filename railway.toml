@@ -1,0 +1,7 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "server/Dockerfile"
+
+[deploy]
+restartPolicyMaxRetries = 5
+heartbeatTimeout = 30
