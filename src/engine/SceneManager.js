@@ -263,6 +263,7 @@ export class SceneManager {
         this.arenaAnimParts = null;
         this.arenaBoard = null;
         if (mapId === 'prontera') {
+            this._createGrassDecor(config);
             this._createPvpArena();
             this._createArenaLeaderboard();
         }
@@ -559,6 +560,12 @@ export class SceneManager {
         const altColor = new THREE.Color(config.groundColor2);
         const pathColor = new THREE.Color(config.pathColor);
 
+        // Lush grass palette derived from the map colors (fresh highlight +
+        // deep shade + a warm dry patch) so the field reads rich, not flat.
+        const gLight = baseColor.clone().lerp(new THREE.Color(0xffffff), 0.30);
+        const gDeep = altColor.clone().multiplyScalar(0.78);
+        const gWarm = baseColor.clone().lerp(new THREE.Color(0xb8a24a), 0.35);
+
         for (let i = 0; i < positions.count; i++) {
             const x = positions.getX(i);
             const z = -positions.getY(i); // Y in plane space = -Z in world after -90deg X rotation
@@ -612,15 +619,20 @@ export class SceneManager {
                     // Path crosses
                     color.lerp(pathColor, 0.7 - distFromCenter * 0.01);
                 } else {
-                    // Grass color variation
-                    const noiseVal = Math.sin(x * 0.5 + 1.3) * Math.cos(z * 0.7 + 0.8);
-                    color.lerp(altColor, noiseVal * 0.5 + 0.5);
+                    // Lush multi-tone grass: two noise octaves blend deep→base,
+                    // fresh-green highlights on the peaks, occasional warm patch.
+                    const n1 = Math.sin(x * 0.5 + 1.3) * Math.cos(z * 0.7 + 0.8);   // broad
+                    const n2 = Math.sin(x * 1.7 - 0.4) * Math.cos(z * 1.3 + 2.1);   // fine
+                    color = gDeep.clone().lerp(baseColor, n1 * 0.5 + 0.5);
+                    if (n2 > 0.5) color.lerp(gLight, (n2 - 0.5) * 1.3);
+                    const patch = Math.sin(x * 0.13 + 4) * Math.cos(z * 0.11 - 2);
+                    if (patch > 0.72) color.lerp(gWarm, (patch - 0.72) * 2.2);
                 }
             }
 
-            // Vignette shading on outer edges
+            // Vignette shading on outer edges (lighter than before = more vibrant)
             const edgeFade = Math.max(0, 1 - distFromCenter / (size * 0.4));
-            color.multiplyScalar(0.6 + edgeFade * 0.5);
+            color.multiplyScalar(0.74 + edgeFade * 0.42);
 
             colors.push(color.r, color.g, color.b);
         }
@@ -837,6 +849,93 @@ export class SceneManager {
         this.scene.add(group);
         this.envObjects.push(group);
         this.arenaAnimParts = anim;
+    }
+
+    // ============ Grass Tufts & Wildflowers ============
+    // Scatters 3D grass blade tufts and colorful wildflowers across the field
+    // to give the ground depth and life. Uses InstancedMesh (few draw calls)
+    // and a light wind sway. Skips river/arena/paths/rocky-cave zones.
+    _createGrassDecor(config) {
+        // Valid grassy spot? (away from water, arena, paths, mountain, cave)
+        const okSpot = (x, z) => {
+            const riverZ = Math.sin(x * 0.08) * 10 - 2;
+            if (Math.abs(z - riverZ) < 8.5) return false;      // river + banks
+            if (this.isInArena && this.isInArena(x, z, 1)) return false;
+            if (Math.abs(x) < 2.2 || Math.abs(z) < 2.2) return false; // paths
+            if (x > 6 && z > 6) return false;                  // mountain
+            if (x < -6 && z < -6) return false;                // cave
+            return true;
+        };
+
+        const groundH = (x, z) => Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
+
+        // --- Grass blade tufts (one InstancedMesh of a thin blade) ---
+        const bladeGeo = new THREE.ConeGeometry(0.04, 0.6, 4);
+        bladeGeo.translate(0, 0.3, 0); // base at origin so it grows upward
+        const bladeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const BLADES = 900;
+        const grass = new THREE.InstancedMesh(bladeGeo, bladeMat, BLADES);
+        const m = new THREE.Matrix4();
+        const q = new THREE.Quaternion();
+        const eul = new THREE.Euler();
+        const baseG = new THREE.Color(config.groundColor);
+        let placed = 0, attempts = 0;
+        while (placed < BLADES && attempts < BLADES * 6) {
+            attempts++;
+            const x = (Math.random() - 0.5) * 60;
+            const z = (Math.random() - 0.5) * 60;
+            if (!okSpot(x, z)) continue;
+            const s = 0.7 + Math.random() * 0.9;         // height variation
+            eul.set((Math.random() - 0.5) * 0.4, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.4);
+            q.setFromEuler(eul);
+            m.compose(new THREE.Vector3(x, groundH(x, z), z), q, new THREE.Vector3(s, s, s));
+            grass.setMatrixAt(placed, m);
+            // green variation: fresh↔deep
+            const c = baseG.clone().lerp(new THREE.Color(0x9fe25a), Math.random() * 0.5)
+                .multiplyScalar(0.75 + Math.random() * 0.4);
+            grass.setColorAt(placed, c);
+            placed++;
+        }
+        grass.count = placed;
+        grass.instanceMatrix.needsUpdate = true;
+        if (grass.instanceColor) grass.instanceColor.needsUpdate = true;
+        grass.receiveShadow = true;
+        this.scene.add(grass);
+        this.envObjects.push(grass);
+        this.grassDecor = grass;
+
+        // --- Wildflowers (small bright heads on short stems) ---
+        const flowerColors = [0xff5d7a, 0xffd23f, 0xffffff, 0xb46cff, 0x5db4ff];
+        const headGeo = new THREE.SphereGeometry(0.11, 6, 5);
+        const flowerMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const FLOWERS = 150;
+        const flowers = new THREE.InstancedMesh(headGeo, flowerMat, FLOWERS);
+        const stemGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.35, 4);
+        stemGeo.translate(0, 0.175, 0);
+        const stemMat = new THREE.MeshLambertMaterial({ color: 0x3d7a2e });
+        const stems = new THREE.InstancedMesh(stemGeo, stemMat, FLOWERS);
+        placed = 0; attempts = 0;
+        while (placed < FLOWERS && attempts < FLOWERS * 8) {
+            attempts++;
+            const x = (Math.random() - 0.5) * 58;
+            const z = (Math.random() - 0.5) * 58;
+            if (!okSpot(x, z)) continue;
+            const gy = groundH(x, z);
+            m.compose(new THREE.Vector3(x, gy, z), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+            stems.setMatrixAt(placed, m);
+            m.compose(new THREE.Vector3(x, gy + 0.36, z), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+            flowers.setMatrixAt(placed, m);
+            flowers.setColorAt(placed, new THREE.Color(flowerColors[Math.floor(Math.random() * flowerColors.length)]));
+            placed++;
+        }
+        stems.count = placed;
+        flowers.count = placed;
+        stems.instanceMatrix.needsUpdate = true;
+        flowers.instanceMatrix.needsUpdate = true;
+        if (flowers.instanceColor) flowers.instanceColor.needsUpdate = true;
+        this.scene.add(stems);
+        this.scene.add(flowers);
+        this.envObjects.push(stems, flowers);
     }
 
     // ============ Ambient Life: Sakura Petals ============
