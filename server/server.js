@@ -197,9 +197,20 @@ setInterval(() => {
     io.emit('boss_state', bossPublicState());
 }, 30000);
 
+// Periodic online-count refresh — safety net so the auth screen and HUD stay
+// accurate even if a join/leave broadcast was missed.
+setInterval(() => {
+    io.emit('online_count', onlinePlayers.size);
+}, 15000);
+
 // ============ Socket.io Event Handlers ============
 io.on('connection', (socket) => {
     console.log(`[Server] 🔌 Socket connected: ${socket.id}`);
+
+    // Send the current online count immediately. Sockets that only connect to
+    // watch the count (e.g. the auth/login screen, before they `join`) otherwise
+    // never receive a value until the next join/leave, so they'd show 0.
+    socket.emit('online_count', onlinePlayers.size);
 
     // --- JOIN ---
     socket.on('join', (data) => {
