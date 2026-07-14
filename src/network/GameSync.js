@@ -594,42 +594,30 @@ export async function fetchLeaderboard(category = 'level') {
             sorted.sort((a, b) => (b.total_kills ?? 0) - (a.total_kills ?? 0));
         } else if (category === 'playtime') {
             sorted.sort((a, b) => (b.play_time ?? 0) - (a.play_time ?? 0));
+        } else if (category === 'pvp') {
+            sorted.sort((a, b) => (b.mmr ?? 1000) - (a.mmr ?? 1000) || (b.pvp_wins ?? 0) - (a.pvp_wins ?? 0));
         } else {
             sorted.sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || (b.total_kills ?? 0) - (a.total_kills ?? 0));
         }
         return sorted.slice(0, 20);
     }
 
-    let selectStr = 'name, level, total_kills, gold, play_time, user_id, profiles(username)';
-    let query = supabase.from('characters').select(selectStr);
+    const applyOrder = (q) => {
+        if (category === 'gold') return q.order('gold', { ascending: false });
+        if (category === 'kills') return q.order('total_kills', { ascending: false });
+        if (category === 'playtime') return q.order('play_time', { ascending: false });
+        if (category === 'pvp') return q.order('mmr', { ascending: false }).order('pvp_wins', { ascending: false });
+        return q.order('level', { ascending: false }).order('total_kills', { ascending: false });
+    };
 
-    if (category === 'gold') {
-        query = query.order('gold', { ascending: false });
-    } else if (category === 'kills') {
-        query = query.order('total_kills', { ascending: false });
-    } else if (category === 'playtime') {
-        query = query.order('play_time', { ascending: false });
-    } else {
-        query = query.order('level', { ascending: false }).order('total_kills', { ascending: false });
-    }
+    const cols = 'name, level, total_kills, gold, play_time, mmr, pvp_wins, pvp_losses, user_id';
+    let query = applyOrder(supabase.from('characters').select(`${cols}, profiles(username)`));
 
     let { data, error } = await query.limit(20);
     if (error) {
         console.warn('[Zolos] fetchLeaderboard error with profiles relation, retrying without profiles:', error.message);
         // Fallback when database has relationship key mapping cache issue
-        let fallbackQuery = supabase
-            .from('characters')
-            .select('name, level, total_kills, gold, play_time, user_id');
-        if (category === 'gold') {
-            fallbackQuery = fallbackQuery.order('gold', { ascending: false });
-        } else if (category === 'kills') {
-            fallbackQuery = fallbackQuery.order('total_kills', { ascending: false });
-        } else if (category === 'playtime') {
-            fallbackQuery = fallbackQuery.order('play_time', { ascending: false });
-        } else {
-            fallbackQuery = fallbackQuery.order('level', { ascending: false }).order('total_kills', { ascending: false });
-        }
-        const res = await fallbackQuery.limit(20);
+        const res = await applyOrder(supabase.from('characters').select(cols)).limit(20);
         data = res.data;
     }
     return data || [];

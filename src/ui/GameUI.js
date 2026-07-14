@@ -966,6 +966,12 @@ export class GameUI {
         else if (cat === 'gold') valueText = `💰 ${(entry.gold ?? 0).toLocaleString()} Zeny`;
         else if (cat === 'kills') valueText = `💀 ${(entry.total_kills ?? 0).toLocaleString()} Kills`;
         else if (cat === 'playtime') valueText = `⏱️ ${this._formatTime(entry.play_time ?? 0)}`;
+        else if (cat === 'pvp') {
+          const w = entry.pvp_wins ?? 0, l = entry.pvp_losses ?? 0;
+          const total = w + l;
+          const wr = total > 0 ? Math.round((w / total) * 100) : 0;
+          valueText = `🎖️ ${(entry.mmr ?? 1000).toLocaleString()} MMR &nbsp;·&nbsp; ${w}W/${l}L (${wr}%)`;
+        }
         return `
           <div class="lb-row">
             <span class="lb-rank">${rankIcon}</span>
