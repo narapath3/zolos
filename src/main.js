@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.14 (lush-ground)';
+const BUILD_VERSION = '2026-07-14.15 (perf-shadows)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -104,9 +104,10 @@ async function initAuth() {
 }
 
 // Project 3D vector to screen-space 2D coordinates (X, Y in pixels)
+const _w2sTmp = new THREE.Vector3();
 function worldToScreen(pos, offsetY = 1.6) {
     if (!sceneManager || !sceneManager.camera || !sceneManager.canvas) return { x: 0, y: 0 };
-    const tempV = pos.clone();
+    const tempV = _w2sTmp.copy(pos); // reuse to avoid a per-call allocation
     tempV.y += offsetY;
     tempV.project(sceneManager.camera);
     const canvas = sceneManager.canvas;

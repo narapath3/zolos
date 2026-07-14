@@ -164,8 +164,14 @@ export class AdaptiveRendererSystem {
     const enableShadows = (this.shadowQuality !== 'none');
     this.scene.traverse((object) => {
       if (object.isLight && object.castShadow !== undefined) {
-        if (object.isDirectionalLight || object.isPointLight) {
+        // Only the sun (directional) casts shadows. Point-light shadows are
+        // 6-face cubemap renders of the whole scene each — with several fill/
+        // glow point lights that meant ~30+ extra scene passes per frame for
+        // shadows nobody can see. Never enable them.
+        if (object.isDirectionalLight) {
           object.castShadow = enableShadows;
+        } else if (object.isPointLight) {
+          object.castShadow = false;
         }
       }
     });
@@ -256,8 +262,14 @@ export class AdaptiveRendererSystem {
     const enableShadows = (this.shadowQuality !== 'none');
     this.scene.traverse((object) => {
       if (object.isLight && object.castShadow !== undefined) {
-        if (object.isDirectionalLight || object.isPointLight) {
+        // Only the sun (directional) casts shadows. Point-light shadows are
+        // 6-face cubemap renders of the whole scene each — with several fill/
+        // glow point lights that meant ~30+ extra scene passes per frame for
+        // shadows nobody can see. Never enable them.
+        if (object.isDirectionalLight) {
           object.castShadow = enableShadows;
+        } else if (object.isPointLight) {
+          object.castShadow = false;
         }
       }
     });

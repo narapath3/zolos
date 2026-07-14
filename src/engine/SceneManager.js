@@ -129,7 +129,11 @@ export class SceneManager {
 
         // Renderer
         const useAntialias = (initialQuality !== 'ultra-low' && initialQuality !== 'low');
-        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: useAntialias });
+        this.renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: useAntialias,
+            powerPreference: 'high-performance', // prefer the discrete/faster GPU
+        });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
 
         let initialPixelRatio = 1.0;
@@ -275,6 +279,11 @@ export class SceneManager {
             this._createNPC();
             this._createSellNPC();
         }
+
+        // Perf: point lights must never cast shadows — each would trigger a
+        // 6-face cubemap re-render of the whole scene every frame. Only the
+        // sun (directional) casts shadows.
+        this.scene.traverse(o => { if (o.isPointLight && o.castShadow) o.castShadow = false; });
 
         // Update UI
         if (window.gameUI) {

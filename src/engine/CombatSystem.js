@@ -192,7 +192,10 @@ export class CombatSystem {
             const playerPos = this.character.getPosition();
             const targetPos = target.getPosition();
             // Use 2D distance (XZ plane) for range checks to avoid issues with submerged monsters
-            const distance = new THREE.Vector2(playerPos.x, playerPos.z).distanceTo(new THREE.Vector2(targetPos.x, targetPos.z));
+            // 2D (XZ) distance without allocating Vector2s each frame
+            const _ddx = playerPos.x - targetPos.x;
+            const _ddz = playerPos.z - targetPos.z;
+            const distance = Math.sqrt(_ddx * _ddx + _ddz * _ddz);
             const range = this.character.getAttackRange();
 
             if (distance > range) {
