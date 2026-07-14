@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.1 (int-color-save)';
+const BUILD_VERSION = '2026-07-14.2 (rod-yank)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -218,8 +218,9 @@ async function initGame(charData) {
                 if (gameUI) gameUI.addCombatLog('❗ Fish on the line!', 'system');
                 break;
             case 'fishCaught':
-                // Full yank: lift the rod to hoist the fish out of the water
-                if (character) character.triggerRodLift(1, 0.7);
+                // Full yank: lift the rod overhead to hoist the fish out,
+                // hold at the top briefly, then ease back down
+                if (character) character.triggerRodLift(1, 1.0);
                 if (gameUI) {
                     const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
                     const e = rarityEmoji[event.rarity] || '⚪';

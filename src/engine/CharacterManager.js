@@ -1034,13 +1034,19 @@ export class CharacterManager {
             const holdPose = -1.0; // rod arm extended forward
             if (this.rodLiftTimer > 0) {
                 const dur = this._rodLiftDuration || 0.7;
-                const t = 1 - (this.rodLiftTimer / dur);         // 0 → 1
-                const snap = Math.sin(Math.min(t * 2.2, 1) * Math.PI); // fast up, ease back
+                const t = 1 - (this.rodLiftTimer / dur); // 0 → 1
+                // Yank curve: snap up fast (20%), HOLD at the top (35%),
+                // then ease back down (45%) — the hold makes it clearly readable.
+                let snap;
+                if (t < 0.2) snap = Math.sin((t / 0.2) * Math.PI / 2);
+                else if (t < 0.55) snap = 1;
+                else snap = Math.cos(((t - 0.55) / 0.45) * Math.PI / 2);
                 const strength = this._rodLiftStrength || 1;
-                this.rightArm.rotation.x = holdPose - snap * 1.3 * strength;
-                this.rightArm.rotation.z = -snap * 0.25 * strength;
-                // Body recoil: hop up slightly at the peak of the yank
-                this.mesh.position.y += snap * 0.12 * strength;
+                // Raise the rod arm overhead (about -2.4 rad at full strength)
+                this.rightArm.rotation.x = holdPose - snap * 1.4 * strength;
+                this.rightArm.rotation.z = -snap * 0.3 * strength;
+                // Body recoil: hop up with the yank
+                this.mesh.position.y += snap * 0.18 * strength;
             } else {
                 this.rightArm.rotation.x = holdPose + Math.sin(this.animTimer * 1.5) * 0.04;
                 this.rightArm.rotation.z = 0;
@@ -1079,6 +1085,7 @@ export class CharacterManager {
         this._rodLiftStrength = strength;
         this._rodLiftDuration = duration;
         this.rodLiftTimer = duration;
+        console.log(`[Zolos] 🎣 Rod ${strength >= 1 ? 'YANK' : 'twitch'} (${duration}s)`);
     }
 
     // ============ Skill System Action ============
