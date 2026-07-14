@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.3 (live-fishing-line)';
+const BUILD_VERSION = '2026-07-14.4 (social-while-fishing)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -693,10 +693,15 @@ async function showCharacterSelect(isGuest = false) {
 // ============ Input Handling ============
 function handleMouseInteraction(event) {
     if (!isGameStarted) return;
-    if (combatSystem && combatSystem.isFishing) return;
 
     const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPCs(), remotePlayersMap);
     if (!hit) return;
+
+    // While fishing, social clicks stay available: clicking another player
+    // opens their profile popup (add friend / send items) without breaking
+    // the fishing pose. Ground/monster/NPC clicks remain blocked so the
+    // character doesn't walk away or switch targets mid-cast.
+    if (combatSystem && combatSystem.isFishing && hit.type !== 'player') return;
 
     if (hit.type === 'monster') {
         character.targetMonster = hit.object;
