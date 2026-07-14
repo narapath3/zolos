@@ -277,6 +277,9 @@ export class SceneManager {
         this._createPortals(mapId);
         this._createBirds();
         this._createBirdFlock();
+        this.weather = null;
+        if (mapId === 'prontera') this._initWeather();
+        else if (this._weatherEl) this._weatherEl.style.display = 'none';
 
         if (mapId === 'prontera') {
             this._createNPC();
@@ -448,6 +451,7 @@ export class SceneManager {
         const sky = new THREE.Mesh(skyGeo, skyMat);
         this.scene.add(sky);
         this.envObjects.push(sky);
+        this.skyMat = skyMat; // weather system modulates sky uniforms
 
         // Stylized Sun & Corona Glow
         const sunDir = new THREE.Vector3(12, 25, 10).normalize();
@@ -586,6 +590,181 @@ export class SceneManager {
             this.scene.add(bird);
             this.envObjects.push(bird);
             this.birds.push(bird);
+        }
+    }
+
+    // ============ Weather & Seasons ============
+    // Cycles through atmospheric presets (sunny / spring / cloudy / rain),
+    // smoothly lerping fog, sky and light, and toggling rain / blossom
+    // particle systems. Auto-advances on a timer; setWeather() forces one.
+    _initWeather() {
+        // --- Rain: short falling streaks in a box that follows the player ---
+        const RAIN = 550;
+        const rainPositions = new Float32Array(RAIN * 6); // 2 verts (streak) per drop
+        const rainData = [];
+        for (let i = 0; i < RAIN; i++) {
+            const d = {
+                x: (Math.random() - 0.5) * 44,
+                y: Math.random() * 26,
+                z: (Math.random() - 0.5) * 44,
+                speed: 22 + Math.random() * 14,
+                len: 0.5 + Math.random() * 0.5,
+            };
+            rainData.push(d);
+        }
+        const rainGeo = new THREE.BufferGeometry();
+        rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+        const rainMat = new THREE.LineBasicMaterial({ color: 0xaac4e0, transparent: true, opacity: 0.5 });
+        const rain = new THREE.LineSegments(rainGeo, rainMat);
+        rain.frustumCulled = false;
+        rain.visible = false;
+        this.scene.add(rain);
+        this.envObjects.push(rain);
+        this._rain = { mesh: rain, data: rainData, positions: rainPositions };
+
+        // --- Spring blossoms: pink/white petals drifting map-wide ---
+        const BLOSSOM = 160;
+        const bPos = new Float32Array(BLOSSOM * 3);
+        const bData = [];
+        for (let i = 0; i < BLOSSOM; i++) {
+            const d = { x: (Math.random() - 0.5) * 60, y: Math.random() * 16, z: (Math.random() - 0.5) * 60,
+                        fall: 0.5 + Math.random() * 0.6, sway: 0.4 + Math.random() * 0.5, phase: Math.random() * Math.PI * 2 };
+            bData.push(d);
+            bPos[i * 3] = d.x; bPos[i * 3 + 1] = d.y; bPos[i * 3 + 2] = d.z;
+        }
+        const bGeo = new THREE.BufferGeometry();
+        bGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
+        const blossom = new THREE.Points(bGeo, new THREE.PointsMaterial({ color: 0xffc8dd, size: 0.22, transparent: true, opacity: 0.9, depthWrite: false }));
+        blossom.frustumCulled = false;
+        blossom.visible = false;
+        this.scene.add(blossom);
+        this.envObjects.push(blossom);
+        this._blossom = { mesh: blossom, data: bData, positions: bPos };
+
+        // Preset atmospheres. Colors are hex; lights are intensities.
+        this._weatherPresets = {
+            sunny:  { emoji: '☀️', label: 'แดดออก',   fog: 0.010, fogCol: 0x8fc7e8, sunCol: 0xffe8c0, sun: 1.5, amb: 0.40, skyTop: 0x3a7bd5, skyHor: 0xbfe3f5, rain: false, blossom: false, sunVis: true },
+            spring: { emoji: '🌸', label: 'ใบไม้ผลิ',  fog: 0.010, fogCol: 0xbfe6c8, sunCol: 0xfff0d0, sun: 1.4, amb: 0.45, skyTop: 0x67b7e8, skyHor: 0xf2dcea, rain: false, blossom: true,  sunVis: true },
+            cloudy: { emoji: '☁️', label: 'เมฆมาก',    fog: 0.018, fogCol: 0x9aa6b0, sunCol: 0xd8dce0, sun: 0.7, amb: 0.55, skyTop: 0x8b98a6, skyHor: 0xc2cad0, rain: false, blossom: false, sunVis: false },
+            rain:   { emoji: '🌧️', label: 'ฝนตก',      fog: 0.030, fogCol: 0x5c6670, sunCol: 0xaeb6c0, sun: 0.5, amb: 0.55, skyTop: 0x4a535c, skyHor: 0x707a84, rain: true,  blossom: false, sunVis: false },
+        };
+        this._weatherOrder = ['sunny', 'spring', 'cloudy', 'rain'];
+
+        // Current (animated) atmosphere values, seeded to sunny
+        const p0 = this._weatherPresets.sunny;
+        this._weatherCur = { fog: p0.fog, fogCol: new THREE.Color(p0.fogCol), sunCol: new THREE.Color(p0.sunCol), sun: p0.sun, amb: p0.amb, skyTop: new THREE.Color(p0.skyTop), skyHor: new THREE.Color(p0.skyHor) };
+        this.weather = { type: 'sunny', timer: 45 + Math.random() * 30 };
+        this._ensureWeatherIndicator();
+        this.setWeather('sunny', true);
+    }
+
+    _ensureWeatherIndicator() {
+        if (document.getElementById('weather-indicator')) return;
+        const el = document.createElement('div');
+        el.id = 'weather-indicator';
+        el.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:500;' +
+            'background:rgba(20,18,32,.55);color:#fff;border:1px solid rgba(255,255,255,.15);' +
+            'border-radius:20px;padding:5px 14px;font-family:Itim,Inter,sans-serif;font-size:14px;' +
+            'pointer-events:none;backdrop-filter:blur(4px);white-space:nowrap';
+        document.body.appendChild(el);
+        this._weatherEl = el;
+    }
+
+    _weatherTargetColors() {
+        const p = this._weatherTarget;
+        if (!this._wtc) this._wtc = { fogCol: new THREE.Color(), sunCol: new THREE.Color(), skyTop: new THREE.Color(), skyHor: new THREE.Color() };
+        this._wtc.fogCol.set(p.fogCol); this._wtc.sunCol.set(p.sunCol);
+        this._wtc.skyTop.set(p.skyTop); this._wtc.skyHor.set(p.skyHor);
+        return this._wtc;
+    }
+
+    setWeather(type, instant = false) {
+        if (!this._weatherPresets || !this._weatherPresets[type]) return;
+        this.weather.type = type;
+        const p = this._weatherPresets[type];
+        this._weatherTarget = p;
+        this._weatherTargetColors(); // cache target colors (no per-frame alloc)
+        if (this._weatherEl) this._weatherEl.style.display = 'block';
+        if (this._rain) this._rain.mesh.visible = p.rain;
+        if (this._blossom) this._blossom.mesh.visible = p.blossom;
+        if (this.sunMesh) this.sunMesh.visible = p.sunVis;
+        if (this._weatherEl) this._weatherEl.textContent = `${p.emoji} ${p.label}`;
+        if (instant && this._weatherCur) {
+            const c = this._weatherCur;
+            c.fog = p.fog; c.sun = p.sun; c.amb = p.amb;
+            c.fogCol.set(p.fogCol); c.sunCol.set(p.sunCol); c.skyTop.set(p.skyTop); c.skyHor.set(p.skyHor);
+            this._applyWeather();
+        }
+    }
+
+    _applyWeather() {
+        const c = this._weatherCur;
+        if (this.scene.fog) { this.scene.fog.density = c.fog; this.scene.fog.color.copy(c.fogCol); }
+        this.scene.background = c.fogCol;
+        if (this.sunLight) { this.sunLight.intensity = c.sun; this.sunLight.color.copy(c.sunCol); }
+        if (this.ambientLight) this.ambientLight.intensity = c.amb;
+        if (this.skyMat) {
+            this.skyMat.uniforms.topColor.value.copy(c.skyTop);
+            this.skyMat.uniforms.horizonColor.value.copy(c.skyHor);
+        }
+    }
+
+    _updateWeather(dt) {
+        if (!this.weather || !this._weatherTarget) return;
+
+        // Auto-cycle to the next preset
+        this.weather.timer -= dt;
+        if (this.weather.timer <= 0) {
+            const i = this._weatherOrder.indexOf(this.weather.type);
+            const next = this._weatherOrder[(i + 1) % this._weatherOrder.length];
+            this.weather.timer = 45 + Math.random() * 45;
+            this.setWeather(next, false);
+        }
+
+        // Smoothly lerp current atmosphere toward the target (~ a few seconds)
+        const t = this._weatherTarget, c = this._weatherCur, tc = this._wtc, k = Math.min(1, dt * 0.5);
+        c.fog += (t.fog - c.fog) * k;
+        c.sun += (t.sun - c.sun) * k;
+        c.amb += (t.amb - c.amb) * k;
+        c.fogCol.lerp(tc.fogCol, k);
+        c.sunCol.lerp(tc.sunCol, k);
+        c.skyTop.lerp(tc.skyTop, k);
+        c.skyHor.lerp(tc.skyHor, k);
+        this._applyWeather();
+
+        // Rain animation (streaks fall; box follows the player)
+        if (this._rain && this._rain.mesh.visible) {
+            const fx = this._weatherFocus ? this._weatherFocus.x : 0;
+            const fz = this._weatherFocus ? this._weatherFocus.z : 0;
+            const pos = this._rain.positions;
+            const data = this._rain.data;
+            for (let i = 0; i < data.length; i++) {
+                const d = data[i];
+                d.y -= d.speed * dt;
+                if (d.y < 0) { d.y = 24 + Math.random() * 4; d.x = (Math.random() - 0.5) * 44; d.z = (Math.random() - 0.5) * 44; }
+                const wx = fx + d.x, wz = fz + d.z;
+                const j = i * 6;
+                pos[j] = wx;         pos[j + 1] = d.y;          pos[j + 2] = wz;
+                pos[j + 3] = wx;     pos[j + 4] = d.y - d.len;  pos[j + 5] = wz;
+            }
+            this._rain.mesh.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // Blossom drift (spring)
+        if (this._blossom && this._blossom.mesh.visible) {
+            const fx = this._weatherFocus ? this._weatherFocus.x : 0;
+            const fz = this._weatherFocus ? this._weatherFocus.z : 0;
+            const pos = this._blossom.positions;
+            const data = this._blossom.data;
+            for (let i = 0; i < data.length; i++) {
+                const d = data[i];
+                d.y -= d.fall * dt;
+                if (d.y < 0) { d.y = 15 + Math.random() * 3; d.x = (Math.random() - 0.5) * 60; d.z = (Math.random() - 0.5) * 60; }
+                pos[i * 3] = fx + d.x + Math.sin(this.time * d.sway + d.phase) * 0.8;
+                pos[i * 3 + 1] = d.y;
+                pos[i * 3 + 2] = fz + d.z + Math.cos(this.time * d.sway * 0.7 + d.phase) * 0.6;
+            }
+            this._blossom.mesh.geometry.attributes.position.needsUpdate = true;
         }
     }
 
@@ -2943,6 +3122,7 @@ export class SceneManager {
         this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
 
         this.camera.lookAt(targetPos.x, followY, targetPos.z);
+        this._weatherFocus = { x: targetPos.x, z: targetPos.z }; // rain follows the player
     }
 
     // Duel camera: frame BOTH fighters. Centers on their midpoint and pulls
@@ -3162,6 +3342,9 @@ export class SceneManager {
 
         // Flock of birds passing across the sky
         this._updateBirdFlock(dt);
+
+        // Weather / seasons
+        this._updateWeather(dt);
 
         // Animate flying birds
         if (this.birds) {
