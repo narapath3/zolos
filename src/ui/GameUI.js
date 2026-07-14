@@ -150,6 +150,10 @@ export class GameUI {
     if (autoBtn) {
       autoBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (window.duelState) {
+          this.addCombatLog("🚫 ไม่สามารถเปิดบอทขณะดวล PVP ได้", 'system');
+          return;
+        }
         if (this.combatSystem) {
           if (this.combatSystem.isFishing) {
             this.addCombatLog("🚫 ไม่สามารถเปิดบอทขณะตกปลาได้", 'system');
@@ -167,6 +171,10 @@ export class GameUI {
     if (fishingBtn) {
       fishingBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (window.duelState) {
+          this.addCombatLog("🚫 ไม่สามารถตกปลาขณะดวล PVP ได้", 'system');
+          return;
+        }
         if (this.combatSystem) {
           const isFishing = this.combatSystem.toggleFishing();
           this.setFishingState(isFishing);
@@ -982,7 +990,7 @@ export class GameUI {
         this._renderOnlinePlayers();
       });
     });
-    
+
     // Initial map ID
     this.currentMapId = 'prontera';
   }
@@ -1004,7 +1012,7 @@ export class GameUI {
     const friends = this.friends || [];
     const onlinePlayers = this.onlinePlayers || [];
     const onlineUsernames = new Set(onlinePlayers.map(p => p.username));
-    
+
     let list = [];
     let onlineCount = 0;
 
@@ -1013,7 +1021,7 @@ export class GameUI {
       const onlineFriends = onlinePlayers.filter(p => friends.includes(p.username));
       onlineCount = onlineFriends.length;
       list = [...onlineFriends];
-      
+
       // 2. Offline friends
       friends.forEach(friendName => {
         if (!onlineUsernames.has(friendName)) {
@@ -1024,7 +1032,7 @@ export class GameUI {
           });
         }
       });
-      
+
       // Sort: Online first, then alphabetical
       list.sort((a, b) => {
         if (!!a.isOffline !== !!b.isOffline) return a.isOffline ? 1 : -1;
@@ -1036,7 +1044,7 @@ export class GameUI {
       const onlineInMap = onlinePlayers.filter(p => !p.mapId || p.mapId === currentMapId);
       onlineCount = onlineInMap.length;
       list = [...onlineInMap];
-      
+
       // Append offline friends who are not in the list
       const listUsernames = new Set(list.map(p => p.username));
       friends.forEach(friendName => {
@@ -1049,7 +1057,7 @@ export class GameUI {
           });
         }
       });
-      
+
       // Sort: Online first, then alphabetical
       list.sort((a, b) => {
         if (!!a.isOffline !== !!b.isOffline) return a.isOffline ? 1 : -1;
@@ -1077,7 +1085,7 @@ export class GameUI {
       const dotColor = p.isOffline ? '#666' : '#40e080';
       const nameColor = p.isOffline ? '#b0c0e0' : '#ffffff';
       const badgeStyle = p.isOffline ? 'background:rgba(0,0,0,0.5);color:#888;border-color:rgba(255,255,255,0.1);' : 'background:rgba(0,0,0,0.6);color:#ffffff;border-color:var(--primary-glow);';
-      
+
       return `
         <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
           <span class="online-dot" style="background-color:${dotColor}"></span>
@@ -1129,7 +1137,7 @@ export class GameUI {
       body.addEventListener('click', (e) => {
         const row = e.target.closest('.player-row');
         if (!row) return;
-        
+
         // Skip if player is offline
         if (row.getAttribute('data-offline') === 'true') {
           return;
@@ -1723,7 +1731,7 @@ export class GameUI {
         const isEditing = this.layoutManager.toggleEditMode();
         editLayoutBtn.textContent = isEditing ? '✅ Save Layout (บันทึกตำแหน่ง)' : '🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)';
         // editLayoutBtn.style.background = isEditing ? '#40e080 !important' : 'var(--primary) !important';
-        
+
         if (isEditing) {
           // Close settings panel so user can see the UI
           if (modal) modal.style.display = 'none';
@@ -2919,7 +2927,13 @@ export class GameUI {
 
     // Determine target
     let target = this.character.targetMonster;
-    if (skillId === 'bash' && !target) {
+    if (window.duelState) {
+      const opponentId = window.duelState.opponentUserId;
+      const opponent = window.remotePlayersMap?.get(opponentId);
+      if (opponent) {
+        target = opponent.character;
+      }
+    } else if (skillId === 'bash' && !target) {
       if (this.combatSystem && this.combatSystem.monsters) {
         target = this.combatSystem.monsters.findNearest(this.character.getPosition());
         // Snap target if within reasonable range (3x normal melee range)

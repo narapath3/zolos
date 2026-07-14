@@ -160,6 +160,12 @@ export class CombatSystem {
         }
 
         // Determine active target (manual target from characterManager takes priority)
+        if (window.duelState) {
+            this.currentTarget = null;
+            if (this.character.targetMonster) this.character.targetMonster = null;
+            return;
+        }
+
         let target = null;
         if (this.character.targetMonster) {
             target = this.character.targetMonster;
@@ -240,20 +246,25 @@ export class CombatSystem {
         const monster = target;
         if (!monster || !monster.alive) return;
 
-        if (this.character.isRanged()) {
-            // Ranged attack: Spawn projectile first
+        const weaponClass = this.character.getWeaponClass
+            ? this.character.getWeaponClass()
+            : (this.character.isRanged() ? 'bow' : 'melee');
+
+        if (weaponClass === 'bow' || weaponClass === 'gun') {
+            // Ranged: spawn projectile; damage resolves on hit (see main.js)
             this.onEvent({
                 type: 'playerRangedAttack',
+                weaponClass,
                 target: monster,
                 startPos: this.character.getPosition()
             });
         } else {
-            // Melee attack: Immediate damage
-            this._resolveDamage(monster);
+            // Melee: immediate damage + sword slash
+            this._resolveDamage(monster, 'melee');
         }
     }
 
-    _resolveDamage(monster) {
+    _resolveDamage(monster, weaponClass = null) {
         if (!monster || !monster.alive) return;
 
         // Player attacks monster
@@ -272,6 +283,7 @@ export class CombatSystem {
             critical: isCritical,
             targetPos: monster.getPosition(),
             monsterName: monster.data.name,
+            weaponClass: weaponClass || (this.character.getWeaponClass ? this.character.getWeaponClass() : 'melee'),
         });
 
         // Monster counter-attacks (if alive and within range)

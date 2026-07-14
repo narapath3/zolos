@@ -169,6 +169,14 @@ export class CharacterManager {
         return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow';
     }
 
+    // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet)
+    getWeaponClass() {
+        const w = this.equippedWeapon;
+        if (w === 'Gun') return 'gun';
+        if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow') return 'bow';
+        return 'melee';
+    }
+
     getAttackCooldown() {
         const weapon = this.equippedWeapon;
         if (weapon === 'Sword') return 0.9;
@@ -1214,8 +1222,16 @@ export class CharacterManager {
             const finalDmg = Math.max(1, Math.floor(dmgBase * (0.9 + Math.random() * 0.2)));
             const actualDmg = currentTarget.takeDamage(finalDmg);
 
+            // If casting on player in duel:
+            if (window.duelState && currentTarget.stats) {
+                import('../network/GameSync.js').then(({ sendDuelHit }) => {
+                    sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
+                });
+            }
+
             if (gameUI) {
-                gameUI.addCombatLog(`⚔️ ใช้ [Bash] โจมตี ${currentTarget.name}! สร้างความเสียหาย ${actualDmg}`, 'atk');
+                const targetName = currentTarget.stats ? currentTarget.stats.name : (currentTarget.data ? currentTarget.data.name : currentTarget.name);
+                gameUI.addCombatLog(`⚔️ ใช้ [Bash] โจมตี ${targetName}! สร้างความเสียหาย ${actualDmg}`, 'atk');
             }
 
             // Spawn skill burst particles
@@ -1259,17 +1275,34 @@ export class CharacterManager {
                 particleSystem.createExplosion(this.mesh.position, 0xff6600);
             }
 
-            // Hit all nearby monsters
+            // Hit all nearby targets
             let hits = 0;
-            if (monsterManager && monsterManager.monsters) {
-                monsterManager.monsters.forEach(m => {
-                    if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
+            if (window.duelState) {
+                const opponent = window.remotePlayersMap?.get(window.duelState.opponentUserId);
+                if (opponent && opponent.character && opponent.character.isAlive()) {
+                    if (opponent.mesh.position.distanceTo(this.mesh.position) <= radius) {
                         const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
-                        const actualDmg = m.takeDamage(finalDmg);
+                        const actualDmg = opponent.character.takeDamage(finalDmg);
                         hits++;
-                        if (effectCallback) effectCallback('magnumBreak', m, actualDmg);
+
+                        import('../network/GameSync.js').then(({ sendDuelHit }) => {
+                            sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
+                        });
+
+                        if (effectCallback) effectCallback('magnumBreak', opponent.character, actualDmg);
                     }
-                });
+                }
+            } else {
+                if (monsterManager && monsterManager.monsters) {
+                    monsterManager.monsters.forEach(m => {
+                        if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
+                            const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
+                            const actualDmg = m.takeDamage(finalDmg);
+                            hits++;
+                            if (effectCallback) effectCallback('magnumBreak', m, actualDmg);
+                        }
+                    });
+                }
             }
 
             if (hits === 0 && gameUI) {

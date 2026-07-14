@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.6 (pvp-arena)';
+const BUILD_VERSION = '2026-07-14.7 (weapon-fx)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -45,6 +45,7 @@ let username = 'Adventurer';
 
 // Multiplayer state
 const remotePlayersMap = new Map();
+window.remotePlayersMap = remotePlayersMap;
 let lastBroadcastTime = 0;
 let lastHUDTime = 0;
 let lastStatsTime = 0;
@@ -137,6 +138,7 @@ async function initGame(charData) {
 
     // Setup systems
     particles = new ParticleSystem(sceneManager.scene);
+    particles.camera = sceneManager.camera; // used to billboard sword-slash arcs
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
 
@@ -147,13 +149,24 @@ async function initGame(charData) {
         switch (event.type) {
             case 'playerRangedAttack':
                 if (particles) {
-                    particles.spawnArrow(event.startPos, event.target, () => {
-                        if (combatSystem) combatSystem._resolveDamage(event.target);
-                    });
+                    const wc = event.weaponClass || 'bow';
+                    const resolveHit = () => {
+                        if (combatSystem) combatSystem._resolveDamage(event.target, wc);
+                    };
+                    if (wc === 'gun') {
+                        particles.spawnBullet(event.startPos, event.target, resolveHit);
+                        if (soundManager) soundManager.playAtkSound();
+                    } else {
+                        particles.spawnArrow(event.startPos, event.target, resolveHit);
+                    }
                 }
                 break;
             case 'playerAttack':
                 if (particles) {
+                    // Sword slash arc for melee; plain hit spark for ranged impacts
+                    if (event.weaponClass === 'melee') {
+                        particles.spawnSlash(event.targetPos, event.critical);
+                    }
                     particles.spawnHitEffect(event.targetPos, event.critical);
                     const screenPos = worldToScreen(event.targetPos, 1.2);
                     const dmgType = event.critical ? 'critical-dmg' : 'player-dmg';
@@ -703,6 +716,19 @@ function handleMouseInteraction(event) {
     // character doesn't walk away or switch targets mid-cast.
     if (combatSystem && combatSystem.isFishing && hit.type !== 'player') return;
 
+    // Handle PVP Duels: limit targeting to only ground and the opponent
+    if (duelState) {
+        if (hit.type === 'ground') {
+            autoPath = hit.point;
+            character.targetMonster = null;
+            particles.createClickIndicator(hit.point, 0x44ff44);
+        } else if (hit.type === 'player' && hit.object.userId === duelState.opponentUserId) {
+            // Click opponent: flash red indicator but don't open profile popup
+            particles.createClickIndicator(hit.point, 0xff4444);
+        }
+        return;
+    }
+
     if (hit.type === 'monster') {
         character.targetMonster = hit.object;
         autoPath = hit.point;
@@ -762,6 +788,7 @@ window.duelManager = {
         character.stats.sp = character.stats.max_sp;
 
         duelState = { duelId: payload.duelId, opponentUserId: foe.userId, cooldown: 1.0 };
+        window.duelState = duelState;
 
         if (gameUI) {
             gameUI.addCombatLog('🏟️ เข้าสู่สังเวียน! เดินเข้าหาคู่ต่อสู้เพื่อโจมตี — ผู้ชนะได้ MMR!', 'levelup');
@@ -814,6 +841,7 @@ window.duelManager = {
             if (myMmr !== undefined) character.stats.mmr = myMmr;
         }
         duelState = null;
+        window.duelState = null;
     },
 };
 
@@ -872,197 +900,211 @@ function gameLoop(time) {
             return;
         }
 
-    if (portalCooldown > 0) portalCooldown -= dt;
+        if (portalCooldown > 0) portalCooldown -= dt;
 
-    // 1. Movement
-    const isFishingActive = combatSystem && combatSystem.isFishing;
-    const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
+        // 1. Movement
+        const isFishingActive = combatSystem && combatSystem.isFishing;
+        const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
 
-    if (moveDir) {
-        autoPath = null;
-        character.moveSpeed = isShiftPressed ? 9 : 5.5;
-        character.manualMove(moveDir.x, moveDir.z, dt);
-    } else if (autoPath && !isFishingActive) {
-        // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
-        if (combatSystem && combatSystem.autoFarm) {
+        if (moveDir) {
             autoPath = null;
+            character.moveSpeed = isShiftPressed ? 9 : 5.5;
+            character.manualMove(moveDir.x, moveDir.z, dt);
+        } else if (autoPath && !isFishingActive) {
+            // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
+            if (combatSystem && combatSystem.autoFarm) {
+                autoPath = null;
+            } else {
+                if (!character.moveToward(autoPath, dt)) autoPath = null;
+            }
+        }
+
+        // Clamp inside PvP Arena during active duel
+        if (duelState) {
+            const arenaCenterX = -14;
+            const arenaCenterZ = 14;
+            const dx = character.mesh.position.x - arenaCenterX;
+            const dz = character.mesh.position.z - arenaCenterZ;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            const limitRange = 5.8; // Arena floor radius is 6.2, keep player inside 5.8
+            if (dist > limitRange) {
+                character.mesh.position.x = arenaCenterX + (dx / dist) * limitRange;
+                character.mesh.position.z = arenaCenterZ + (dz / dist) * limitRange;
+            }
+        }
+
+        // 2. Environment Check (Water)
+        const env = sceneManager.getEnvironmentAt(character.getPosition());
+        if (env === 'water') {
+            character.state = 'swimming';
+            character.moveSpeed = 2.2;
+            character.baseY = -0.5; // Partially submerged, visible while swimming
         } else {
-            if (!character.moveToward(autoPath, dt)) autoPath = null;
+            character.baseY = 1.2; // Default ground height
+            // Reset to normal speed when not in water
+            if (character.state === 'swimming') {
+                character.state = 'idle';
+            }
+            // Ensure speed is reset to 5.5 (or higher if shift is pressed)
+            const baseSpeed = isShiftPressed ? 9.0 : 5.5;
+            if (character.moveSpeed < 5.5) {
+                character.moveSpeed = baseSpeed;
+            }
         }
-    }
 
-    // 2. Environment Check (Water)
-    const env = sceneManager.getEnvironmentAt(character.getPosition());
-    if (env === 'water') {
-        character.state = 'swimming';
-        character.moveSpeed = 2.2;
-        character.baseY = -0.5; // Partially submerged, visible while swimming
-    } else {
-        character.baseY = 1.2; // Default ground height
-        // Reset to normal speed when not in water
-        if (character.state === 'swimming') {
-            character.state = 'idle';
+        // Step 10 Part A: Force swimming state if in water, regardless of what CombatSystem or moveToward set.
+        // This ensures the 'swimming' state is always the one broadcast.
+        if (env === 'water') {
+            character.state = 'swimming';
         }
-        // Ensure speed is reset to 5.5 (or higher if shift is pressed)
-        const baseSpeed = isShiftPressed ? 9.0 : 5.5;
-        if (character.moveSpeed < 5.5) {
-            character.moveSpeed = baseSpeed;
+
+        // 3. Combat
+        if (character.targetMonster) {
+            const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
+            if (dist <= character.getAttackRange()) {
+                autoPath = null;
+            } else {
+                // Keep walking towards the target monster (works for water monsters too)
+                autoPath = character.targetMonster.mesh.position.clone();
+            }
         }
-    }
 
-    // Step 10 Part A: Force swimming state if in water, regardless of what CombatSystem or moveToward set.
-    // This ensures the 'swimming' state is always the one broadcast.
-    if (env === 'water') {
-        character.state = 'swimming';
-    }
+        // 4. Portal Check
+        if (portalCooldown <= 0) {
+            const portals = sceneManager.getPortals();
+            portals.forEach(portal => {
+                if (character.getPosition().distanceTo(portal.position) < 1.8) {
+                    const targetMap = portal.userData.targetMap;
+                    if (targetMap) {
+                        portalCooldown = 2.0;
+                        autoPath = null;
 
-    // 3. Combat
-    if (character.targetMonster) {
-        const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
-        if (dist <= character.getAttackRange()) {
-            autoPath = null;
-        } else {
-            // Keep walking towards the target monster (works for water monsters too)
-            autoPath = character.targetMonster.mesh.position.clone();
-        }
-    }
+                        // Clear stale combat state before loading new map
+                        if (character) {
+                            character.targetMonster = null;
+                            character.state = 'idle';
+                        }
+                        if (combatSystem) {
+                            combatSystem.currentTarget = null;
+                            combatSystem.autoFarm = false;
+                            combatSystem.isFishing = false;
+                        }
+                        if (gameUI && typeof gameUI.clearTarget === 'function') {
+                            gameUI.clearTarget();
+                        }
+                        if (inputManager && typeof inputManager.reset === 'function') {
+                            inputManager.reset();
+                        }
 
-    // 4. Portal Check
-    if (portalCooldown <= 0) {
-        const portals = sceneManager.getPortals();
-        portals.forEach(portal => {
-            if (character.getPosition().distanceTo(portal.position) < 1.8) {
-                const targetMap = portal.userData.targetMap;
-                if (targetMap) {
-                    portalCooldown = 2.0;
-                    autoPath = null;
+                        // Set safe spawn point for new map
+                        const spawn = { x: 0, y: 1.2, z: 10 };
+                        character.baseY = spawn.y;
+                        character.mesh.position.set(spawn.x, spawn.y, spawn.z);
 
-                    // Clear stale combat state before loading new map
-                    if (character) {
-                        character.targetMonster = null;
-                        character.state = 'idle';
+                        console.log(`[Warp] Starting warp to ${targetMap}`);
+                        sceneManager.loadMap(targetMap);
+                        console.log(`[Warp] Map ${targetMap} loaded`);
+                        monsters.clearAll();
+                        monsters.mapId = targetMap;
+                        monsters.spawnInitial(character.stats.level);
+                        console.log(`[Warp] Monsters spawned`);
+
+                        // Update multiplayer presence for the new map
+                        updatePresence(character.stats.level, username, targetMap);
+                        console.log(`[Warp] Presence updated`);
+
+                        // Immediately broadcast position on the new map so others see us at the spawn point
+                        broadcastPosition(
+                            userId,
+                            username,
+                            character.stats.level,
+                            character.getPosition(),
+                            character.mesh.rotation.y,
+                            character.state,
+                            character.getAppearance(),
+                            targetMap
+                        );
+                        console.log(`[Warp] Initial position broadcasted for new map`);
+
+                        // Clear remote players from old map
+                        for (const [id, rp] of remotePlayersMap.entries()) {
+                            if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                        }
+                        remotePlayersMap.clear();
+                        console.log(`[Warp] Remote players cleared`);
                     }
-                    if (combatSystem) {
-                        combatSystem.currentTarget = null;
-                        combatSystem.autoFarm = false;
-                        combatSystem.isFishing = false;
-                    }
-                    if (gameUI && typeof gameUI.clearTarget === 'function') {
-                        gameUI.clearTarget();
-                    }
-                    if (inputManager && typeof inputManager.reset === 'function') {
-                        inputManager.reset();
-                    }
-
-                    // Set safe spawn point for new map
-                    const spawn = { x: 0, y: 1.2, z: 10 };
-                    character.baseY = spawn.y;
-                    character.mesh.position.set(spawn.x, spawn.y, spawn.z);
-
-                    console.log(`[Warp] Starting warp to ${targetMap}`);
-                    sceneManager.loadMap(targetMap);
-                    console.log(`[Warp] Map ${targetMap} loaded`);
-                    monsters.clearAll();
-                    monsters.mapId = targetMap;
-                    monsters.spawnInitial(character.stats.level);
-                    console.log(`[Warp] Monsters spawned`);
-
-                    // Update multiplayer presence for the new map
-                    updatePresence(character.stats.level, username, targetMap);
-                    console.log(`[Warp] Presence updated`);
-
-                    // Immediately broadcast position on the new map so others see us at the spawn point
-                    broadcastPosition(
-                        userId,
-                        username,
-                        character.stats.level,
-                        character.getPosition(),
-                        character.mesh.rotation.y,
-                        character.state,
-                        character.getAppearance(),
-                        targetMap
-                    );
-                    console.log(`[Warp] Initial position broadcasted for new map`);
-                    
-                    // Clear remote players from old map
-                    for (const [id, rp] of remotePlayersMap.entries()) {
-                        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
-                    }
-                    remotePlayersMap.clear();
-                    console.log(`[Warp] Remote players cleared`);
                 }
-            }
-        });
-    }
-
-    // 5. Updates
-    character.update(dt);
-
-    // Fishing line follows the live rod tip (incl. the catch yank)
-    if (isFishingActive && sceneManager && character.getRodTipPosition) {
-        sceneManager.updateFishingRodTip(
-            character.getRodTipPosition(rodTipTmp),
-            character.getRodYankProgress()
-        );
-    }
-
-    // PVP duel: auto-swing at the opponent when in range
-    updateDuelCombat(dt);
-    monsters.update(dt, sceneManager.camera, character.stats.level);
-    sceneManager.updateAnimations(dt);
-    if (particles) particles.update(dt);
-    if (combatSystem) combatSystem.update(dt);
-    if (gameUI) gameUI.updateTargetIndicator(sceneManager);
-
-    // 6. Camera & Networking
-    sceneManager.followTarget(character.getPosition(), character.baseY);
-
-    const now = performance.now();
-    if (now - lastBroadcastTime > 100) {
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
-        lastBroadcastTime = now;
-    }
-
-    if (now - lastHUDTime > 100) {
-        if (gameUI) {
-            gameUI.updateHUD(character.stats);
-            // Also update stats panel if visible (throttled)
-            const statsPanel = document.getElementById('stats-panel');
-            if (statsPanel && statsPanel.style.display !== 'none') {
-                gameUI.updateStats(character.stats);
-            }
-
-            // Update skill cooldown progress bars on mobile and desktop slots
-            if (character.cooldowns) {
-                const SKILLS_LIST = ['bash', 'heal', 'magnumBreak'];
-                SKILLS_LIST.forEach(skillId => {
-                    const current = character.cooldowns[skillId] || 0;
-                    const maxMax = skillId === 'bash' ? 3 : skillId === 'heal' ? 5 : 8; // Max cooldown levels
-                    gameUI.updateSkillCooldown(skillId, current, maxMax);
-                });
-            }
-
-            // FPS Counter
-            const fps = Math.round(1 / dt);
-            const fpsEl = document.getElementById('fps-counter');
-            if (fpsEl) fpsEl.textContent = `FPS: ${fps}`;
+            });
         }
-        lastHUDTime = now;
-    }
 
-    if (now - lastMinimapTime > 150) {
-        if (gameUI) {
-            gameUI.updateMinimap(
-                character.getPosition(),
-                monsters.getAlive(),
-                sceneManager.portals,
-                sceneManager.npcKafra,
-                remotePlayersMap,
-                sceneManager.currentMapId
+        // 5. Updates
+        character.update(dt);
+
+        // Fishing line follows the live rod tip (incl. the catch yank)
+        if (isFishingActive && sceneManager && character.getRodTipPosition) {
+            sceneManager.updateFishingRodTip(
+                character.getRodTipPosition(rodTipTmp),
+                character.getRodYankProgress()
             );
         }
-        lastMinimapTime = now;
-    }
+
+        // PVP duel: auto-swing at the opponent when in range
+        updateDuelCombat(dt);
+        monsters.update(dt, sceneManager.camera, character.stats.level);
+        sceneManager.updateAnimations(dt);
+        if (particles) particles.update(dt);
+        if (combatSystem) combatSystem.update(dt);
+        if (gameUI) gameUI.updateTargetIndicator(sceneManager);
+
+        // 6. Camera & Networking
+        sceneManager.followTarget(character.getPosition(), character.baseY);
+
+        const now = performance.now();
+        if (now - lastBroadcastTime > 100) {
+            broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
+            lastBroadcastTime = now;
+        }
+
+        if (now - lastHUDTime > 100) {
+            if (gameUI) {
+                gameUI.updateHUD(character.stats);
+                // Also update stats panel if visible (throttled)
+                const statsPanel = document.getElementById('stats-panel');
+                if (statsPanel && statsPanel.style.display !== 'none') {
+                    gameUI.updateStats(character.stats);
+                }
+
+                // Update skill cooldown progress bars on mobile and desktop slots
+                if (character.cooldowns) {
+                    const SKILLS_LIST = ['bash', 'heal', 'magnumBreak'];
+                    SKILLS_LIST.forEach(skillId => {
+                        const current = character.cooldowns[skillId] || 0;
+                        const maxMax = skillId === 'bash' ? 3 : skillId === 'heal' ? 5 : 8; // Max cooldown levels
+                        gameUI.updateSkillCooldown(skillId, current, maxMax);
+                    });
+                }
+
+                // FPS Counter
+                const fps = Math.round(1 / dt);
+                const fpsEl = document.getElementById('fps-counter');
+                if (fpsEl) fpsEl.textContent = `FPS: ${fps}`;
+            }
+            lastHUDTime = now;
+        }
+
+        if (now - lastMinimapTime > 150) {
+            if (gameUI) {
+                gameUI.updateMinimap(
+                    character.getPosition(),
+                    monsters.getAlive(),
+                    sceneManager.portals,
+                    sceneManager.npcKafra,
+                    remotePlayersMap,
+                    sceneManager.currentMapId
+                );
+            }
+            lastMinimapTime = now;
+        }
 
         sceneManager.render();
     } catch (err) {

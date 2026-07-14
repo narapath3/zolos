@@ -48,6 +48,7 @@ export class ParticleSystem {
         this.shockwaves = [];
         this.splashEffects = [];
         this.projectiles = [];
+        this.slashes = [];
         this.splashCooldown = 0;
         
         // Performance monitoring
@@ -402,6 +403,84 @@ export class ParticleSystem {
         });
     }
 
+    // ============ Bullet Projectile (Gun) ============
+    spawnBullet(startPos, targetMonster, onHit) {
+        const group = new THREE.Group();
+
+        // Glowing slug
+        const slug = new THREE.Mesh(
+            new THREE.SphereGeometry(0.07, 8, 6),
+            new THREE.MeshBasicMaterial({ color: 0xfff2a0 })
+        );
+        group.add(slug);
+
+        // Soft glow halo
+        const halo = new THREE.Mesh(
+            new THREE.SphereGeometry(0.16, 8, 6),
+            new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.4, depthWrite: false })
+        );
+        group.add(halo);
+
+        // Short tracer tail
+        const tracer = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.03, 0.005, 0.5, 5),
+            new THREE.MeshBasicMaterial({ color: 0xffe080, transparent: true, opacity: 0.7, depthWrite: false })
+        );
+        tracer.rotation.x = Math.PI / 2;
+        tracer.position.z = -0.28;
+        group.add(tracer);
+
+        group.position.copy(startPos);
+        group.position.y += 1.0; // muzzle at chest height
+        this.scene.add(group);
+
+        // Muzzle flash at the barrel
+        const flash = new THREE.Mesh(
+            new THREE.SphereGeometry(0.18, 8, 6),
+            new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.9, depthWrite: false })
+        );
+        flash.position.copy(group.position);
+        this.scene.add(flash);
+        this.hitEffects.push({ mesh: flash, velocity: new THREE.Vector3(0, 0, 0), gravity: 0, life: 0.12 });
+
+        this.projectiles.push({
+            mesh: group,
+            target: targetMonster,
+            speed: 55, // bullets are much faster than arrows
+            onHit: onHit,
+            life: 1.5
+        });
+    }
+
+    // ============ Sword Slash Arc (Melee) ============
+    spawnSlash(position, isCritical = false) {
+        // Crescent arc that flashes across the target and fades quickly
+        const inner = isCritical ? 0.45 : 0.35;
+        const outer = isCritical ? 1.15 : 0.9;
+        const geo = new THREE.RingGeometry(inner, outer, 20, 1, 0, Math.PI * 0.85);
+        const mat = new THREE.MeshBasicMaterial({
+            color: isCritical ? 0xffe060 : 0xffffff,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        const slash = new THREE.Mesh(geo, mat);
+        slash.position.copy(position);
+        slash.position.y += 0.9;
+        // Random diagonal orientation for variety
+        const tilt = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4) + (Math.random() - 0.5) * 0.5;
+        // Billboard toward the camera, then apply the diagonal tilt
+        if (this.camera) slash.lookAt(this.camera.position);
+        slash.rotateZ(tilt);
+        this.scene.add(slash);
+        this.slashes.push({
+            mesh: slash,
+            life: 0.2,
+            maxLife: 0.2,
+        });
+    }
+
     // ============ Update ============
     update(deltaTime) {
         // Update projectiles
@@ -508,6 +587,20 @@ export class ParticleSystem {
             if (effect.life <= 0) {
                 this.scene.remove(effect.mesh);
                 this.deathEffects.splice(i, 1);
+            }
+        }
+
+        // Update sword slashes (quick expand + fade, billboarded to camera)
+        for (let i = this.slashes.length - 1; i >= 0; i--) {
+            const s = this.slashes[i];
+            s.life -= deltaTime;
+            const progress = 1 - s.life / s.maxLife;
+            const scale = 0.7 + progress * 0.8;
+            s.mesh.scale.set(scale, scale, scale);
+            s.mesh.material.opacity = Math.max(0, 0.9 * (1 - progress));
+            if (s.life <= 0) {
+                this.scene.remove(s.mesh);
+                this.slashes.splice(i, 1);
             }
         }
 
