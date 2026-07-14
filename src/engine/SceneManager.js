@@ -649,13 +649,26 @@ export class SceneManager {
             rain:   { emoji: '🌧️', label: 'ฝนตก',      fog: 0.030, fogCol: 0x5c6670, sunCol: 0xaeb6c0, sun: 0.5, amb: 0.55, skyTop: 0x4a535c, skyHor: 0x707a84, rain: true,  blossom: false, sunVis: false },
         };
         this._weatherOrder = ['sunny', 'spring', 'cloudy', 'rain'];
+        // Each preset lasts this long; the whole cycle repeats. Weather is
+        // derived from the shared wall clock so EVERY player sees the same
+        // weather at the same time (no server/network needed — clocks are
+        // NTP-synced). Full cycle here = 4 × 90s = 6 minutes.
+        this._weatherPhaseMs = 90000;
 
-        // Current (animated) atmosphere values, seeded to sunny
-        const p0 = this._weatherPresets.sunny;
+        // Seed to whatever the shared schedule says right now
+        const startType = this._scheduledWeather();
+        const p0 = this._weatherPresets[startType];
         this._weatherCur = { fog: p0.fog, fogCol: new THREE.Color(p0.fogCol), sunCol: new THREE.Color(p0.sunCol), sun: p0.sun, amb: p0.amb, skyTop: new THREE.Color(p0.skyTop), skyHor: new THREE.Color(p0.skyHor) };
-        this.weather = { type: 'sunny', timer: 45 + Math.random() * 30 };
+        this.weather = { type: startType };
         this._ensureWeatherIndicator();
-        this.setWeather('sunny', true);
+        this.setWeather(startType, true);
+    }
+
+    // The weather everyone should currently be in, from the shared clock.
+    _scheduledWeather() {
+        const order = this._weatherOrder;
+        const idx = Math.floor(Date.now() / this._weatherPhaseMs) % order.length;
+        return order[idx];
     }
 
     _ensureWeatherIndicator() {
@@ -727,14 +740,9 @@ export class SceneManager {
     _updateWeather(dt) {
         if (!this.weather || !this._weatherTarget) return;
 
-        // Auto-cycle to the next preset
-        this.weather.timer -= dt;
-        if (this.weather.timer <= 0) {
-            const i = this._weatherOrder.indexOf(this.weather.type);
-            const next = this._weatherOrder[(i + 1) % this._weatherOrder.length];
-            this.weather.timer = 45 + Math.random() * 45;
-            this.setWeather(next, false);
-        }
+        // Follow the shared schedule so all players stay in sync
+        const sched = this._scheduledWeather();
+        if (sched !== this.weather.type) this.setWeather(sched, false);
 
         // Smoothly lerp current atmosphere toward the target (~ a few seconds)
         const t = this._weatherTarget, c = this._weatherCur, tc = this._wtc, k = Math.min(1, dt * 0.5);
