@@ -659,14 +659,29 @@ export class SceneManager {
     }
 
     _ensureWeatherIndicator() {
-        if (document.getElementById('weather-indicator')) return;
+        if (document.getElementById('weather-indicator')) {
+            this._weatherEl = document.getElementById('weather-indicator');
+            return;
+        }
         const el = document.createElement('div');
         el.id = 'weather-indicator';
-        el.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:500;' +
-            'background:rgba(20,18,32,.55);color:#fff;border:1px solid rgba(255,255,255,.15);' +
-            'border-radius:20px;padding:5px 14px;font-family:Itim,Inter,sans-serif;font-size:14px;' +
-            'pointer-events:none;backdrop-filter:blur(4px);white-space:nowrap';
-        document.body.appendChild(el);
+        // Compact badge that sits just under the Lv. line in the player HUD.
+        el.style.cssText = 'display:inline-block;margin-top:5px;align-self:flex-start;' +
+            'background:rgba(20,18,32,.55);color:#fff;border:1px solid rgba(255,255,255,.18);' +
+            'border-radius:14px;padding:3px 10px;font-family:Itim,Inter,sans-serif;font-size:12px;' +
+            'pointer-events:none;white-space:nowrap';
+        // Prefer to place it inside the player info block, right under the level
+        const info = document.querySelector('.player-info');
+        const level = info ? info.querySelector('.player-level') : null;
+        if (info && level) {
+            level.insertAdjacentElement('afterend', el);
+        } else if (info) {
+            info.appendChild(el);
+        } else {
+            // Fallback: fixed top-left if the HUD isn't present
+            el.style.cssText += ';position:fixed;top:56px;left:12px;z-index:500';
+            document.body.appendChild(el);
+        }
         this._weatherEl = el;
     }
 
