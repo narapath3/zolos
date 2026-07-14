@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.11 (pvp-leaderboard)';
+const BUILD_VERSION = '2026-07-14.12 (bg-autofarm)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -630,6 +630,10 @@ async function initGame(charData) {
         window.__zolosLoopStarted = true;
         requestAnimationFrame(gameLoop);
     }
+    // Background simulation loop (keeps AUTO bot running when tab is hidden)
+    if (!bgIntervalId) {
+        bgIntervalId = setInterval(backgroundTick, 500);
+    }
 
     // Input listeners — Shift key for sprinting
     window.addEventListener('keydown', (e) => {
@@ -932,9 +936,55 @@ function updateDuelCombat(dt) {
 }
 
 // ============ Game Loop ============
+// ===== Background simulation =====
+// The browser pauses requestAnimationFrame when the tab is hidden/minimized,
+// which would freeze the AUTO bot (farming & fishing). This setInterval keeps
+// the simulation advancing while hidden. It only does work when the tab is
+// hidden (rAF handles the visible case), and advances in fixed sub-steps so
+// combat/fishing progress at real speed even though hidden-tab intervals are
+// throttled to ~1s.
+let bgLastTime = 0;
+let bgIntervalId = null;
+
+function backgroundTick() {
+    if (!isGameStarted || !document.hidden || !character) return;
+    const now = performance.now();
+    if (!bgLastTime) bgLastTime = now;
+    let elapsed = (now - bgLastTime) / 1000;
+    bgLastTime = now;
+    if (elapsed <= 0) return;
+    elapsed = Math.min(elapsed, 5); // cap catch-up after long sleep/background
+
+    try {
+        let remaining = elapsed;
+        while (remaining > 0) {
+            const step = Math.min(0.1, remaining);
+            character.update(step);
+            if (combatSystem) combatSystem.update(step);       // auto-farm + fishing + attacks
+            if (monsters) monsters.update(step, sceneManager.camera, character.stats.level);
+            if (particles) particles.update(step);             // advance/cleanup effects
+            remaining -= step;
+        }
+        if (gameUI) gameUI.updateHUD(character.stats);
+    } catch (e) {
+        console.warn('[Zolos] background tick error:', e);
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        bgLastTime = performance.now(); // start fresh — don't over-catch-up
+    } else {
+        bgLastTime = 0;
+        lastTime = performance.now();   // avoid a huge dt spike in the rAF loop on resume
+    }
+});
+
 function gameLoop(time) {
     requestAnimationFrame(gameLoop);
     if (!isGameStarted) return;
+    // While hidden, the background interval drives the simulation instead.
+    if (document.hidden) return;
 
     try {
         const dt = Math.min(0.1, (time - lastTime) / 1000);
