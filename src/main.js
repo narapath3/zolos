@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.8 (arena-v2)';
+const BUILD_VERSION = '2026-07-14.9 (duel-cam)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -57,6 +57,10 @@ let isShiftPressed = false;
 
 // Reusable vector for per-frame rod tip queries (avoids per-frame allocation)
 const rodTipTmp = new THREE.Vector3();
+
+// Mobile/touch detection — duel camera pulls back further on small screens
+const IS_MOBILE = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
 // Hover highlight state
 let hoveredMeshGroup = null;
@@ -1099,7 +1103,13 @@ function gameLoop(time) {
         if (gameUI) gameUI.updateTargetIndicator(sceneManager);
 
         // 6. Camera & Networking
-        sceneManager.followTarget(character.getPosition(), character.baseY);
+        // During a duel, frame both fighters (extra pull-back on mobile).
+        const duelFoe = duelState ? remotePlayersMap.get(duelState.opponentUserId) : null;
+        if (duelState && duelFoe && duelFoe.mesh) {
+            sceneManager.frameDuel(character.getPosition(), duelFoe.mesh.position, IS_MOBILE);
+        } else {
+            sceneManager.followTarget(character.getPosition(), character.baseY);
+        }
 
         const now = performance.now();
         if (now - lastBroadcastTime > 100) {

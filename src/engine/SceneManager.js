@@ -2661,6 +2661,34 @@ export class SceneManager {
         this.camera.lookAt(targetPos.x, followY, targetPos.z);
     }
 
+    // Duel camera: frame BOTH fighters. Centers on their midpoint and pulls
+    // back based on how far apart they are, so both stay on screen. Mobile
+    // (narrow/portrait viewport) needs to pull back more because the limited
+    // horizontal FOV would otherwise crop a fighter off the side.
+    frameDuel(posA, posB, isMobile = false) {
+        const midX = (posA.x + posB.x) / 2;
+        const midZ = (posA.z + posB.z) / 2;
+        const sep = Math.hypot(posA.x - posB.x, posA.z - posB.z);
+
+        // Base rig, expanded by separation. Portrait screens get a bigger
+        // multiplier + a wider minimum so nobody is cropped.
+        const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        const portrait = isMobile || aspect < 1;
+        const zoomK = portrait ? 1.75 : 1.15;
+        const baseDist = portrait ? 15 : 13;
+        const dist = Math.min(34, baseDist + sep * zoomK);
+
+        const targetCamX = midX;
+        const targetCamY = dist;      // height scales with pull-back
+        const targetCamZ = midZ + dist;
+        const smoothing = 0.1;
+
+        this.camera.position.x += (targetCamX - this.camera.position.x) * smoothing;
+        this.camera.position.y += (targetCamY - this.camera.position.y) * smoothing;
+        this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
+        this.camera.lookAt(midX, 1.0, midZ);
+    }
+
     // Check if a position is in the winding river (and not on the bridge)
     isInWater(position) {
         if (!this.waterMesh) return false;
