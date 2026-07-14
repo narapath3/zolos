@@ -1324,6 +1324,69 @@ export class GameUI {
     }
   }
 
+  _ensureDuelStyles() {
+    if (document.getElementById('duel-fx-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'duel-fx-styles';
+    s.textContent = `
+      #duel-overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        pointer-events:none;z-index:9000;font-family:'Press Start 2P','Fredoka One',sans-serif;text-align:center}
+      #duel-overlay .duel-title{font-size:clamp(38px,9vw,96px);font-weight:900;letter-spacing:2px;
+        animation:duelPop .6s cubic-bezier(.2,1.4,.4,1) both;text-shadow:0 4px 18px rgba(0,0,0,.6)}
+      #duel-overlay .duel-sub{margin-top:18px;font-size:clamp(14px,2.6vw,24px);color:#fff;
+        animation:duelFade .8s ease .35s both;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+      #duel-overlay .duel-mmr{margin-top:10px;font-size:clamp(13px,2.2vw,20px);animation:duelFade .8s ease .55s both}
+      .duel-win .duel-title{color:#ffd94a;text-shadow:0 0 24px rgba(255,200,60,.8),0 4px 18px rgba(0,0,0,.6)}
+      .duel-lose .duel-title{color:#ff5c5c;text-shadow:0 0 24px rgba(255,60,60,.6),0 4px 18px rgba(0,0,0,.6)}
+      .duel-flash .duel-title{color:#fff;animation:duelFight .5s ease both}
+      @keyframes duelPop{0%{transform:scale(.2) rotate(-8deg);opacity:0}60%{transform:scale(1.15) rotate(2deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+      @keyframes duelFight{0%{transform:scale(2.5);opacity:0}40%{opacity:1}100%{transform:scale(1);opacity:1}}
+      @keyframes duelFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+      #duel-overlay.duel-hide{animation:duelOut .5s ease forwards}
+      @keyframes duelOut{to{opacity:0;transform:scale(1.05)}}
+    `;
+    document.head.appendChild(s);
+  }
+
+  _showDuelOverlay(cls, html, holdMs) {
+    this._ensureDuelStyles();
+    let ov = document.getElementById('duel-overlay');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'duel-overlay';
+    ov.className = cls;
+    ov.innerHTML = html;
+    document.body.appendChild(ov);
+    clearTimeout(this._duelOverlayTimer);
+    this._duelOverlayTimer = setTimeout(() => {
+      ov.classList.add('duel-hide');
+      setTimeout(() => ov.remove(), 500);
+    }, holdMs);
+  }
+
+  // "FIGHT!" flash when the cage drops and the duel begins
+  showDuelBanner() {
+    this._showDuelOverlay('duel-flash', `<div class="duel-title">⚔️ FIGHT! ⚔️</div>`, 1400);
+  }
+
+  // Big VICTORY / DEFEAT banner with MMR change
+  showDuelResult(won, delta, mmr, forfeit) {
+    const mmrLine = (delta !== undefined && mmr !== undefined)
+      ? `<div class="duel-mmr" style="color:${won ? '#7CFC9A' : '#ff8a8a'}">${won ? '▲ +' : '▼ -'}${delta} MMR &nbsp;→&nbsp; ${mmr}</div>`
+      : '';
+    if (won) {
+      this._showDuelOverlay('duel-win',
+        `<div class="duel-title">🏆 VICTORY!</div>
+         <div class="duel-sub">คุณคือผู้ชนะแห่งสังเวียน!${forfeit ? ' (คู่ต่อสู้ยอมแพ้)' : ''}</div>${mmrLine}`,
+        4500);
+    } else {
+      this._showDuelOverlay('duel-lose',
+        `<div class="duel-title">💀 DEFEAT</div>
+         <div class="duel-sub">พ่ายแพ้ในสังเวียน... ฝึกฝนแล้วกลับมาใหม่!</div>${mmrLine}`,
+        4500);
+    }
+  }
+
   receiveFriendRequest(payload) {
     if (!payload) return;
     this.activeIncomingFriendRequest = payload;

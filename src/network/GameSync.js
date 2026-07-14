@@ -1423,6 +1423,28 @@ export async function sendFriendResponsePacket(senderUserId, targetUserId, accep
     return { success: true };
 }
 
+// ============ PVP MMR Leaderboard ============
+export async function getMMRLeaderboard(limit = 8) {
+    if (isOfflineMode || !supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('characters')
+            .select('name, mmr, pvp_wins, pvp_losses')
+            .order('mmr', { ascending: false })
+            .limit(limit);
+        if (error || !data) return [];
+        return data.map(r => ({
+            name: r.name,
+            mmr: Number(r.mmr) || 1000,
+            wins: Number(r.pvp_wins) || 0,
+            losses: Number(r.pvp_losses) || 0,
+        }));
+    } catch (e) {
+        console.warn('[Zolos] MMR leaderboard fetch failed:', e.message);
+        return [];
+    }
+}
+
 // ============ PVP Duel Networking ============
 export function sendDuelRequest(targetUserId, targetName, senderName, senderLevel) {
     if (isOfflineMode) return { success: false, reason: 'offline' };

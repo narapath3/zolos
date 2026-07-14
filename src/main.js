@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.7 (weapon-fx)';
+const BUILD_VERSION = '2026-07-14.8 (arena-v2)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -540,6 +540,9 @@ async function initGame(charData) {
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);
 
+    // Populate the arena MMR leaderboard board
+    refreshArenaLeaderboard();
+
     // Step 9: Wire up chat send callback
     if (gameUI) {
         gameUI.setupChatSendCallback((message) => {
@@ -758,6 +761,18 @@ function handleMouseInteraction(event) {
 }
 window.handleCanvasTap = handleMouseInteraction;
 
+// Fetch top-MMR players and paint them onto the arena board
+async function refreshArenaLeaderboard() {
+    if (!sceneManager || !sceneManager.updateArenaLeaderboard) return;
+    try {
+        const { getMMRLeaderboard } = await import('./network/GameSync.js');
+        const entries = await getMMRLeaderboard(8);
+        sceneManager.updateArenaLeaderboard(entries);
+    } catch (e) {
+        console.warn('[Zolos] refreshArenaLeaderboard failed:', e.message);
+    }
+}
+
 // ============ PVP Duel Manager ============
 // duel_start → teleport both players to the arena and enter duel mode.
 // While dueling, walking into attack range auto-swings at the opponent;
@@ -787,11 +802,15 @@ window.duelManager = {
         character.stats.hp = character.stats.max_hp;
         character.stats.sp = character.stats.max_sp;
 
+        // Raise the cage — players are locked inside until the duel ends
+        if (sceneManager && sceneManager.showArenaCage) sceneManager.showArenaCage();
+
         duelState = { duelId: payload.duelId, opponentUserId: foe.userId, cooldown: 1.0 };
         window.duelState = duelState;
 
         if (gameUI) {
-            gameUI.addCombatLog('🏟️ เข้าสู่สังเวียน! เดินเข้าหาคู่ต่อสู้เพื่อโจมตี — ผู้ชนะได้ MMR!', 'levelup');
+            if (gameUI.showDuelBanner) gameUI.showDuelBanner('start');
+            gameUI.addCombatLog('🏟️ เข้าสู่สังเวียน! กรงถูกปิด — สู้จนกว่าจะมีผู้ชนะ!', 'levelup');
             gameUI.setAutoFarmState(false);
             gameUI.updateHUD(character.stats);
         }
@@ -831,7 +850,15 @@ window.duelManager = {
                 gameUI.addCombatLog(`💀 แพ้การดวล...${deltaTxt}`, 'death');
                 gameUI.triggerScreenShake(true);
             }
+            // Big victory/defeat banner
+            if (gameUI.showDuelResult) {
+                gameUI.showDuelResult(won, payload.delta, myMmr, !!payload.forfeit);
+            }
         }
+        // Drop the cage now the fight is over
+        if (sceneManager && sceneManager.hideArenaCage) sceneManager.hideArenaCage();
+        // Refresh the leaderboard board with the new MMR values
+        refreshArenaLeaderboard();
         // Restore both players to full HP; loser gets back on their feet
         if (character) {
             character.stats.hp = character.stats.max_hp;
@@ -844,6 +871,20 @@ window.duelManager = {
         window.duelState = null;
     },
 };
+
+// Keep a dueling player locked inside the cage (called each frame).
+function clampToArena() {
+    if (!duelState || !character || !sceneManager || !sceneManager.getArenaInfo) return;
+    const { x: cx, z: cz, radius } = sceneManager.getArenaInfo();
+    const p = character.mesh.position;
+    const dx = p.x - cx, dz = p.z - cz;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d > radius) {
+        p.x = cx + (dx / d) * radius;
+        p.z = cz + (dz / d) * radius;
+        autoPath = null; // cancel any click-to-move heading out
+    }
+}
 
 // Per-frame duel combat: auto-swing at the opponent when in range
 function updateDuelCombat(dt) {
@@ -1048,8 +1089,9 @@ function gameLoop(time) {
             );
         }
 
-        // PVP duel: auto-swing at the opponent when in range
+        // PVP duel: auto-swing at the opponent when in range, and stay caged
         updateDuelCombat(dt);
+        clampToArena();
         monsters.update(dt, sceneManager.camera, character.stats.level);
         sceneManager.updateAnimations(dt);
         if (particles) particles.update(dt);

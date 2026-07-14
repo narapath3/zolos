@@ -261,7 +261,11 @@ export class SceneManager {
 
         // PVP arena on the main field
         this.arenaAnimParts = null;
-        if (mapId === 'prontera') this._createPvpArena();
+        this.arenaBoard = null;
+        if (mapId === 'prontera') {
+            this._createPvpArena();
+            this._createArenaLeaderboard();
+        }
 
         this._createPortals(mapId);
         this._createBirds();
@@ -1004,6 +1008,162 @@ export class SceneManager {
         const az = z - PVP_ARENA_POS.z;
         if (ax * ax + az * az < 8.5 * 8.5) return false;
         return true;
+    }
+
+    // True if (x,z) is inside the PVP arena keep-out zone (monsters excluded).
+    isInArena(x, z, margin = 0) {
+        if (this.currentMap !== 'prontera') return false;
+        const dx = x - PVP_ARENA_POS.x;
+        const dz = z - PVP_ARENA_POS.z;
+        const r = 7.5 + margin;
+        return dx * dx + dz * dz < r * r;
+    }
+
+    // Arena center + the fighting-ring radius used for the duel cage/clamp.
+    getArenaInfo() {
+        return { x: PVP_ARENA_POS.x, z: PVP_ARENA_POS.z, radius: 5.4 };
+    }
+
+    // ============ Arena MMR Leaderboard Board ============
+    _createArenaLeaderboard() {
+        const { x: cx, z: cz } = PVP_ARENA_POS;
+        const group = new THREE.Group();
+
+        // Two wooden posts
+        const postMat = new THREE.MeshLambertMaterial({ color: 0x4a3520 });
+        for (const sx of [-2.3, 2.3]) {
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 5.2, 8), postMat);
+            post.position.set(sx, 2.6, 0);
+            post.castShadow = true;
+            group.add(post);
+        }
+        // Top banner bar
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.35, 0.35), postMat);
+        bar.position.y = 5.0;
+        group.add(bar);
+
+        // Canvas-textured board panel
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 512;
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.anisotropy = 4;
+        const panel = new THREE.Mesh(
+            new THREE.PlaneGeometry(4.8, 4.8),
+            new THREE.MeshBasicMaterial({ map: tex, transparent: true })
+        );
+        panel.position.set(0, 2.9, 0.2);
+        group.add(panel);
+
+        // Place behind the arena, facing back toward the approach (spawn side)
+        group.position.set(cx, 0, cz + 7.5);
+        group.rotation.y = Math.PI;
+        this.scene.add(group);
+        this.envObjects.push(group);
+
+        this.arenaBoard = { group, canvas, ctx: canvas.getContext('2d'), tex };
+        this.updateArenaLeaderboard(null); // initial "loading" state
+    }
+
+    // Redraw the leaderboard panel. entries: [{name, mmr, wins, losses}]
+    updateArenaLeaderboard(entries) {
+        if (!this.arenaBoard) return;
+        const { canvas, ctx, tex } = this.arenaBoard;
+        const W = canvas.width, H = canvas.height;
+        ctx.clearRect(0, 0, W, H);
+
+        // Parchment/stone background
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        grad.addColorStop(0, '#2a2436');
+        grad.addColorStop(1, '#1a1626');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = '#d8b04a';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(10, 10, W - 20, H - 20);
+
+        // Title
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffd94a';
+        ctx.font = 'bold 46px "Fredoka One", Arial';
+        ctx.fillText('🏆 PVP RANKING', W / 2, 70);
+        ctx.strokeStyle = '#d8b04a';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(40, 92); ctx.lineTo(W - 40, 92); ctx.stroke();
+
+        if (!entries) {
+            ctx.fillStyle = '#cfc9dd';
+            ctx.font = '28px Arial';
+            ctx.fillText('กำลังโหลด...', W / 2, 260);
+        } else if (entries.length === 0) {
+            ctx.fillStyle = '#cfc9dd';
+            ctx.font = '26px Arial';
+            ctx.fillText('ยังไม่มีนักสู้ในตาราง', W / 2, 260);
+        } else {
+            const medals = ['🥇', '🥈', '🥉'];
+            ctx.textAlign = 'left';
+            let y = 150;
+            entries.slice(0, 8).forEach((e, i) => {
+                const rank = medals[i] || `${i + 1}.`;
+                ctx.fillStyle = i === 0 ? '#ffd94a' : (i < 3 ? '#ffffff' : '#cfc9dd');
+                ctx.font = i < 3 ? 'bold 34px Arial' : '30px Arial';
+                const name = (e.name || 'Unknown').slice(0, 12);
+                ctx.fillText(`${rank} ${name}`, 45, y);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#7cd0ff';
+                ctx.fillText(`${e.mmr}`, W - 45, y);
+                ctx.textAlign = 'left';
+                y += 46;
+            });
+        }
+        tex.needsUpdate = true;
+    }
+
+    // Raise a translucent cage/dome over the arena during a duel.
+    showArenaCage() {
+        if (this._arenaCage) return;
+        const { x: cx, z: cz, radius } = this.getArenaInfo();
+        const R = radius + 0.3;
+        const group = new THREE.Group();
+
+        // Translucent energy dome
+        const domeMat = new THREE.MeshBasicMaterial({
+            color: 0xff6050, transparent: true, opacity: 0.12,
+            side: THREE.DoubleSide, depthWrite: false,
+        });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
+        dome.position.y = 0.4;
+        group.add(dome);
+
+        // Vertical cage bars
+        const barMat = new THREE.MeshStandardMaterial({
+            color: 0xffaa33, emissive: 0xff5522, emissiveIntensity: 0.6, metalness: 0.6, roughness: 0.3,
+        });
+        const bars = 20;
+        for (let i = 0; i < bars; i++) {
+            const a = (i / bars) * Math.PI * 2;
+            const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 4.2, 6), barMat);
+            bar.position.set(Math.cos(a) * R, 2.2, Math.sin(a) * R);
+            group.add(bar);
+        }
+        // Top and bottom rings
+        for (const y of [0.5, 4.2]) {
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(R, 0.08, 8, 40), barMat);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = y;
+            group.add(ring);
+        }
+
+        group.position.set(cx, 0, cz);
+        this.scene.add(group);
+        this._arenaCage = group;
+        this._arenaCagePulse = 0;
+    }
+
+    hideArenaCage() {
+        if (!this._arenaCage) return;
+        this.scene.remove(this._arenaCage);
+        this._arenaCage.traverse(c => { if (c.geometry) c.geometry.dispose(); });
+        this._arenaCage = null;
     }
 
     _createEnvironment(config) {
@@ -2583,6 +2743,13 @@ export class SceneManager {
             a.banners.forEach((b, i) => {
                 b.rotation.z = Math.sin(this.time * 2.4 + i * 1.3) * 0.09;
             });
+        }
+
+        // Duel cage shimmer
+        if (this._arenaCage) {
+            this._arenaCagePulse = (this._arenaCagePulse || 0) + dt;
+            const dome = this._arenaCage.children[0];
+            if (dome && dome.material) dome.material.opacity = 0.10 + Math.sin(this._arenaCagePulse * 3) * 0.06;
         }
 
         // Flowing water: scroll the caustic texture along the river

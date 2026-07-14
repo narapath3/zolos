@@ -689,7 +689,10 @@ class Monster {
                 const targetEnv = sceneManager.getEnvironmentAt(testPos);
                 const requiredEnv = this.data.environment || 'ground';
 
-                if (targetEnv === requiredEnv) {
+                if (sceneManager.isInArena && sceneManager.isInArena(newX, newZ)) {
+                    // Steer away from the arena keep-out zone
+                    this.wanderTarget = null;
+                } else if (targetEnv === requiredEnv) {
                     this.wanderTarget = testPos;
                 } else if (requiredEnv === 'water') {
                     // Pick new target toward river center
@@ -725,6 +728,12 @@ class Monster {
 
                 // Final check: prevent monster from stepping out of its required environment
                 if (sceneManager) {
+                    // Hard block: never step into the PVP arena
+                    if (sceneManager.isInArena && sceneManager.isInArena(nextX, nextZ)) {
+                        this.wanderTarget = null;
+                        this.isMoving = false;
+                        return;
+                    }
                     const nextPos = new THREE.Vector3(nextX, 0, nextZ);
                     const nextEnv = sceneManager.getEnvironmentAt(nextPos);
                     const requiredEnv = this.data.environment || 'ground';
@@ -823,6 +832,10 @@ export class MonsterManager {
             pos.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
 
             if (this.sceneManager) {
+                // Never spawn inside the PVP arena keep-out zone
+                if (this.sceneManager.isInArena && this.sceneManager.isInArena(pos.x, pos.z)) {
+                    continue;
+                }
                 const posEnv = this.sceneManager.getEnvironmentAt(pos);
                 if (posEnv === environment) {
                     return pos;
