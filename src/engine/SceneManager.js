@@ -1,6 +1,7 @@
 // Scene Manager — Three.js Scene, Camera, Renderer, Environment
 // Upgraded: Lush world with water, varied trees, sky dome, portals, NPC
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
@@ -266,6 +267,7 @@ export class SceneManager {
         // PVP arena on the main field
         this.arenaAnimParts = null;
         this.arenaBoard = null;
+        this._arenaGroup = null;
         if (mapId === 'prontera') {
             this._createGrassDecor(config);
             this._createPvpArena();
@@ -285,9 +287,102 @@ export class SceneManager {
         // sun (directional) casts shadows.
         this.scene.traverse(o => { if (o.isPointLight && o.castShadow) o.castShadow = false; });
 
+        // Perf: batch static environment meshes into far fewer draw calls
+        this._mergeStaticEnvironment();
+
         // Update UI
         if (window.gameUI) {
             window.gameUI.setMapName(this.getCurrentMapName(), mapId);
+        }
+    }
+
+    // ============ Static Draw-Call Batching ============
+    // Merges non-animated environment meshes that share a material into single
+    // meshes (one draw call each). Pixel-identical: same triangles in world
+    // space, same material. Anything animated or pickable is excluded, and any
+    // group that fails to merge is left untouched (safe fallback).
+    _mergeStaticEnvironment() {
+        try {
+            this.scene.updateMatrixWorld(true);
+
+            // Build the exclusion set (animated / pickable / instanced roots)
+            const exclude = new Set();
+            const addTree = (o) => { if (o) o.traverse(c => exclude.add(c)); };
+            (this.swayingObjects || []).forEach(addTree);  // trees sway
+            (this.portalMeshes || []).forEach(addTree);    // portals pulse + pickable
+            (this.fishes || []).forEach(addTree);          // fish swim
+            addTree(this.waterMesh);                       // water texture scrolls
+            addTree(this._arenaGroup);                     // arena has flames/banners
+            if (this.arenaBoard) addTree(this.arenaBoard.group);
+            addTree(this.npcMesh);
+            addTree(this.npcSellMesh);
+
+            // Visual signature so only pixel-equivalent materials merge together
+            const matKey = (m) => [
+                m.type, m.color?.getHexString?.(), m.emissive?.getHexString?.(),
+                m.emissiveIntensity, m.map?.uuid || 0, !!m.transparent, m.opacity,
+                m.side, !!m.vertexColors, !!m.flatShading, m.roughness, m.metalness,
+            ].join('|');
+
+            // Bucket clones of every mergeable leaf mesh by material signature
+            const buckets = new Map();
+            for (const root of this.envObjects) {
+                if (exclude.has(root)) continue;
+                root.traverse((o) => {
+                    if (exclude.has(o)) return;
+                    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+                    if (o.isPoints || o.isLine || o.isSprite) return;
+                    if (!o.geometry || !o.geometry.isBufferGeometry) return;
+                    if (Array.isArray(o.material)) return;
+                    if (o.material.transparent) return; // avoid transparency sort issues
+
+                    const key = matKey(o.material) + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0);
+                    if (!buckets.has(key)) {
+                        buckets.set(key, { material: o.material, cast: o.castShadow, receive: o.receiveShadow, geos: [], sources: [] });
+                    }
+                    const b = buckets.get(key);
+                    const g = o.geometry.clone();
+                    g.applyMatrix4(o.matrixWorld);              // bake world transform
+                    // Keep only the attributes needed to merge cleanly
+                    for (const name of Object.keys(g.attributes)) {
+                        if (!['position', 'normal', 'uv', 'color'].includes(name)) g.deleteAttribute(name);
+                    }
+                    b.geos.push(g);
+                    b.sources.push(o);
+                });
+            }
+
+            let mergedMeshes = 0, savedCalls = 0;
+            for (const b of buckets.values()) {
+                if (b.geos.length < 2) continue; // no benefit merging a single mesh
+                // Ensure consistent attribute sets across the group
+                const attrsFirst = Object.keys(b.geos[0].attributes).sort().join(',');
+                if (!b.geos.every(g => Object.keys(g.attributes).sort().join(',') === attrsFirst)) continue;
+
+                let merged;
+                try { merged = mergeGeometries(b.geos, false); } catch { merged = null; }
+                if (!merged) continue; // merge failed → leave originals untouched (safe)
+
+                const mesh = new THREE.Mesh(merged, b.material);
+                mesh.castShadow = b.cast;
+                mesh.receiveShadow = b.receive;
+                mesh.matrixAutoUpdate = false; // fully static
+                this.scene.add(mesh);
+                this.envObjects.push(mesh);
+
+                // Remove the now-merged originals from the scene
+                for (const src of b.sources) {
+                    if (src.parent) src.parent.remove(src);
+                    if (src.geometry) src.geometry.dispose();
+                }
+                mergedMeshes++;
+                savedCalls += b.sources.length - 1;
+            }
+            if (mergedMeshes > 0) {
+                console.log(`[Zolos] 🧩 Static merge: -${savedCalls} draw calls (${mergedMeshes} batches)`);
+            }
+        } catch (e) {
+            console.warn('[Zolos] static merge skipped:', e.message);
         }
     }
 
@@ -857,6 +952,7 @@ export class SceneManager {
         group.position.set(cx, 0, cz);
         this.scene.add(group);
         this.envObjects.push(group);
+        this._arenaGroup = group; // excluded from static merge (has animated parts)
         this.arenaAnimParts = anim;
     }
 
