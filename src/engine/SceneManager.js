@@ -276,6 +276,7 @@ export class SceneManager {
 
         this._createPortals(mapId);
         this._createBirds();
+        this._createBirdFlock();
 
         if (mapId === 'prontera') {
             this._createNPC();
@@ -311,6 +312,8 @@ export class SceneManager {
             (this.swayingObjects || []).forEach(addTree);  // trees sway
             (this.portalMeshes || []).forEach(addTree);    // portals pulse + pickable
             (this.fishes || []).forEach(addTree);          // fish swim
+            (this.birds || []).forEach(addTree);           // circling birds
+            addTree(this.birdFlock && this.birdFlock.group); // passing flock
             addTree(this.waterMesh);                       // water texture scrolls
             addTree(this._arenaGroup);                     // arena has flames/banners
             if (this.arenaBoard) addTree(this.arenaBoard.group);
@@ -583,6 +586,83 @@ export class SceneManager {
             this.scene.add(bird);
             this.envObjects.push(bird);
             this.birds.push(bird);
+        }
+    }
+
+    // A loose V-formation flock that flies straight across the sky, then
+    // respawns from a random edge after a short delay — reads as "birds
+    // passing by" (distinct from the high circling birds above).
+    _createBirdFlock() {
+        const group = new THREE.Group();
+        const birds = [];
+        const bodyGeo = new THREE.BoxGeometry(0.16, 0.08, 0.4);
+        const bodyMat = new THREE.MeshBasicMaterial({ color: 0x33323a });
+        const wingGeo = new THREE.PlaneGeometry(0.5, 0.18);
+        const wingMat = new THREE.MeshBasicMaterial({ color: 0x44424c, side: THREE.DoubleSide });
+
+        const COUNT = 6;
+        for (let i = 0; i < COUNT; i++) {
+            const bird = new THREE.Group();
+            bird.add(new THREE.Mesh(bodyGeo, bodyMat));
+            const lp = new THREE.Group(); lp.position.set(-0.08, 0, 0);
+            const lm = new THREE.Mesh(wingGeo, wingMat); lm.position.set(-0.25, 0, 0); lp.add(lm); bird.add(lp);
+            const rp = new THREE.Group(); rp.position.set(0.08, 0, 0);
+            const rm = new THREE.Mesh(wingGeo, wingMat); rm.position.set(0.25, 0, 0); rp.add(rm); bird.add(rp);
+
+            // V-formation offset (leader at front, others fan out behind)
+            const side = (i % 2 === 0 ? 1 : -1);
+            const rank = Math.ceil(i / 2);
+            bird.position.set(side * rank * 1.1, (Math.random() - 0.5) * 0.4, -rank * 1.2);
+            bird.userData = { leftWing: lp, rightWing: rp, flapOffset: Math.random() * Math.PI * 2, flapSpeed: 9 + Math.random() * 3 };
+            group.add(bird);
+            birds.push(bird);
+        }
+
+        this.scene.add(group);
+        this.envObjects.push(group);
+        this.birdFlock = { group, birds, timer: 2 + Math.random() * 6, flying: false };
+        this._respawnFlock();
+    }
+
+    _respawnFlock() {
+        const f = this.birdFlock;
+        if (!f) return;
+        // Start just off one edge, fly to the opposite side across the map
+        const fromLeft = Math.random() < 0.5;
+        const startX = fromLeft ? -48 : 48;
+        const z = -30 + Math.random() * 60;
+        const height = 15 + Math.random() * 8;
+        f.group.position.set(startX, height, z);
+        // Heading roughly across X with a slight Z drift
+        const dirX = fromLeft ? 1 : -1;
+        const drift = (Math.random() - 0.5) * 0.35;
+        f.dir = new THREE.Vector3(dirX, 0, drift).normalize();
+        f.group.rotation.y = Math.atan2(f.dir.x, f.dir.z);
+        f.speed = 6 + Math.random() * 4;
+        f.flying = true;
+    }
+
+    _updateBirdFlock(dt) {
+        const f = this.birdFlock;
+        if (!f) return;
+        if (!f.flying) {
+            f.timer -= dt;
+            if (f.timer <= 0) this._respawnFlock();
+            return;
+        }
+        f.group.position.addScaledVector(f.dir, f.speed * dt);
+        f.group.position.y += Math.sin(this.time * 0.6) * dt * 0.4; // gentle bob
+        // Flap wings
+        for (const b of f.birds) {
+            const u = b.userData;
+            const flap = Math.sin(this.time * u.flapSpeed + u.flapOffset) * 0.85;
+            u.leftWing.rotation.z = -flap;
+            u.rightWing.rotation.z = flap;
+        }
+        // Off the far edge? park it and schedule the next fly-by
+        if (Math.abs(f.group.position.x) > 52) {
+            f.flying = false;
+            f.timer = 5 + Math.random() * 12;
         }
     }
 
@@ -3079,6 +3159,9 @@ export class SceneManager {
                 pivot.children[0].material.opacity = pulse;
             });
         }
+
+        // Flock of birds passing across the sky
+        this._updateBirdFlock(dt);
 
         // Animate flying birds
         if (this.birds) {
