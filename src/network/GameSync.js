@@ -749,6 +749,13 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
 
+            // ===== WORLD BOSS =====
+            socket.on('boss_state', (payload) => window.worldBossManager?.onState?.(payload));
+            socket.on('boss_spawn', (payload) => window.worldBossManager?.onSpawn?.(payload));
+            socket.on('boss_hp', (payload) => window.worldBossManager?.onHp?.(payload));
+            socket.on('boss_dead', (payload) => window.worldBossManager?.onDead?.(payload));
+            socket.on('boss_flee', (payload) => window.worldBossManager?.onFlee?.(payload));
+
             socketListenersAttached = true;
         }
 
@@ -1480,6 +1487,15 @@ export function reportDuelEnd(winnerUserId, loserUserId) {
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         socket.emit('duel_end', { winnerUserId, loserUserId });
+    }
+}
+
+// ============ World Boss Networking ============
+export function sendBossHit(damage, critical = false) {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('boss_hit', { damage, critical });
     }
 }
 

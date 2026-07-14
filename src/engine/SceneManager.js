@@ -233,6 +233,10 @@ export class SceneManager {
         this.sakuraPetals = null;
         this.fishes = [];
 
+        // World boss lives only on the field it spawned in; drop it on map change
+        // (the client's boss manager re-spawns the mesh if we return mid-fight).
+        this.removeWorldBoss();
+
         this.currentMap = mapId;
 
         // Update scene colors
@@ -1508,6 +1512,179 @@ export class SceneManager {
     // Arena center + the fighting-ring radius used for the duel cage/clamp.
     getArenaInfo() {
         return { x: PVP_ARENA_POS.x, z: PVP_ARENA_POS.z, radius: 5.4 };
+    }
+
+    // ============ World Boss ============
+    // A towering boss built on demand at the given spot. Only ever one exists;
+    // it's added after the static merge, so it stays fully dynamic/animated.
+    spawnWorldBoss(name, x = 0, z = 0) {
+        if (this._worldBoss) this.removeWorldBoss();
+
+        const group = new THREE.Group();
+        group.position.set(x, 0, z);
+
+        const darkMat = new THREE.MeshLambertMaterial({ color: 0x2a1230 });
+        const rockMat = new THREE.MeshLambertMaterial({ color: 0x3b1f24 });
+        const emberMat = new THREE.MeshBasicMaterial({ color: 0xff5522 });
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xff8a1e });
+
+        // Legs
+        const legMat = darkMat;
+        for (const sx of [-0.85, 0.85]) {
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, 2.4, 7), legMat);
+            leg.position.set(sx, 1.2, 0);
+            leg.castShadow = true;
+            group.add(leg);
+            const foot = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 1.4), rockMat);
+            foot.position.set(sx, 0.25, 0.2);
+            group.add(foot);
+        }
+
+        // Torso — chunky crystalline body
+        const torso = new THREE.Mesh(new THREE.IcosahedronGeometry(1.9, 0), rockMat);
+        torso.position.y = 3.6;
+        torso.scale.set(1.0, 1.15, 0.9);
+        torso.castShadow = true;
+        group.add(torso);
+
+        // Glowing molten core in the chest
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), coreMat);
+        core.position.set(0, 3.7, 0.9);
+        group.add(core);
+        const coreGlow = new THREE.Mesh(
+            new THREE.SphereGeometry(1.1, 16, 12),
+            new THREE.MeshBasicMaterial({ color: 0xff5a1e, transparent: true, opacity: 0.35, depthWrite: false })
+        );
+        coreGlow.position.copy(core.position);
+        group.add(coreGlow);
+        const coreLight = new THREE.PointLight(0xff6a2a, 2.4, 16, 2);
+        coreLight.position.copy(core.position);
+        coreLight.castShadow = false;
+        group.add(coreLight);
+
+        // Shoulders + arms
+        const arms = [];
+        for (const sx of [-1, 1]) {
+            const shoulder = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 0), rockMat);
+            shoulder.position.set(sx * 2.1, 4.2, 0);
+            group.add(shoulder);
+
+            const arm = new THREE.Group();
+            arm.position.set(sx * 2.1, 4.1, 0);
+            const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 2.2, 6), darkMat);
+            upper.position.y = -1.1;
+            upper.castShadow = true;
+            arm.add(upper);
+            const fist = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75, 0), rockMat);
+            fist.position.y = -2.3;
+            arm.add(fist);
+            // ember spikes on the fist
+            for (let i = 0; i < 3; i++) {
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.5, 5), emberMat);
+                spike.position.set((i - 1) * 0.35, -2.6, 0.2);
+                arm.add(spike);
+            }
+            group.add(arm);
+            arms.push({ arm, side: sx, phase: sx > 0 ? Math.PI : 0 });
+        }
+
+        // Head + horns + eyes
+        const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.95, 0), darkMat);
+        head.position.y = 5.7;
+        head.castShadow = true;
+        group.add(head);
+        for (const sx of [-1, 1]) {
+            const horn = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.2, 6), rockMat);
+            horn.position.set(sx * 0.5, 6.4, -0.1);
+            horn.rotation.z = sx * -0.5;
+            group.add(horn);
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffdd33 }));
+            eye.position.set(sx * 0.38, 5.75, 0.8);
+            group.add(eye);
+        }
+
+        // Floating ember shards orbiting the boss
+        const embers = [];
+        for (let i = 0; i < 10; i++) {
+            const e = new THREE.Mesh(new THREE.TetrahedronGeometry(0.18), emberMat);
+            const a = (i / 10) * Math.PI * 2;
+            e.userData = { angle: a, radius: 2.6 + Math.random() * 1.2, y: 2 + Math.random() * 3, spin: 0.6 + Math.random() };
+            group.add(e);
+            embers.push(e);
+        }
+
+        this.scene.add(group);
+        this._worldBoss = {
+            group, name: name || 'World Boss', x, z,
+            core, coreGlow, coreLight, arms, embers,
+            baseY: 0, bob: 0, hitFlash: 0,
+            torsoMat: rockMat, coreMat,
+        };
+        return this._worldBoss;
+    }
+
+    removeWorldBoss() {
+        if (!this._worldBoss) return;
+        const g = this._worldBoss.group;
+        this.scene.remove(g);
+        g.traverse(o => {
+            if (o.geometry) o.geometry.dispose();
+            if (o.material) {
+                if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+                else o.material.dispose();
+            }
+        });
+        this._worldBoss = null;
+    }
+
+    getWorldBossInfo() {
+        if (!this._worldBoss) return null;
+        return { x: this._worldBoss.x, z: this._worldBoss.z, radius: 2.4, name: this._worldBoss.name };
+    }
+
+    // Brief flash + recoil when the boss takes a hit.
+    playBossHitReaction() {
+        if (this._worldBoss) this._worldBoss.hitFlash = 0.18;
+    }
+
+    _updateWorldBoss(dt) {
+        const b = this._worldBoss;
+        if (!b) return;
+        b.bob += dt;
+        // Idle breathing bob
+        b.group.position.y = b.baseY + Math.sin(b.bob * 1.6) * 0.12;
+        // Core pulse
+        const pulse = 0.85 + Math.sin(b.bob * 4) * 0.15;
+        b.core.scale.setScalar(pulse);
+        b.coreGlow.scale.setScalar(pulse * 1.05);
+        if (b.coreLight) b.coreLight.intensity = 2.0 + Math.sin(b.bob * 4) * 0.8;
+        // Slow menacing sway of the arms
+        b.arms.forEach(a => {
+            a.arm.rotation.x = Math.sin(b.bob * 1.2 + a.phase) * 0.25;
+        });
+        // Orbiting embers
+        b.embers.forEach(e => {
+            const u = e.userData;
+            u.angle += u.spin * dt;
+            e.position.set(Math.cos(u.angle) * u.radius, u.y + Math.sin(b.bob * 2 + u.angle) * 0.3, Math.sin(u.angle) * u.radius);
+            e.rotation.y += dt * 2;
+        });
+        // Hit reaction: flash the body red and recoil slightly
+        if (b.hitFlash > 0) {
+            b.hitFlash = Math.max(0, b.hitFlash - dt);
+            const f = b.hitFlash / 0.18;
+            b.torsoMat.emissive = b.torsoMat.emissive || new THREE.Color(0x000000);
+            b.torsoMat.emissive.setRGB(f * 0.6, f * 0.1, f * 0.1);
+            b.group.position.z = b.z + f * 0.15;
+        } else {
+            b.group.position.z = b.z;
+        }
+        // Face the player if we have a follow target
+        if (this._weatherFocus) {
+            const dx = this._weatherFocus.x - b.x;
+            const dz = this._weatherFocus.z - b.z;
+            b.group.rotation.y = Math.atan2(dx, dz);
+        }
     }
 
     // ============ Arena MMR Leaderboard Board ============
@@ -3368,6 +3545,9 @@ export class SceneManager {
 
         // Weather / seasons
         this._updateWeather(dt);
+
+        // World boss idle animation
+        this._updateWorldBoss(dt);
 
         // Animate flying birds
         if (this.birds) {

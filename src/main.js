@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.20 (weather-sync)';
+const BUILD_VERSION = '2026-07-14.21 (world-boss)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -35,6 +35,7 @@ import {
     updatePresence,
     getDeterministicGuestName,
     isPlaceholderName,
+    sendBossHit,
 } from './network/GameSync.js';
 
 // ============ App State ============
@@ -270,6 +271,9 @@ async function initGame(charData) {
     gameUI = new GameUI(character, soundManager, combatSystem);
     window.gameUI = gameUI;
     gameUI.particles = particles;
+
+    // Build the World Boss HUD (countdown, HP bar, summary board)
+    initBossUI();
 
     // Initialize Announcement System
     announcementSystem.init();
@@ -938,6 +942,368 @@ function updateDuelCombat(dt) {
     }
 }
 
+// ============ World Boss ============
+// A giant server-scheduled boss everyone fights together. The server owns the
+// shared HP and per-player damage; this client renders the boss, deals damage
+// (relayed via sendBossHit), shows the countdown/HP bar, and applies the reward
+// the server assigns to *this* player when the boss dies.
+let bossState = null;           // { active, name, hp, maxHp, x, z }
+let bossCountdownTarget = 0;     // epoch ms of next spawn (for the countdown pill)
+let bossFleeTarget = 0;          // epoch ms the active boss flees
+let bossAtkTimer = 0;            // boss AoE counter-attack cadence
+let bossSwingCd = 0;             // our attack cooldown vs the boss
+let bossRewardClaimed = false;   // guard so a reward is applied once per kill
+
+const BOSS_ITEM_META = {
+    'Dragon Heart': { emoji: '🐲', type: 'material', rarity: 'legendary', price: 20000, desc: 'หัวใจมังกรจากบอสโลก — ล้ำค่าที่สุด' },
+    'Mythril Shard': { emoji: '💠', type: 'material', rarity: 'rare', price: 6000, desc: 'เศษมิธริลจากบอสโลก' },
+};
+
+function fmtCountdown(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(s / 60);
+    return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+}
+
+// Build the boss HUD (countdown pill, HP bar, spawn toast, summary board) once.
+function initBossUI() {
+    if (document.getElementById('boss-ui-style')) return;
+    const style = document.createElement('style');
+    style.id = 'boss-ui-style';
+    style.textContent = `
+    #boss-countdown{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;
+      background:linear-gradient(135deg,rgba(60,20,20,.92),rgba(30,10,30,.92));
+      border:1px solid #b4462e;border-radius:20px;padding:5px 14px;color:#ffd9a0;
+      font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.5);display:none;
+      backdrop-filter:blur(4px);white-space:nowrap;cursor:default;user-select:none;}
+    #boss-hpbar{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:61;
+      width:min(560px,86vw);display:none;text-align:center;}
+    #boss-hpbar .bh-name{color:#ffcf6a;font-weight:800;font-size:15px;
+      text-shadow:0 2px 6px rgba(0,0,0,.8);letter-spacing:.5px;margin-bottom:3px;}
+    #boss-hpbar .bh-track{height:20px;border-radius:11px;background:rgba(0,0,0,.55);
+      border:1.5px solid #7a2d1f;overflow:hidden;position:relative;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+    #boss-hpbar .bh-fill{height:100%;width:100%;
+      background:linear-gradient(90deg,#ff3b30,#ff7a2e,#ffb038);transition:width .18s ease;}
+    #boss-hpbar .bh-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      color:#fff;font-weight:700;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.9);}
+    #boss-hpbar .bh-flee{color:#ffb0a0;font-size:11px;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+    #boss-toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%) scale(.7);z-index:2000;
+      text-align:center;pointer-events:none;opacity:0;transition:all .5s cubic-bezier(.2,1.3,.4,1);}
+    #boss-toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
+    #boss-toast .bt-title{font-size:40px;font-weight:900;color:#ff6a2a;
+      text-shadow:0 0 24px rgba(255,80,20,.9),0 4px 10px rgba(0,0,0,.9);}
+    #boss-toast .bt-sub{font-size:16px;color:#ffe0b0;margin-top:6px;text-shadow:0 2px 8px rgba(0,0,0,.9);}
+    #boss-summary{position:fixed;inset:0;z-index:2100;display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.62);backdrop-filter:blur(3px);}
+    #boss-summary .bs-card{width:min(430px,92vw);max-height:86vh;overflow:auto;border-radius:18px;
+      background:linear-gradient(160deg,#241019,#1a0f22);border:1.5px solid #8a3b2a;
+      box-shadow:0 20px 60px rgba(0,0,0,.7);padding:20px 18px;text-align:center;
+      animation:bsPop .4s cubic-bezier(.2,1.3,.4,1);}
+    @keyframes bsPop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+    #boss-summary .bs-crown{font-size:38px}
+    #boss-summary .bs-title{font-size:20px;font-weight:900;color:#ffcf6a;margin:4px 0}
+    #boss-summary .bs-killer{color:#ffe0b0;font-size:13px;margin-bottom:12px}
+    #boss-summary .bs-row{display:flex;align-items:center;gap:8px;padding:7px 10px;margin:4px 0;
+      border-radius:10px;background:rgba(255,255,255,.05);font-size:13px;color:#f0e6d8;}
+    #boss-summary .bs-row.me{background:linear-gradient(90deg,rgba(255,140,40,.25),rgba(255,80,40,.12));
+      border:1px solid #ff8a2e;}
+    #boss-summary .bs-rank{width:26px;font-weight:800;color:#ffd070;flex:none;text-align:center}
+    #boss-summary .bs-nm{flex:1;text-align:left;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #boss-summary .bs-dmg{color:#ff9a6a;font-size:11px;flex:none}
+    #boss-summary .bs-rw{color:#7ee08a;font-size:11px;flex:none;font-weight:700}
+    #boss-summary .bs-mine{margin-top:12px;padding:10px;border-radius:12px;
+      background:linear-gradient(135deg,rgba(255,180,60,.18),rgba(255,90,40,.1));border:1px solid #ff8a2e;
+      color:#ffe6c0;font-weight:700;font-size:13px;}
+    #boss-summary .bs-close{margin-top:14px;padding:9px 26px;border:none;border-radius:22px;cursor:pointer;
+      background:linear-gradient(135deg,#ff7a2e,#ff3b30);color:#fff;font-weight:800;font-size:14px;}
+    `;
+    document.head.appendChild(style);
+
+    const cd = document.createElement('div');
+    cd.id = 'boss-countdown';
+    document.body.appendChild(cd);
+
+    const bar = document.createElement('div');
+    bar.id = 'boss-hpbar';
+    bar.innerHTML = `<div class="bh-name"></div>
+      <div class="bh-track"><div class="bh-fill"></div><div class="bh-text"></div></div>
+      <div class="bh-flee"></div>`;
+    document.body.appendChild(bar);
+
+    const toast = document.createElement('div');
+    toast.id = 'boss-toast';
+    toast.innerHTML = `<div class="bt-title"></div><div class="bt-sub"></div>`;
+    document.body.appendChild(toast);
+
+    const summary = document.createElement('div');
+    summary.id = 'boss-summary';
+    summary.innerHTML = `<div class="bs-card"></div>`;
+    summary.addEventListener('click', (e) => { if (e.target === summary) summary.style.display = 'none'; });
+    document.body.appendChild(summary);
+}
+
+window.worldBossManager = {
+    onState(p) {
+        if (!p) return;
+        if (p.active) {
+            bossState = { active: true, name: p.name, hp: p.hp, maxHp: p.maxHp, x: p.x || 0, z: p.z || 0 };
+            bossFleeTarget = Date.now() + (p.msUntilFlee || 0);
+            bossRewardClaimed = false;
+            this._showBar();
+        } else {
+            bossState = null;
+            bossCountdownTarget = Date.now() + (p.msUntilSpawn || 0);
+            this._hideBar();
+        }
+        this.reconcileMesh();
+    },
+
+    onSpawn(p) {
+        if (!p) return;
+        bossState = { active: true, name: p.name, hp: p.hp, maxHp: p.maxHp, x: p.x || 0, z: p.z || 0 };
+        bossFleeTarget = Date.now() + (p.msUntilFlee || 0);
+        bossRewardClaimed = false;
+        this._showBar();
+        this.reconcileMesh();
+        if (gameUI) gameUI.addCombatLog(`👹 บอสโลก [${p.name}] ปรากฏตัวกลางทุ่ง Prontera! รีบไปช่วยกันตี!`, 'levelup');
+        this._toast(`👹 ${p.name}`, 'บอสโลกปรากฏตัว! ไปที่ทุ่งหญ้า Prontera เพื่อร่วมรบ');
+        if (soundManager) soundManager.playLevelUpSound();
+    },
+
+    onHp(p) {
+        if (!p || !bossState) return;
+        bossState.hp = p.hp;
+        bossState.maxHp = p.maxHp;
+        this._updateBar();
+    },
+
+    onDead(p) {
+        if (!p) return;
+        bossState = null;
+        bossCountdownTarget = Date.now() + (p.msUntilSpawn || 0);
+        this._hideBar();
+        // Death flourish, then remove the mesh
+        if (sceneManager && sceneManager._worldBoss && sceneManager.getWorldBossInfo) {
+            const bi = sceneManager.getWorldBossInfo();
+            sceneManager.playBossHitReaction();
+            for (let i = 0; i < 14; i++) {
+                setTimeout(() => {
+                    if (particles && bi) particles.spawnHitEffect(
+                        new THREE.Vector3(bi.x + (Math.random() - 0.5) * 3.5, 1 + Math.random() * 4.5, bi.z + (Math.random() - 0.5) * 3.5), true);
+                }, i * 55);
+            }
+            setTimeout(() => { if (sceneManager) sceneManager.removeWorldBoss(); }, 950);
+        }
+        this._applyReward(p);
+        this._showSummary(p);
+        if (gameUI) gameUI.addCombatLog(`💀 ${p.name} ถูกปราบแล้ว! ผู้ปิดจ๊อบ: ${p.killerName}`, 'levelup');
+    },
+
+    onFlee(p) {
+        bossState = null;
+        bossCountdownTarget = Date.now() + ((p && p.msUntilSpawn) || 0);
+        this._hideBar();
+        if (sceneManager) sceneManager.removeWorldBoss();
+        if (gameUI) gameUI.addCombatLog(`🌫️ ${(p && p.name) || 'บอส'} หนีหายเข้าไปในหมอก... ไม่มีใครปราบได้ทัน`, 'warning');
+    },
+
+    // Mesh exists iff there's an active boss and we're on the home field.
+    reconcileMesh() {
+        if (!sceneManager) return;
+        const onField = sceneManager.currentMap === 'prontera';
+        if (bossState && bossState.active && onField) {
+            if (!sceneManager._worldBoss) sceneManager.spawnWorldBoss(bossState.name, bossState.x, bossState.z);
+        } else if (sceneManager._worldBoss) {
+            sceneManager.removeWorldBoss();
+        }
+    },
+
+    _applyReward(p) {
+        if (bossRewardClaimed || !p || !Array.isArray(p.ranking) || !character) return;
+        const mine = p.ranking.find(r => r.userId === userId);
+        if (!mine) return;
+        bossRewardClaimed = true;
+        character.stats.gold = (Number(character.stats.gold) || 0) + (mine.gold || 0);
+        if (mine.exp) {
+            const leveled = character.addExp(mine.exp);
+            if (leveled && gameUI) gameUI.addCombatLog(`🎉 LEVEL UP! เลเวล ${character.stats.level}!`, 'levelup');
+        }
+        if (mine.item && gameUI) {
+            const meta = BOSS_ITEM_META[mine.item] || { emoji: '💎', type: 'material', rarity: 'legendary', price: 5000, desc: 'ของหายากจากบอสโลก' };
+            gameUI.addItem({ name: mine.item, type: meta.type, emoji: meta.emoji, rarity: meta.rarity, price: meta.price, desc: meta.desc });
+        }
+        if (gameUI) {
+            gameUI.addCombatLog(`🏆 อันดับ #${mine.rank} | +${mine.gold} Gold, +${mine.exp} EXP${mine.item ? `, ได้รับ ${mine.item}!` : ''}`, 'loot');
+            gameUI.updateHUD(character.stats);
+        }
+    },
+
+    _showBar() {
+        const cd = document.getElementById('boss-countdown');
+        const bar = document.getElementById('boss-hpbar');
+        if (cd) cd.style.display = 'none';
+        if (bar) { bar.style.display = 'block'; bar.querySelector('.bh-name').textContent = `👹 ${bossState.name}`; }
+        this._updateBar();
+    },
+    _updateBar() {
+        const bar = document.getElementById('boss-hpbar');
+        if (!bar || !bossState) return;
+        const pct = Math.max(0, Math.min(100, (bossState.hp / bossState.maxHp) * 100));
+        bar.querySelector('.bh-fill').style.width = pct + '%';
+        bar.querySelector('.bh-text').textContent = `${Math.ceil(bossState.hp).toLocaleString()} / ${bossState.maxHp.toLocaleString()}`;
+    },
+    _hideBar() {
+        const bar = document.getElementById('boss-hpbar');
+        if (bar) bar.style.display = 'none';
+    },
+    _toast(title, sub) {
+        const t = document.getElementById('boss-toast');
+        if (!t) return;
+        t.querySelector('.bt-title').textContent = title;
+        t.querySelector('.bt-sub').textContent = sub;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3800);
+    },
+    _showSummary(p) {
+        const box = document.getElementById('boss-summary');
+        if (!box) return;
+        const card = box.querySelector('.bs-card');
+        const ranking = (p.ranking || []).slice(0, 8);
+        const mine = (p.ranking || []).find(r => r.userId === userId);
+        const medal = (r) => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`);
+        let rows = ranking.map(r => `
+            <div class="bs-row ${r.userId === userId ? 'me' : ''}">
+              <div class="bs-rank">${medal(r.rank)}</div>
+              <div class="bs-nm">${escapeHtml(r.name)}</div>
+              <div class="bs-dmg">${r.dmg.toLocaleString()} dmg</div>
+              <div class="bs-rw">+${r.gold}g${r.item ? ' 🎁' : ''}</div>
+            </div>`).join('');
+        const mineHtml = mine
+            ? `<div class="bs-mine">รางวัลของคุณ (อันดับ #${mine.rank}): +${mine.gold} Gold · +${mine.exp} EXP${mine.item ? ` · ${BOSS_ITEM_META[mine.item]?.emoji || '💎'} ${mine.item}` : ''}</div>`
+            : `<div class="bs-mine">คุณไม่ได้ร่วมโจมตีบอสครั้งนี้ — ครั้งหน้าอย่าพลาด!</div>`;
+        card.innerHTML = `
+            <div class="bs-crown">🏆</div>
+            <div class="bs-title">ปราบ ${escapeHtml(p.name)} สำเร็จ!</div>
+            <div class="bs-killer">⚔️ ผู้ปิดจ๊อบ: ${escapeHtml(p.killerName || '-')}</div>
+            ${rows}
+            ${mineHtml}
+            <button class="bs-close">รับรางวัล</button>`;
+        card.querySelector('.bs-close').onclick = () => { box.style.display = 'none'; };
+        box.style.display = 'flex';
+        setTimeout(() => { if (box.style.display === 'flex') box.style.display = 'none'; }, 12000);
+    },
+};
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+}
+
+// Update the boss countdown pill / HP-bar flee timer (called on the HUD throttle).
+function updateBossHud() {
+    const cd = document.getElementById('boss-countdown');
+    if (bossState && bossState.active) {
+        if (cd) cd.style.display = 'none';
+        const flee = document.querySelector('#boss-hpbar .bh-flee');
+        if (flee) {
+            const onField = sceneManager && sceneManager.currentMap === 'prontera';
+            const rem = fmtCountdown(bossFleeTarget - Date.now());
+            flee.textContent = onField ? `⏳ หนีใน ${rem}` : `⏳ หนีใน ${rem} — ไปทุ่ง Prontera เพื่อร่วมรบ!`;
+        }
+    } else if (bossCountdownTarget) {
+        if (cd) {
+            cd.style.display = 'block';
+            cd.textContent = `👹 บอสโลกเกิดในอีก ${fmtCountdown(bossCountdownTarget - Date.now())}`;
+        }
+    }
+}
+
+// Per-frame: swing at the boss when in range; the boss slams back if you're close.
+function updateBossCombat(dt) {
+    if (duelState) return;
+    if (!bossState || !bossState.active || !character || !character.isAlive()) return;
+    if (!sceneManager || sceneManager.currentMap !== 'prontera' || !sceneManager._worldBoss) return;
+
+    const info = sceneManager.getWorldBossInfo();
+    if (!info) return;
+    const myPos = character.getPosition();
+    const dx = info.x - myPos.x;
+    const dz = info.z - myPos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    // Boss AoE counter-attack when players are near
+    bossAtkTimer -= dt;
+    if (dist < info.radius + 3.6 && bossAtkTimer <= 0) {
+        bossAtkTimer = 2.4;
+        const bossDmg = 8 + Math.floor(Math.random() * 10) + Math.floor((character.stats.level || 1) * 0.4);
+        const actual = character.takeDamage(bossDmg);
+        if (particles) {
+            const sp = worldToScreen(myPos, 1.6);
+            particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
+            particles.spawnHitEffect(myPos.clone(), false);
+        }
+        if (gameUI) {
+            gameUI.addCombatLog(`🔥 ${bossState.name} ฟาดใส่คุณ -${actual}`, 'warning');
+            gameUI.updateHUD(character.stats);
+        }
+        // Boss killed us — CombatSystem only schedules respawns for monster
+        // deaths, so handle the boss case here (mirrors that 3s revive).
+        if (!character.isAlive()) {
+            if (gameUI) { gameUI.addCombatLog('💀 คุณถูกบอสปราบ! กำลังเกิดใหม่ใน 3 วินาที...', 'death'); gameUI.setAutoFarmState(false); }
+            if (combatSystem) { combatSystem.autoFarm = false; combatSystem.currentTarget = null; }
+            character.targetMonster = null;
+            setTimeout(() => {
+                if (character && !character.isAlive()) {
+                    character.respawn();
+                    if (gameUI) { gameUI.addCombatLog('💚 คุณเกิดใหม่แล้ว!', 'system'); gameUI.updateHUD(character.stats); }
+                }
+            }, 3000);
+        }
+    }
+
+    const reach = character.getAttackRange() + info.radius + 0.4;
+    if (dist > reach) return;
+
+    character.mesh.rotation.y = Math.atan2(dx, dz);
+
+    bossSwingCd = Math.max(0, bossSwingCd - dt);
+    if (bossSwingCd > 0) {
+        if (bossSwingCd < character.getAttackCooldown() * 0.5 && character.state === 'attacking') character.state = 'idle';
+        return;
+    }
+    bossSwingCd = character.getAttackCooldown();
+    character.state = 'attacking';
+
+    const isCrit = Math.random() < 0.12;
+    let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 6);
+    if (isCrit) dmg = Math.floor(dmg * 1.9);
+
+    const bossPos = new THREE.Vector3(info.x, 3.4, info.z);
+    const applyHit = () => {
+        sendBossHit(dmg, isCrit);
+        if (sceneManager) sceneManager.playBossHitReaction();
+        if (particles) {
+            const sp = worldToScreen(bossPos, 0);
+            particles.spawnDamageNumber(sp.x, sp.y, dmg, isCrit ? 'critical-dmg' : 'player-dmg');
+            particles.spawnHitEffect(bossPos.clone(), isCrit);
+        }
+    };
+
+    const wc = character.getWeaponClass ? character.getWeaponClass() : 'melee';
+    if (wc === 'bow' || wc === 'gun') {
+        const targetWrap = { alive: true, getPosition: () => bossPos.clone() };
+        if (particles) {
+            if (wc === 'gun') particles.spawnBullet(myPos, targetWrap, applyHit);
+            else particles.spawnArrow(myPos, targetWrap, applyHit);
+        } else applyHit();
+    } else {
+        if (particles) particles.spawnSlash(bossPos.clone(), isCrit);
+        applyHit();
+    }
+    if (soundManager) soundManager.playAtkSound();
+}
+
 // ============ Game Loop ============
 // ===== Background simulation =====
 // The browser pauses requestAnimationFrame when the tab is hidden/minimized,
@@ -1152,6 +1518,9 @@ function gameLoop(time) {
         // PVP duel: auto-swing at the opponent when in range, and stay caged
         updateDuelCombat(dt);
         clampToArena();
+        // World boss: keep the mesh in sync and swing when in range
+        if (window.worldBossManager) window.worldBossManager.reconcileMesh();
+        updateBossCombat(dt);
         monsters.update(dt, sceneManager.camera, character.stats.level);
         sceneManager.updateAnimations(dt);
         if (particles) particles.update(dt);
@@ -1174,6 +1543,7 @@ function gameLoop(time) {
         }
 
         if (now - lastHUDTime > 100) {
+            updateBossHud();
             if (gameUI) {
                 gameUI.updateHUD(character.stats);
                 // Also update stats panel if visible (throttled)
