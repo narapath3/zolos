@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.12 (bg-autofarm)';
+const BUILD_VERSION = '2026-07-14.13 (remote-fishing-line)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -500,6 +500,8 @@ async function initGame(charData) {
                 if (p.appearance) {
                     rp.character.applyAppearance(p.appearance);
                 }
+                // Show this remote player's fishing line while they're fishing
+                rp.character.syncFishingLine(rp.character.state === 'fishing');
                 // Update animations for remote player
                 rp.character.update(1 / 60);
             }

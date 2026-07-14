@@ -468,6 +468,57 @@ export class CharacterManager {
         this._applyGenderHair();
     }
 
+    // Self-contained fishing line + bobber, attached to this character's mesh
+    // (local space, so it follows the player's position/facing and is cleaned
+    // up with the mesh). Used to show OTHER players' fishing lines — the local
+    // player uses the richer SceneManager fishing line. `active` = show it.
+    syncFishingLine(active) {
+        if (!active) {
+            if (this._fishLineGroup) {
+                this.mesh.remove(this._fishLineGroup);
+                this._fishLineGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); });
+                this._fishLineGroup = null;
+            }
+            return;
+        }
+
+        const waterY = 0.05;
+        // Start near the hands/rod tip; cast forward (+Z is the facing dir since
+        // rotation.y is set via atan2(dx,dz)); bobber sits on the water surface.
+        const startLocal = new THREE.Vector3(0, 1.75, 0.45);
+        const bobLocalY = waterY - (this.mesh.position.y || 1.2);
+        const bobLocal = new THREE.Vector3(0, bobLocalY, 2.8);
+
+        if (!this._fishLineGroup) {
+            const g = new THREE.Group();
+            this._fishLineMesh = new THREE.Line(
+                new THREE.BufferGeometry(),
+                new THREE.LineBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.8 })
+            );
+            g.add(this._fishLineMesh);
+            this._fishBobber = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12, 8, 6),
+                new THREE.MeshLambertMaterial({ color: 0xff4020 })
+            );
+            g.add(this._fishBobber);
+            this.mesh.add(g);
+            this._fishLineGroup = g;
+        }
+
+        // Bobber gentle bob on the surface
+        const t = this.animTimer || 0;
+        this._fishBobber.position.set(bobLocal.x, bobLocal.y + Math.sin(t * 2.5) * 0.05, bobLocal.z);
+
+        // Slack line curve from rod tip to bobber
+        const mid = new THREE.Vector3(
+            (startLocal.x + bobLocal.x) / 2,
+            startLocal.y + 0.3,
+            (startLocal.z + bobLocal.z) / 2
+        );
+        const curve = new THREE.QuadraticBezierCurve3(startLocal, mid, this._fishBobber.position);
+        this._fishLineMesh.geometry.setFromPoints(curve.getPoints(16));
+    }
+
     _applyGenderHair() {
         if (!this.mesh) return;
 
