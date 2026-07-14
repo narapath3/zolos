@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.2 (rod-yank)';
+const BUILD_VERSION = '2026-07-14.3 (live-fishing-line)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -53,6 +53,9 @@ let lastMinimapTime = 0;
 // Input state
 let autoPath = null;
 let isShiftPressed = false;
+
+// Reusable vector for per-frame rod tip queries (avoids per-frame allocation)
+const rodTipTmp = new THREE.Vector3();
 
 // Hover highlight state
 let hoveredMeshGroup = null;
@@ -209,6 +212,9 @@ async function initGame(charData) {
                 break;
             case 'fishingCast':
                 if (sceneManager && character) sceneManager.createFishingLine(character.getPosition(), event.bobberPos);
+                // Hide the rod's short built-in line — the dynamic bezier line
+                // to the bobber replaces it while fishing
+                if (character) character.setRodLineVisible(false);
                 if (gameUI) gameUI.addCombatLog('🎣 Cast the line into the water...', 'system');
                 break;
             case 'fishingBite':
@@ -234,6 +240,7 @@ async function initGame(charData) {
                 break;
             case 'fishingStop':
                 if (sceneManager) sceneManager.removeFishingLine();
+                if (character) character.setRodLineVisible(true);
                 break;
         }
     }, sceneManager);
@@ -862,6 +869,14 @@ function gameLoop(time) {
 
     // 5. Updates
     character.update(dt);
+
+    // Fishing line follows the live rod tip (incl. the catch yank)
+    if (isFishingActive && sceneManager && character.getRodTipPosition) {
+        sceneManager.updateFishingRodTip(
+            character.getRodTipPosition(rodTipTmp),
+            character.getRodYankProgress()
+        );
+    }
     monsters.update(dt, sceneManager.camera, character.stats.level);
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);

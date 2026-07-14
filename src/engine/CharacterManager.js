@@ -309,12 +309,41 @@ export class CharacterManager {
             const tipZ = 0.3 + 0.7 * Math.sin(-Math.PI / 4);
             line.position.set(0, tipY - 0.6, tipZ);
             group.add(line);
+            // Hidden while actively fishing — the dynamic bezier line to the
+            // bobber replaces it (two lines at once looks wrong).
+            this.rodDanglingLine = line;
+
+            // Invisible marker at the rod tip so the dynamic fishing line can
+            // start exactly where the rod ends, following every arm movement.
+            const tipMarker = new THREE.Object3D();
+            tipMarker.position.set(0, tipY, tipZ);
+            group.add(tipMarker);
+            this.rodTipMarker = tipMarker;
 
             group.position.set(0, -0.2, 0.15);
 
             this.weaponMesh = group;
             this.rightArm.add(this.weaponMesh);
         }
+    }
+
+    // World position of the fishing rod's tip (falls back to hand height)
+    getRodTipPosition(target = new THREE.Vector3()) {
+        if (this.rodTipMarker && this.rodTipMarker.parent) {
+            return this.rodTipMarker.getWorldPosition(target);
+        }
+        target.copy(this.mesh.position);
+        target.y += 1.4;
+        return target;
+    }
+
+    // Current yank progress 0..1 (drives line tension & bobber hoist)
+    getRodYankProgress() {
+        return this._rodSnapValue || 0;
+    }
+
+    setRodLineVisible(visible) {
+        if (this.rodDanglingLine) this.rodDanglingLine.visible = visible;
     }
 
     _createModel() {
@@ -1047,9 +1076,12 @@ export class CharacterManager {
                 this.rightArm.rotation.z = -snap * 0.3 * strength;
                 // Body recoil: hop up with the yank
                 this.mesh.position.y += snap * 0.18 * strength;
+                // Expose progress so the fishing line & bobber can follow
+                this._rodSnapValue = snap * strength;
             } else {
                 this.rightArm.rotation.x = holdPose + Math.sin(this.animTimer * 1.5) * 0.04;
                 this.rightArm.rotation.z = 0;
+                this._rodSnapValue = 0;
             }
         }
 

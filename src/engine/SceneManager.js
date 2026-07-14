@@ -2628,9 +2628,12 @@ export class SceneManager {
 
         // Store metadata
         this._fishingBobberBaseY = bobberY;
+        this._fishingBobberBase = { x: bobberX, y: bobberY, z: bobberZ };
         this._fishingPlayerPos = { ...playerPos };
         this._fishingBiteActive = false;
         this._fishingBiteTimer = 0;
+        this._fishingRodTip = null;
+        this._fishingYank = 0;
 
         this.scene.add(this._fishingGroup);
     }
@@ -2731,23 +2734,51 @@ export class SceneManager {
             }
         }
 
-        // Update the fishing line curve dynamically (throttled: every 2nd frame)
-        this._fishingLineFrame = ((this._fishingLineFrame || 0) + 1) % 2;
-        if (this._fishingLineFrame === 0 && this._fishingLineMesh && this._fishingPlayerPos) {
-            const pp = this._fishingPlayerPos;
+        // Yank hoist: while the rod is being lifted, pull the bobber up out of
+        // the water and slightly toward the player (applied after bite/idle
+        // animations so it wins during the yank).
+        const yank = this._fishingYank || 0;
+        if (yank > 0.01 && this._fishingBobberBase) {
+            const base = this._fishingBobberBase;
+            const tip = this._fishingRodTip || { x: base.x, z: base.z };
+            this._fishingBobber.position.x = base.x + (tip.x - base.x) * yank * 0.35;
+            this._fishingBobber.position.z = base.z + (tip.z - base.z) * yank * 0.35;
+            this._fishingBobber.position.y = base.y + yank * 1.5;
+        } else if (this._fishingBobberBase && this._fishingBobber.position.y > (this._fishingBobberBaseY || 0.05) + 0.5) {
+            // Ease back down to the water after the yank ends
+            this._fishingBobber.position.x = this._fishingBobberBase.x;
+            this._fishingBobber.position.z = this._fishingBobberBase.z;
+            this._fishingBobber.position.y = this._fishingBobberBaseY || 0.05;
+        }
+
+        // Update the fishing line curve every frame. The line starts at the
+        // ROD TIP (live world position, follows the yank), not the static
+        // position captured at cast time.
+        if (this._fishingLineMesh) {
             const bp = this._fishingBobber.position;
+            const tip = this._fishingRodTip
+                ? this._fishingRodTip
+                : { x: this._fishingPlayerPos.x, y: (this._fishingPlayerPos.y || 0) + 1.4, z: this._fishingPlayerPos.z };
+
+            // Line sag: slack while waiting, taut (less sag) during the yank
+            const sag = 0.7 * (1 - yank * 0.85) + Math.sin(this.time * 1.5) * 0.06;
+            const midY = Math.max((tip.y + bp.y) / 2 + sag, bp.y + 0.15);
+
             const curve = new THREE.QuadraticBezierCurve3(
-                new THREE.Vector3(pp.x, (pp.y || 0) + 1.4, pp.z),
-                new THREE.Vector3(
-                    (pp.x + bp.x) / 2,
-                    2.5 + Math.sin(this.time * 1.5) * 0.1,
-                    (pp.z + bp.z) / 2
-                ),
+                new THREE.Vector3(tip.x, tip.y, tip.z),
+                new THREE.Vector3((tip.x + bp.x) / 2, midY, (tip.z + bp.z) / 2),
                 new THREE.Vector3(bp.x, bp.y, bp.z)
             );
-            const points = curve.getPoints(24);
-            this._fishingLineMesh.geometry.setFromPoints(points);
+            this._fishingLineMesh.geometry.setFromPoints(curve.getPoints(24));
         }
+    }
+
+    // Called from the game loop each frame while fishing: live rod-tip world
+    // position + current yank progress (0..1) from the character animation.
+    updateFishingRodTip(tipPos, yankProgress = 0) {
+        if (!this._fishingRodTip) this._fishingRodTip = new THREE.Vector3();
+        this._fishingRodTip.copy(tipPos);
+        this._fishingYank = yankProgress;
     }
 
     _createDetailTexture() {
