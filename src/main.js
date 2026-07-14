@@ -213,9 +213,13 @@ async function initGame(charData) {
                 break;
             case 'fishingBite':
                 if (sceneManager) sceneManager.animateFishBite();
+                // Small rod twitch as the fish tugs the line
+                if (character) character.triggerRodLift(0.35, 0.4);
                 if (gameUI) gameUI.addCombatLog('❗ Fish on the line!', 'system');
                 break;
             case 'fishCaught':
+                // Full yank: lift the rod to hoist the fish out of the water
+                if (character) character.triggerRodLift(1, 0.7);
                 if (gameUI) {
                     const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
                     const e = rarityEmoji[event.rarity] || '⚪';

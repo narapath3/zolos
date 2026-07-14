@@ -18,7 +18,8 @@ export class CharacterManager {
         this.glassesMesh = null;
 
         // State
-        this.state = 'idle'; // idle, walking, attacking
+        this.state = 'idle'; // idle, walking, attacking, fishing, swimming
+        this.rodLiftTimer = 0; // fishing rod yank animation countdown
         this.animTimer = 0;
         this.attackTimer = 0;
         this.attackCooldown = 1.0; // seconds between attacks
@@ -1020,6 +1021,37 @@ export class CharacterManager {
             this.rightLeg.rotation.x = Math.sin(this.animTimer * 5 + Math.PI) * 0.4;
         }
 
+        // Fishing pose: hold the rod out over the water, gentle idle bob.
+        // rodLiftTimer drives the "yank" — a fast snap of the rod arm upward
+        // with a small body recoil, easing back down (triggered on bite/catch).
+        if (this.state === 'fishing') {
+            this.mesh.position.y = this.baseY + Math.sin(this.animTimer * 1.5) * 0.03;
+            this.leftArm.rotation.x = -0.15;
+            this.leftArm.rotation.z = 0;
+            this.leftLeg.rotation.x = 0;
+            this.rightLeg.rotation.x = 0;
+
+            const holdPose = -1.0; // rod arm extended forward
+            if (this.rodLiftTimer > 0) {
+                const dur = this._rodLiftDuration || 0.7;
+                const t = 1 - (this.rodLiftTimer / dur);         // 0 → 1
+                const snap = Math.sin(Math.min(t * 2.2, 1) * Math.PI); // fast up, ease back
+                const strength = this._rodLiftStrength || 1;
+                this.rightArm.rotation.x = holdPose - snap * 1.3 * strength;
+                this.rightArm.rotation.z = -snap * 0.25 * strength;
+                // Body recoil: hop up slightly at the peak of the yank
+                this.mesh.position.y += snap * 0.12 * strength;
+            } else {
+                this.rightArm.rotation.x = holdPose + Math.sin(this.animTimer * 1.5) * 0.04;
+                this.rightArm.rotation.z = 0;
+            }
+        }
+
+        // Count down the rod-lift yank (runs even if state changes mid-yank)
+        if (this.rodLiftTimer > 0) {
+            this.rodLiftTimer = Math.max(0, this.rodLiftTimer - dt);
+        }
+
         // Attack animation
         if (this.state === 'attacking') {
             const t = (this.animTimer % 0.5) / 0.5;
@@ -1039,6 +1071,14 @@ export class CharacterManager {
 
         // Play time tracker
         this.stats.play_time += dt;
+    }
+
+    // Trigger the fishing-rod yank animation.
+    // strength 1 = full catch yank; smaller values give a subtle twitch (bite).
+    triggerRodLift(strength = 1, duration = 0.7) {
+        this._rodLiftStrength = strength;
+        this._rodLiftDuration = duration;
+        this.rodLiftTimer = duration;
     }
 
     // ============ Skill System Action ============
