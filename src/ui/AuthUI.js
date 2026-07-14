@@ -34,6 +34,28 @@ export class AuthUI {
         this._changeAccountBtn = document.getElementById('btn-change-account');
         this._forgotPwBtn = document.getElementById('btn-forgot-password');
 
+        // Gender selection (register mode only) — drives the character model
+        this._genderRowEl = document.getElementById('auth-gender-row');
+        this._genderMaleBtn = document.getElementById('auth-gender-male');
+        this._genderFemaleBtn = document.getElementById('auth-gender-female');
+        this._selectedGender = 'male';
+        const styleGenderButtons = () => {
+            const sel = { border: '2px solid #4a90d9', background: 'rgba(74,144,217,0.25)' };
+            const unsel = { border: '2px solid transparent', background: 'rgba(255,255,255,0.08)' };
+            const m = this._selectedGender === 'male' ? sel : unsel;
+            const f = this._selectedGender === 'female' ? sel : unsel;
+            if (this._genderMaleBtn) Object.assign(this._genderMaleBtn.style, m);
+            if (this._genderFemaleBtn) Object.assign(this._genderFemaleBtn.style, f);
+        };
+        if (this._genderMaleBtn) this._genderMaleBtn.addEventListener('click', () => {
+            this._selectedGender = 'male';
+            styleGenderButtons();
+        });
+        if (this._genderFemaleBtn) this._genderFemaleBtn.addEventListener('click', () => {
+            this._selectedGender = 'female';
+            styleGenderButtons();
+        });
+
         if (this._startBtn) {
             this._startBtn.addEventListener('click', () => {
                 this._splashEl.style.display = 'none';
@@ -103,6 +125,7 @@ export class AuthUI {
 
         if (mode === 'forgot') {
             this._charnameEl.style.display = 'none';
+            if (this._genderRowEl) this._genderRowEl.style.display = 'none';
             passwordWrapper.style.display = 'none';
             usernameInput.placeholder = 'Enter your email';
             
@@ -127,6 +150,7 @@ export class AuthUI {
         } else {
             const isRegister = mode === 'register';
             this._charnameEl.style.display = isRegister ? '' : 'none';
+            if (this._genderRowEl) this._genderRowEl.style.display = isRegister ? 'flex' : 'none';
             passwordWrapper.style.display = 'flex';
             usernameInput.placeholder = 'Email or Username';
             
@@ -339,7 +363,7 @@ export class AuthUI {
         this._setStatus('Creating account...', 'info');
         try {
             const email = input.includes('@') ? input : `${input}@zolos.game`;
-            const data = await signUp(email, password, charName);
+            const data = await signUp(email, password, charName, this._selectedGender);
             this._setStatus('Account created! Welcome, ' + charName + '! ⚔️', 'success');
             setTimeout(() => {
                 this.onAuthSuccess({

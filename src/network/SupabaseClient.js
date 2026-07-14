@@ -38,7 +38,7 @@ export const localDb = {
 };
 
 // ============ Auth Helpers ============
-export async function signUp(email, password, username) {
+export async function signUp(email, password, username, gender = 'male') {
   if (isOfflineMode || !supabase) {
     // Simulating offline sign up
     const users = localDb.get('users') || {};
@@ -50,7 +50,7 @@ export async function signUp(email, password, username) {
     localDb.set('users', users);
 
     // Save profile locally
-    const profile = { id: userId, username, created_at: new Date().toISOString() };
+    const profile = { id: userId, username, gender, created_at: new Date().toISOString() };
     localDb.set(`profile_${userId}`, profile);
     saveActiveSession(userId);
 
@@ -60,15 +60,16 @@ export async function signUp(email, password, username) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username } }
+    options: { data: { username, gender } }
   });
   if (error) throw error;
 
-  // Create profile
+  // Create profile (gender chosen at registration drives the character model)
   if (data.user) {
     await supabase.from('profiles').upsert({
       id: data.user.id,
-      username
+      username,
+      gender
     });
   }
   return data;

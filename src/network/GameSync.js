@@ -79,9 +79,11 @@ export async function loadCharacter(userId) {
 
 export async function createCharacter(userId) {
     let name = getDeterministicGuestName(userId);
+    let gender = 'male';
     try {
         const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
         const profile = await getProfile(userId);
+        if (profile && profile.gender) gender = profile.gender;
         if (profile && profile.username && !isPlaceholderName(profile.username)) {
             name = profile.username;
         } else {
@@ -118,6 +120,7 @@ export async function createCharacter(userId) {
         id: userId.startsWith('local_') || userId.startsWith('guest_') ? userId : 'char_' + Math.random().toString(36).substring(2, 10),
         user_id: userId,
         name: name,
+        gender: gender,
         level: 1,
         exp: 0,
         hp: 100,
@@ -211,13 +214,13 @@ export async function saveCharacter(characterId, updates) {
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender'
     ];
 
     // Optional appearance fields (may not be in DB yet)
     // We only include these if they are present in the updates object
     const appearanceFields = [
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender'
     ];
 
     // Filter the updates to only include fields we know are safe or intended for DB
@@ -304,7 +307,7 @@ export async function saveCharacterByUserId(userId, updates) {
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color'
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender'
     ];
 
     const filteredUpdates = {};

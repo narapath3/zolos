@@ -20,6 +20,7 @@ export class CharacterManager {
         // State
         this.state = 'idle'; // idle, walking, attacking, fishing, swimming
         this.rodLiftTimer = 0; // fishing rod yank animation countdown
+        this.gender = 'male'; // 'male' | 'female' — female gets long hair
         this.animTimer = 0;
         this.attackTimer = 0;
         this.attackCooldown = 1.0; // seconds between attacks
@@ -372,6 +373,9 @@ export class CharacterManager {
         this.hair.position.y = 1.95;
         this.mesh.add(this.hair);
 
+        // Gender-specific hair (female = long hair down the back)
+        this._applyGenderHair();
+
         // Eyes
         const eyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.05);
         const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
@@ -446,6 +450,48 @@ export class CharacterManager {
                 }
             }
         });
+    }
+
+    // Set gender and rebuild the gender-specific hair.
+    // Female characters get long hair: a back panel flowing down to the
+    // shoulders plus two side strands framing the face.
+    setGender(gender) {
+        this.gender = gender === 'female' ? 'female' : 'male';
+        this._applyGenderHair();
+    }
+
+    _applyGenderHair() {
+        if (!this.mesh) return;
+
+        // Remove previous long-hair meshes
+        if (this.longHair) {
+            this.mesh.remove(this.longHair);
+            this.longHair.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+            });
+            this.longHair = null;
+        }
+
+        if (this.gender !== 'female' || !this.hair) return;
+
+        // Share the base hair material so setHairColor() recolors everything
+        const mat = this.hair.material;
+        const group = new THREE.Group();
+
+        // Back panel flowing down to shoulder level
+        const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.85, 0.14), mat);
+        back.position.set(0, 1.5, -0.3);
+        group.add(back);
+
+        // Side strands framing the face
+        for (const side of [-1, 1]) {
+            const strand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.16), mat);
+            strand.position.set(side * 0.3, 1.62, -0.12);
+            group.add(strand);
+        }
+
+        this.longHair = group;
+        this.mesh.add(group);
     }
 
     setHairColor(color) {
@@ -985,6 +1031,7 @@ export class CharacterManager {
                 graphics_quality: this.gameSettings.graphics_quality,
                 fps_enabled: this.gameSettings.fps_enabled,
                 // Persistence fix: Include appearance fields
+                gender: this.gender,
                 weapon: this.equippedWeapon,
                 hat: this.equippedHat,
                 glasses: this.equippedGlasses,
@@ -1258,6 +1305,7 @@ export class CharacterManager {
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
 
         // Load appearance if available
+        if (data.gender) this.setGender(data.gender);
         if (data.body_color) this.setBodyColor(data.body_color);
         if (data.hair_color) this.setHairColor(data.hair_color);
         if (data.pants_color) this.setPantsColor(data.pants_color);
@@ -1297,6 +1345,7 @@ export class CharacterManager {
 
     getAppearance() {
         return {
+            gender: this.gender,
             bodyColor: this.bodyColor,
             hairColor: this.hairColor,
             pantsColor: this.pantsColor,
@@ -1308,6 +1357,7 @@ export class CharacterManager {
 
     applyAppearance(app) {
         if (!app) return;
+        if (app.gender !== undefined && app.gender !== this.gender) this.setGender(app.gender);
         if (app.bodyColor !== undefined) this.setBodyColor(app.bodyColor);
         if (app.hairColor !== undefined) this.setHairColor(app.hairColor);
         if (app.pantsColor !== undefined) this.setPantsColor(app.pantsColor);
