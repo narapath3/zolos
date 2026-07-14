@@ -971,12 +971,12 @@ function initBossUI() {
     const style = document.createElement('style');
     style.id = 'boss-ui-style';
     style.textContent = `
-    #boss-countdown{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:60;
+    #boss-countdown{position:fixed;top:96px;left:50%;transform:translateX(-50%);z-index:60;
       background:linear-gradient(135deg,rgba(60,20,20,.92),rgba(30,10,30,.92));
       border:1px solid #b4462e;border-radius:20px;padding:5px 14px;color:#ffd9a0;
       font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.5);display:none;
       backdrop-filter:blur(4px);white-space:nowrap;cursor:default;user-select:none;}
-    #boss-hpbar{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:61;
+    #boss-hpbar{position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:61;
       width:min(560px,86vw);display:none;text-align:center;}
     #boss-hpbar .bh-name{color:#ffcf6a;font-weight:800;font-size:15px;
       text-shadow:0 2px 6px rgba(0,0,0,.8);letter-spacing:.5px;margin-bottom:3px;}
@@ -987,6 +987,13 @@ function initBossUI() {
     #boss-hpbar .bh-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
       color:#fff;font-weight:700;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.9);}
     #boss-hpbar .bh-flee{color:#ffb0a0;font-size:11px;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,.8);}
+    @media(max-width:768px){
+      #boss-countdown{top:82px;font-size:11px;padding:4px 10px;}
+      #boss-hpbar{top:78px;}
+      #boss-hpbar .bh-name{font-size:13px;}
+      #boss-hpbar .bh-track{height:16px;}
+      #boss-hpbar .bh-text{font-size:10px;}
+    }
     #boss-toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%) scale(.7);z-index:2000;
       text-align:center;pointer-events:none;opacity:0;transition:all .5s cubic-bezier(.2,1.3,.4,1);}
     #boss-toast.show{opacity:1;transform:translate(-50%,-50%) scale(1);}
