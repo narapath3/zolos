@@ -1303,6 +1303,10 @@ export class CharacterManager {
         this.stats.gold = isNaN(Number(data.gold)) ? 0 : Number(data.gold);
         this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
+        // PVP ranking (server-authoritative — written only by the map server)
+        this.stats.mmr = isNaN(Number(data.mmr)) ? 1000 : Number(data.mmr);
+        this.stats.pvp_wins = isNaN(Number(data.pvp_wins)) ? 0 : Number(data.pvp_wins);
+        this.stats.pvp_losses = isNaN(Number(data.pvp_losses)) ? 0 : Number(data.pvp_losses);
 
         // Load appearance if available
         if (data.gender) this.setGender(data.gender);

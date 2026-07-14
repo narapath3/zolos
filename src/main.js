@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.5 (gender-select)';
+const BUILD_VERSION = '2026-07-14.6 (pvp-arena)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 import { SceneManager } from './engine/SceneManager.js';
@@ -732,6 +732,129 @@ function handleMouseInteraction(event) {
 }
 window.handleCanvasTap = handleMouseInteraction;
 
+// ============ PVP Duel Manager ============
+// duel_start → teleport both players to the arena and enter duel mode.
+// While dueling, walking into attack range auto-swings at the opponent;
+// hits are relayed victim-authoritative (each client applies damage to its
+// own HP). When a player dies their client reports duel_end; the server
+// settles MMR (Elo) and broadcasts duel_result.
+let duelState = null; // { duelId, opponentUserId, cooldown }
+
+window.duelManager = {
+    onDuelStart(payload) {
+        if (!payload || !character || !payload.players) return;
+        const me = payload.players.find(p => p.userId === userId);
+        const foe = payload.players.find(p => p.userId !== userId);
+        if (!me || !foe) return;
+
+        // Stop PvE activities so the duel is clean
+        if (combatSystem) {
+            combatSystem.autoFarm = false;
+            combatSystem.currentTarget = null;
+            if (combatSystem.isFishing) combatSystem.toggleFishing();
+        }
+        character.targetMonster = null;
+        autoPath = null;
+
+        // Teleport to the arena spawn and heal to full for a fair fight
+        character.mesh.position.set(me.spawn.x, 1.2, me.spawn.z);
+        character.stats.hp = character.stats.max_hp;
+        character.stats.sp = character.stats.max_sp;
+
+        duelState = { duelId: payload.duelId, opponentUserId: foe.userId, cooldown: 1.0 };
+
+        if (gameUI) {
+            gameUI.addCombatLog('🏟️ เข้าสู่สังเวียน! เดินเข้าหาคู่ต่อสู้เพื่อโจมตี — ผู้ชนะได้ MMR!', 'levelup');
+            gameUI.setAutoFarmState(false);
+            gameUI.updateHUD(character.stats);
+        }
+    },
+
+    onDuelHit(payload) {
+        if (!duelState || !payload || !character) return;
+        const dmg = Math.max(1, Number(payload.damage) || 0);
+        const actual = character.takeDamage(dmg);
+        if (gameUI) gameUI.addCombatLog(`🩸 โดนโจมตี -${actual}${payload.critical ? ' (CRIT!)' : ''}`, 'warning');
+        if (particles) {
+            const screenPos = worldToScreen(character.getPosition(), 1.6);
+            particles.spawnDamageNumber(screenPos.x, screenPos.y, actual, 'monster-dmg');
+            particles.spawnHitEffect(character.getPosition(), !!payload.critical);
+        }
+        if (gameUI) gameUI.updateHUD(character.stats);
+
+        // I died → report defeat; server settles MMR and notifies both sides
+        if (!character.isAlive()) {
+            import('./network/GameSync.js').then(({ reportDuelEnd }) => {
+                reportDuelEnd(payload.attackerUserId || duelState.opponentUserId, userId);
+            });
+        }
+    },
+
+    onDuelResult(payload) {
+        if (!payload) return;
+        const won = payload.winnerUserId === userId;
+        const myMmr = won ? payload.winnerMmr : payload.loserMmr;
+        const deltaTxt = payload.delta !== undefined
+            ? (won ? ` (+${payload.delta} MMR → ${myMmr})` : ` (-${payload.delta} MMR → ${myMmr})`)
+            : '';
+        if (gameUI) {
+            if (won) {
+                gameUI.addCombatLog(`🏆 ชนะการดวล!${payload.forfeit ? ' (คู่ต่อสู้ออกจากเกม)' : ''}${deltaTxt}`, 'levelup');
+            } else {
+                gameUI.addCombatLog(`💀 แพ้การดวล...${deltaTxt}`, 'death');
+                gameUI.triggerScreenShake(true);
+            }
+        }
+        // Restore both players to full HP; loser gets back on their feet
+        if (character) {
+            character.stats.hp = character.stats.max_hp;
+            character.state = 'idle';
+            if (gameUI) gameUI.updateHUD(character.stats);
+            // Keep MMR in local stats for display
+            if (myMmr !== undefined) character.stats.mmr = myMmr;
+        }
+        duelState = null;
+    },
+};
+
+// Per-frame duel combat: auto-swing at the opponent when in range
+function updateDuelCombat(dt) {
+    if (!duelState || !character || !character.isAlive()) return;
+    duelState.cooldown = Math.max(0, duelState.cooldown - dt);
+
+    const rp = remotePlayersMap.get(duelState.opponentUserId);
+    if (!rp || !rp.mesh) return; // opponent not in view yet
+
+    const myPos = character.getPosition();
+    const foePos = rp.mesh.position;
+    const dx = foePos.x - myPos.x;
+    const dz = foePos.z - myPos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist <= character.getAttackRange() + 0.7) {
+        character.mesh.rotation.y = Math.atan2(dx, dz);
+        if (duelState.cooldown <= 0) {
+            duelState.cooldown = character.getAttackCooldown();
+            character.state = 'attacking';
+            const isCritical = Math.random() < 0.1;
+            let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 5);
+            if (isCritical) dmg = Math.floor(dmg * 1.8);
+
+            import('./network/GameSync.js').then(({ sendDuelHit }) => {
+                sendDuelHit(duelState?.opponentUserId, dmg, isCritical);
+            });
+            if (particles) {
+                const screenPos = worldToScreen(foePos, 1.2);
+                particles.spawnDamageNumber(screenPos.x, screenPos.y, dmg, isCritical ? 'critical-dmg' : 'player-dmg');
+                particles.spawnHitEffect(foePos.clone(), isCritical);
+            }
+            if (soundManager) soundManager.playAtkSound();
+        } else if (duelState.cooldown < character.getAttackCooldown() * 0.5 && character.state === 'attacking') {
+            character.state = 'idle';
+        }
+    }
+}
+
 // ============ Game Loop ============
 function gameLoop(time) {
     requestAnimationFrame(gameLoop);
@@ -882,6 +1005,9 @@ function gameLoop(time) {
             character.getRodYankProgress()
         );
     }
+
+    // PVP duel: auto-swing at the opponent when in range
+    updateDuelCombat(dt);
     monsters.update(dt, sceneManager.camera, character.stats.level);
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);

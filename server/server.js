@@ -64,6 +64,8 @@ const onlinePlayers = new Map();
 const userSocketMap = new Map();
 // Map<userId, SaveData> — pending save data
 const pendingSaves = new Map();
+// Map<userId, DuelInfo> — both participants map to the same duel object
+const activeDuels = new Map();
 
 // PlayerInfo shape:
 // { userId, username, level, socketId, joinedAt, lastSaveData: null }
@@ -199,6 +201,91 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ============ PVP DUEL SYSTEM ============
+    // Challenge flow mirrors trade_request/response. Damage is relayed
+    // victim-authoritative (each client applies hits to its own HP). The
+    // LOSER's client reports duel_end; the server settles MMR via Elo (K=32)
+    // exactly once per duel and broadcasts the result to both players.
+
+    // --- Challenge another player ---
+    socket.on('duel_request', (payload) => {
+        if (!payload || !payload.targetUserId) return;
+        const targetSocketId = userSocketMap.get(payload.targetUserId);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('duel_request', payload);
+        }
+    });
+
+    // --- Accept / decline ---
+    socket.on('duel_response', (payload) => {
+        if (!payload || !payload.senderUserId) return;
+        const challengerSocketId = userSocketMap.get(payload.senderUserId);
+        if (!challengerSocketId) return;
+
+        io.to(challengerSocketId).emit('duel_response', payload);
+
+        if (payload.accepted && payload.targetUserId) {
+            const duelId = `duel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+            const duel = {
+                duelId,
+                a: payload.senderUserId,   // challenger
+                b: payload.targetUserId,   // accepter
+                settled: false,
+                startedAt: Date.now(),
+            };
+            activeDuels.set(payload.senderUserId, duel);
+            activeDuels.set(payload.targetUserId, duel);
+
+            // Arena spawn points (matches the arena built client-side at -14,14)
+            const startPayload = {
+                duelId,
+                players: [
+                    { userId: payload.senderUserId, spawn: { x: -17, z: 14 } },
+                    { userId: payload.targetUserId, spawn: { x: -11, z: 14 } },
+                ],
+            };
+            io.to(challengerSocketId).emit('duel_start', startPayload);
+            const accepterSocketId = userSocketMap.get(payload.targetUserId);
+            if (accepterSocketId) io.to(accepterSocketId).emit('duel_start', startPayload);
+            console.log(`[Server] ⚔️ Duel started: ${payload.senderUserId} vs ${payload.targetUserId}`);
+        }
+    });
+
+    // --- Relay a hit to the victim ---
+    socket.on('duel_hit', (payload) => {
+        if (!payload || !payload.targetUserId) return;
+        const targetSocketId = userSocketMap.get(payload.targetUserId);
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('duel_hit', payload);
+        }
+    });
+
+    // --- Loser reports defeat; server settles MMR once ---
+    socket.on('duel_end', async (payload) => {
+        if (!payload || !payload.winnerUserId || !payload.loserUserId) return;
+        const duel = activeDuels.get(payload.loserUserId);
+        if (!duel || duel.settled) return;
+        // Validate the pair matches the registered duel
+        const pair = [duel.a, duel.b];
+        if (!pair.includes(payload.winnerUserId) || !pair.includes(payload.loserUserId)) return;
+        duel.settled = true;
+        activeDuels.delete(duel.a);
+        activeDuels.delete(duel.b);
+
+        const result = await settleDuelMMR(payload.winnerUserId, payload.loserUserId);
+        const resultPayload = {
+            duelId: duel.duelId,
+            winnerUserId: payload.winnerUserId,
+            loserUserId: payload.loserUserId,
+            ...result, // { winnerMmr, loserMmr, delta } or {} if DB unavailable
+        };
+        for (const uid of pair) {
+            const sid = userSocketMap.get(uid);
+            if (sid) io.to(sid).emit('duel_result', resultPayload);
+        }
+        console.log(`[Server] 🏆 Duel settled: ${payload.winnerUserId} beat ${payload.loserUserId} (Δ${result.delta ?? '?'})`);
+    });
+
     // --- ADMIN ANNOUNCEMENT ---
     socket.on('admin:announcement', (data) => {
         // Broadcast announcement to ALL connected clients immediately
@@ -240,6 +327,27 @@ io.on('connection', (socket) => {
         if (player) {
             console.log(`[Server] ➖ Player left: ${player.username} (${player.userId}) — reason: ${reason}`);
 
+            // If mid-duel, the disconnector forfeits: opponent wins
+            const duel = activeDuels.get(player.userId);
+            if (duel && !duel.settled) {
+                duel.settled = true;
+                const opponent = duel.a === player.userId ? duel.b : duel.a;
+                activeDuels.delete(duel.a);
+                activeDuels.delete(duel.b);
+                const result = await settleDuelMMR(opponent, player.userId);
+                const sid = userSocketMap.get(opponent);
+                if (sid) {
+                    io.to(sid).emit('duel_result', {
+                        duelId: duel.duelId,
+                        winnerUserId: opponent,
+                        loserUserId: player.userId,
+                        forfeit: true,
+                        ...result,
+                    });
+                }
+                console.log(`[Server] 🏳️ Duel forfeit by disconnect: ${player.userId}`);
+            }
+
             // Save on disconnect
             if (player.lastSaveData) {
                 await saveCharacterToSupabase(player.lastSaveData);
@@ -279,6 +387,48 @@ function broadcastPlayerList(mapId) {
     
     // Global count can still be broadcast to everyone
     io.emit('online_count', globalCount);
+}
+
+// ============ PVP MMR (Elo, K=32) ============
+// Reads both players' MMR from `characters`, applies Elo, writes back new
+// MMR + win/loss counters. Returns {winnerMmr, loserMmr, delta} or {} when
+// the DB is unavailable.
+async function settleDuelMMR(winnerUserId, loserUserId) {
+    if (!supabase) return {};
+    try {
+        const { data: rows, error } = await supabase
+            .from('characters')
+            .select('id, user_id, mmr, pvp_wins, pvp_losses')
+            .in('user_id', [winnerUserId, loserUserId]);
+        if (error || !rows || rows.length < 2) {
+            console.error('[Server] ❌ MMR read failed:', error?.message);
+            return {};
+        }
+        const w = rows.find(r => r.user_id === winnerUserId);
+        const l = rows.find(r => r.user_id === loserUserId);
+        if (!w || !l) return {};
+
+        const wMmr = Number(w.mmr) || 1000;
+        const lMmr = Number(l.mmr) || 1000;
+        const K = 32;
+        const expectedWin = 1 / (1 + Math.pow(10, (lMmr - wMmr) / 400));
+        const delta = Math.max(1, Math.round(K * (1 - expectedWin)));
+
+        const winnerMmr = wMmr + delta;
+        const loserMmr = Math.max(0, lMmr - delta);
+
+        await supabase.from('characters')
+            .update({ mmr: winnerMmr, pvp_wins: (Number(w.pvp_wins) || 0) + 1 })
+            .eq('id', w.id);
+        await supabase.from('characters')
+            .update({ mmr: loserMmr, pvp_losses: (Number(l.pvp_losses) || 0) + 1 })
+            .eq('id', l.id);
+
+        return { winnerMmr, loserMmr, delta };
+    } catch (e) {
+        console.error('[Server] ❌ settleDuelMMR failed:', e.message);
+        return {};
+    }
 }
 
 // ============ Periodic Save to Supabase ============

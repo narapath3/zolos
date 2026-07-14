@@ -724,6 +724,43 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
 
+            // ===== PVP DUEL =====
+            socket.on('duel_request', (payload) => {
+                if (payload && payload.targetUserId === userId) {
+                    if (window.gameUI && typeof window.gameUI.receiveDuelRequest === 'function') {
+                        window.gameUI.receiveDuelRequest(payload);
+                    }
+                }
+            });
+
+            socket.on('duel_response', (payload) => {
+                if (payload && payload.senderUserId === userId) {
+                    if (window.gameUI && typeof window.gameUI.receiveDuelResponse === 'function') {
+                        window.gameUI.receiveDuelResponse(payload);
+                    }
+                }
+            });
+
+            socket.on('duel_start', (payload) => {
+                if (window.duelManager && typeof window.duelManager.onDuelStart === 'function') {
+                    window.duelManager.onDuelStart(payload);
+                }
+            });
+
+            socket.on('duel_hit', (payload) => {
+                if (payload && payload.targetUserId === userId) {
+                    if (window.duelManager && typeof window.duelManager.onDuelHit === 'function') {
+                        window.duelManager.onDuelHit(payload);
+                    }
+                }
+            });
+
+            socket.on('duel_result', (payload) => {
+                if (window.duelManager && typeof window.duelManager.onDuelResult === 'function') {
+                    window.duelManager.onDuelResult(payload);
+                }
+            });
+
             socketListenersAttached = true;
         }
 
@@ -1384,6 +1421,56 @@ export async function sendFriendResponsePacket(senderUserId, targetUserId, accep
         });
     }
     return { success: true };
+}
+
+// ============ PVP Duel Networking ============
+export function sendDuelRequest(targetUserId, targetName, senderName, senderLevel) {
+    if (isOfflineMode) return { success: false, reason: 'offline' };
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('duel_request', {
+            senderUserId: currentUserId,
+            senderName,
+            senderLevel,
+            targetUserId,
+            targetName,
+        });
+        return { success: true };
+    }
+    return { success: false, reason: 'not_connected' };
+}
+
+export function sendDuelResponse(senderUserId, accepted) {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('duel_response', {
+            senderUserId,           // the challenger (recipient of this response)
+            targetUserId: currentUserId, // the accepter
+            accepted,
+        });
+    }
+}
+
+export function sendDuelHit(targetUserId, damage, critical = false) {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('duel_hit', {
+            attackerUserId: currentUserId,
+            targetUserId,
+            damage,
+            critical,
+        });
+    }
+}
+
+export function reportDuelEnd(winnerUserId, loserUserId) {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('duel_end', { winnerUserId, loserUserId });
+    }
 }
 
 // ============ Offline Mock Presence (unchanged) ============

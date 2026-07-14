@@ -2,6 +2,9 @@
 // Upgraded: Lush world with water, varied trees, sky dome, portals, NPC
 import * as THREE from 'three';
 
+// PVP arena location on the main field (server duel spawns are center ± 3 on x)
+const PVP_ARENA_POS = { x: -14, z: 14 };
+
 // ============ Map Configs ============
 const MAP_CONFIGS = {
     prontera: {
@@ -255,6 +258,10 @@ export class SceneManager {
         // Ambient life: sakura petals from cherry trees, fish in the river
         this._createSakuraPetals();
         this._createFish(config);
+
+        // PVP arena on the main field
+        this.arenaAnimParts = null;
+        if (mapId === 'prontera') this._createPvpArena();
 
         this._createPortals(mapId);
         this._createBirds();
@@ -721,6 +728,113 @@ export class SceneManager {
         this._createBridge(0, -2);
     }
 
+    // ============ PVP Arena ============
+    // A circular dueling ring on the open field: raised stone platform,
+    // torch pillars, red/blue banners, gold center emblem, and a pulsing
+    // glow ring. Duelists spawn at center ± 3 on the x axis (see server.js).
+    _createPvpArena() {
+        const { x: cx, z: cz } = PVP_ARENA_POS;
+        const group = new THREE.Group();
+        const anim = { flames: [], glowRing: null, banners: [] };
+
+        // --- Raised stone platform (two tiers) ---
+        const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8a8a92 });
+        const darkStoneMat = new THREE.MeshLambertMaterial({ color: 0x5a5a64 });
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(6.6, 7.0, 0.25, 24), darkStoneMat);
+        base.position.y = 0.12;
+        base.receiveShadow = true;
+        group.add(base);
+        const floor = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 6.2, 0.3, 24), stoneMat);
+        floor.position.y = 0.38;
+        floor.receiveShadow = true;
+        group.add(floor);
+
+        // --- Battle circle markings ---
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xd8b04a });
+        const markRing = new THREE.Mesh(new THREE.TorusGeometry(4.6, 0.07, 6, 40), ringMat);
+        markRing.rotation.x = -Math.PI / 2;
+        markRing.position.y = 0.54;
+        group.add(markRing);
+
+        // --- Gold center emblem ---
+        const emblem = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.8, 0.8, 0.06, 16),
+            new THREE.MeshLambertMaterial({ color: 0xd8b04a, emissive: 0x604010, emissiveIntensity: 0.35 })
+        );
+        emblem.position.y = 0.55;
+        group.add(emblem);
+
+        // --- Pulsing glow ring (animated) ---
+        const glowRing = new THREE.Mesh(
+            new THREE.TorusGeometry(5.2, 0.1, 8, 48),
+            new THREE.MeshBasicMaterial({ color: 0xff5040, transparent: true, opacity: 0.55 })
+        );
+        glowRing.rotation.x = -Math.PI / 2;
+        glowRing.position.y = 0.56;
+        group.add(glowRing);
+        anim.glowRing = glowRing;
+
+        // --- Torch pillars around the ring (gaps at the ± x entrances) ---
+        const pillarMat = new THREE.MeshLambertMaterial({ color: 0x6a6a74 });
+        const capMat = new THREE.MeshLambertMaterial({ color: 0x4a4a54 });
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            // Leave entrance gaps on the east/west sides (where duelists spawn)
+            if (Math.abs(Math.cos(angle)) > 0.92) continue;
+            const px = Math.cos(angle) * 5.9;
+            const pz = Math.sin(angle) * 5.9;
+
+            const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.0, 0.5), pillarMat);
+            pillar.position.set(px, 1.35, pz);
+            pillar.castShadow = true;
+            group.add(pillar);
+            const cap = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.18, 0.66), capMat);
+            cap.position.set(px, 2.42, pz);
+            group.add(cap);
+
+            // Torch flame (emissive, flickers via updateAnimations)
+            const flame = new THREE.Mesh(
+                new THREE.ConeGeometry(0.16, 0.45, 6),
+                new THREE.MeshBasicMaterial({ color: 0xff8830, transparent: true, opacity: 0.95 })
+            );
+            flame.position.set(px, 2.75, pz);
+            group.add(flame);
+            anim.flames.push(flame);
+        }
+
+        // --- Red/Blue banners at the two entrances ---
+        const poleMat = new THREE.MeshLambertMaterial({ color: 0x4a3520 });
+        [[-1, 0xe04040], [1, 0x4060d0]].forEach(([side, color]) => {
+            for (const zOff of [-2.2, 2.2]) {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.4, 6), poleMat);
+                pole.position.set(side * 7.2, 1.7, zOff);
+                pole.castShadow = true;
+                group.add(pole);
+                const flag = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1.0, 0.65),
+                    new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })
+                );
+                flag.position.set(side * 7.2 + side * -0.55, 3.0, zOff);
+                flag.rotation.y = side > 0 ? Math.PI : 0;
+                group.add(flag);
+                anim.banners.push(flag);
+            }
+        });
+
+        // --- Stone steps at both entrances ---
+        for (const side of [-1, 1]) {
+            const step = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 2.4), darkStoneMat);
+            step.position.set(side * 6.9, 0.11, 0);
+            step.receiveShadow = true;
+            group.add(step);
+        }
+
+        group.position.set(cx, 0, cz);
+        this.scene.add(group);
+        this.envObjects.push(group);
+        this.arenaAnimParts = anim;
+    }
+
     // ============ Ambient Life: Sakura Petals ============
     // Small pink quads drifting down from every cherry-tree canopy, looping forever.
     _createSakuraPetals() {
@@ -884,7 +998,12 @@ export class SceneManager {
     _isOnLand(x, z) {
         // Returns true if not in the river zone (wider river)
         const riverZ = Math.sin(x * 0.08) * 10 - 2;
-        return Math.abs(z - riverZ) > 7.0;
+        if (Math.abs(z - riverZ) <= 7.0) return false;
+        // Keep the PVP arena zone clear of random scenery (trees/rocks/etc.)
+        const ax = x - PVP_ARENA_POS.x;
+        const az = z - PVP_ARENA_POS.z;
+        if (ax * ax + az * az < 8.5 * 8.5) return false;
+        return true;
     }
 
     _createEnvironment(config) {
@@ -2447,6 +2566,24 @@ export class SceneManager {
             }
         }
         */
+
+        // PVP arena ambiance: torch flicker, glow-ring pulse, banner wave
+        if (this.arenaAnimParts) {
+            const a = this.arenaAnimParts;
+            a.flames.forEach((f, i) => {
+                const s = 0.85 + Math.sin(this.time * 9 + i * 1.7) * 0.18 + Math.sin(this.time * 23 + i) * 0.07;
+                f.scale.set(s, 0.8 + s * 0.35, s);
+                f.material.opacity = 0.75 + Math.sin(this.time * 13 + i * 2.1) * 0.2;
+            });
+            if (a.glowRing) {
+                a.glowRing.material.opacity = 0.35 + Math.sin(this.time * 2.2) * 0.2;
+                const rs = 1 + Math.sin(this.time * 2.2) * 0.012;
+                a.glowRing.scale.set(rs, rs, 1);
+            }
+            a.banners.forEach((b, i) => {
+                b.rotation.z = Math.sin(this.time * 2.4 + i * 1.3) * 0.09;
+            });
+        }
 
         // Flowing water: scroll the caustic texture along the river
         if (this.waterFlowTex) {

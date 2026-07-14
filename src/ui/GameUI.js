@@ -1165,6 +1165,29 @@ export class GameUI {
       });
     }
 
+    // PVP duel challenge from profile popup
+    const popupDuelBtn = document.getElementById('btn-popup-duel');
+    if (popupDuelBtn) {
+      popupDuelBtn.addEventListener('click', async () => {
+        const target = this.selectedProfilePlayer;
+        if (!target) return;
+        if (popup) popup.style.display = 'none';
+        this.updateMobileControlsVisibility();
+        const { sendDuelRequest } = await import('../network/GameSync.js');
+        const res = sendDuelRequest(
+          target.userId,
+          target.username,
+          this.character?.stats?.name || 'Adventurer',
+          this.character?.stats?.level || 1
+        );
+        if (res.success) {
+          this.addCombatLog(`⚔️ ส่งคำท้าดวลไปยัง ${target.username} แล้ว รอการตอบรับ...`, 'system');
+        } else {
+          this.addCombatLog('❌ ท้าดวลไม่ได้ (ออฟไลน์/เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
+        }
+      });
+    }
+
     // Friend request confirmation modal buttons
     this.activeIncomingFriendRequest = null;
     const friendModal = document.getElementById('friend-confirm-modal');
@@ -1269,6 +1292,27 @@ export class GameUI {
 
       sendFriendRequestPacket(myName, myLevel, targetUserId, username);
       this.addCombatLog(`✉️ ส่งคำขอเป็นเพื่อนไปยัง ${username} แล้ว`, 'system');
+    }
+  }
+
+  // ============ PVP Duel Request/Response ============
+  receiveDuelRequest(payload) {
+    if (!payload) return;
+    this.addCombatLog(`⚔️ ${payload.senderName} (Lv.${payload.senderLevel || '?'}) ท้าดวล PVP!`, 'warning');
+    // Simple accept dialog (same approach as layout-reset confirm)
+    const accepted = confirm(`⚔️ ${payload.senderName} (Lv.${payload.senderLevel || '?'}) ท้าดวล PVP!\n\nรับคำท้าหรือไม่?`);
+    import('../network/GameSync.js').then(({ sendDuelResponse }) => {
+      sendDuelResponse(payload.senderUserId, accepted);
+    });
+    if (!accepted) this.addCombatLog('🚫 ปฏิเสธคำท้าดวล', 'system');
+  }
+
+  receiveDuelResponse(payload) {
+    if (!payload) return;
+    if (payload.accepted) {
+      this.addCombatLog('✅ คู่ต่อสู้รับคำท้า! กำลังเข้าสู่สังเวียน...', 'system');
+    } else {
+      this.addCombatLog('🚫 คู่ต่อสู้ปฏิเสธคำท้าดวล', 'warning');
     }
   }
 
