@@ -489,6 +489,13 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- VENDING STALLS ---
+    // A stall opened/closed anywhere → everyone refreshes their stall view
+    // (the stall data itself lives in Supabase; this is just the change ping).
+    socket.on('stall_change', () => {
+        io.emit('stalls_update');
+    });
+
     // --- ADMIN ANNOUNCEMENT ---
     socket.on('admin:announcement', (data) => {
         // Broadcast announcement to ALL connected clients immediately

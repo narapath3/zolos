@@ -954,6 +954,9 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             // ===== WARP TO FRIEND =====
             socket.on('warp_result', (payload) => window.warpManager?.onWarpResult?.(payload));
 
+            // ===== VENDING STALLS =====
+            socket.on('stalls_update', () => window.stallManager?.refresh?.());
+
             // ===== WORLD BOSS =====
             socket.on('boss_state', (payload) => window.worldBossManager?.onState?.(payload));
             socket.on('boss_spawn', (payload) => window.worldBossManager?.onSpawn?.(payload));
@@ -1293,6 +1296,96 @@ export async function cancelMarketListing(listingId, characterId) {
         return true;
     }
     return false;
+}
+
+// ============ Vending Stalls ============
+// A stall is a physical shop stand in Prontera showing the owner's marketplace
+// listings. The stall row itself only stores presence (name/slot/appearance);
+// buying goes through the normal marketplace flow, so offline owners get paid.
+export async function fetchVendingStalls() {
+    if (isOfflineMode || !supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('vending_stalls')
+            .select('*')
+            .order('slot', { ascending: true });
+        if (error) throw error;
+        return data || [];
+    } catch (e) {
+        console.warn('[Zolos] Failed to fetch vending stalls:', e.message);
+        return [];
+    }
+}
+
+export async function openVendingStall(characterId, ownerName, shopName, appearance) {
+    if (isOfflineMode || !supabase) return { ok: false, reason: 'offline' };
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { ok: false, reason: 'guest' };
+
+        // Find a free slot (0..7)
+        const { data: taken } = await supabase.from('vending_stalls').select('slot, user_id');
+        const mine = (taken || []).find(s => s.user_id === user.id);
+        const usedSlots = new Set((taken || []).map(s => s.slot));
+        let slot = mine ? mine.slot : -1;
+        if (slot < 0) {
+            for (let i = 0; i < 8; i++) { if (!usedSlots.has(i)) { slot = i; break; } }
+            if (slot < 0) return { ok: false, reason: 'full' };
+        }
+
+        const row = {
+            user_id: user.id,
+            character_id: characterId,
+            owner_name: ownerName,
+            shop_name: (shopName || 'ร้านค้า').slice(0, 24),
+            slot,
+            appearance: appearance || {},
+            updated_at: new Date().toISOString(),
+        };
+        const { error } = await supabase.from('vending_stalls').upsert(row, { onConflict: 'user_id' });
+        if (error) throw error;
+
+        // Nudge everyone to refresh their stall view
+        const socket = getSocket();
+        if (socket && isSocketConnected()) socket.emit('stall_change', {});
+        return { ok: true, slot };
+    } catch (e) {
+        console.error('[Zolos] Failed to open vending stall:', e.message);
+        return { ok: false, reason: e.message };
+    }
+}
+
+export async function closeVendingStall() {
+    if (isOfflineMode || !supabase) return false;
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+        const { error } = await supabase.from('vending_stalls').delete().eq('user_id', user.id);
+        if (error) throw error;
+        const socket = getSocket();
+        if (socket && isSocketConnected()) socket.emit('stall_change', {});
+        return true;
+    } catch (e) {
+        console.error('[Zolos] Failed to close vending stall:', e.message);
+        return false;
+    }
+}
+
+// Listings belonging to one stall owner (seller_id is the auth user uuid)
+export async function fetchStallListings(ownerUserId) {
+    if (isOfflineMode || !supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('marketplace')
+            .select('*')
+            .eq('seller_id', ownerUserId)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+    } catch (e) {
+        console.warn('[Zolos] Failed to fetch stall listings:', e.message);
+        return [];
+    }
 }
 
 export async function buyMarketItem(listingId, buyerCharId, buyerName) {

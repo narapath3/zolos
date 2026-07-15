@@ -2,6 +2,7 @@
 // Upgraded: Lush world with water, varied trees, sky dome, portals, NPC
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ITEMS } from './GameData.js';
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
@@ -232,6 +233,7 @@ export class SceneManager {
         this.npcMesh = null;
         this.npcSellMesh = null;
         this.npcWeaponMesh = null;
+        this.clearVendingStalls();
         this.swayingObjects = [];
         this.birds = [];
 
@@ -3128,6 +3130,152 @@ export class SceneManager {
         this.npcWeaponMesh = group;
     }
 
+    // ============ Vending Stalls (player shops) ============
+    // A market street on the north side of Prontera: up to 8 player stalls in a
+    // row, each with a colored awning, a seated vendor styled like the owner,
+    // a glowing shop sign and the top wares displayed on the counter.
+    clearVendingStalls() {
+        if (!this.stallMeshes) this.stallMeshes = [];
+        for (const g of this.stallMeshes) {
+            this.scene.remove(g);
+            g.traverse(o => {
+                if (o.geometry) o.geometry.dispose();
+                if (o.material) {
+                    const mats = Array.isArray(o.material) ? o.material : [o.material];
+                    mats.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
+                }
+            });
+        }
+        this.stallMeshes = [];
+    }
+
+    buildVendingStalls(stalls) {
+        this.clearVendingStalls();
+        if (this.currentMap !== 'prontera' || !stalls || !stalls.length) return;
+
+        const AWNING_COLORS = [0xd94a4a, 0x3a8ad9, 0x3fae5a, 0xd9a03a, 0x9a5ad9, 0xd95a9a, 0x3ab8b0, 0xb8763a];
+        const SLOT_X = [-14, -10, -6, -2, 2, 6, 10, 14];
+        const STREET_Z = -12;
+
+        for (const stall of stalls) {
+            const slot = Math.max(0, Math.min(7, stall.slot | 0));
+            const group = new THREE.Group();
+            group.userData.isStall = true;
+            group.userData.stall = stall;
+
+            const awningColor = AWNING_COLORS[slot];
+            const wood = new THREE.MeshLambertMaterial({ color: 0x7a5a34 });
+            const woodDark = new THREE.MeshLambertMaterial({ color: 0x5a3e20 });
+
+            // Platform + counter
+            const base = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.14, 2.4), wood);
+            base.position.y = 0.07; base.receiveShadow = true;
+            group.add(base);
+            const counter = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.75, 0.55), woodDark);
+            counter.position.set(0, 0.5, 0.75); counter.castShadow = true;
+            group.add(counter);
+            const counterTop = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.06, 0.7), wood);
+            counterTop.position.set(0, 0.9, 0.75);
+            group.add(counterTop);
+
+            // Posts + sloped awning
+            const postGeo = new THREE.CylinderGeometry(0.06, 0.07, 2.3, 6);
+            [[-1.3, -0.85], [1.3, -0.85], [-1.3, 1.0], [1.3, 1.0]].forEach(([px, pz]) => {
+                const post = new THREE.Mesh(postGeo, woodDark);
+                post.position.set(px, 1.25, pz); post.castShadow = true;
+                group.add(post);
+            });
+            const awning = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.08, 2.6),
+                new THREE.MeshLambertMaterial({ color: awningColor }));
+            awning.position.set(0, 2.45, 0.1);
+            awning.rotation.x = -0.12;
+            awning.castShadow = true;
+            group.add(awning);
+            // Scalloped front trim
+            for (let i = 0; i < 5; i++) {
+                const trim = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.3, 4),
+                    new THREE.MeshLambertMaterial({ color: awningColor }));
+                trim.position.set(-1.28 + i * 0.64, 2.2, 1.35);
+                trim.rotation.x = Math.PI;
+                group.add(trim);
+            }
+
+            // Seated vendor styled like the owner
+            const app = stall.appearance || {};
+            const vendor = new THREE.Group();
+            vendor.add(this._boxMesh(0.5, 0.6, 0.34, app.bodyColor || 0x4060c0, 0, 0.62, 0));
+            vendor.add(this._boxMesh(0.4, 0.4, 0.4, 0xffccaa, 0, 1.18, 0));
+            vendor.add(this._boxMesh(0.45, 0.22, 0.45, app.hairColor || 0xc04040, 0, 1.42, 0));
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            [[-0.09, 1.2], [0.09, 1.2]].forEach(([x, y]) => {
+                const e = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.03), eyeMat);
+                e.position.set(x, y, 0.21); vendor.add(e);
+            });
+            vendor.add(this._boxMesh(0.16, 0.42, 0.16, app.bodyColor || 0x4060c0, -0.33, 0.62, 0.1));
+            vendor.add(this._boxMesh(0.16, 0.42, 0.16, app.bodyColor || 0x4060c0, 0.33, 0.62, 0.1));
+            vendor.position.set(0, 0.14, -0.15);
+            group.add(vendor);
+
+            // Featured wares on the counter (up to 3 item emojis)
+            const items = stall.items || [];
+            if (items.length) {
+                const ic = document.createElement('canvas');
+                ic.width = 384; ic.height = 128;
+                const ictx = ic.getContext('2d');
+                ictx.font = '84px Arial';
+                ictx.textAlign = 'center';
+                items.slice(0, 3).forEach((it, i) => {
+                    const meta = (typeof ITEMS !== 'undefined' && ITEMS[it.item_name]) || null;
+                    ictx.fillText((meta && meta.emoji) || '📦', 64 + i * 128, 96);
+                });
+                const itemSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+                    map: new THREE.CanvasTexture(ic), transparent: true
+                }));
+                itemSprite.position.set(0, 1.25, 0.78);
+                itemSprite.scale.set(1.5, 0.5, 1);
+                group.add(itemSprite);
+            }
+
+            // Glowing shop sign
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 160;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(20, 12, 6, 0.8)';
+            ctx.roundRect(24, 10, 464, 88, 18); ctx.fill();
+            ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 5;
+            ctx.roundRect(24, 10, 464, 88, 18); ctx.stroke();
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 14;
+            ctx.font = 'bold 44px Arial';
+            ctx.fillStyle = '#ffd97a';
+            ctx.fillText(`🏪 ${stall.shop_name || 'ร้านค้า'}`, 256, 68);
+            ctx.shadowBlur = 0;
+            ctx.font = 'bold 30px Arial';
+            ctx.fillStyle = '#cfe0f0';
+            ctx.fillText(`ร้านของ ${stall.owner_name || '???'}`, 256, 138);
+            const sign = new THREE.Sprite(new THREE.SpriteMaterial({
+                map: new THREE.CanvasTexture(canvas), transparent: true
+            }));
+            sign.position.y = 3.3;
+            sign.scale.set(3.2, 1.0, 1);
+            group.add(sign);
+
+            group.position.set(SLOT_X[slot], 0, STREET_Z);
+            this.scene.add(group);
+            this.stallMeshes.push(group);
+        }
+
+        // One shared warm light over the market street (perf: never per-stall)
+        if (this.stallMeshes.length) {
+            const streetLight = new THREE.PointLight(0xffcc77, 1.1, 30);
+            streetLight.position.set(0, 6, STREET_Z + 1);
+            const holder = new THREE.Group();
+            holder.add(streetLight);
+            this.scene.add(holder);
+            this.stallMeshes.push(holder);
+        }
+    }
+
     // Tiny helper for boxy NPC parts
     _boxMesh(w, h, d, color, x, y, z) {
         const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
@@ -3350,6 +3498,10 @@ export class SceneManager {
                 targets.push(npcs);
             }
         }
+        // Player vending stalls are clickable shops
+        if (this.stallMeshes) {
+            this.stallMeshes.forEach(s => { if (s.userData && s.userData.isStall) targets.push(s); });
+        }
         if (monsters && monsters.monsters) {
             monsters.monsters.forEach(m => {
                 if (m.alive && m.mesh) {
@@ -3372,6 +3524,9 @@ export class SceneManager {
                 let obj = hit.object;
 
                 while (obj) {
+                    if (obj.userData && obj.userData.isStall) {
+                        return { type: 'stall', point: hit.point, object: obj.userData.stall };
+                    }
                     if (npcs) {
                         if (Array.isArray(npcs)) {
                             for (const n of npcs) {

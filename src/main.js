@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.39 (master-angler-title)';
+const BUILD_VERSION = '2026-07-15.40 (vending-stalls)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -129,6 +129,25 @@ function worldToScreen(pos, offsetY = 1.6) {
     const y = (tempV.y * -0.5 + 0.5) * canvas.clientHeight;
     return { x, y };
 }
+
+// ============ Vending Stalls (player shops in town) ============
+// Presence rows live in Supabase; the socket 'stalls_update' ping triggers a
+// refetch so every client rebuilds the market street when a stall opens/closes.
+window.stallManager = {
+    async refresh() {
+        if (!sceneManager) return;
+        if (sceneManager.currentMap !== 'prontera') { sceneManager.clearVendingStalls(); return; }
+        try {
+            const { fetchVendingStalls, fetchMarketListings } = await import('./network/GameSync.js');
+            const [stalls, listings] = await Promise.all([fetchVendingStalls(), fetchMarketListings()]);
+            const bySeller = {};
+            (listings || []).forEach(l => { (bySeller[l.seller_id] = bySeller[l.seller_id] || []).push(l); });
+            sceneManager.buildVendingStalls((stalls || []).map(s => ({ ...s, items: (bySeller[s.user_id] || []).slice(0, 3) })));
+        } catch (e) {
+            console.warn('[Stalls] refresh failed:', e);
+        }
+    },
+};
 
 // ============ Forged-weapon signature on-hit burst ============
 // Colored explosion matching the equipped forged weapon's element. Throttled so
@@ -618,6 +637,7 @@ async function initGame(charData) {
     await gameUI.loadFriendsFromDB(charData.id);
     await gameUI.loadFishingAlmanacFromDB(charData.id);
     await gameUI.loadLoginStreakFromDB(charData.id); // daily reward — auto-opens if claimable
+    window.stallManager.refresh(); // build the player market street
 
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);
@@ -858,6 +878,13 @@ function handleMouseInteraction(event) {
         return;
     }
 
+    if (hit.type === 'stall') {
+        // Player vending stall → open its shop window
+        particles.createClickIndicator(hit.point, 0xffd24a);
+        if (gameUI) gameUI.openStallShop(hit.object);
+        return;
+    }
+
     if (hit.type === 'monster') {
         character.targetMonster = hit.object;
         autoPath = hit.point;
@@ -1043,6 +1070,9 @@ function loadMapAndSpawn(targetMap, spawn) {
         if (rp.mesh) sceneManager.scene.remove(rp.mesh);
     }
     remotePlayersMap.clear();
+
+    // Rebuild the player market street when arriving in town
+    if (window.stallManager) window.stallManager.refresh();
 }
 
 // ============ Warp To Friend ============

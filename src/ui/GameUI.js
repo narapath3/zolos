@@ -246,6 +246,11 @@ export class GameUI {
       btnDailyReward.addEventListener('click', () => this.openDailyReward());
     }
 
+    const btnVendingStall = document.getElementById('btn-vending-stall');
+    if (btnVendingStall) {
+      btnVendingStall.addEventListener('click', () => this._openVendingStallSetup());
+    }
+
     // Close buttons
     document.querySelectorAll('.panel-close').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -341,6 +346,15 @@ export class GameUI {
     const dailyModal = document.getElementById('daily-modal');
     if (dailyModal) {
       const display = dailyModal.style.display || window.getComputedStyle(dailyModal).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
+    // Check the Vending Stall shop overlay (standalone modal)
+    const stallModal = document.getElementById('stall-modal');
+    if (stallModal) {
+      const display = stallModal.style.display || window.getComputedStyle(stallModal).display;
       if (display !== 'none') {
         anyPanelOpen = true;
       }
@@ -2919,6 +2933,174 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this._updateDailyRewardBadge();
+  }
+
+  // ============ Vending Stalls (player shops) ============
+  // The stall is a physical storefront over the player's marketplace listings:
+  // buying from a stall IS a marketplace purchase, so offline owners get paid.
+  _isMyStall(stall) {
+    const uid = this.character && this.character.userId;
+    return !!(uid && stall && stall.user_id === uid);
+  }
+
+  async openStallShop(stall) {
+    if (!stall) return;
+    if (!document.getElementById('stall-style')) {
+      const st = document.createElement('style');
+      st.id = 'stall-style';
+      st.textContent = `
+        #stall-modal{position:fixed;inset:0;z-index:1420;display:none;align-items:center;justify-content:center;
+          background:rgba(0,0,0,.62);backdrop-filter:blur(3px);padding:12px;box-sizing:border-box;}
+        #stall-card{width:min(560px,94vw);max-height:86vh;display:flex;flex-direction:column;border-radius:16px;
+          background:linear-gradient(160deg,#2a2010,#171008);border:1.5px solid #ffd24a;
+          box-shadow:0 0 34px rgba(255,210,74,.25),0 20px 60px rgba(0,0,0,.7);overflow:hidden;}
+        #stall-card .stall-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+        @media (max-width:768px){
+          #stall-modal{align-items:flex-start;padding:8px 8px 116px;}
+          #stall-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
+        }`;
+      document.head.appendChild(st);
+    }
+    let modal = document.getElementById('stall-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'stall-modal';
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { modal.style.display = 'none'; this.updateMobileControlsVisibility(); }
+      });
+      modal.innerHTML = `<div id="stall-card"></div>`;
+      document.body.appendChild(modal);
+    }
+    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+    this._activeStall = stall;
+    modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+    await this._renderStallShop();
+  }
+
+  async _renderStallShop() {
+    const card = document.getElementById('stall-card');
+    const stall = this._activeStall;
+    if (!card || !stall) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const mine = this._isMyStall(stall);
+
+    card.innerHTML = `
+      <div style="padding:16px 18px;background:linear-gradient(90deg,#4a3410,#241806);border-bottom:1px solid #ffd24a;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:26px;">🏪</div>
+          <div style="flex:1;">
+            <div style="font-weight:900;color:#ffd97a;font-size:17px;text-shadow:0 0 10px rgba(255,178,32,.5);">${esc(stall.shop_name)}</div>
+            <div style="font-size:11px;color:#c8b088;">ร้านของ ${esc(stall.owner_name)}${mine ? ' (ร้านคุณเอง)' : ''}</div>
+          </div>
+          <button id="stall-close" style="background:rgba(255,255,255,.08);border:none;color:#f0dcb0;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+        </div>
+      </div>
+      <div class="stall-body" style="padding:14px 16px;">
+        <div style="text-align:center;color:#8a7a5a;font-size:11px;padding:14px;">⏳ กำลังโหลดสินค้า...</div>
+      </div>`;
+    card.querySelector('#stall-close').onclick = () => {
+      const m = document.getElementById('stall-modal'); if (m) m.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    };
+
+    const { fetchStallListings } = await import('../network/GameSync.js');
+    const listings = await fetchStallListings(stall.user_id);
+    const body = card.querySelector('.stall-body');
+    if (!body) return;
+
+    const rows = listings.length ? listings.map(l => {
+      const meta = ITEMS[l.item_name] || { emoji: '📦' };
+      const rc = { epic: '#c774ff', legendary: '#ffcf4a', mythic: '#ff5a7a', rare: '#4aa3ff' }[meta.rarity] || '#c9d4df';
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;margin-bottom:8px;
+          background:rgba(0,0,0,.3);border:1px solid ${rc}44;">
+          <div style="font-size:22px;">${meta.emoji}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;color:${rc};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.item_name)} ×${l.quantity}</div>
+            <div style="font-size:11px;color:#ffd97a;font-weight:700;">💰 ${Number(l.price).toLocaleString()} Zeny</div>
+          </div>
+          ${mine
+          ? `<button data-stall-cancel="${l.id}" style="border:none;border-radius:10px;padding:7px 12px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(224,72,58,.85);color:#fff;">ยกเลิก</button>`
+          : `<button data-stall-buy="${l.id}" style="border:none;border-radius:10px;padding:7px 14px;cursor:pointer;font-weight:800;font-size:12px;background:linear-gradient(135deg,#ffcf4a,#ff9e2e);color:#3a2600;">ซื้อ</button>`}
+        </div>`;
+    }).join('') : `<div style="text-align:center;color:#8a7a5a;font-size:12px;padding:22px;">😴 ตอนนี้ไม่มีสินค้าวางขาย</div>`;
+
+    const ownerBar = mine ? `
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="stall-add-items" style="flex:1;border:none;border-radius:10px;padding:9px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(74,163,255,.2);border:1px solid #4aa3ff;color:#9fccff;">➕ เพิ่มสินค้า (ตั้งขายในตลาด)</button>
+        <button id="stall-close-shop" style="flex:1;border:none;border-radius:10px;padding:9px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(224,72,58,.2);border:1px solid #e0483a;color:#ffb0a8;">🚫 ปิดร้าน (เก็บแผง)</button>
+      </div>` : '';
+
+    body.innerHTML = rows + ownerBar;
+
+    body.querySelectorAll('[data-stall-buy]').forEach(b => {
+      b.onclick = async () => {
+        const listing = listings.find(l => String(l.id) === b.getAttribute('data-stall-buy'));
+        if (!listing) return;
+        await this._performMarketBuyAction(listing);
+        this._renderStallShop();
+        if (window.stallManager) window.stallManager.refresh();
+      };
+    });
+    body.querySelectorAll('[data-stall-cancel]').forEach(b => {
+      b.onclick = async () => {
+        const listing = listings.find(l => String(l.id) === b.getAttribute('data-stall-cancel'));
+        if (!listing) return;
+        await this._performMarketCancelAction(listing);
+        this._renderStallShop();
+        if (window.stallManager) window.stallManager.refresh();
+      };
+    });
+    const addBtn = body.querySelector('#stall-add-items');
+    if (addBtn) addBtn.onclick = () => {
+      const m = document.getElementById('stall-modal'); if (m) m.style.display = 'none';
+      this._togglePanel('market-panel');
+      // Jump straight to the sell tab
+      const sellTab = document.querySelector('.market-tab[data-tab="sell"]');
+      if (sellTab) sellTab.click();
+    };
+    const closeShopBtn = body.querySelector('#stall-close-shop');
+    if (closeShopBtn) closeShopBtn.onclick = async () => {
+      const { closeVendingStall } = await import('../network/GameSync.js');
+      const ok = await closeVendingStall();
+      if (ok) {
+        this.addCombatLog('🏪 เก็บแผงขายของเรียบร้อย', 'system');
+        const m = document.getElementById('stall-modal'); if (m) m.style.display = 'none';
+        this.updateMobileControlsVisibility();
+        if (window.stallManager) window.stallManager.refresh();
+      } else {
+        this.addCombatLog('❌ ปิดร้านไม่สำเร็จ ลองอีกครั้ง', 'warning');
+      }
+    };
+  }
+
+  async _openVendingStallSetup() {
+    if (!this.character) return;
+    // Guests can't own a stall — the row needs a real auth user for RLS
+    const uid = this.character.userId || '';
+    if (!uid || uid.startsWith('guest_') || uid.startsWith('local_')) {
+      this.addCombatLog('❌ ต้องผูกบัญชี (อีเมล) ก่อนจึงจะเปิดแผงขายของได้', 'warning');
+      return;
+    }
+    const name = prompt('ตั้งชื่อร้านของคุณ (ไม่เกิน 24 ตัวอักษร):', `ร้าน${this.character.stats.name}`);
+    if (!name) return;
+    const app = this.character.getAppearance ? this.character.getAppearance() : {};
+    const { openVendingStall } = await import('../network/GameSync.js');
+    const res = await openVendingStall(this.characterId, this.character.stats.name, name, {
+      bodyColor: app.bodyColor, hairColor: app.hairColor, pantsColor: app.pantsColor, gender: app.gender,
+    });
+    if (res.ok) {
+      this.addCombatLog(`🏪✨ เปิดแผง "${name}" ที่ถนนตลาดแล้ว! (ช่องที่ ${res.slot + 1}) — ตั้งขายของในแท็บนี้ได้เลย`, 'levelup');
+      if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
+      if (window.stallManager) window.stallManager.refresh();
+    } else if (res.reason === 'full') {
+      this.addCombatLog('❌ ถนนตลาดเต็ม (8 แผง) — ลองใหม่ภายหลัง', 'warning');
+    } else if (res.reason === 'guest') {
+      this.addCombatLog('❌ ต้องผูกบัญชี (อีเมล) ก่อนจึงจะเปิดแผงขายของได้', 'warning');
+    } else {
+      this.addCombatLog('❌ เปิดร้านไม่สำเร็จ: ' + (res.reason || 'unknown'), 'warning');
+    }
   }
 
   // ============ Weapon Smith — Forge (crafting) ============
