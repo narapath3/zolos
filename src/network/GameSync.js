@@ -455,6 +455,59 @@ export async function loadFishingAlmanac(characterId) {
     }
 }
 
+// ============ Login Streak (Daily Rewards) ============
+// Stored as a system inventory item, same pattern as the fishing almanac.
+// Shape: { streak: number, lastClaim: 'YYYY-MM-DD' }
+export async function saveLoginStreak(characterId, streakData) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        localDb.set(`login_streak_${characterId}`, streakData);
+        return;
+    }
+    try {
+        const { data: existing } = await supabase
+            .from('inventory')
+            .select('id')
+            .eq('character_id', characterId)
+            .eq('item_name', 'login_streak')
+            .eq('item_type', 'system')
+            .maybeSingle();
+
+        if (existing) {
+            await supabase.from('inventory').update({ stats: streakData }).eq('id', existing.id);
+        } else {
+            await supabase.from('inventory').insert({
+                character_id: characterId,
+                item_name: 'login_streak',
+                item_type: 'system',
+                quantity: 1,
+                stats: streakData
+            });
+        }
+    } catch (e) {
+        console.error('[GameSync] Failed to save login streak to DB:', e);
+    }
+}
+
+export async function loadLoginStreak(characterId) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        return localDb.get(`login_streak_${characterId}`) || null;
+    }
+    try {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('stats')
+            .eq('character_id', characterId)
+            .eq('item_name', 'login_streak')
+            .eq('item_type', 'system')
+            .maybeSingle();
+        if (error) throw error;
+        return data?.stats || null;
+    } catch (e) {
+        console.error('[GameSync] Failed to load login streak from DB:', e);
+        return null;
+    }
+}
+
 // ============ Bind Guest → Real Account (with progress migration) ============
 // Anonymous Supabase sessions aren't available on this project, so every guest
 // is a LOCAL guest with no auth session — `updateUser` can't bind them ("Auth
@@ -532,10 +585,11 @@ export async function migrateGuestToAccount(email, password, guest) {
         if (!ok) failedItems.push(it.item_name);
     }
 
-    // 6. System collections (friends / daily quests / fishing almanac)
+    // 6. System collections (friends / daily quests / fishing almanac / login streak)
     if (guest.friends) await withRetry(() => saveFriendsList(newCharId, guest.friends));
     if (guest.dailyQuests) await withRetry(() => saveDailyQuests(newCharId, guest.dailyQuests));
     if (guest.almanac) await withRetry(() => saveFishingAlmanac(newCharId, guest.almanac));
+    if (guest.loginStreak) await withRetry(() => saveLoginStreak(newCharId, guest.loginStreak));
 
     // 7. Switch the active session to the new real account
     saveActiveSession(newUserId);

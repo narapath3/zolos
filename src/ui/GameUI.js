@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
 
@@ -241,6 +241,11 @@ export class GameUI {
       btnAlmanac.addEventListener('click', () => this.openFishingAlmanac());
     }
 
+    const btnDailyReward = document.getElementById('btn-daily-reward');
+    if (btnDailyReward) {
+      btnDailyReward.addEventListener('click', () => this.openDailyReward());
+    }
+
     // Close buttons
     document.querySelectorAll('.panel-close').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -327,6 +332,15 @@ export class GameUI {
     const forgeModal = document.getElementById('forge-modal');
     if (forgeModal) {
       const display = forgeModal.style.display || window.getComputedStyle(forgeModal).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
+    // Check the Daily Reward overlay (standalone modal)
+    const dailyModal = document.getElementById('daily-modal');
+    if (dailyModal) {
+      const display = dailyModal.style.display || window.getComputedStyle(dailyModal).display;
       if (display !== 'none') {
         anyPanelOpen = true;
       }
@@ -2673,6 +2687,224 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+  }
+
+  // ============ Login Streak — Daily Rewards ============
+  // 7-day cycle; missing a day resets the streak. Rewards escalate to a
+  // Dragon Heart on day 7 (the forge's rarest catalyst) so the streak feeds
+  // the crafting loop. State: { streak, lastClaim: 'YYYY-MM-DD' }.
+  static _STREAK_REWARDS = [
+    { day: 1, gold: 500, items: [] },
+    { day: 2, gold: 1000, items: [{ name: 'Red Herb', qty: 5 }] },
+    { day: 3, gold: 2000, items: [{ name: 'Iron Ore', qty: 5 }] },
+    { day: 4, gold: 3500, items: [{ name: 'Crystal Blue', qty: 2 }] },
+    { day: 5, gold: 5000, items: [{ name: 'Oridecon Stone', qty: 2 }] },
+    { day: 6, gold: 8000, items: [{ name: 'Fire Element Stone', qty: 1 }] },
+    { day: 7, gold: 15000, items: [{ name: 'Dragon Heart', qty: 1 }] },
+  ];
+
+  _todayStr(offsetDays = 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  // Streak the player is ON if they claim today (also true streak after claim)
+  _pendingStreak() {
+    const s = this.loginStreak || { streak: 0, lastClaim: null };
+    if (s.lastClaim === this._todayStr()) return s.streak;      // already claimed
+    if (s.lastClaim === this._todayStr(-1)) return s.streak + 1; // continue
+    return 1;                                                    // broken/new
+  }
+
+  _canClaimDaily() {
+    const s = this.loginStreak || { streak: 0, lastClaim: null };
+    return s.lastClaim !== this._todayStr();
+  }
+
+  async loadLoginStreakFromDB(characterId) {
+    this.characterId = this.characterId || characterId;
+    try {
+      const dbData = await loadLoginStreak(characterId);
+      const localKey = `zolos_login_streak_${characterId}`;
+      let localData = null;
+      try { localData = JSON.parse(localStorage.getItem(localKey) || 'null'); } catch (e) { /* ignore */ }
+      // Prefer whichever record is most recent
+      this.loginStreak = (dbData && (!localData || (dbData.lastClaim || '') >= (localData.lastClaim || ''))) ? dbData : (localData || dbData) || { streak: 0, lastClaim: null };
+      localStorage.setItem(localKey, JSON.stringify(this.loginStreak));
+    } catch (e) {
+      this.loginStreak = { streak: 0, lastClaim: null };
+    }
+    this._updateDailyRewardBadge();
+    // Auto-open once per session when there's a reward waiting
+    if (this._canClaimDaily()) {
+      setTimeout(() => this.openDailyReward(), 1600);
+    }
+  }
+
+  async _saveLoginStreak() {
+    if (!this.characterId) return;
+    localStorage.setItem(`zolos_login_streak_${this.characterId}`, JSON.stringify(this.loginStreak));
+    try { await saveLoginStreak(this.characterId, this.loginStreak); } catch (e) { /* keep local */ }
+  }
+
+  // Pulse the HUD 🎁 button while a reward is claimable
+  _updateDailyRewardBadge() {
+    const btn = document.getElementById('btn-daily-reward');
+    if (!btn) return;
+    if (this._canClaimDaily()) {
+      btn.style.animation = 'dailyPulse 1.2s ease-in-out infinite';
+      btn.style.boxShadow = '0 0 14px rgba(255,200,60,0.75)';
+    } else {
+      btn.style.animation = '';
+      btn.style.boxShadow = '';
+    }
+  }
+
+  openDailyReward() {
+    if (!document.getElementById('daily-style')) {
+      const st = document.createElement('style');
+      st.id = 'daily-style';
+      st.textContent = `
+        #daily-modal{position:fixed;inset:0;z-index:1450;display:none;align-items:center;justify-content:center;
+          background:rgba(0,0,0,.66);backdrop-filter:blur(4px);padding:12px;box-sizing:border-box;}
+        #daily-card{width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:18px;
+          background:linear-gradient(165deg,#241540,#120a24);border:1.5px solid #8a5cff;
+          box-shadow:0 0 40px rgba(138,92,255,.35),0 24px 70px rgba(0,0,0,.75);overflow:hidden;}
+        #daily-card .daily-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+        @keyframes dailyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+        @keyframes dailyGlow{0%,100%{box-shadow:0 0 10px rgba(255,207,74,.45);}50%{box-shadow:0 0 26px rgba(255,207,74,.95);}}
+        @keyframes dailyShine{0%{background-position:-140% 0;}100%{background-position:240% 0;}}
+        .daily-slot-today{animation:dailyGlow 1.4s ease-in-out infinite;}
+        .daily-claim-btn{position:relative;overflow:hidden;}
+        .daily-claim-btn::after{content:'';position:absolute;inset:0;
+          background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);
+          background-size:220% 100%;animation:dailyShine 2.2s linear infinite;}
+        @media (max-width:768px){
+          #daily-modal{align-items:flex-start;padding:8px 8px 116px;}
+          #daily-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
+        }`;
+      document.head.appendChild(st);
+    }
+    let modal = document.getElementById('daily-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'daily-modal';
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { modal.style.display = 'none'; this.updateMobileControlsVisibility(); }
+      });
+      modal.innerHTML = `<div id="daily-card"></div>`;
+      document.body.appendChild(modal);
+    }
+    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+    this._renderDailyReward();
+    modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+  }
+
+  _renderDailyReward() {
+    const card = document.getElementById('daily-card');
+    if (!card) return;
+    const rewards = GameUI._STREAK_REWARDS;
+    const pending = this._pendingStreak();
+    const todayIdx = ((pending - 1) % 7) + 1; // 1..7 within the cycle
+    const canClaim = this._canClaimDaily();
+    const streakShown = canClaim ? pending : (this.loginStreak?.streak || 0);
+    const brokeStreak = canClaim && pending === 1 && (this.loginStreak?.streak || 0) > 0;
+
+    const itemLine = (r) => r.items.map(it => `${(ITEMS[it.name] || {}).emoji || '📦'}×${it.qty}`).join(' ');
+
+    const slots = rewards.map(r => {
+      const isToday = r.day === todayIdx;
+      const isPast = r.day < todayIdx || (!canClaim && r.day === todayIdx);
+      const isDay7 = r.day === 7;
+      const bg = isToday && canClaim
+        ? 'linear-gradient(160deg,rgba(255,207,74,.25),rgba(255,122,46,.15))'
+        : isPast ? 'rgba(95,221,122,.08)' : 'rgba(255,255,255,.04)';
+      const border = isToday && canClaim ? '#ffcf4a' : isPast ? 'rgba(95,221,122,.4)' : 'rgba(255,255,255,.09)';
+      const label = isPast ? '✅' : (isToday && canClaim ? '⭐ วันนี้' : `วัน ${r.day}`);
+      return `
+        <div class="${isToday && canClaim ? 'daily-slot-today' : ''}" style="border-radius:12px;padding:8px 4px;text-align:center;
+          background:${bg};border:1.5px solid ${border};${isDay7 ? 'grid-column:span 2;' : ''}
+          ${isPast && !(isToday && canClaim) ? 'opacity:.55;filter:saturate(.6);' : ''}">
+          <div style="font-size:9px;font-weight:800;color:${isToday && canClaim ? '#ffcf4a' : '#9aa5c0'};margin-bottom:3px;">${label}</div>
+          <div style="font-size:${isDay7 ? '26px' : '20px'};">${isDay7 ? '🐉' : '💰'}</div>
+          <div style="font-size:10px;color:#ffd97a;font-weight:700;">${r.gold.toLocaleString()}g</div>
+          ${r.items.length ? `<div style="font-size:10px;color:#c9b8ff;">${itemLine(r)}</div>` : ''}
+          ${isDay7 ? `<div style="font-size:9px;color:#ff9a7a;font-weight:700;">Dragon Heart!</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const claimArea = canClaim
+      ? `<button id="daily-claim" class="daily-claim-btn" style="width:100%;border:none;border-radius:14px;padding:14px;cursor:pointer;
+          font-weight:900;font-size:16px;background:linear-gradient(135deg,#ffcf4a,#ff7a2e);color:#3a2000;">
+          🎁 รับรางวัลวัน ${todayIdx} — ${rewards[todayIdx - 1].gold.toLocaleString()} Gold${rewards[todayIdx - 1].items.length ? ' + ' + itemLine(rewards[todayIdx - 1]) : ''}</button>`
+      : `<div style="text-align:center;padding:12px;border-radius:12px;background:rgba(95,221,122,.1);border:1px solid rgba(95,221,122,.35);
+          color:#7de89a;font-weight:800;font-size:13px;">✅ รับแล้ววันนี้ — กลับมาพรุ่งนี้เพื่อรักษาสตรีค! 🔥</div>`;
+
+    card.innerHTML = `
+      <div style="padding:18px 20px 14px;background:linear-gradient(90deg,#3a2170,#1c1040);border-bottom:1px solid #8a5cff;position:relative;">
+        <button id="daily-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.1);border:none;color:#d8ccff;
+          width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:34px;">🎁</div>
+          <div>
+            <div style="font-weight:900;color:#fff;font-size:19px;text-shadow:0 0 12px rgba(255,207,74,.5);">รางวัลเข้าเกมรายวัน</div>
+            <div style="font-size:12px;color:#c0b0f0;">สตรีคปัจจุบัน: <span style="color:#ffcf4a;font-weight:900;">🔥 ${streakShown} วัน</span>
+            ${brokeStreak ? '<span style="color:#ff9a8a;"> (สตรีคขาด — เริ่มใหม่วัน 1)</span>' : ''}</div>
+          </div>
+        </div>
+      </div>
+      <div class="daily-body" style="padding:16px 18px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">${slots}</div>
+        ${claimArea}
+        <div style="margin-top:10px;text-align:center;font-size:10px;color:#8a7fb0;">เข้าเกมทุกวันเพื่อรางวัลใหญ่ขึ้นเรื่อยๆ — ขาดวันใดวันหนึ่ง สตรีคจะเริ่มนับใหม่</div>
+      </div>`;
+
+    card.querySelector('#daily-close').onclick = () => {
+      const m = document.getElementById('daily-modal'); if (m) m.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    };
+    const claimBtn = card.querySelector('#daily-claim');
+    if (claimBtn) claimBtn.onclick = () => this._claimDailyReward();
+  }
+
+  async _claimDailyReward() {
+    if (!this._canClaimDaily() || !this.character) return;
+    const pending = this._pendingStreak();
+    const dayIdx = ((pending - 1) % 7) + 1;
+    const reward = GameUI._STREAK_REWARDS[dayIdx - 1];
+
+    // Grant gold + items
+    this.character.stats.gold = (Number(this.character.stats.gold) || 0) + reward.gold;
+    for (const it of reward.items) {
+      const meta = ITEMS[it.name] || {};
+      const existing = this.inventory.find(i => i.item_name === it.name);
+      if (existing) existing.quantity += it.qty;
+      else this.inventory.push({ item_name: it.name, item_type: meta.type || 'material', emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: it.qty, stats: {} });
+      if (this.characterId) saveInventoryItem(this.characterId, it.name, meta.type || 'material', it.qty).catch(() => {});
+    }
+
+    // Advance the streak and persist
+    this.loginStreak = { streak: pending, lastClaim: this._todayStr() };
+    await this._saveLoginStreak();
+    if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => {});
+
+    // Celebration
+    const itemTxt = reward.items.map(it => `${(ITEMS[it.name] || {}).emoji || ''} ${it.name}×${it.qty}`).join(', ');
+    this.addCombatLog(`🎁 รับรางวัลวัน ${dayIdx} สำเร็จ! +${reward.gold.toLocaleString()}g${itemTxt ? ' + ' + itemTxt : ''} (สตรีค 🔥${pending})`, 'levelup');
+    if (this.triggerScreenShake) this.triggerScreenShake(true);
+    if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
+    try {
+      if (window.particles && this.character.getPosition) {
+        window.particles.createExplosion(this.character.getPosition(), dayIdx === 7 ? 0xff5a7a : 0xffcf4a);
+      }
+    } catch (e) { /* non-fatal */ }
+
+    this._renderDailyReward();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this._updateDailyRewardBadge();
   }
 
   // ============ Weapon Smith — Forge (crafting) ============

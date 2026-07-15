@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.37 (global-online-list)';
+const BUILD_VERSION = '2026-07-15.38 (login-streak)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -328,6 +328,7 @@ async function initGame(charData) {
             friends: gameUI.friends || [],
             dailyQuests: gameUI.dailyQuestsState || null,
             almanac: gameUI.almanac || null,
+            loginStreak: gameUI.loginStreak || null,
         };
         const result = await migrateGuestToAccount(email, password, guest);
         charData.isGuest = false; // Update local state
@@ -616,6 +617,7 @@ async function initGame(charData) {
     await gameUI.loadDailyQuestsFromDB(charData.id);
     await gameUI.loadFriendsFromDB(charData.id);
     await gameUI.loadFishingAlmanacFromDB(charData.id);
+    await gameUI.loadLoginStreakFromDB(charData.id); // daily reward — auto-opens if claimable
 
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);
