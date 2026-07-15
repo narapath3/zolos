@@ -514,20 +514,33 @@ export async function migrateGuestToAccount(email, password, guest) {
     if (charErr) throw new Error('ผูกบัญชีสำเร็จบางส่วน แต่ย้ายตัวละครไม่สำเร็จ: ' + charErr.message);
     const newCharId = newChar.id;
 
-    // 5. Inventory
+    // Retry helper — a single transient failure must not silently drop data.
+    const withRetry = async (fn) => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try { await fn(); return true; }
+            catch (e) { if (attempt === 2) return false; await new Promise(r => setTimeout(r, 250)); }
+        }
+        return false;
+    };
+
+    // 5. Inventory — each item retried; anything that still fails is reported
+    // back to the caller instead of vanishing quietly.
+    const failedItems = [];
     for (const it of (guest.inventory || [])) {
         if (!it || !it.item_name || !it.quantity) continue;
-        try { await saveInventoryItem(newCharId, it.item_name, it.item_type || 'material', it.quantity, it.stats || {}); } catch (e) { /* skip bad item */ }
+        const ok = await withRetry(() => saveInventoryItem(newCharId, it.item_name, it.item_type || 'material', it.quantity, it.stats || {}));
+        if (!ok) failedItems.push(it.item_name);
     }
 
     // 6. System collections (friends / daily quests / fishing almanac)
-    try { if (guest.friends) await saveFriendsList(newCharId, guest.friends); } catch (e) { }
-    try { if (guest.dailyQuests) await saveDailyQuests(newCharId, guest.dailyQuests); } catch (e) { }
-    try { if (guest.almanac) await saveFishingAlmanac(newCharId, guest.almanac); } catch (e) { }
+    if (guest.friends) await withRetry(() => saveFriendsList(newCharId, guest.friends));
+    if (guest.dailyQuests) await withRetry(() => saveDailyQuests(newCharId, guest.dailyQuests));
+    if (guest.almanac) await withRetry(() => saveFishingAlmanac(newCharId, guest.almanac));
 
     // 7. Switch the active session to the new real account
     saveActiveSession(newUserId);
-    return { userId: newUserId, characterId: newCharId };
+    if (failedItems.length) console.warn('[Migrate] items that failed to transfer:', failedItems);
+    return { userId: newUserId, characterId: newCharId, failedItems };
 }
 
 // ============ Friends List DB Sync (System Inventory Fallback) ============

@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.33 (camera-rotate)';
+const BUILD_VERSION = '2026-07-15.34 (guest-migrate-hardening)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -315,8 +315,12 @@ async function initGame(charData) {
             dailyQuests: gameUI.dailyQuestsState || null,
             almanac: gameUI.almanac || null,
         };
-        await migrateGuestToAccount(email, password, guest);
+        const result = await migrateGuestToAccount(email, password, guest);
         charData.isGuest = false; // Update local state
+        // If any item failed to transfer, tell the player instead of hiding it.
+        if (result && result.failedItems && result.failedItems.length && gameUI) {
+            gameUI.addCombatLog(`⚠️ บางไอเทมย้ายไม่สำเร็จ: ${result.failedItems.join(', ')} (ลองผูกบัญชีซ้ำได้)`, 'warning');
+        }
         // Reload into the freshly-created real account (its Supabase session now
         // wins over the old local-guest fallback), with all progress migrated.
         setTimeout(() => window.location.reload(), 2200);
