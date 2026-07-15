@@ -1037,15 +1037,34 @@ export const SHOP_ITEMS = [
     { name: 'Orange Juice', price: 120 },
     { name: 'Blue Herb', price: 150 },
     { name: 'Grape', price: 50 },
+    // ---- Weapons (basic → legendary). Buy one and the hero visibly wields it. ----
+    { name: 'Novice Cutter', price: 150 },
     { name: 'Sword', price: 200 },
     { name: 'Bow', price: 250 },
     { name: 'Gun', price: 400 },
+    { name: 'Mage Staff', price: 600 },
     { name: 'Fishing Rod', price: 150 },
-    // Also list some basic defensive armor/shields in the shop
+    { name: 'Silver Dagger', price: 3200 },
+    { name: 'Katana', price: 3500 },
+    { name: 'Crossbow', price: 4000 },
+    { name: 'Heavy Warhammer', price: 5000 },
+    { name: 'Excalibur', price: 25000 },      // glows gold in hand
+    { name: 'Rudra Bow', price: 28000 },      // radiant bow
+    { name: 'Ragnarok Blade', price: 120000 },// mythic, crimson glow
+    // ---- Armor / shields / accessories ----
     { name: 'Cotton Shirt', price: 100 },
+    { name: 'Iron Helm', price: 50 },
     { name: 'Wooden Buckler', price: 120 },
+    { name: 'Silver Ring', price: 450 },
+    { name: 'Leather Cloak', price: 650 },
     { name: 'Iron Shield', price: 750 },
-    { name: 'Adventurer Suit', price: 800 }
+    { name: 'Adventurer Suit', price: 800 },
+    { name: 'Speed Boots', price: 900 },
+    { name: 'Ranger Hood', price: 2500 },
+    { name: 'Tear Shield', price: 3600 },
+    { name: 'Steel Plate Mail', price: 6000 },
+    { name: 'Golden Shield', price: 18000 },
+    { name: 'Odin Garment', price: 22000 }
 ];
 
 // ============ EXP TABLE ============

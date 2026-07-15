@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.34 (guest-migrate-hardening)';
+const BUILD_VERSION = '2026-07-15.35 (weapon-shop-visuals)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -857,6 +857,9 @@ function handleMouseInteraction(event) {
         if (npcType === 'sell') {
             gameUI._togglePanel('sell-shop-panel');
             gameUI._renderSellShop();
+        } else if (npcType === 'weaponsmith') {
+            // Weapon smith opens the shop focused on gear
+            gameUI.openShopTab('equip');
         } else {
             gameUI._togglePanel('shop-panel');
             gameUI._renderShop();

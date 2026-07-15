@@ -230,6 +230,8 @@ export class SceneManager {
         this.waterMesh = null;
         this.cloudSprites = [];
         this.npcMesh = null;
+        this.npcSellMesh = null;
+        this.npcWeaponMesh = null;
         this.swayingObjects = [];
         this.birds = [];
 
@@ -292,6 +294,7 @@ export class SceneManager {
         if (mapId === 'prontera') {
             this._createNPC();
             this._createSellNPC();
+            this._createWeaponSmithNPC();
         }
 
         // Perf: point lights must never cast shadows — each would trigger a
@@ -416,6 +419,7 @@ export class SceneManager {
         const list = [];
         if (this.npcMesh) list.push(this.npcMesh);
         if (this.npcSellMesh) list.push(this.npcSellMesh);
+        if (this.npcWeaponMesh) list.push(this.npcWeaponMesh);
         return list;
     }
 
@@ -3003,6 +3007,133 @@ export class SceneManager {
         this.scene.add(group);
         this.envObjects.push(group);
         this.npcMesh = group;
+    }
+
+    // ---- Weapon Smith: a blacksmith stall that opens the equipment shop ----
+    _createWeaponSmithNPC() {
+        const group = new THREE.Group();
+        group.userData.isNPC = true;
+        group.userData.npcType = 'weaponsmith';
+
+        const stone = new THREE.MeshLambertMaterial({ color: 0x5c5c66 });
+        const darkStone = new THREE.MeshLambertMaterial({ color: 0x3a3a42 });
+        const iron = new THREE.MeshLambertMaterial({ color: 0x2e2e34 });
+        const wood = new THREE.MeshLambertMaterial({ color: 0x6a4a2a });
+
+        // ---- Stone platform ----
+        const base = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.16, 3.2), new THREE.MeshLambertMaterial({ color: 0x6b6b60 }));
+        base.position.y = 0.08; base.receiveShadow = true;
+        group.add(base);
+
+        // ---- Forge furnace (stone block with glowing coals) ----
+        const furnace = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.3, 1.2), stone);
+        furnace.position.set(-1.1, 0.75, -0.7); furnace.castShadow = true;
+        group.add(furnace);
+        // Furnace mouth
+        const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.2), darkStone);
+        mouth.position.set(-1.1, 0.7, 0.0);
+        group.add(mouth);
+        // Glowing coals
+        const coals = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.15), new THREE.MeshBasicMaterial({ color: 0xff6a1a }));
+        coals.position.set(-1.1, 0.6, 0.02);
+        group.add(coals);
+        const forgeGlow = new THREE.PointLight(0xff7a2a, 1.6, 7);
+        forgeGlow.position.set(-1.1, 0.8, 0.4);
+        group.add(forgeGlow);
+        // Chimney
+        const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.4, 6), darkStone);
+        chimney.position.set(-1.1, 2.1, -0.7); chimney.castShadow = true;
+        group.add(chimney);
+
+        // ---- Anvil ----
+        const anvilBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.5, 6), wood);
+        anvilBase.position.set(0.6, 0.35, 0.4); anvilBase.castShadow = true;
+        group.add(anvilBase);
+        const anvilTop = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.32), iron);
+        anvilTop.position.set(0.6, 0.7, 0.4); anvilTop.castShadow = true;
+        group.add(anvilTop);
+        const anvilHorn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 6), iron);
+        anvilHorn.position.set(1.05, 0.72, 0.4); anvilHorn.rotation.z = -Math.PI / 2;
+        group.add(anvilHorn);
+        // A glowing sword being forged on the anvil
+        const forgeBlade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.6, 0.03), new THREE.MeshLambertMaterial({ color: 0xff8844, emissive: new THREE.Color(0xff5511), emissiveIntensity: 0.7 }));
+        forgeBlade.position.set(0.55, 0.9, 0.4); forgeBlade.rotation.z = 0.3;
+        group.add(forgeBlade);
+
+        // ---- Weapon rack (behind, with a few blades on display) ----
+        const rack = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.12, 0.25), wood);
+        rack.position.set(1.0, 1.7, -1.35);
+        group.add(rack);
+        const rackLegGeo = new THREE.BoxGeometry(0.1, 1.7, 0.1);
+        [0.1, 1.9].forEach(x => {
+            const leg = new THREE.Mesh(rackLegGeo, wood);
+            leg.position.set(x, 0.85, -1.35); leg.castShadow = true;
+            group.add(leg);
+        });
+        const rackColors = [0xd0d0dc, 0xffd23a, 0x88ccff];
+        rackColors.forEach((c, i) => {
+            const disp = new THREE.Group();
+            const bl = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.03), new THREE.MeshLambertMaterial({ color: c }));
+            bl.position.y = 0.45; bl.castShadow = true; disp.add(bl);
+            const gd = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.08), new THREE.MeshLambertMaterial({ color: 0x8a6a3a }));
+            disp.add(gd);
+            disp.position.set(0.4 + i * 0.6, 1.15, -1.3);
+            group.add(disp);
+        });
+
+        // ---- Blacksmith figure ----
+        const smith = new THREE.Group();
+        smith.add(this._boxMesh(0.6, 0.8, 0.4, 0x6a4030, 0, 1.0, 0));           // torso (leather)
+        const apron = this._boxMesh(0.5, 0.6, 0.02, 0x2a2a2a, 0, 0.9, 0.2); smith.add(apron); // apron
+        smith.add(this._boxMesh(0.46, 0.46, 0.46, 0xdCA878, 0, 1.66, 0));       // head
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        [[-0.1, 1.68, 0.24], [0.1, 1.68, 0.24]].forEach(([x, y, z]) => {
+            const e = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.04), eyeMat);
+            e.position.set(x, y, z); smith.add(e);
+        });
+        smith.add(this._boxMesh(0.5, 0.16, 0.5, 0x7a1f1f, 0, 1.95, 0));         // bandana
+        smith.add(this._boxMesh(0.18, 0.5, 0.18, 0xdCA878, -0.4, 0.95, 0.05));  // left arm
+        smith.add(this._boxMesh(0.18, 0.5, 0.18, 0xdCA878, 0.4, 0.85, 0.15));   // right arm (raised, hammering)
+        smith.add(this._boxMesh(0.2, 0.45, 0.22, 0x3a2a1a, -0.14, 0.4, 0));     // legs
+        smith.add(this._boxMesh(0.2, 0.45, 0.22, 0x3a2a1a, 0.14, 0.4, 0));
+        // Hammer in right hand
+        const hHandle = this._boxMesh(0.05, 0.4, 0.05, 0x5a3a1a, 0.55, 1.05, 0.2); smith.add(hHandle);
+        const hHead = this._boxMesh(0.16, 0.14, 0.16, 0x2e2e34, 0.55, 1.28, 0.2); smith.add(hHead);
+        smith.position.set(0.55, 0.16, 1.05);
+        smith.rotation.y = -0.5;
+        group.add(smith);
+
+        // ---- Floating name tag ----
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024; canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(30, 20, 12, 0.72)';
+        ctx.roundRect(128, 16, 768, 96, 24); ctx.fill();
+        ctx.strokeStyle = '#d08040'; ctx.lineWidth = 6;
+        ctx.roundRect(128, 16, 768, 96, 24); ctx.stroke();
+        ctx.font = 'bold 46px "Helvetica Neue", Helvetica, Arial, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffb060';
+        ctx.fillText('⚒️ ช่างตีอาวุธ', 512, 64);
+        const nameTag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
+        nameTag.position.y = 3.2;
+        nameTag.scale.set(5.0, 0.625, 1);
+        group.add(nameTag);
+
+        // ---- Place on dry land, away from the general shop ----
+        group.position.set(9, 0, 6);
+        group.rotation.y = -0.4;
+        this.scene.add(group);
+        this.envObjects.push(group);
+        this.npcWeaponMesh = group;
+    }
+
+    // Tiny helper for boxy NPC parts
+    _boxMesh(w, h, d, color, x, y, z) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color }));
+        m.position.set(x, y, z);
+        m.castShadow = true;
+        return m;
     }
 
     _createSellNPC() {

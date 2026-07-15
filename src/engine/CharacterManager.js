@@ -166,7 +166,7 @@ export class CharacterManager {
 
     isRanged() {
         const weapon = this.equippedWeapon;
-        return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow';
+        return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow' || weapon === 'Rudra Bow';
     }
 
     // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet)
@@ -333,7 +333,191 @@ export class CharacterManager {
 
             this.weaponMesh = group;
             this.rightArm.add(this.weaponMesh);
+        } else {
+            // Any other catalog weapon → distinctive parametric model so the
+            // hero visibly holds exactly what was bought/equipped, with a glow
+            // aura for the rare/legendary/mythic pieces.
+            const mesh = this._buildGenericWeapon(itemName);
+            if (mesh) {
+                this.weaponMesh = mesh;
+                this.rightArm.add(this.weaponMesh);
+            }
         }
+    }
+
+    // ===== Parametric weapon models (covers every weapon in the catalog) =====
+    // Each entry picks a builder + colors; legendary/mythic get an emissive
+    // glow so they read as "special" in the hero's hand.
+    _buildGenericWeapon(itemName) {
+        const SPECS = {
+            'Novice Cutter':   { kind: 'dagger',     blade: 0xb8bcc8, guard: 0x8a6a3a, len: 0.6 },
+            'Silver Dagger':   { kind: 'dagger',     blade: 0xe6e8f2, guard: 0xc0c0c8, len: 0.66, glow: 0x99aaff, glowI: 0.35 },
+            'Katana':          { kind: 'katana',     blade: 0xe2e6ec, guard: 0x2a2a2a, len: 1.15 },
+            'Heavy Warhammer': { kind: 'hammer',     head: 0x70727a, handle: 0x5a3a1a },
+            'Mage Staff':      { kind: 'staff',      shaft: 0x7a4a24, gem: 0x46c8ff, glow: 0x46c8ff, glowI: 0.7 },
+            'Crossbow':        { kind: 'crossbow',   wood: 0x6a4a2a, metal: 0x9098a0 },
+            'Great Bow':       { kind: 'bow',        wood: 0x5a3a1a, scale: 1.25 },
+            'Excalibur':       { kind: 'greatsword', blade: 0xfff2c0, guard: 0xffd23a, len: 1.3, gem: 0x66ccff, glow: 0xffcc33, glowI: 0.95 },
+            'Rudra Bow':       { kind: 'bow',        wood: 0xd8bc6a, scale: 1.3, glow: 0x86ff9a, glowI: 0.85 },
+            'Ragnarok Blade':  { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
+        };
+        let spec = SPECS[itemName];
+        if (!spec) {
+            // Heuristic fallback so ANY weapon (incl. future drops) still shows something
+            const it = ITEMS[itemName];
+            if (it && it.type !== 'weapon' && it.type !== 'fishing_rod') return null;
+            const n = itemName.toLowerCase();
+            if (n.includes('bow')) spec = { kind: 'bow', wood: 0x6a4a2a };
+            else if (n.includes('gun') || n.includes('pistol') || n.includes('rifle')) spec = { kind: 'gun' };
+            else if (n.includes('staff') || n.includes('wand')) spec = { kind: 'staff', shaft: 0x7a4a24, gem: 0x46c8ff, glow: 0x46c8ff, glowI: 0.6 };
+            else if (n.includes('hammer') || n.includes('mace')) spec = { kind: 'hammer', head: 0x70727a, handle: 0x5a3a1a };
+            else if (n.includes('dagger') || n.includes('cutter') || n.includes('knife')) spec = { kind: 'dagger', blade: 0xc8ccd6, guard: 0x8a6a3a, len: 0.6 };
+            else spec = { kind: 'sword', blade: 0xc0c0d0, guard: 0xffd040, len: 1.0 };
+        }
+        switch (spec.kind) {
+            case 'dagger':     return this._wpBlade({ ...spec, len: spec.len || 0.6, width: 0.07 });
+            case 'greatsword': return this._wpBlade({ ...spec, width: 0.15 });
+            case 'katana':     return this._wpKatana(spec);
+            case 'hammer':     return this._wpHammer(spec);
+            case 'staff':      return this._wpStaff(spec);
+            case 'bow':        return this._wpBow(spec);
+            case 'crossbow':   return this._wpCrossbow(spec);
+            case 'gun':        return this._wpGun(spec);
+            case 'sword':
+            default:           return this._wpBlade({ ...spec, width: spec.width || 0.09 });
+        }
+    }
+
+    _wpBlade({ blade = 0xc0c0d0, guard = 0xffd040, len = 1.0, width = 0.09, glow, glowI = 0, gem }) {
+        const group = new THREE.Group();
+        const bladeMat = new THREE.MeshLambertMaterial({ color: blade });
+        if (glow) { bladeMat.emissive = new THREE.Color(glow); bladeMat.emissiveIntensity = glowI; }
+        const bladeMesh = new THREE.Mesh(new THREE.BoxGeometry(width, len, 0.04), bladeMat);
+        bladeMesh.position.set(0, -0.2 + len / 2, 0);
+        bladeMesh.castShadow = true;
+        group.add(bladeMesh);
+        // Pointed tip
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(width * 0.7, 0.18, 4), bladeMat);
+        tip.position.set(0, -0.2 + len + 0.06, 0);
+        tip.rotation.y = Math.PI / 4;
+        group.add(tip);
+        // Cross-guard
+        const guardMesh = new THREE.Mesh(new THREE.BoxGeometry(width + 0.16, 0.06, 0.1), new THREE.MeshLambertMaterial({ color: guard }));
+        guardMesh.position.set(0, -0.2, 0);
+        group.add(guardMesh);
+        // Handle
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 6), new THREE.MeshLambertMaterial({ color: 0x5a3a1a }));
+        handle.position.set(0, -0.35, 0);
+        group.add(handle);
+        if (gem) {
+            const gemMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshLambertMaterial({ color: gem, emissive: new THREE.Color(gem), emissiveIntensity: 0.8 }));
+            gemMesh.position.set(0, -0.2, 0.08);
+            group.add(gemMesh);
+        }
+        if (glow) group.add(this._wpAura(glow, new THREE.BoxGeometry(width * 2.4, len * 1.05, 0.12), bladeMesh.position));
+        group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    _wpKatana({ blade = 0xe2e6ec, guard = 0x2a2a2a, len = 1.15, glow, glowI = 0 }) {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshLambertMaterial({ color: blade });
+        if (glow) { mat.emissive = new THREE.Color(glow); mat.emissiveIntensity = glowI; }
+        const b = new THREE.Mesh(new THREE.BoxGeometry(0.07, len, 0.03), mat);
+        b.position.set(0, -0.2 + len / 2, 0);
+        b.rotation.z = 0.1; // hint of curve
+        b.castShadow = true;
+        group.add(b);
+        const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 10), new THREE.MeshLambertMaterial({ color: guard }));
+        tsuba.position.set(0, -0.2, 0); tsuba.rotation.x = Math.PI / 2;
+        group.add(tsuba);
+        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.32, 6), new THREE.MeshLambertMaterial({ color: 0x202028 }));
+        handle.position.set(0, -0.37, 0);
+        group.add(handle);
+        group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    _wpHammer({ head = 0x70727a, handle = 0x5a3a1a, glow, glowI = 0 }) {
+        const group = new THREE.Group();
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 1.0, 6), new THREE.MeshLambertMaterial({ color: handle }));
+        shaft.position.set(0, 0.15, 0); shaft.castShadow = true;
+        group.add(shaft);
+        const headMat = new THREE.MeshLambertMaterial({ color: head });
+        if (glow) { headMat.emissive = new THREE.Color(glow); headMat.emissiveIntensity = glowI; }
+        const block = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.3, 0.34), headMat);
+        block.position.set(0, 0.62, 0); block.castShadow = true;
+        group.add(block);
+        const band = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.06, 0.36), new THREE.MeshLambertMaterial({ color: 0x3a3a40 }));
+        band.position.set(0, 0.62, 0);
+        group.add(band);
+        group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    _wpStaff({ shaft = 0x7a4a24, gem = 0x46c8ff, glow = 0x46c8ff, glowI = 0.6 }) {
+        const group = new THREE.Group();
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.3, 6), new THREE.MeshLambertMaterial({ color: shaft }));
+        rod.position.set(0, 0.25, 0); rod.castShadow = true;
+        group.add(rod);
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), new THREE.MeshLambertMaterial({ color: gem, emissive: new THREE.Color(glow), emissiveIntensity: glowI }));
+        orb.position.set(0, 0.95, 0);
+        group.add(orb);
+        const holder = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.02, 6, 10), new THREE.MeshLambertMaterial({ color: 0xd0a040 }));
+        holder.position.set(0, 0.88, 0); holder.rotation.x = Math.PI / 2;
+        group.add(holder);
+        group.add(this._wpAura(glow, new THREE.SphereGeometry(0.2, 10, 10), new THREE.Vector3(0, 0.95, 0)));
+        group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    _wpBow({ wood = 0x8b5a2b, scale = 1.0, glow, glowI = 0 }) {
+        const group = new THREE.Group();
+        const woodMat = new THREE.MeshLambertMaterial({ color: wood });
+        if (glow) { woodMat.emissive = new THREE.Color(glow); woodMat.emissiveIntensity = glowI; }
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.05), woodMat));
+        const limbGeo = new THREE.BoxGeometry(0.04, 0.42, 0.04);
+        const up = new THREE.Mesh(limbGeo, woodMat); up.position.set(0, 0.33, -0.08); up.rotation.x = -0.45; up.castShadow = true; group.add(up);
+        const lo = new THREE.Mesh(limbGeo, woodMat); lo.position.set(0, -0.33, -0.08); lo.rotation.x = 0.45; lo.castShadow = true; group.add(lo);
+        const str = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1.0, 4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+        str.position.set(0, 0, -0.2); group.add(str);
+        if (glow) group.add(this._wpAura(glow, new THREE.BoxGeometry(0.16, 1.0, 0.16), new THREE.Vector3(0, 0, -0.05)));
+        group.scale.setScalar(scale);
+        group.position.set(0, -0.1, 0.15);
+        group.rotation.x = Math.PI / 2;
+        return group;
+    }
+
+    _wpCrossbow({ wood = 0x6a4a2a, metal = 0x9098a0 }) {
+        const group = new THREE.Group();
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), new THREE.MeshLambertMaterial({ color: wood }));
+        stock.castShadow = true; group.add(stock);
+        const limb = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.04, 0.04), new THREE.MeshLambertMaterial({ color: metal }));
+        limb.position.set(0, 0.22, 0.02); limb.castShadow = true; group.add(limb);
+        const str = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+        str.position.set(0, 0.22, -0.02); str.rotation.z = Math.PI / 2; group.add(str);
+        group.position.set(0, -0.1, 0.15);
+        group.rotation.x = Math.PI / 2;
+        return group;
+    }
+
+    _wpGun() {
+        const group = new THREE.Group();
+        const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.45, 0.08), new THREE.MeshLambertMaterial({ color: 0x4a4a4a }));
+        barrel.position.set(0, 0.1, 0.05); barrel.rotation.x = Math.PI / 2; barrel.castShadow = true; group.add(barrel);
+        const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.22, 0.07), new THREE.MeshLambertMaterial({ color: 0x8b5a2b }));
+        grip.position.set(0, -0.1, 0); grip.rotation.x = 0.2; grip.castShadow = true; group.add(grip);
+        group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    // Cheap additive glow shell (no extra light) for special weapons.
+    _wpAura(color, geometry, position) {
+        const aura = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false
+        }));
+        aura.position.copy(position);
+        return aura;
     }
 
     // World position of the fishing rod's tip (falls back to hand height)

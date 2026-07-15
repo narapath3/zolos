@@ -2515,6 +2515,17 @@ export class GameUI {
 
   }
 
+  // Open the buy shop pre-filtered to a tab ('all' | 'usable' | 'equip').
+  openShopTab(tab = 'all') {
+    this.currentShopTab = tab;
+    this.selectedShopItem = null;
+    const tabs = document.querySelectorAll('.shop-tab');
+    tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === tab));
+    this._togglePanel('shop-panel');
+    this._renderShop();
+    this._updateShopDetailBox();
+  }
+
   _renderShop() {
     // Increment quest progress for visiting the shop
     this.incrementQuestProgress('shop', 'any');
