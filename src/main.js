@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.40 (vending-stalls)';
+const BUILD_VERSION = '2026-07-15.41 (stall-street-visible)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -879,9 +879,15 @@ function handleMouseInteraction(event) {
     }
 
     if (hit.type === 'stall') {
-        // Player vending stall → open its shop window
         particles.createClickIndicator(hit.point, 0xffd24a);
-        if (gameUI) gameUI.openStallShop(hit.object);
+        if (gameUI) {
+            if (hit.object && hit.object.empty) {
+                // Vacant stand → offer to open your own shop here
+                gameUI._openVendingStallSetup();
+            } else {
+                gameUI.openStallShop(hit.object);
+            }
+        }
         return;
     }
 

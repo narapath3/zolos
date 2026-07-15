@@ -3151,14 +3151,28 @@ export class SceneManager {
 
     buildVendingStalls(stalls) {
         this.clearVendingStalls();
-        if (this.currentMap !== 'prontera' || !stalls || !stalls.length) return;
+        if (this.currentMap !== 'prontera') return;
 
         const AWNING_COLORS = [0xd94a4a, 0x3a8ad9, 0x3fae5a, 0xd9a03a, 0x9a5ad9, 0xd95a9a, 0x3ab8b0, 0xb8763a];
         const SLOT_X = [-14, -10, -6, -2, 2, 6, 10, 14];
-        const STREET_Z = -12;
+        // South side of town — the winding river tops out at z ≈ +8, the PvP
+        // arena at (-14,14) reaches z ≈ 20, portals sit at x = ±25. z = 22
+        // keeps the whole street clear of all of them.
+        const STREET_Z = 22;
 
-        for (const stall of stalls) {
-            const slot = Math.max(0, Math.min(7, stall.slot | 0));
+        // Empty slots render as vacant stands ("แผงว่าง") so the street is
+        // always visible and clicking a vacant stand opens the setup flow.
+        const bySlot = new Map();
+        (stalls || []).forEach(s => bySlot.set(Math.max(0, Math.min(7, s.slot | 0)), s));
+
+        for (let slot = 0; slot < 8; slot++) {
+            const stall = bySlot.get(slot);
+            if (!stall) {
+                const g = this._buildEmptyStallStand(slot, SLOT_X[slot], STREET_Z);
+                this.scene.add(g);
+                this.stallMeshes.push(g);
+                continue;
+            }
             const group = new THREE.Group();
             group.userData.isStall = true;
             group.userData.stall = stall;
@@ -3274,6 +3288,49 @@ export class SceneManager {
             this.scene.add(holder);
             this.stallMeshes.push(holder);
         }
+    }
+
+    // A vacant stall stand — muted wood, "แผงว่าง" sign, clickable to open one.
+    _buildEmptyStallStand(slot, x, z) {
+        const group = new THREE.Group();
+        group.userData.isStall = true;
+        group.userData.stall = { empty: true, slot };
+
+        const wood = new THREE.MeshLambertMaterial({ color: 0x6a5236 });
+        const base = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.14, 2.4), wood);
+        base.position.y = 0.07; base.receiveShadow = true;
+        group.add(base);
+        const counter = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.75, 0.55), new THREE.MeshLambertMaterial({ color: 0x54402a }));
+        counter.position.set(0, 0.5, 0.75); counter.castShadow = true;
+        group.add(counter);
+        const postGeo = new THREE.CylinderGeometry(0.06, 0.07, 2.3, 6);
+        [[-1.3, -0.85], [1.3, -0.85], [-1.3, 1.0], [1.3, 1.0]].forEach(([px, pz]) => {
+            const post = new THREE.Mesh(postGeo, wood);
+            post.position.set(px, 1.25, pz); post.castShadow = true;
+            group.add(post);
+        });
+        const awning = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.08, 2.6), new THREE.MeshLambertMaterial({ color: 0x8a8378 }));
+        awning.position.set(0, 2.45, 0.1); awning.rotation.x = -0.12;
+        group.add(awning);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 96;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(20, 16, 10, 0.65)';
+        ctx.roundRect(64, 8, 384, 80, 16); ctx.fill();
+        ctx.strokeStyle = '#9a8a6a'; ctx.lineWidth = 4;
+        ctx.roundRect(64, 8, 384, 80, 16); ctx.stroke();
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 36px Arial';
+        ctx.fillStyle = '#cfc4a8';
+        ctx.fillText('🏪 แผงว่าง — เปิดร้านได้!', 256, 60);
+        const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
+        sign.position.y = 3.1;
+        sign.scale.set(2.8, 0.55, 1);
+        group.add(sign);
+
+        group.position.set(x, 0, z);
+        return group;
     }
 
     // Tiny helper for boxy NPC parts
