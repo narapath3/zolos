@@ -114,6 +114,10 @@ export class SceneManager {
         this.camera.position.set(0, 18, 18);
         this.camera.lookAt(0, 0, 0);
 
+        // Player-controlled camera yaw (right-drag to rotate). 0 = default
+        // behind-the-shoulder angle, so nothing changes until the player rotates.
+        this.cameraYaw = 0;
+
         // Detect initial quality level
         const savedQuality = localStorage.getItem('zolos_graphics_quality');
         let initialQuality = savedQuality;
@@ -3305,10 +3309,15 @@ export class SceneManager {
     // stableY: use the character's baseY instead of animated mesh.position.y
     //          to prevent camera shake from walking/running bounce animation
     followTarget(targetPos, stableY) {
-        const offsetX = 0;
         const offsetY = 18;
-        const offsetZ = 18;
+        const dist = 18;        // horizontal distance from the player
         const smoothing = 0.08;
+
+        // Orbit the horizontal offset by the player-controlled yaw. At yaw 0
+        // this is (0, 18) — identical to the original fixed camera angle.
+        const yaw = this.cameraYaw || 0;
+        const offsetX = Math.sin(yaw) * dist;
+        const offsetZ = Math.cos(yaw) * dist;
 
         // Use stableY (baseY) for camera Y to avoid bounce-induced shake
         const followY = stableY !== undefined ? stableY : targetPos.y;
@@ -3323,6 +3332,24 @@ export class SceneManager {
 
         this.camera.lookAt(targetPos.x, followY, targetPos.z);
         this._weatherFocus = { x: targetPos.x, z: targetPos.z }; // rain follows the player
+    }
+
+    // Rotate the follow camera around the player (right-drag). deltaYaw is in
+    // radians. The angle is kept in [-π, π] to avoid unbounded growth.
+    rotateCamera(deltaYaw) {
+        let y = (this.cameraYaw || 0) + deltaYaw;
+        if (y > Math.PI) y -= Math.PI * 2;
+        else if (y < -Math.PI) y += Math.PI * 2;
+        this.cameraYaw = y;
+    }
+
+    // Snap the camera back to the default behind-the-shoulder angle.
+    resetCameraYaw() {
+        this.cameraYaw = 0;
+    }
+
+    getCameraYaw() {
+        return this.cameraYaw || 0;
     }
 
     // Duel camera: frame BOTH fighters. Centers on their midpoint and pulls

@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.32 (warp-to-friend)';
+const BUILD_VERSION = '2026-07-15.33 (camera-rotate)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -702,6 +702,12 @@ async function initGame(charData) {
         } else if (e.code === 'Digit3' || e.key === '3') {
             gameUI.castSkill('magnumBreak');
         }
+
+        // Reset the camera angle back to default (ignore while typing)
+        const tag = e.target && e.target.tagName;
+        if (e.code === 'KeyR' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+            if (sceneManager && sceneManager.resetCameraYaw) sceneManager.resetCameraYaw();
+        }
     });
     window.addEventListener('keyup', (e) => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = false;
@@ -709,8 +715,39 @@ async function initGame(charData) {
 
     canvas.addEventListener('mousedown', (e) => handleMouseInteraction(e));
 
+    // ----- Right-click drag to rotate the camera -----
+    // Frees the player from the fixed viewing angle. The contextmenu blocker
+    // (added earlier) keeps the browser menu from popping up while dragging.
+    let camDragging = false;
+    let camDragLastX = 0;
+    const ROTATE_SENS = 0.006; // radians per pixel dragged
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 2) {
+            camDragging = true;
+            camDragLastX = e.clientX;
+            canvas.style.cursor = 'grabbing';
+            e.preventDefault();
+        }
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!camDragging) return;
+        const dx = e.clientX - camDragLastX;
+        camDragLastX = e.clientX;
+        if (sceneManager && sceneManager.rotateCamera) {
+            sceneManager.rotateCamera(-dx * ROTATE_SENS);
+        }
+    });
+    const endCamDrag = () => {
+        if (!camDragging) return;
+        camDragging = false;
+        canvas.style.cursor = "url('/assets/cute_cursor_32.png'), default";
+    };
+    window.addEventListener('mouseup', (e) => { if (e.button === 2) endCamDrag(); });
+    window.addEventListener('blur', endCamDrag);
+
     // Mouse move for monster/player hovering with highlight glow
     canvas.addEventListener('mousemove', (e) => {
+        if (camDragging) return; // don't fight the rotate cursor / waste raycasts
         if (!sceneManager || !monsters || !gameUI) return;
         const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPCs(), remotePlayersMap);
 
@@ -775,6 +812,9 @@ async function showCharacterSelect(isGuest = false) {
 // ============ Input Handling ============
 function handleMouseInteraction(event) {
     if (!isGameStarted) return;
+    // Only the left button (or touch, which has no button) moves/targets.
+    // Right button is reserved for camera rotation (see below).
+    if (event.button === 2 || event.button === 1) return;
 
     const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPCs(), remotePlayersMap);
     if (!hit) return;
@@ -1623,7 +1663,13 @@ function gameLoop(time) {
         if (moveDir) {
             autoPath = null;
             character.moveSpeed = isShiftPressed ? 9 : 5.5;
-            character.manualMove(moveDir.x, moveDir.z, dt);
+            // Rotate the input by the camera yaw so "forward" always means
+            // "away from the camera", regardless of how it's been rotated.
+            const yaw = sceneManager.getCameraYaw ? sceneManager.getCameraYaw() : 0;
+            const s = Math.sin(yaw), c = Math.cos(yaw);
+            const wx = moveDir.z * s + moveDir.x * c;
+            const wz = moveDir.z * c - moveDir.x * s;
+            character.manualMove(wx, wz, dt);
         } else if (autoPath && !isFishingActive) {
             // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
             if (combatSystem && combatSystem.autoFarm) {
