@@ -220,6 +220,8 @@ export class GameUI {
     if (btnAdmin) {
       btnAdmin.addEventListener('click', () => {
         if (window.adminUI) {
+          const almanac = document.getElementById('almanac-modal');
+          if (almanac) almanac.style.display = 'none';
           window.adminUI.toggle();
           this.updateMobileControlsVisibility();
         }
@@ -276,6 +278,10 @@ export class GameUI {
     document.querySelectorAll('.side-panel').forEach(p => {
       if (p.id !== panelId) p.style.display = 'none';
     });
+    // The Fishing Almanac is a standalone overlay (not a .side-panel) — close it
+    // too so opening any other menu dismisses it.
+    const almanac = document.getElementById('almanac-modal');
+    if (almanac) almanac.style.display = 'none';
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     this.updateMobileControlsVisibility();
   }
@@ -777,8 +783,11 @@ export class GameUI {
       modal.innerHTML = `<div id="almanac-card" style="width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(160deg,#12233a,#0d1526);border:1.5px solid #2f6fb0;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;"></div>`;
       document.body.appendChild(modal);
     }
+    // Close any open side panels so the almanac doesn't stack on top of them.
+    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
     this._renderAlmanac();
     modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
   }
 
   _renderAlmanac() {
@@ -2116,6 +2125,9 @@ export class GameUI {
 
 
     const openEditor = () => {
+      // Close the Fishing Almanac overlay if it's open
+      const almanac = document.getElementById('almanac-modal');
+      if (almanac) almanac.style.display = 'none';
       // Default to profile tab on open
       if (tabProfileBtn) {
         tabProfileBtn.click();
