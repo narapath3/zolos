@@ -70,6 +70,28 @@ const activeDuels = new Map();
 // PlayerInfo shape:
 // { userId, username, level, socketId, joinedAt, lastSaveData: null }
 
+// ============ Chat Moderation ============
+// Server-authoritative so it can't be bypassed from the browser console.
+// Longer phrases first so they censor fully before their sub-words match.
+const PROFANITY = [
+    'ควยเย็ดแม่', 'เย็ดแม่', 'เย็ด', 'ควย', 'ควย', 'สัส', 'สาด', 'ไอสัส', 'ไอ้สัส',
+    'เหี้ย', 'ไอเหี้ย', 'ไอ้เหี้ย', 'หน้าหี', 'หี', 'แตด', 'ดอกทอง', 'กะหรี่', 'อีดอก',
+    'สถุน', 'ระยำ', 'ชาติหมา', 'จัญไร', 'สันดาน', 'พ่อมึงตาย', 'แม่มึงตาย', 'ไอ้ควาย',
+    'fuck', 'fuk', 'fvck', 'shit', 'bitch', 'dick', 'cunt', 'pussy', 'asshole', 'motherfucker', 'nigger',
+].sort((a, b) => b.length - a.length);
+const PROFANITY_RE = PROFANITY.map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+
+function censorProfanity(text) {
+    let out = text;
+    for (const re of PROFANITY_RE) out = out.replace(re, m => '*'.repeat(m.length));
+    return out;
+}
+
+// Per-socket rate limit: max messages per window + block instant duplicates.
+const CHAT_MAX_PER_WINDOW = 6;
+const CHAT_WINDOW_MS = 6000;
+const CHAT_DUP_MS = 3000;
+
 // ============ World Boss (server-authoritative) ============
 // A giant boss spawns on the main field on a fixed schedule. Everyone shares
 // one HP pool; each hit is relayed to the server which tracks per-player
@@ -279,10 +301,47 @@ io.on('connection', (socket) => {
 
     // --- CHAT ---
     socket.on('chat', (payload) => {
-        if (!payload) return;
+        if (!payload || typeof payload.message !== 'string') return;
+        const player = onlinePlayers.get(socket.id);
+        if (!player) return; // must be a joined player
+
         const mapId = payload.mapId || 'prontera_field';
-        // Broadcast chat to ALL clients in the SAME map
-        io.to(`map:${mapId}`).emit('chat', payload);
+        const isSystem = payload.userId === 'system';
+
+        let msg = payload.message.trim();
+        if (!msg) return;
+        if (msg.length > 200) msg = msg.slice(0, 200);
+
+        // Rate limit EVERY message from this socket (covers spoofed 'system'
+        // messages too, so the system channel can't dodge the filter/limit).
+        const now = Date.now();
+        if (!socket._chatTimes) socket._chatTimes = [];
+        socket._chatTimes = socket._chatTimes.filter(t => now - t < CHAT_WINDOW_MS);
+        if (socket._chatTimes.length >= CHAT_MAX_PER_WINDOW) {
+            socket.emit('chat_blocked', { reason: 'rate' });
+            return;
+        }
+        if (socket._lastChat && socket._lastChat.msg === msg && now - socket._lastChat.at < CHAT_DUP_MS) {
+            socket.emit('chat_blocked', { reason: 'dup' });
+            return;
+        }
+        socket._chatTimes.push(now);
+        socket._lastChat = { msg, at: now };
+
+        msg = censorProfanity(msg);
+
+        // Never trust client identity for a player message — use the server's
+        // known username/level so nobody can impersonate another player from
+        // the console. (System/market messages keep their label but are still
+        // rate-limited + censored above.)
+        const out = {
+            userId: isSystem ? 'system' : player.userId,
+            username: isSystem ? (payload.username || '📢 ระบบ') : player.username,
+            level: isSystem ? (payload.level || 99) : player.level,
+            message: msg,
+            mapId,
+        };
+        io.to(`map:${mapId}`).emit('chat', out);
     });
 
     // --- PRESENCE UPDATE ---

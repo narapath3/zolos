@@ -878,6 +878,16 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
 
+            // Server dropped a message (too fast / duplicate) — gentle heads-up
+            socket.on('chat_blocked', (payload) => {
+                if (window.gameUI && typeof window.gameUI.addCombatLog === 'function') {
+                    const reason = payload && payload.reason === 'dup'
+                        ? '⚠️ อย่าส่งข้อความซ้ำเดิมรัวๆ นะ'
+                        : '⚠️ พิมพ์เร็วเกินไป เว้นสักครู่แล้วลองใหม่';
+                    window.gameUI.addCombatLog(reason, 'warning');
+                }
+            });
+
             socket.on('trade_request', (payload) => {
                 if (payload && payload.targetUserId === userId) {
                     if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
