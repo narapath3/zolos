@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.22 (boss-combat-fx)';
+const BUILD_VERSION = '2026-07-14.23 (audio-settings)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -311,18 +311,32 @@ async function initGame(charData) {
         sceneManager.scene
     );
 
+    // Persisted audio prefs (per-device, in localStorage). Separate controls
+    // for Music (BGM) and Sound Effects (SFX), each with its own volume.
+    const musicEnabled = localStorage.getItem('zolos_music_enabled') !== 'false';
+    const musicVolume = parseInt(localStorage.getItem('zolos_music_volume') || '25', 10);
+    const sfxEnabled = localStorage.getItem('zolos_sfx_enabled') !== 'false';
+    const sfxVolumeStr = localStorage.getItem('zolos_sfx_volume');
+
     // In-game BGM: stream via hidden YouTube embed (see YouTubeBGM.js)
     import('./engine/YouTubeBGM.js').then(({ youtubeBGM }) => {
         window.youtubeBGM = youtubeBGM;
-        youtubeBGM.setEnabled(character?.gameSettings?.sound_enabled !== false);
+        youtubeBGM.setVolume(musicVolume);
+        youtubeBGM.setEnabled(musicEnabled);
         youtubeBGM.start();
     });
 
+    // Apply persisted SFX prefs to the sound manager
+    if (soundManager) {
+        soundManager.enabled = sfxEnabled;
+        if (sfxVolumeStr !== null) {
+            const v = parseInt(sfxVolumeStr, 10);
+            if (!isNaN(v)) soundManager.masterVolume = Math.max(0, Math.min(1, v / 100));
+        }
+    }
+
     // Apply persisted game settings
     if (character && character.gameSettings) {
-        if (soundManager) {
-            soundManager.enabled = character.gameSettings.sound_enabled !== false;
-        }
         if (window.rendererSystem) {
             window.rendererSystem.qualityLevel = character.gameSettings.graphics_quality || 'auto';
             window.rendererSystem.applyQualitySettings();

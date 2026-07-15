@@ -663,11 +663,31 @@
             <div class="form-group">
               <label style="display: block; margin-bottom: 6px;">🔊 Game Audio / ระบบเสียง</label>
               <div
-                style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                <input type="checkbox" id="settings-sound-enabled" checked
-                  style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                <span id="settings-sound-label" style="font-size: 13px; color: var(--text); font-weight: 500;">Sound
-                  Effects: ON</span>
+                style="display: flex; flex-direction: column; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+
+                <!-- Music (BGM) -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-music-enabled" checked
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">🎵 เพลงประกอบ (Music)</span>
+                  <span id="settings-music-vol-label"
+                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">25%</span>
+                </div>
+                <input type="range" id="settings-music-volume" min="0" max="100" value="25"
+                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+
+                <div style="height: 1px; background: var(--border); margin: 2px 0;"></div>
+
+                <!-- Sound Effects (SFX) -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-sfx-enabled" checked
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">🔊 เสียงเอฟเฟกต์ (SFX)</span>
+                  <span id="settings-sfx-vol-label"
+                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">30%</span>
+                </div>
+                <input type="range" id="settings-sfx-volume" min="0" max="100" value="30"
+                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
               </div>
             </div>
 

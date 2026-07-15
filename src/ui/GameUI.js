@@ -1574,6 +1574,39 @@ export class GameUI {
     this.chatSendCallback = callback;
   }
 
+  // Reflect the current audio state onto the Settings controls (toggles + sliders).
+  _syncAudioSettingsUI() {
+    const musicOn = localStorage.getItem('zolos_music_enabled') !== 'false';
+    const sfxOn = this.soundManager ? this.soundManager.enabled
+      : (localStorage.getItem('zolos_sfx_enabled') !== 'false');
+    const musicVol = window.youtubeBGM ? window.youtubeBGM.volume
+      : parseInt(localStorage.getItem('zolos_music_volume') || '25', 10);
+    const sfxVol = this.soundManager ? Math.round(this.soundManager.masterVolume * 100)
+      : parseInt(localStorage.getItem('zolos_sfx_volume') || '30', 10);
+
+    const set = (id, prop, val) => { const el = document.getElementById(id); if (el) el[prop] = val; };
+    set('settings-music-enabled', 'checked', musicOn);
+    set('settings-sfx-enabled', 'checked', sfxOn);
+    set('settings-music-volume', 'value', musicVol);
+    set('settings-sfx-volume', 'value', sfxVol);
+    set('settings-music-vol-label', 'textContent', musicVol + '%');
+    set('settings-sfx-vol-label', 'textContent', sfxVol + '%');
+  }
+
+  // Keep the legacy combined sound_enabled flag roughly in sync so anything
+  // still reading it behaves sensibly (on if either music or SFX is on).
+  _persistLegacySoundFlag() {
+    const musicOn = localStorage.getItem('zolos_music_enabled') !== 'false';
+    const sfxOn = localStorage.getItem('zolos_sfx_enabled') !== 'false';
+    const combined = musicOn || sfxOn;
+    if (this.character && this.character.gameSettings) {
+      this.character.gameSettings.sound_enabled = combined;
+      if (typeof this.character.saveStatsToDatabase === 'function') {
+        this.character.saveStatsToDatabase();
+      }
+    }
+  }
+
   receiveChatMessage(username, message) {
     const chatMessages = document.getElementById('chat-messages');
     if (!chatMessages) return;
@@ -1714,15 +1747,8 @@ export class GameUI {
         tabSettingsBtn.classList.add('active-tab');
         // Handled by CSS .active-tab class
 
-        // Sync config values when opening
-        const soundCheckbox = document.getElementById('settings-sound-enabled');
-        const soundLabel = document.getElementById('settings-sound-label');
-        if (soundCheckbox && this.soundManager) {
-          soundCheckbox.checked = this.soundManager.enabled;
-          if (soundLabel) {
-            soundLabel.textContent = `Sound Effects: ${this.soundManager.enabled ? 'ON' : 'OFF'}`;
-          }
-        }
+        // Sync audio config values when opening the Settings tab
+        this._syncAudioSettingsUI();
         const graphicsSelect = document.getElementById('settings-graphics-quality');
         if (graphicsSelect && window.rendererSystem) {
           graphicsSelect.value = window.rendererSystem.qualityLevel;
@@ -1734,28 +1760,55 @@ export class GameUI {
       });
     }
 
-    // Audio Mute settings listener
-    const soundCheckbox = document.getElementById('settings-sound-enabled');
-    if (soundCheckbox) {
-      soundCheckbox.addEventListener('change', (e) => {
+    // ===== Audio settings: separate Music (BGM) & Sound Effects (SFX) =====
+    // Each has an on/off toggle and a 0–100 volume slider. Persisted in
+    // localStorage (these are device settings, not part of the DB schema).
+    const musicToggle = document.getElementById('settings-music-enabled');
+    const musicSlider = document.getElementById('settings-music-volume');
+    const sfxToggle = document.getElementById('settings-sfx-enabled');
+    const sfxSlider = document.getElementById('settings-sfx-volume');
+
+    if (musicToggle) {
+      musicToggle.addEventListener('change', (e) => {
+        const on = e.target.checked;
+        if (window.youtubeBGM) window.youtubeBGM.setEnabled(on);
+        localStorage.setItem('zolos_music_enabled', on ? 'true' : 'false');
+        // Keep the legacy combined flag roughly in sync (music || sfx = "sound on")
+        this._persistLegacySoundFlag();
+      });
+    }
+    if (musicSlider) {
+      musicSlider.addEventListener('input', (e) => {
+        const v = parseInt(e.target.value, 10) || 0;
+        if (window.youtubeBGM) window.youtubeBGM.setVolume(v);
+        const lbl = document.getElementById('settings-music-vol-label');
+        if (lbl) lbl.textContent = v + '%';
+        localStorage.setItem('zolos_music_volume', String(v));
+      });
+    }
+
+    if (sfxToggle) {
+      sfxToggle.addEventListener('change', (e) => {
+        const on = e.target.checked;
         if (this.soundManager) {
-          this.soundManager.enabled = e.target.checked;
-          const soundLabel = document.getElementById('settings-sound-label');
-          if (soundLabel) {
-            soundLabel.textContent = `Sound Effects: ${this.soundManager.enabled ? 'ON' : 'OFF'}`;
-          }
-          if (e.target.checked) {
-            this.soundManager.playUseItemSound();
-          }
+          this.soundManager.enabled = on;
+          if (on) this.soundManager.playUseItemSound(); // preview
         }
-        // Keep the YouTube BGM in sync with the sound setting
-        if (window.youtubeBGM) {
-          window.youtubeBGM.setEnabled(e.target.checked);
-        }
-        if (this.character && this.character.gameSettings) {
-          this.character.gameSettings.sound_enabled = e.target.checked;
-          this.character.saveStatsToDatabase();
-        }
+        localStorage.setItem('zolos_sfx_enabled', on ? 'true' : 'false');
+        this._persistLegacySoundFlag();
+      });
+    }
+    if (sfxSlider) {
+      sfxSlider.addEventListener('input', (e) => {
+        const v = parseInt(e.target.value, 10) || 0;
+        if (this.soundManager) this.soundManager.masterVolume = v / 100;
+        const lbl = document.getElementById('settings-sfx-vol-label');
+        if (lbl) lbl.textContent = v + '%';
+        localStorage.setItem('zolos_sfx_volume', String(v));
+      });
+      // Preview the new level when the user releases the slider
+      sfxSlider.addEventListener('change', () => {
+        if (this.soundManager && this.soundManager.enabled) this.soundManager.playHitSound();
       });
     }
 
