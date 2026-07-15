@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.23 (audio-settings)';
+const BUILD_VERSION = '2026-07-14.24 (fishing-almanac)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -255,6 +255,8 @@ async function initGame(charData) {
                     gameUI.addCombatLog(`🎣 You caught a ${e} ${event.item.name}!`, 'loot');
                     // Item is added via 'lootDrop' event in CombatSystem.js
                     gameUI.incrementQuestProgress('fish', 'any');
+                    // Record it in the Fishing Almanac (discovery bonus on new species)
+                    if (gameUI.recordFishCatch) gameUI.recordFishCatch(event.item);
                 }
                 break;
             case 'monsterKilled':
@@ -564,6 +566,7 @@ async function initGame(charData) {
     await gameUI.loadInventoryFromDB(charData.id);
     await gameUI.loadDailyQuestsFromDB(charData.id);
     await gameUI.loadFriendsFromDB(charData.id);
+    await gameUI.loadFishingAlmanacFromDB(charData.id);
 
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);

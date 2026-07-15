@@ -404,6 +404,57 @@ export async function loadDailyQuests(characterId) {
     }
 }
 
+// ============ Fishing Almanac DB Sync (System Inventory Fallback) ============
+export async function saveFishingAlmanac(characterId, almanacData) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        localDb.set(`fishing_almanac_${characterId}`, almanacData);
+        return;
+    }
+    try {
+        const { data: existing } = await supabase
+            .from('inventory')
+            .select('id')
+            .eq('character_id', characterId)
+            .eq('item_name', 'fishing_almanac')
+            .eq('item_type', 'system')
+            .maybeSingle();
+
+        if (existing) {
+            await supabase.from('inventory').update({ stats: almanacData }).eq('id', existing.id);
+        } else {
+            await supabase.from('inventory').insert({
+                character_id: characterId,
+                item_name: 'fishing_almanac',
+                item_type: 'system',
+                quantity: 1,
+                stats: almanacData
+            });
+        }
+    } catch (e) {
+        console.error('[GameSync] Failed to save fishing almanac to DB:', e);
+    }
+}
+
+export async function loadFishingAlmanac(characterId) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        return localDb.get(`fishing_almanac_${characterId}`) || null;
+    }
+    try {
+        const { data, error } = await supabase
+            .from('inventory')
+            .select('stats')
+            .eq('character_id', characterId)
+            .eq('item_name', 'fishing_almanac')
+            .eq('item_type', 'system')
+            .maybeSingle();
+        if (error) throw error;
+        return data?.stats || null;
+    } catch (e) {
+        console.error('[GameSync] Failed to load fishing almanac from DB:', e);
+        return null;
+    }
+}
+
 // ============ Friends List DB Sync (System Inventory Fallback) ============
 export async function saveFriendsList(characterId, friendsList) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {

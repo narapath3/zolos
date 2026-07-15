@@ -1,5 +1,5 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList } from '../network/GameSync.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES } from '../engine/GameData.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
 
@@ -232,6 +232,11 @@ export class GameUI {
         this._togglePanel('wiki-panel');
         this._renderWiki();
       });
+    }
+
+    const btnAlmanac = document.getElementById('btn-almanac');
+    if (btnAlmanac) {
+      btnAlmanac.addEventListener('click', () => this.openFishingAlmanac());
     }
 
     // Close buttons
@@ -630,6 +635,243 @@ export class GameUI {
     } catch (e) {
       console.error('[Zolos] Failed to save friends list:', e);
     }
+  }
+
+  // ============ Fishing Almanac ============
+  // A collection log of every fish species. Each new species caught grants a
+  // small discovery bonus; completing a whole rarity tier (or the entire book)
+  // grants a big claimable reward. Persisted like daily quests / friends.
+  async loadFishingAlmanacFromDB(characterId) {
+    if (!characterId) return;
+    this.characterId = characterId;
+    this.almanac = { caught: [], claimed: [] };
+    try {
+      const localKey = `zolos_almanac_${characterId}`;
+      let local = null;
+      try { const s = localStorage.getItem(localKey); if (s) local = JSON.parse(s); } catch (e) { }
+      const db = await loadFishingAlmanac(characterId);
+      // Merge DB + local so nothing is ever lost (union of caught species)
+      const merged = { caught: [], claimed: [] };
+      const caught = new Set([...(db?.caught || []), ...(local?.caught || [])]);
+      const claimed = new Set([...(db?.claimed || []), ...(local?.claimed || [])]);
+      merged.caught = [...caught];
+      merged.claimed = [...claimed];
+      this.almanac = merged;
+      localStorage.setItem(localKey, JSON.stringify(merged));
+    } catch (e) {
+      console.error('[Zolos] Failed to load fishing almanac:', e);
+    }
+  }
+
+  async _saveFishingAlmanac() {
+    if (!this.almanac) return;
+    try {
+      if (this.characterId) {
+        localStorage.setItem(`zolos_almanac_${this.characterId}`, JSON.stringify(this.almanac));
+        await saveFishingAlmanac(this.characterId, this.almanac);
+      }
+    } catch (e) {
+      console.error('[Zolos] Failed to save fishing almanac:', e);
+    }
+  }
+
+  // Per-species discovery bonus (gold) and per-tier completion rewards.
+  static get _ALMANAC_DISCOVERY() { return { common: 50, uncommon: 150, rare: 500, legendary: 2000 }; }
+  static get _ALMANAC_TIER_REWARD() {
+    return {
+      common: { gold: 3000 },
+      uncommon: { gold: 8000 },
+      rare: { gold: 20000 },
+      legendary: { gold: 60000 },
+      all: { gold: 150000, item: { name: 'Master Angler Trophy', type: 'material', emoji: '🏆', rarity: 'legendary', price: 99999, desc: 'ถ้วยรางวัลสุดยอดนักตกปลา — จับปลาครบทุกชนิดในสมุดสะสม!' } },
+    };
+  }
+
+  _almanacTierCounts() {
+    if (!this.almanac) this.almanac = { caught: [], claimed: [] };
+    const caught = new Set(this.almanac.caught);
+    const totals = {}, got = {};
+    for (const [name, data] of Object.entries(FISH_SPECIES)) {
+      totals[data.rarity] = (totals[data.rarity] || 0) + 1;
+      if (caught.has(name)) got[data.rarity] = (got[data.rarity] || 0) + 1;
+    }
+    return { totals, got, caughtTotal: caught.size, grandTotal: Object.keys(FISH_SPECIES).length };
+  }
+
+  // Called from the fishCaught flow. Records a species; grants the discovery
+  // bonus the first time it's seen and auto-refreshes the almanac if open.
+  recordFishCatch(item) {
+    if (!item || (item.type && item.type !== 'fish')) return;
+    const name = item.name || item.item_name;
+    if (!name || !FISH_SPECIES[name]) return;
+    if (!this.almanac) this.almanac = { caught: [], claimed: [] };
+    if (this.almanac.caught.includes(name)) return; // already discovered
+
+    this.almanac.caught.push(name);
+    const rarity = FISH_SPECIES[name].rarity;
+    const bonus = GameUI._ALMANAC_DISCOVERY[rarity] || 50;
+    if (this.character && this.character.stats) {
+      this.character.stats.gold = (Number(this.character.stats.gold) || 0) + bonus;
+      this.updateHUD(this.character.stats);
+    }
+    const rEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' }[rarity] || '⚪';
+    this.addCombatLog(`📖 พบปลาชนิดใหม่! ${item.emoji || '🐟'} ${name} ${rEmoji} (+${bonus} Gold) — สมุดสะสม ${this._almanacTierCounts().caughtTotal}/${this._almanacTierCounts().grandTotal}`, 'loot');
+    this._saveFishingAlmanac();
+    // If a tier just got completed, nudge the player
+    this._notifyAlmanacCompletions();
+    const modal = document.getElementById('almanac-modal');
+    if (modal && modal.style.display !== 'none') this._renderAlmanac();
+  }
+
+  _notifyAlmanacCompletions() {
+    const { totals, got } = this._almanacTierCounts();
+    const claimed = new Set(this.almanac.claimed);
+    const label = { common: 'ธรรมดา', uncommon: 'พบบ่อย', rare: 'หายาก', legendary: 'ตำนาน' };
+    for (const tier of ['common', 'uncommon', 'rare', 'legendary']) {
+      if (totals[tier] && got[tier] === totals[tier] && !claimed.has(tier)) {
+        this.addCombatLog(`🎉 สะสมปลาระดับ "${label[tier]}" ครบแล้ว! เปิดสมุดปลา 📖 เพื่อรับรางวัล`, 'levelup');
+      }
+    }
+    const allDone = ['common', 'uncommon', 'rare', 'legendary'].every(t => totals[t] && got[t] === totals[t]);
+    if (allDone && !claimed.has('all')) {
+      this.addCombatLog('👑 คุณจับปลาครบทุกชนิดแล้ว! เปิดสมุดปลารับรางวัลใหญ่สุดพิเศษ!', 'levelup');
+    }
+  }
+
+  _claimAlmanacReward(tier) {
+    const { totals, got } = this._almanacTierCounts();
+    if (!this.almanac) return;
+    const claimed = new Set(this.almanac.claimed);
+    if (claimed.has(tier)) return;
+
+    let complete = false;
+    if (tier === 'all') {
+      complete = ['common', 'uncommon', 'rare', 'legendary'].every(t => totals[t] && got[t] === totals[t]);
+    } else {
+      complete = totals[tier] && got[tier] === totals[tier];
+    }
+    if (!complete) return;
+
+    const reward = GameUI._ALMANAC_TIER_REWARD[tier];
+    if (this.character && this.character.stats) {
+      this.character.stats.gold = (Number(this.character.stats.gold) || 0) + (reward.gold || 0);
+      this.updateHUD(this.character.stats);
+    }
+    if (reward.item) this.addItem(reward.item);
+    this.almanac.claimed.push(tier);
+    this._saveFishingAlmanac();
+
+    const label = { common: 'ธรรมดา', uncommon: 'พบบ่อย', rare: 'หายาก', legendary: 'ตำนาน', all: 'ครบทุกชนิด' }[tier];
+    this.addCombatLog(`🏅 รับรางวัลสะสมปลา "${label}": +${(reward.gold || 0).toLocaleString()} Gold${reward.item ? ` + ${reward.item.emoji} ${reward.item.name}` : ''}!`, 'levelup');
+    if (this.soundManager) this.soundManager.playLevelUpSound();
+    this._renderAlmanac();
+  }
+
+  openFishingAlmanac() {
+    let modal = document.getElementById('almanac-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'almanac-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:1400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);';
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+      modal.innerHTML = `<div id="almanac-card" style="width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(160deg,#12233a,#0d1526);border:1.5px solid #2f6fb0;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;"></div>`;
+      document.body.appendChild(modal);
+    }
+    this._renderAlmanac();
+    modal.style.display = 'flex';
+  }
+
+  _renderAlmanac() {
+    const card = document.getElementById('almanac-card');
+    if (!card) return;
+    if (!this.almanac) this.almanac = { caught: [], claimed: [] };
+    const caught = new Set(this.almanac.caught);
+    const claimed = new Set(this.almanac.claimed);
+    const { totals, got, caughtTotal, grandTotal } = this._almanacTierCounts();
+
+    const tierMeta = {
+      common: { label: 'ธรรมดา', color: '#b8c4d0', badge: '⚪' },
+      uncommon: { label: 'พบบ่อย', color: '#5fdd7a', badge: '🟢' },
+      rare: { label: 'หายาก', color: '#4aa3ff', badge: '🔵' },
+      legendary: { label: 'ตำนาน', color: '#ffcf4a', badge: '🟡' },
+    };
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    let sections = '';
+    for (const tier of ['common', 'uncommon', 'rare', 'legendary']) {
+      const m = tierMeta[tier];
+      const tierFish = Object.entries(FISH_SPECIES).filter(([, d]) => d.rarity === tier);
+      const done = got[tier] === totals[tier];
+      const canClaim = done && !claimed.has(tier);
+      const claimedTier = claimed.has(tier);
+      const rw = GameUI._ALMANAC_TIER_REWARD[tier];
+
+      const slots = tierFish.map(([name, d]) => {
+        const has = caught.has(name);
+        return `<div title="${has ? esc(name) + ' — ' + esc(d.desc) : 'ยังไม่ค้นพบ'}"
+          style="aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;
+          background:${has ? 'rgba(74,163,255,.12)' : 'rgba(255,255,255,.03)'};border:1px solid ${has ? m.color + '66' : 'rgba(255,255,255,.06)'};">
+          <div style="font-size:20px;${has ? '' : 'filter:grayscale(1);opacity:.3;'}">${has ? (d.emoji || '🐟') : '❓'}</div>
+          <div style="font-size:8px;text-align:center;line-height:1.1;color:${has ? '#dfe8f2' : '#54606e'};max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${has ? esc(name) : '???'}</div>
+        </div>`;
+      }).join('');
+
+      const claimBtn = canClaim
+        ? `<button data-almanac-claim="${tier}" style="border:none;border-radius:16px;padding:5px 14px;cursor:pointer;font-weight:800;font-size:12px;background:linear-gradient(135deg,#ffcf4a,#ff9e2e);color:#3a2600;">🎁 รับ +${rw.gold.toLocaleString()}g</button>`
+        : claimedTier
+          ? `<span style="font-size:11px;color:#5fdd7a;font-weight:700;">✅ รับแล้ว</span>`
+          : `<span style="font-size:11px;color:#7f8b99;">รางวัล +${rw.gold.toLocaleString()}g</span>`;
+
+      sections += `
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-weight:800;color:${m.color};font-size:14px;">${m.badge} ${m.label}</span>
+            <span style="font-size:12px;color:#8a97a5;">${got[tier] || 0}/${totals[tier]}</span>
+            <span style="flex:1;"></span>
+            ${claimBtn}
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;">${slots}</div>
+        </div>`;
+    }
+
+    const allDone = ['common', 'uncommon', 'rare', 'legendary'].every(t => got[t] === totals[t]);
+    const allClaimed = claimed.has('all');
+    const allRw = GameUI._ALMANAC_TIER_REWARD.all;
+    const grandBanner = `
+      <div style="margin-top:6px;padding:12px;border-radius:12px;background:linear-gradient(135deg,rgba(255,207,74,.14),rgba(255,90,40,.08));border:1px solid ${allDone ? '#ffcf4a' : 'rgba(255,255,255,.08)'};display:flex;align-items:center;gap:10px;">
+        <div style="font-size:26px;">${allClaimed ? '👑' : '🏆'}</div>
+        <div style="flex:1;">
+          <div style="font-weight:800;color:#ffcf6a;font-size:13px;">รางวัลใหญ่: จับครบทั้งหมด (${caughtTotal}/${grandTotal})</div>
+          <div style="font-size:11px;color:#c9d4df;">+${allRw.gold.toLocaleString()} Gold + ${allRw.item.emoji} ${allRw.item.name}</div>
+        </div>
+        ${allDone && !allClaimed
+        ? `<button data-almanac-claim="all" style="border:none;border-radius:18px;padding:8px 18px;cursor:pointer;font-weight:800;background:linear-gradient(135deg,#ffcf4a,#ff7a2e);color:#3a2600;">รับรางวัล</button>`
+        : allClaimed ? `<span style="color:#5fdd7a;font-weight:800;font-size:12px;">✅ รับแล้ว</span>` : `<span style="color:#7f8b99;font-size:11px;">ยังไม่ครบ</span>`}
+      </div>`;
+
+    const pct = Math.round((caughtTotal / grandTotal) * 100);
+    card.innerHTML = `
+      <div style="padding:16px 18px;background:linear-gradient(90deg,#173352,#0f1c30);border-bottom:1px solid #2f6fb0;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:22px;">📖</div>
+          <div style="flex:1;">
+            <div style="font-weight:900;color:#eaf2fb;font-size:17px;">สมุดสะสมปลา</div>
+            <div style="font-size:11px;color:#8fa3b8;">Fishing Almanac — ค้นพบแล้ว ${caughtTotal}/${grandTotal} ชนิด (${pct}%)</div>
+          </div>
+          <button id="almanac-close" style="background:rgba(255,255,255,.08);border:none;color:#cfe0f0;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+        </div>
+        <div style="height:8px;border-radius:6px;background:rgba(0,0,0,.4);margin-top:10px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4aa3ff,#5fdd7a);transition:width .3s;"></div>
+        </div>
+      </div>
+      <div style="padding:16px 18px;overflow-y:auto;">${sections}${grandBanner}</div>`;
+
+    card.querySelector('#almanac-close').onclick = () => {
+      const m = document.getElementById('almanac-modal'); if (m) m.style.display = 'none';
+    };
+    card.querySelectorAll('[data-almanac-claim]').forEach(btn => {
+      btn.onclick = () => this._claimAlmanacReward(btn.getAttribute('data-almanac-claim'));
+    });
   }
 
 
