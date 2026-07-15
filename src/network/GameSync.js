@@ -875,6 +875,9 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
 
+            // ===== WARP TO FRIEND =====
+            socket.on('warp_result', (payload) => window.warpManager?.onWarpResult?.(payload));
+
             // ===== WORLD BOSS =====
             socket.on('boss_state', (payload) => window.worldBossManager?.onState?.(payload));
             socket.on('boss_spawn', (payload) => window.worldBossManager?.onSpawn?.(payload));
@@ -1623,6 +1626,19 @@ export function sendBossHit(damage, critical = false) {
     if (socket && isSocketConnected()) {
         socket.emit('boss_hit', { damage, critical });
     }
+}
+
+// ============ Warp To Friend ============
+// Ask the server for a friend's current position/map. The reply arrives on the
+// `warp_result` socket event and is handled by window.warpManager.
+export function sendWarpRequest(targetUserId) {
+    if (isOfflineMode || !targetUserId) return { success: false };
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('warp_request', { targetUserId });
+        return { success: true };
+    }
+    return { success: false };
 }
 
 // ============ Offline Mock Presence (unchanged) ============

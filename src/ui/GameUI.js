@@ -1461,6 +1461,25 @@ export class GameUI {
       });
     }
 
+    // Warp-to-friend from profile popup
+    const popupWarpBtn = document.getElementById('btn-popup-warp');
+    if (popupWarpBtn) {
+      popupWarpBtn.addEventListener('click', async () => {
+        const target = this.selectedProfilePlayer;
+        if (!target || !target.userId) return;
+        if (popup) popup.style.display = 'none';
+        this.updateMobileControlsVisibility();
+        const { sendWarpRequest } = await import('../network/GameSync.js');
+        const res = sendWarpRequest(target.userId);
+        if (res && res.success) {
+          if (window.warpManager) window.warpManager.pending = { targetName: target.username };
+          this.addCombatLog(`🌀 กำลังวาปไปหา ${target.username}...`, 'system');
+        } else {
+          this.addCombatLog('❌ วาปไม่ได้ (เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
+        }
+      });
+    }
+
     // PVP duel challenge from profile popup
     const popupDuelBtn = document.getElementById('btn-popup-duel');
     if (popupDuelBtn) {
@@ -1546,6 +1565,15 @@ export class GameUI {
       } else {
         popupTradeBtn.style.display = 'block';
       }
+    }
+
+    // Warp — only to an online friend (not yourself, not offline)
+    const popupWarpBtn = document.getElementById('btn-popup-warp');
+    if (popupWarpBtn) {
+      const myName = this.character && this.character.stats ? this.character.stats.name : '';
+      const isFriend = this.friends.includes(player.username);
+      const canWarp = !player.isOffline && player.username !== myName && isFriend && !!player.userId;
+      popupWarpBtn.style.display = canWarp ? 'block' : 'none';
     }
 
     if (popup) {

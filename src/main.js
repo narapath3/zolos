@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.31 (block-rightclick)';
+const BUILD_VERSION = '2026-07-15.32 (warp-to-friend)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -938,6 +938,112 @@ window.duelManager = {
     },
 };
 
+// ============ Map Warp (shared by portals + warp-to-friend) ============
+// Loads a new map, moves the player to `spawn`, respawns monsters, refreshes
+// multiplayer presence and clears remote players carried over from the old map.
+function loadMapAndSpawn(targetMap, spawn) {
+    portalCooldown = 2.0;
+    autoPath = null;
+
+    // Clear stale combat state before loading the new map
+    if (character) {
+        character.targetMonster = null;
+        character.state = 'idle';
+    }
+    if (combatSystem) {
+        combatSystem.currentTarget = null;
+        combatSystem.autoFarm = false;
+        combatSystem.isFishing = false;
+    }
+    if (gameUI && typeof gameUI.clearTarget === 'function') gameUI.clearTarget();
+    if (inputManager && typeof inputManager.reset === 'function') inputManager.reset();
+
+    // Move to the spawn point BEFORE loading, so the first render is correct
+    character.baseY = spawn.y;
+    character.mesh.position.set(spawn.x, spawn.y, spawn.z);
+
+    sceneManager.loadMap(targetMap);
+    monsters.clearAll();
+    monsters.mapId = targetMap;
+    monsters.spawnInitial(character.stats.level);
+
+    // Update multiplayer presence for the new map + broadcast our new spot
+    updatePresence(character.stats.level, username, targetMap);
+    broadcastPosition(
+        userId, username, character.stats.level,
+        character.getPosition(), character.mesh.rotation.y,
+        character.state, character.getAppearance(), targetMap
+    );
+
+    // Clear remote players carried over from the old map
+    for (const [, rp] of remotePlayersMap.entries()) {
+        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+    }
+    remotePlayersMap.clear();
+}
+
+// ============ Warp To Friend ============
+// The player picked an online friend to warp to. sendWarpRequest() asks the
+// server for that friend's current map + position; the reply lands here via the
+// `warp_result` socket event.
+window.warpManager = {
+    pending: null, // { targetName } while a request is in flight
+
+    onWarpResult(payload) {
+        this.pending = null;
+        if (!payload || !character || !sceneManager) return;
+
+        if (!payload.ok) {
+            if (gameUI) gameUI.addCombatLog(
+                payload.reason === 'offline'
+                    ? '❌ วาปไม่ได้ — เพื่อนออฟไลน์แล้ว'
+                    : '❌ วาปไม่ได้ ลองใหม่อีกครั้ง',
+                'warning'
+            );
+            return;
+        }
+
+        if (typeof payload.x !== 'number' || typeof payload.z !== 'number') {
+            if (gameUI) gameUI.addCombatLog('❌ วาปไม่ได้ — ยังไม่รู้ตำแหน่งเพื่อน ลองอีกครั้งสักครู่', 'warning');
+            return;
+        }
+
+        // Not allowed mid-duel
+        if (duelState) {
+            if (gameUI) gameUI.addCombatLog('❌ วาปไม่ได้ระหว่างการดวล', 'warning');
+            return;
+        }
+
+        const targetMap = payload.mapId || 'prontera';
+        // Land a short distance away so we don't stack right on top of them
+        const ang = Math.random() * Math.PI * 2;
+        const off = 1.8;
+        const sx = payload.x + Math.cos(ang) * off;
+        const sz = payload.z + Math.sin(ang) * off;
+
+        if (targetMap !== sceneManager.currentMap) {
+            loadMapAndSpawn(targetMap, { x: sx, y: 1.2, z: sz });
+        } else {
+            // Same map — just reposition and re-broadcast (no reload needed)
+            autoPath = null;
+            character.targetMonster = null;
+            character.baseY = 1.2;
+            character.mesh.position.set(sx, 1.2, sz);
+            broadcastPosition(
+                userId, username, character.stats.level,
+                character.getPosition(), character.mesh.rotation.y,
+                character.state, character.getAppearance(), targetMap
+            );
+        }
+
+        // A little sparkle on arrival
+        if (particles && typeof particles.spawnHitEffect === 'function') {
+            particles.spawnHitEffect(character.getPosition(), true);
+        }
+        if (gameUI) gameUI.addCombatLog(`✨ วาปไปหา ${payload.targetName || 'เพื่อน'} สำเร็จ!`, 'levelup');
+    },
+};
+
 // Keep a dueling player locked inside the cage (called each frame).
 function clampToArena() {
     if (!duelState || !character || !sceneManager || !sceneManager.getArenaInfo) return;
@@ -1584,62 +1690,8 @@ function gameLoop(time) {
                 if (character.getPosition().distanceTo(portal.position) < 1.8) {
                     const targetMap = portal.userData.targetMap;
                     if (targetMap) {
-                        portalCooldown = 2.0;
-                        autoPath = null;
-
-                        // Clear stale combat state before loading new map
-                        if (character) {
-                            character.targetMonster = null;
-                            character.state = 'idle';
-                        }
-                        if (combatSystem) {
-                            combatSystem.currentTarget = null;
-                            combatSystem.autoFarm = false;
-                            combatSystem.isFishing = false;
-                        }
-                        if (gameUI && typeof gameUI.clearTarget === 'function') {
-                            gameUI.clearTarget();
-                        }
-                        if (inputManager && typeof inputManager.reset === 'function') {
-                            inputManager.reset();
-                        }
-
-                        // Set safe spawn point for new map
-                        const spawn = { x: 0, y: 1.2, z: 10 };
-                        character.baseY = spawn.y;
-                        character.mesh.position.set(spawn.x, spawn.y, spawn.z);
-
-                        console.log(`[Warp] Starting warp to ${targetMap}`);
-                        sceneManager.loadMap(targetMap);
-                        console.log(`[Warp] Map ${targetMap} loaded`);
-                        monsters.clearAll();
-                        monsters.mapId = targetMap;
-                        monsters.spawnInitial(character.stats.level);
-                        console.log(`[Warp] Monsters spawned`);
-
-                        // Update multiplayer presence for the new map
-                        updatePresence(character.stats.level, username, targetMap);
-                        console.log(`[Warp] Presence updated`);
-
-                        // Immediately broadcast position on the new map so others see us at the spawn point
-                        broadcastPosition(
-                            userId,
-                            username,
-                            character.stats.level,
-                            character.getPosition(),
-                            character.mesh.rotation.y,
-                            character.state,
-                            character.getAppearance(),
-                            targetMap
-                        );
-                        console.log(`[Warp] Initial position broadcasted for new map`);
-
-                        // Clear remote players from old map
-                        for (const [id, rp] of remotePlayersMap.entries()) {
-                            if (rp.mesh) sceneManager.scene.remove(rp.mesh);
-                        }
-                        remotePlayersMap.clear();
-                        console.log(`[Warp] Remote players cleared`);
+                        console.log(`[Warp] Portal warp to ${targetMap}`);
+                        loadMapAndSpawn(targetMap, { x: 0, y: 1.2, z: 10 });
                     }
                 }
             });

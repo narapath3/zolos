@@ -258,6 +258,12 @@ io.on('connection', (socket) => {
     socket.on('pos', (payload) => {
         if (!payload || !payload.userId) return;
         const mapId = payload.mapId || 'prontera_field';
+        // Remember the sender's latest position so friends can warp to them —
+        // even across maps (positions are only relayed within a map room).
+        const self = onlinePlayers.get(socket.id);
+        if (self && typeof payload.x === 'number' && typeof payload.z === 'number') {
+            self.lastPos = { x: payload.x, y: payload.y, z: payload.z, mapId };
+        }
         // Broadcast position to all OTHER clients in the SAME map
         socket.to(`map:${mapId}`).emit('pos', payload);
     });
@@ -341,6 +347,33 @@ io.on('connection', (socket) => {
         if (targetSocketId) {
             io.to(targetSocketId).emit('friend_response', payload);
         }
+    });
+
+    // --- WARP TO FRIEND ---
+    // Requester wants to teleport to an online player. We answer directly from
+    // the target's last-known position (tracked from their `pos` broadcasts),
+    // including which map they're on, so cross-map warps work too.
+    socket.on('warp_request', (payload) => {
+        if (!payload || !payload.targetUserId) return;
+        const requester = onlinePlayers.get(socket.id);
+        if (!requester) return;
+        const targetSocketId = userSocketMap.get(payload.targetUserId);
+        const target = targetSocketId ? onlinePlayers.get(targetSocketId) : null;
+        if (!target) {
+            socket.emit('warp_result', { ok: false, reason: 'offline', targetUserId: payload.targetUserId });
+            return;
+        }
+        const pos = target.lastPos;
+        socket.emit('warp_result', {
+            ok: true,
+            targetUserId: target.userId,
+            targetName: target.username,
+            mapId: (pos && pos.mapId) || target.mapId || 'prontera',
+            x: pos ? pos.x : null,
+            y: pos ? pos.y : null,
+            z: pos ? pos.z : null,
+        });
+        console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username}`);
     });
 
     // ============ PVP DUEL SYSTEM ============
