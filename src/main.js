@@ -1,10 +1,24 @@
 // ZOLOS — Idle RPG Online
 // Main Entry Point
 
+// Security/privacy: silence verbose console output in production so the browser
+// devtools can't be used to watch live player data, positions or internals.
+// Errors & warnings stay for diagnostics. (Dev keeps full logging on localhost.)
+// Bundler-agnostic on purpose — rolldown-vite ignores esbuild's `drop`.
+(() => {
+    const h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '') return;
+    const noop = () => {};
+    console.log = noop;
+    console.info = noop;
+    console.debug = noop;
+    console.table = noop;
+    console.dir = noop;
+})();
+
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-16.43 (lock-admin-api)';
-console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
+const BUILD_VERSION = '2026-07-16.44 (silence-console)';
 window.ZOLOS_BUILD = BUILD_VERSION;
 
 // Notify + offer reload when a newer build is deployed while this tab is open
