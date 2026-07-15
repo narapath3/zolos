@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.30 (auto-skills)';
+const BUILD_VERSION = '2026-07-14.31 (block-rightclick)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -11,6 +11,17 @@ window.ZOLOS_BUILD = BUILD_VERSION;
 import('./engine/UpdateChecker.js').then(({ startUpdateChecker }) => startUpdateChecker());
 // PWA: register the service worker + wire the "Install app" button
 import('./pwa.js').then(({ initPWA }) => initPWA());
+
+// Block the browser right-click context menu while in-game (keep it working on
+// the login screen, and always allow it on text fields so paste still works).
+window.addEventListener('contextmenu', (e) => {
+    const gameScreen = document.getElementById('game-screen');
+    const inGame = gameScreen && gameScreen.style.display !== 'none';
+    if (!inGame) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
+    e.preventDefault();
+}, { capture: true });
 import { SceneManager } from './engine/SceneManager.js';
 import { CharacterManager } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
