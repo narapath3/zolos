@@ -4437,6 +4437,12 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: none !important;
 }
 
+/* Also hide the right-side action cluster (sprint / skill / attack buttons)
+   so nothing floats over an open menu like the Fishing Almanac. */
+.panels-open #mobile-actions {
+  display: none !important;
+}
+
 /* ========== ADMIN BUTTON ========== */
 #btn-admin {
   position: relative;

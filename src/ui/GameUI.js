@@ -314,6 +314,15 @@ export class GameUI {
       }
     }
 
+    // Check the Fishing Almanac overlay (standalone modal, not a .side-panel)
+    const almanacModal = document.getElementById('almanac-modal');
+    if (almanacModal) {
+      const display = almanacModal.style.display || window.getComputedStyle(almanacModal).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
     if (anyPanelOpen) {
       document.body.classList.add('panels-open');
     } else {
@@ -798,7 +807,9 @@ export class GameUI {
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'almanac-modal';
-      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { modal.style.display = 'none'; this.updateMobileControlsVisibility(); }
+      });
       modal.innerHTML = `<div id="almanac-card"></div>`;
       document.body.appendChild(modal);
     }
@@ -896,6 +907,7 @@ export class GameUI {
 
     card.querySelector('#almanac-close').onclick = () => {
       const m = document.getElementById('almanac-modal'); if (m) m.style.display = 'none';
+      this.updateMobileControlsVisibility();
     };
     card.querySelectorAll('[data-almanac-claim]').forEach(btn => {
       btn.onclick = () => this._claimAlmanacReward(btn.getAttribute('data-almanac-claim'));
