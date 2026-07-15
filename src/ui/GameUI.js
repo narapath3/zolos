@@ -774,13 +774,32 @@ export class GameUI {
   }
 
   openFishingAlmanac() {
+    // Responsive styles (injected once). On mobile the overlay is anchored near
+    // the top and reserves space at the bottom so it never covers the HUD /
+    // skill buttons; the card height is capped and its body scrolls internally.
+    if (!document.getElementById('almanac-style')) {
+      const st = document.createElement('style');
+      st.id = 'almanac-style';
+      st.textContent = `
+        #almanac-modal{position:fixed;inset:0;z-index:1400;display:none;align-items:center;justify-content:center;
+          background:rgba(0,0,0,.6);backdrop-filter:blur(3px);padding:12px;box-sizing:border-box;}
+        #almanac-card{width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:16px;
+          background:linear-gradient(160deg,#12233a,#0d1526);border:1.5px solid #2f6fb0;
+          box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;}
+        #almanac-card .almanac-head{flex:0 0 auto;}
+        #almanac-card .almanac-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+        @media (max-width:768px){
+          #almanac-modal{align-items:flex-start;padding:8px 8px 116px;}
+          #almanac-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
+        }`;
+      document.head.appendChild(st);
+    }
     let modal = document.getElementById('almanac-modal');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'almanac-modal';
-      modal.style.cssText = 'position:fixed;inset:0;z-index:1400;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);';
       modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
-      modal.innerHTML = `<div id="almanac-card" style="width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:16px;background:linear-gradient(160deg,#12233a,#0d1526);border:1.5px solid #2f6fb0;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;"></div>`;
+      modal.innerHTML = `<div id="almanac-card"></div>`;
       document.body.appendChild(modal);
     }
     // Close any open side panels so the almanac doesn't stack on top of them.
@@ -860,7 +879,7 @@ export class GameUI {
 
     const pct = Math.round((caughtTotal / grandTotal) * 100);
     card.innerHTML = `
-      <div style="padding:16px 18px;background:linear-gradient(90deg,#173352,#0f1c30);border-bottom:1px solid #2f6fb0;">
+      <div class="almanac-head" style="padding:16px 18px;background:linear-gradient(90deg,#173352,#0f1c30);border-bottom:1px solid #2f6fb0;">
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="font-size:22px;">📖</div>
           <div style="flex:1;">
@@ -873,7 +892,7 @@ export class GameUI {
           <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4aa3ff,#5fdd7a);transition:width .3s;"></div>
         </div>
       </div>
-      <div style="padding:16px 18px;overflow-y:auto;">${sections}${grandBanner}</div>`;
+      <div class="almanac-body" style="padding:16px 18px;">${sections}${grandBanner}</div>`;
 
     card.querySelector('#almanac-close').onclick = () => {
       const m = document.getElementById('almanac-modal'); if (m) m.style.display = 'none';
