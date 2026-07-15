@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.21 (world-boss)';
+const BUILD_VERSION = '2026-07-14.22 (boss-combat-fx)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -1226,22 +1226,35 @@ function updateBossHud() {
     }
 }
 
-// Per-frame: swing at the boss when in range; the boss slams back if you're close.
+// Per-frame: rush the boss, keep swinging with big visible effects, and take
+// the counter-slams. While "engaged" we set window.bossEngaged so CombatSystem
+// stands down (no idle-reset / no wandering off to farm nearby monsters), which
+// is what makes the attack animation actually play instead of freezing at idle.
 function updateBossCombat(dt) {
-    if (duelState) return;
-    if (!bossState || !bossState.active || !character || !character.isAlive()) return;
-    if (!sceneManager || sceneManager.currentMap !== 'prontera' || !sceneManager._worldBoss) return;
+    // Not engageable → release the takeover so normal combat resumes.
+    if (duelState || !bossState || !bossState.active || !character || !character.isAlive()
+        || (combatSystem && combatSystem.isFishing)
+        || !sceneManager || sceneManager.currentMap !== 'prontera' || !sceneManager._worldBoss) {
+        window.bossEngaged = false;
+        return;
+    }
 
     const info = sceneManager.getWorldBossInfo();
-    if (!info) return;
+    if (!info) { window.bossEngaged = false; return; }
+
     const myPos = character.getPosition();
     const dx = info.x - myPos.x;
     const dz = info.z - myPos.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
+    const dist = Math.sqrt(dx * dx + dz * dz) || 0.0001;
 
-    // Boss AoE counter-attack when players are near
+    const wc = character.getWeaponClass ? character.getWeaponClass() : 'melee';
+    // Melee gets a forgiving reach (the boss is huge); ranged keeps its distance.
+    const reach = character.getAttackRange() + info.radius + (wc === 'melee' ? 1.2 : 0.4);
+    const ENGAGE = info.radius + 12; // rush in when this close to the boss
+
+    // ----- Boss AoE counter-attack (slams anyone standing near it) -----
     bossAtkTimer -= dt;
-    if (dist < info.radius + 3.6 && bossAtkTimer <= 0) {
+    if (dist < info.radius + 3.8 && bossAtkTimer <= 0) {
         bossAtkTimer = 2.4;
         const bossDmg = 8 + Math.floor(Math.random() * 10) + Math.floor((character.stats.level || 1) * 0.4);
         const actual = character.takeDamage(bossDmg);
@@ -1254,9 +1267,8 @@ function updateBossCombat(dt) {
             gameUI.addCombatLog(`🔥 ${bossState.name} ฟาดใส่คุณ -${actual}`, 'warning');
             gameUI.updateHUD(character.stats);
         }
-        // Boss killed us — CombatSystem only schedules respawns for monster
-        // deaths, so handle the boss case here (mirrors that 3s revive).
         if (!character.isAlive()) {
+            window.bossEngaged = false;
             if (gameUI) { gameUI.addCombatLog('💀 คุณถูกบอสปราบ! กำลังเกิดใหม่ใน 3 วินาที...', 'death'); gameUI.setAutoFarmState(false); }
             if (combatSystem) { combatSystem.autoFarm = false; combatSystem.currentTarget = null; }
             character.targetMonster = null;
@@ -1266,48 +1278,76 @@ function updateBossCombat(dt) {
                     if (gameUI) { gameUI.addCombatLog('💚 คุณเกิดใหม่แล้ว!', 'system'); gameUI.updateHUD(character.stats); }
                 }
             }, 3000);
+            return;
         }
     }
 
-    const reach = character.getAttackRange() + info.radius + 0.4;
-    if (dist > reach) return;
+    // Outside the engage bubble → let normal play continue.
+    if (dist > ENGAGE) { window.bossEngaged = false; return; }
 
-    character.mesh.rotation.y = Math.atan2(dx, dz);
+    // Engaged: take over auto-farm targeting so it doesn't drag us off to a mob.
+    window.bossEngaged = true;
+    character.targetMonster = null;
+    character.mesh.rotation.y = Math.atan2(dx, dz); // always face the boss
 
-    bossSwingCd = Math.max(0, bossSwingCd - dt);
-    if (bossSwingCd > 0) {
-        if (bossSwingCd < character.getAttackCooldown() * 0.5 && character.state === 'attacking') character.state = 'idle';
-        return;
+    // Auto-rush the boss if out of swing range — but only when the player isn't
+    // steering themselves (WASD or click-to-move), so walking away still works.
+    const manualDir = (inputManager && !(combatSystem && combatSystem.isFishing)) ? inputManager.getMovementDirection() : null;
+    if (dist > reach) {
+        if (!manualDir && !autoPath) {
+            character.moveSpeed = isShiftPressed ? 9 : 5.5;
+            character.moveToward(new THREE.Vector3(info.x, myPos.y, info.z), dt);
+            character.state = 'running';
+        }
+        return; // not close enough to hit yet
     }
-    bossSwingCd = character.getAttackCooldown();
+
+    // In range → keep the attack animation running continuously (the arm loops
+    // its swing while state stays 'attacking'; CombatSystem no longer resets it).
     character.state = 'attacking';
 
-    const isCrit = Math.random() < 0.12;
-    let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 6);
-    if (isCrit) dmg = Math.floor(dmg * 1.9);
+    bossSwingCd = Math.max(0, bossSwingCd - dt);
+    if (bossSwingCd > 0) return;
+    bossSwingCd = character.getAttackCooldown();
 
-    const bossPos = new THREE.Vector3(info.x, 3.4, info.z);
+    // ----- Land a hit with spectacular feedback -----
+    const isCrit = Math.random() < 0.14;
+    let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 6);
+    if (isCrit) dmg = Math.floor(dmg * 1.95);
+
+    const dirX = dx / dist, dirZ = dz / dist;
+    const bossBody = new THREE.Vector3(info.x, 3.2, info.z);
+    // A slash arc right at the hero's swing, plus impacts on the boss body.
+    const swingPos = new THREE.Vector3(myPos.x + dirX * 1.6, myPos.y + 1.35, myPos.z + dirZ * 1.6);
+
     const applyHit = () => {
         sendBossHit(dmg, isCrit);
         if (sceneManager) sceneManager.playBossHitReaction();
         if (particles) {
-            const sp = worldToScreen(bossPos, 0);
+            const sp = worldToScreen(bossBody, 0);
             particles.spawnDamageNumber(sp.x, sp.y, dmg, isCrit ? 'critical-dmg' : 'player-dmg');
-            particles.spawnHitEffect(bossPos.clone(), isCrit);
+            particles.spawnHitEffect(bossBody.clone(), isCrit);
+            // Extra ember sparks bursting off the boss for impact
+            particles.spawnHitEffect(new THREE.Vector3(
+                info.x + (Math.random() - 0.5) * 1.8, 2.2 + Math.random() * 1.8, info.z + (Math.random() - 0.5) * 1.8), isCrit);
         }
     };
 
-    const wc = character.getWeaponClass ? character.getWeaponClass() : 'melee';
     if (wc === 'bow' || wc === 'gun') {
-        const targetWrap = { alive: true, getPosition: () => bossPos.clone() };
+        const targetWrap = { alive: true, getPosition: () => bossBody.clone() };
         if (particles) {
             if (wc === 'gun') particles.spawnBullet(myPos, targetWrap, applyHit);
             else particles.spawnArrow(myPos, targetWrap, applyHit);
         } else applyHit();
     } else {
-        if (particles) particles.spawnSlash(bossPos.clone(), isCrit);
+        // Melee: a big slash in front of the hero + one across the boss body
+        if (particles) {
+            particles.spawnSlash(swingPos, isCrit);
+            particles.spawnSlash(bossBody.clone(), isCrit);
+        }
         applyHit();
     }
+    if (isCrit && gameUI) gameUI.triggerScreenShake(true);
     if (soundManager) soundManager.playAtkSound();
 }
 

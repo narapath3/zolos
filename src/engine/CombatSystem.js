@@ -166,6 +166,16 @@ export class CombatSystem {
             return;
         }
 
+        // While actively fighting the World Boss, stand down: the boss combat
+        // loop drives movement, facing, and the (continuous) attack animation.
+        // Without this, this update would reset state back to 'idle' every frame
+        // and drag the player off to farm nearby monsters.
+        if (window.bossEngaged) {
+            this.currentTarget = null;
+            if (this.character.targetMonster) this.character.targetMonster = null;
+            return;
+        }
+
         let target = null;
         if (this.character.targetMonster) {
             target = this.character.targetMonster;
