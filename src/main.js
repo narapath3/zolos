@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.28 (almanac-hide-controls)';
+const BUILD_VERSION = '2026-07-14.29 (bind-guest-migrate)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -286,11 +286,29 @@ async function initGame(charData) {
     // Set guest mode state
     gameUI.setGuestMode(charData.isGuest === true);
 
-    // Setup bind account callback
+    // Setup bind account callback.
+    // Guests are local (no anonymous auth session on this project), so binding
+    // creates a real account and migrates the guest's progress to it, then
+    // reloads into the new account.
     gameUI.setupBindAccountCallback(async (email, password) => {
-        const { bindAccount } = await import('./network/SupabaseClient.js');
-        await bindAccount(email, password);
+        const { migrateGuestToAccount } = await import('./network/GameSync.js');
+        const saveData = character.getSaveData();
+        const guest = {
+            name: character.stats.name,
+            gender: character.gender || charData.gender || 'male',
+            stats: { ...saveData.updates },
+            inventory: (gameUI.inventory || []).map(i => ({
+                item_name: i.item_name, item_type: i.item_type, quantity: i.quantity, stats: i.stats || {}
+            })),
+            friends: gameUI.friends || [],
+            dailyQuests: gameUI.dailyQuestsState || null,
+            almanac: gameUI.almanac || null,
+        };
+        await migrateGuestToAccount(email, password, guest);
         charData.isGuest = false; // Update local state
+        // Reload into the freshly-created real account (its Supabase session now
+        // wins over the old local-guest fallback), with all progress migrated.
+        setTimeout(() => window.location.reload(), 2200);
     });
 
     // Setup skill clicks

@@ -1,5 +1,5 @@
 // Game Sync — Save/Load character data to Supabase + Realtime via Socket.io
-import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName } from './SupabaseClient.js';
+import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName, saveActiveSession } from './SupabaseClient.js';
 import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
 export { getDeterministicGuestName, isPlaceholderName };
 
@@ -453,6 +453,81 @@ export async function loadFishingAlmanac(characterId) {
         console.error('[GameSync] Failed to load fishing almanac from DB:', e);
         return null;
     }
+}
+
+// ============ Bind Guest → Real Account (with progress migration) ============
+// Anonymous Supabase sessions aren't available on this project, so every guest
+// is a LOCAL guest with no auth session — `updateUser` can't bind them ("Auth
+// session missing"). Instead we create a real account and migrate the guest's
+// progress (character stats, inventory, friends, quests, almanac) to it, then
+// switch the active session so a reload lands in the new account.
+export async function migrateGuestToAccount(email, password, guest) {
+    if (isOfflineMode || !supabase) throw new Error('ไม่สามารถผูกบัญชีในโหมดออฟไลน์');
+    if (!guest) throw new Error('ไม่พบข้อมูลตัวละคร');
+
+    const username = guest.name || 'Adventurer';
+    const gender = guest.gender || 'male';
+
+    // 1. Create the real account (auto-signs-in when email confirmation is off)
+    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email, password, options: { data: { username, gender } }
+    });
+    if (signUpErr) {
+        const msg = (signUpErr.message || '').toLowerCase();
+        if (msg.includes('already registered') || msg.includes('already been registered')) {
+            throw new Error('อีเมลนี้ถูกใช้สมัครแล้ว — ลองอีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้');
+        }
+        throw signUpErr;
+    }
+    const newUser = signUpData?.user;
+    if (!newUser) throw new Error('สมัครบัญชีไม่สำเร็จ');
+    const newUserId = newUser.id;
+
+    // 2. Ensure an active session exists (required for RLS-protected inserts)
+    let sess = (await supabase.auth.getSession())?.data?.session;
+    if (!sess) {
+        const { error: siErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (siErr) throw new Error('บัญชีถูกสร้างแล้ว แต่ต้องยืนยันอีเมลก่อนใช้งาน โปรดตรวจสอบกล่องอีเมล');
+        sess = (await supabase.auth.getSession())?.data?.session;
+    }
+
+    // 3. Profile
+    try { await supabase.from('profiles').upsert({ id: newUserId, username, gender }); } catch (e) { /* non-fatal */ }
+
+    // 4. Character row — carry over the guest's stats (strip non-DB fields)
+    const s = { ...(guest.stats || {}) };
+    delete s.id; delete s.sound_enabled; delete s.graphics_quality; delete s.fps_enabled;
+    const charInsert = {
+        // `id` is a NOT NULL text PK with no DB default — set it client-side
+        // exactly like createCharacter() does for registrations.
+        id: 'char_' + Math.random().toString(36).substring(2, 10),
+        user_id: newUserId,
+        name: username,
+        gender,
+        last_map: (guest.stats && guest.stats.last_map) || 'prontera_field',
+        ...s,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+    };
+    const { data: newChar, error: charErr } = await supabase
+        .from('characters').insert(charInsert).select().single();
+    if (charErr) throw new Error('ผูกบัญชีสำเร็จบางส่วน แต่ย้ายตัวละครไม่สำเร็จ: ' + charErr.message);
+    const newCharId = newChar.id;
+
+    // 5. Inventory
+    for (const it of (guest.inventory || [])) {
+        if (!it || !it.item_name || !it.quantity) continue;
+        try { await saveInventoryItem(newCharId, it.item_name, it.item_type || 'material', it.quantity, it.stats || {}); } catch (e) { /* skip bad item */ }
+    }
+
+    // 6. System collections (friends / daily quests / fishing almanac)
+    try { if (guest.friends) await saveFriendsList(newCharId, guest.friends); } catch (e) { }
+    try { if (guest.dailyQuests) await saveDailyQuests(newCharId, guest.dailyQuests); } catch (e) { }
+    try { if (guest.almanac) await saveFishingAlmanac(newCharId, guest.almanac); } catch (e) { }
+
+    // 7. Switch the active session to the new real account
+    saveActiveSession(newUserId);
+    return { userId: newUserId, characterId: newCharId };
 }
 
 // ============ Friends List DB Sync (System Inventory Fallback) ============
