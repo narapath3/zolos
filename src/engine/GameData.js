@@ -117,7 +117,17 @@ export const ITEMS = {
     // ---- 3 MYTHIC ITEMS ----
     'Valkyrie Armor': { emoji: '👑', type: 'armor', rarity: 'mythic', desc: 'ชุดศึกสตรีสวรรค์ในตำนานสวมใส่ ป้องกันสัมฤทธิ์เดชระดับจักรวาลและดึงดูดพลัง (DEF +180, HP +3000)', price: 100000, defBonus: 180, hpBonus: 3000 },
     'Ragnarok Blade': { emoji: '🔱', type: 'weapon', rarity: 'mythic', desc: 'อาวุธระดับสูงสุด ดาบฉีกวิญญาณสยบคุกสวรรค์พังพิศดารสร้างดาเมจขีดสุด (ATK +250, SP +300)', price: 120000, atkBonus: 250, spBonus: 300 },
-    'Aegis of Olympus': { emoji: '🌌', type: 'shield', rarity: 'mythic', desc: 'โล่เทวทูตอีจิสม่านอวกาศ ดูดซับการปัดเป่าดาเมจทั้งหมดอย่างไร้ขีดจำกัด (DEF +160, HP +1500)', price: 95000, defBonus: 160, hpBonus: 1500 }
+    'Aegis of Olympus': { emoji: '🌌', type: 'shield', rarity: 'mythic', desc: 'โล่เทวทูตอีจิสม่านอวกาศ ดูดซับการปัดเป่าดาเมจทั้งหมดอย่างไร้ขีดจำกัด (DEF +160, HP +1500)', price: 95000, defBonus: 160, hpBonus: 1500 },
+
+    // ---- Rare crafting catalyst (also a World Boss reward) ----
+    'Dragon Heart': { emoji: '🐉', type: 'material', rarity: 'legendary', desc: 'หัวใจมังกรที่ยังเต้นด้วยไฟธาตุ ของหายากสุดจาก World Boss ใช้หลอมอาวุธระดับเทพ', price: 8000 },
+
+    // ---- FORGED WEAPONS (crafted at the Weapon Smith) — high ATK + signature effect ----
+    'Ember Fang': { emoji: '🔥', type: 'weapon', rarity: 'epic', desc: 'ดาบหลอมแก่นธาตุไฟ ทุกครั้งที่ฟันจะปะทุเปลวเพลิงลุกโชน (ATK +60, เอฟเฟกต์ไฟ)', price: 12000, atkBonus: 60, forgeEffect: 'fire' },
+    'Frost Cleaver': { emoji: '❄️', type: 'weapon', rarity: 'epic', desc: 'คาทานะเคลือบน้ำแข็งนิรันดร์ ฟันแล้วระเบิดเกล็ดหิมะเยือกแข็ง (ATK +90, เอฟเฟกต์น้ำแข็ง)', price: 22000, atkBonus: 90, forgeEffect: 'frost' },
+    'Stormcaller Bow': { emoji: '⚡', type: 'weapon', rarity: 'epic', desc: 'คันธนูอัญเชิญพายุ ลูกศรทุกดอกพาดสายฟ้าฟาด (ATK +85, ระยะไกล, เอฟเฟกต์สายฟ้า)', price: 24000, atkBonus: 85, forgeEffect: 'storm' },
+    'Soulreaper': { emoji: '👻', type: 'weapon', rarity: 'legendary', desc: 'มีดสั้นกลืนวิญญาณ ปลดปล่อยดวงจิตอาฆาตทุกครั้งที่โจมตี (ATK +130, เอฟเฟกต์วิญญาณ)', price: 55000, atkBonus: 130, forgeEffect: 'soul' },
+    'Godslayer': { emoji: '🌌', type: 'weapon', rarity: 'mythic', desc: 'ดาบสังหารเทพหลอมจากหัวใจมังกรและเอ็มเพอเรียมบริสุทธิ์ ปลดปล่อยโนวาจักรวาลทุกการโจมตี (ATK +300, เอฟเฟกต์โนวา)', price: 250000, atkBonus: 300, forgeEffect: 'nova' }
 };
 
 // ============ FISH SPECIES ============
@@ -1065,6 +1075,18 @@ export const SHOP_ITEMS = [
     { name: 'Steel Plate Mail', price: 6000 },
     { name: 'Golden Shield', price: 18000 },
     { name: 'Odin Garment', price: 22000 }
+];
+
+// ============ FORGE RECIPES ============
+// Weapon Smith crafting: a base weapon + materials (from your bag) + gold →
+// a special forged weapon with high ATK and a signature on-hit effect.
+// `base` is consumed (qty 1); every material qty is consumed too.
+export const FORGE_RECIPES = [
+    { result: 'Ember Fang',      base: 'Sword',         materials: [{ name: 'Fire Element Stone', qty: 1 }, { name: 'Iron Ore', qty: 5 }],        gold: 2000 },
+    { result: 'Frost Cleaver',   base: 'Katana',        materials: [{ name: 'Crystal Blue', qty: 3 }, { name: 'Elunium Stone', qty: 2 }],         gold: 8000 },
+    { result: 'Stormcaller Bow', base: 'Bow',           materials: [{ name: 'Wind Element Stone', qty: 2 }, { name: 'Nine Tail Fur', qty: 3 }],   gold: 8000 },
+    { result: 'Soulreaper',      base: 'Silver Dagger', materials: [{ name: 'Ghostly Essence', qty: 2 }, { name: 'Devil Horn', qty: 2 }],         gold: 20000 },
+    { result: 'Godslayer',       base: 'Excalibur',     materials: [{ name: 'Dragon Heart', qty: 3 }, { name: 'Pure Emperium', qty: 1 }],         gold: 60000 },
 ];
 
 // ============ EXP TABLE ============

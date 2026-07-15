@@ -166,15 +166,21 @@ export class CharacterManager {
 
     isRanged() {
         const weapon = this.equippedWeapon;
-        return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow' || weapon === 'Rudra Bow';
+        return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow' || weapon === 'Rudra Bow' || weapon === 'Stormcaller Bow';
     }
 
     // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet)
     getWeaponClass() {
         const w = this.equippedWeapon;
         if (w === 'Gun') return 'gun';
-        if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow') return 'bow';
+        if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
         return 'melee';
+    }
+
+    // Signature effect id for forged weapons ('fire'|'frost'|'storm'|'soul'|'nova'), else null
+    getForgeEffect() {
+        const w = this.equippedWeapon;
+        return (w && ITEMS[w] && ITEMS[w].forgeEffect) || null;
     }
 
     getAttackCooldown() {
@@ -360,6 +366,12 @@ export class CharacterManager {
             'Excalibur':       { kind: 'greatsword', blade: 0xfff2c0, guard: 0xffd23a, len: 1.3, gem: 0x66ccff, glow: 0xffcc33, glowI: 0.95 },
             'Rudra Bow':       { kind: 'bow',        wood: 0xd8bc6a, scale: 1.3, glow: 0x86ff9a, glowI: 0.85 },
             'Ragnarok Blade':  { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
+            // ---- Forged weapons (Weapon Smith crafts) ----
+            'Ember Fang':      { kind: 'greatsword', blade: 0xff8a3a, guard: 0x6a2a10, len: 1.25, gem: 0xff3300, glow: 0xff5a1a, glowI: 1.05 },
+            'Frost Cleaver':   { kind: 'katana',     blade: 0xd0f4ff, guard: 0x2a5a7a, len: 1.2, glow: 0x66ddff, glowI: 1.05 },
+            'Stormcaller Bow': { kind: 'bow',        wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
+            'Soulreaper':      { kind: 'dagger',     blade: 0xc9a6ff, guard: 0x3a1a5a, len: 0.72, gem: 0xaa33ff, glow: 0xaa66ff, glowI: 1.1 },
+            'Godslayer':       { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
         };
         let spec = SPECS[itemName];
         if (!spec) {

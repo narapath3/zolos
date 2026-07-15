@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-15.35 (weapon-shop-visuals)';
+const BUILD_VERSION = '2026-07-15.36 (weapon-forge)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -130,6 +130,18 @@ function worldToScreen(pos, offsetY = 1.6) {
     return { x, y };
 }
 
+// ============ Forged-weapon signature on-hit burst ============
+// Colored explosion matching the equipped forged weapon's element. Throttled so
+// it stays spectacular without spamming a 30-spark burst on every single hit.
+const FORGE_EFFECT_COLORS = { fire: 0xff5a1a, frost: 0x66ddff, storm: 0x9fc0ff, soul: 0xaa66ff, nova: 0xffe066 };
+function spawnForgeBurst(pos, isCrit) {
+    if (!character || !particles || !pos || !character.getForgeEffect) return;
+    const eff = character.getForgeEffect();
+    if (!eff) return;
+    if (!isCrit && Math.random() > 0.4) return; // always on crit, ~40% otherwise
+    particles.createExplosion(pos, FORGE_EFFECT_COLORS[eff] || 0xffcf4a);
+}
+
 // ============ Initialize Game ============
 async function initGame(charData) {
     const canvas = document.getElementById('game-canvas');
@@ -161,6 +173,7 @@ async function initGame(charData) {
     // Setup systems
     particles = new ParticleSystem(sceneManager.scene);
     particles.camera = sceneManager.camera; // used to billboard sword-slash arcs
+    window.particles = particles; // exposed for the forge's craft-success burst
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
 
@@ -190,6 +203,7 @@ async function initGame(charData) {
                         particles.spawnSlash(event.targetPos, event.critical);
                     }
                     particles.spawnHitEffect(event.targetPos, event.critical);
+                    spawnForgeBurst(event.targetPos, event.critical); // forged-weapon element burst
                     const screenPos = worldToScreen(event.targetPos, 1.2);
                     const dmgType = event.critical ? 'critical-dmg' : 'player-dmg';
                     particles.spawnDamageNumber(screenPos.x, screenPos.y, event.damage, dmgType);
@@ -858,8 +872,8 @@ function handleMouseInteraction(event) {
             gameUI._togglePanel('sell-shop-panel');
             gameUI._renderSellShop();
         } else if (npcType === 'weaponsmith') {
-            // Weapon smith opens the shop focused on gear
-            gameUI.openShopTab('equip');
+            // Weapon smith opens the Forge (craft special weapons from materials)
+            gameUI.openForge();
         } else {
             gameUI._togglePanel('shop-panel');
             gameUI._renderShop();
@@ -1528,6 +1542,7 @@ function updateBossCombat(dt) {
             const sp = worldToScreen(bossBody, 0);
             particles.spawnDamageNumber(sp.x, sp.y, dmg, isCrit ? 'critical-dmg' : 'player-dmg');
             particles.spawnHitEffect(bossBody.clone(), isCrit);
+            spawnForgeBurst(bossBody.clone(), isCrit); // forged-weapon element burst
             // Extra ember sparks bursting off the boss for impact
             particles.spawnHitEffect(new THREE.Vector3(
                 info.x + (Math.random() - 0.5) * 1.8, 2.2 + Math.random() * 1.8, info.z + (Math.random() - 0.5) * 1.8), isCrit);

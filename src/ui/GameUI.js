@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
@@ -318,6 +318,15 @@ export class GameUI {
     const almanacModal = document.getElementById('almanac-modal');
     if (almanacModal) {
       const display = almanacModal.style.display || window.getComputedStyle(almanacModal).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
+    // Check the Forge overlay (standalone modal)
+    const forgeModal = document.getElementById('forge-modal');
+    if (forgeModal) {
+      const display = forgeModal.style.display || window.getComputedStyle(forgeModal).display;
       if (display !== 'none') {
         anyPanelOpen = true;
       }
@@ -2659,6 +2668,157 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+  }
+
+  // ============ Weapon Smith — Forge (crafting) ============
+  _invCount(name) {
+    const it = (this.inventory || []).find(i => i.item_name === name);
+    return it ? it.quantity : 0;
+  }
+
+  openForge() {
+    if (!document.getElementById('forge-style')) {
+      const st = document.createElement('style');
+      st.id = 'forge-style';
+      st.textContent = `
+        #forge-modal{position:fixed;inset:0;z-index:1400;display:none;align-items:center;justify-content:center;
+          background:rgba(0,0,0,.62);backdrop-filter:blur(3px);padding:12px;box-sizing:border-box;}
+        #forge-card{width:min(680px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:16px;
+          background:linear-gradient(160deg,#2a1712,#160d0a);border:1.5px solid #b5642a;
+          box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;}
+        #forge-card .forge-head{flex:0 0 auto;}
+        #forge-card .forge-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+        @media (max-width:768px){
+          #forge-modal{align-items:flex-start;padding:8px 8px 116px;}
+          #forge-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
+        }`;
+      document.head.appendChild(st);
+    }
+    let modal = document.getElementById('forge-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'forge-modal';
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { modal.style.display = 'none'; this.updateMobileControlsVisibility(); }
+      });
+      modal.innerHTML = `<div id="forge-card"></div>`;
+      document.body.appendChild(modal);
+    }
+    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+    this._renderForge();
+    modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+  }
+
+  _renderForge() {
+    const card = document.getElementById('forge-card');
+    if (!card) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const gold = this.character ? (Number(this.character.stats.gold) || 0) : 0;
+    const rarityColor = { epic: '#c774ff', legendary: '#ffcf4a', mythic: '#ff5a7a' };
+    const effLabel = { fire: '🔥 ไฟ', frost: '❄️ น้ำแข็ง', storm: '⚡ สายฟ้า', soul: '👻 วิญญาณ', nova: '🌌 โนวา' };
+
+    const cards = FORGE_RECIPES.map((r, idx) => {
+      const res = ITEMS[r.result] || {};
+      const rc = rarityColor[res.rarity] || '#c9d4df';
+      const reqs = [{ name: r.base, qty: 1 }, ...r.materials];
+      let allOk = gold >= r.gold;
+      const reqHtml = reqs.map(req => {
+        const have = this._invCount(req.name);
+        const ok = have >= req.qty;
+        if (!ok) allOk = false;
+        const md = ITEMS[req.name] || {};
+        return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:${ok ? '#bfe0a8' : '#e69a8a'};">
+          <span>${md.emoji || '📦'}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(req.name)}</span>
+          <span style="font-weight:700;">${have}/${req.qty}</span></div>`;
+      }).join('');
+
+      const btn = allOk
+        ? `<button data-forge="${idx}" style="border:none;border-radius:14px;padding:8px 16px;cursor:pointer;font-weight:800;font-size:12px;background:linear-gradient(135deg,#ff9e2e,#ff5a1a);color:#2a1000;">⚒️ ตี</button>`
+        : `<span style="font-size:11px;color:#8a7a6a;">ส่วนผสมไม่ครบ</span>`;
+
+      return `
+        <div style="margin-bottom:12px;padding:12px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid ${rc}55;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:26px;">${res.emoji || '🗡️'}</div>
+            <div style="flex:1;">
+              <div style="font-weight:800;color:${rc};font-size:14px;">${esc(r.result)}</div>
+              <div style="font-size:11px;color:#d0b090;">ATK +${res.atkBonus || 0}${res.forgeEffect ? ' · ' + (effLabel[res.forgeEffect] || res.forgeEffect) : ''}</div>
+            </div>
+            ${btn}
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;">${reqHtml}</div>
+          <div style="margin-top:6px;font-size:11px;color:${gold >= r.gold ? '#ffcf6a' : '#e69a8a'};">💰 ${r.gold.toLocaleString()} Zeny</div>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="forge-head" style="padding:16px 18px;background:linear-gradient(90deg,#3a1c10,#241109);border-bottom:1px solid #b5642a;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:22px;">⚒️</div>
+          <div style="flex:1;">
+            <div style="font-weight:900;color:#ffdcb0;font-size:17px;">โรงตีอาวุธ</div>
+            <div style="font-size:11px;color:#c79a78;">รวมส่วนผสมในกระเป๋า → อาวุธพิเศษพลังสูง + เอฟเฟกต์อลังการ</div>
+          </div>
+          <div style="font-size:12px;color:#ffcf6a;font-weight:700;">💰 ${gold.toLocaleString()}</div>
+          <button id="forge-close" style="background:rgba(255,255,255,.08);border:none;color:#f0d0b0;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+        </div>
+      </div>
+      <div class="forge-body" style="padding:14px 16px;">${cards}</div>`;
+
+    card.querySelector('#forge-close').onclick = () => {
+      const m = document.getElementById('forge-modal'); if (m) m.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    };
+    card.querySelectorAll('[data-forge]').forEach(b => {
+      b.onclick = () => this._forgeItem(FORGE_RECIPES[parseInt(b.getAttribute('data-forge'), 10)]);
+    });
+  }
+
+  _forgeItem(recipe) {
+    if (!recipe || !this.character) return;
+    const reqs = [{ name: recipe.base, qty: 1 }, ...recipe.materials];
+    const gold = Number(this.character.stats.gold) || 0;
+    // Re-validate — bag/gold may have changed since render
+    for (const req of reqs) {
+      if (this._invCount(req.name) < req.qty) { this.addCombatLog(`❌ ส่วนผสมไม่พอ: ${req.name}`, 'warning'); return; }
+    }
+    if (gold < recipe.gold) { this.addCombatLog('❌ เงิน Zeny ไม่พอ', 'warning'); return; }
+
+    // Consume gold + all ingredients
+    this.character.stats.gold = gold - recipe.gold;
+    for (const req of reqs) {
+      const inv = this.inventory.find(i => i.item_name === req.name);
+      if (!inv) continue;
+      const type = inv.item_type;
+      inv.quantity -= req.qty;
+      if (inv.quantity <= 0) this.inventory = this.inventory.filter(i => i !== inv);
+      if (this.characterId) saveInventoryItem(this.characterId, req.name, type, -req.qty).catch(() => {});
+    }
+
+    // Add the forged weapon
+    const resData = ITEMS[recipe.result] || {};
+    const existing = this.inventory.find(i => i.item_name === recipe.result);
+    if (existing) existing.quantity += 1;
+    else this.inventory.push({ item_name: recipe.result, item_type: resData.type || 'weapon', emoji: resData.emoji, desc: resData.desc, price: resData.price || 0, quantity: 1, stats: {} });
+    if (this.characterId) {
+      saveInventoryItem(this.characterId, recipe.result, resData.type || 'weapon', 1).catch(() => {});
+      if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => {});
+    }
+
+    // Spectacle
+    this.addCombatLog(`⚒️✨ ตี ${resData.emoji || ''} ${recipe.result} สำเร็จ! (ATK +${resData.atkBonus || 0}) — ไปสวมที่กระเป๋าได้เลย`, 'levelup');
+    if (this.triggerScreenShake) this.triggerScreenShake(true);
+    if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
+    else if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+    try {
+      const eff = { fire: 0xff5a1a, frost: 0x66ddff, storm: 0x9fc0ff, soul: 0xaa66ff, nova: 0xffe066 }[resData.forgeEffect] || 0xffcf4a;
+      if (window.particles && this.character.getPosition) window.particles.createExplosion(this.character.getPosition(), eff);
+    } catch (e) { /* non-fatal */ }
+
+    this._renderForge();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
   }
 
   // ============ Sell Shop Logic ============
