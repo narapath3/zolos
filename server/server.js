@@ -244,6 +244,15 @@ io.on('connection', (socket) => {
         onlinePlayers.set(socket.id, playerInfo);
         userSocketMap.set(userId, socket.id);
 
+        // Resolve admin status server-side (never trust the client). Cached on
+        // the player so the admin:announcement handler can gate on it.
+        playerInfo.isAdmin = false;
+        if (supabase && userId && !userId.startsWith('guest_') && !userId.startsWith('local_')) {
+            supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle()
+                .then(({ data }) => { if (data && data.is_admin === true) playerInfo.isAdmin = true; })
+                .catch(() => { /* default non-admin */ });
+        }
+
         console.log(`[Server] ➕ Player joined: ${username} (${userId}) — Total: ${onlinePlayers.size}`);
 
         // Broadcast updated player list to everyone in this map
@@ -498,29 +507,37 @@ io.on('connection', (socket) => {
 
     // --- ADMIN ANNOUNCEMENT ---
     socket.on('admin:announcement', (data) => {
-        // Broadcast announcement to ALL connected clients immediately
-        io.emit('admin:announcement', data);
-        console.log('[Server] Admin announcement broadcasted:', data.text);
+        // SECURITY: only a verified admin (profiles.is_admin, resolved server-side
+        // at join) may broadcast. This closes the hole where anyone could emit
+        // this event from the browser console to spam the scrolling banner.
+        const player = onlinePlayers.get(socket.id);
+        if (!player || !player.isAdmin) {
+            console.warn(`[Server] 🚫 Rejected admin:announcement from non-admin socket ${socket.id} (${player?.username || 'unknown'})`);
+            return;
+        }
+        if (!data || typeof data.text !== 'string' || !data.text.trim()) return;
 
-        // Handle recurring intervals if specified
-        if (data.interval && data.interval > 0) {
-            const intervalMs = data.interval * 60 * 1000;
-            console.log(`[Server] Scheduling recurring announcement every ${data.interval} minutes`);
-            
-            // Clear any existing interval for the same text to avoid duplicates
-            if (socket.announcementIntervals && socket.announcementIntervals[data.text]) {
-                clearInterval(socket.announcementIntervals[data.text]);
+        // Sanitize: cap length + clamp the recurring interval
+        const clean = {
+            text: data.text.slice(0, 300),
+            type: data.type,
+            duration: Math.min(60000, Math.max(1000, Number(data.duration) || 8000)),
+            timestamp: Date.now(),
+        };
+        const interval = Math.min(120, Math.max(0, Number(data.interval) || 0));
+
+        io.emit('admin:announcement', clean);
+        console.log(`[Server] 📢 Admin announcement by ${player.username}:`, clean.text);
+
+        // Handle recurring intervals if specified (admin only, already gated)
+        if (interval > 0) {
+            const intervalMs = interval * 60 * 1000;
+            if (socket.announcementIntervals && socket.announcementIntervals[clean.text]) {
+                clearInterval(socket.announcementIntervals[clean.text]);
             }
-            
             if (!socket.announcementIntervals) socket.announcementIntervals = {};
-            
-            socket.announcementIntervals[data.text] = setInterval(() => {
-                io.emit('admin:announcement', {
-                    ...data,
-                    timestamp: Date.now(),
-                    isRecurring: true
-                });
-                console.log('[Server] Recurring announcement broadcasted:', data.text);
+            socket.announcementIntervals[clean.text] = setInterval(() => {
+                io.emit('admin:announcement', { ...clean, timestamp: Date.now(), isRecurring: true });
             }, intervalMs);
         }
     });

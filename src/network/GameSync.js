@@ -1405,34 +1405,25 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
             localDb.set('marketplace_listings', listings);
         }
     } else {
+        // Server-authoritative atomic purchase (SECURITY DEFINER RPC): checks the
+        // buyer's gold, moves gold to the seller, delivers the item and removes
+        // the listing in one transaction. The client can't skip payment.
         try {
-            // Retrieve first
-            const { data, error: fetchErr } = await supabase
-                .from('marketplace')
-                .select('*')
-                .eq('id', listingId)
-                .single();
-
-            if (!fetchErr && data) {
-                // Delete with select to verify actual row removal
-                const { data: delData, error: deleteErr } = await supabase
-                    .from('marketplace')
-                    .delete()
-                    .eq('id', listingId)
-                    .select();
-
-                if (deleteErr) throw deleteErr;
-                if (!delData || delData.length === 0) {
-                    // RLS blocked the delete or listing was already bought by someone else
-                    console.error('[Zolos] ❌ Buy failed: listing could not be deleted (RLS or race condition)');
-                    return false;
-                }
-                listing = delData[0];
-                console.log('[Zolos] ✅ Marketplace listing purchased from Supabase:', listing.id);
+            const { data, error } = await supabase.rpc('buy_market_item', { p_listing_id: listingId });
+            if (error || !data || !data.ok) {
+                console.error('[Zolos] ❌ Purchase rejected:', error?.message || data?.reason);
+                return false;
             }
+            // Announce + hand back the authoritative buyer gold
+            const socket2 = getSocket();
+            if (socket2 && isSocketConnected()) {
+                socket2.emit('chat', {
+                    userId: 'system', username: '📢 ระบบตลาด', level: 99,
+                    message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${data.item_name}] x${data.quantity} จาก [${data.seller_name}] ในราคา ${data.price} Zeny!`
+                });
+            }
+            return { success: true, buyerGold: data.buyer_gold };
         } catch (err) {
-            // Do NOT fall back to local — the listing still exists on the server
-            // Returning false lets the UI refund the buyer's gold
             console.error('[Zolos] ❌ Supabase buy failed:', err.message);
             return false;
         }

@@ -3853,10 +3853,15 @@ export class GameUI {
       // Decrease gold
       this.character.stats.gold -= listing.price;
 
-      // Purchase service call (removes listing and adds gold to seller)
+      // Purchase service call (server-authoritative: checks gold, pays seller,
+      // delivers the item, removes the listing — all in one transaction)
       const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
 
       if (boughtResult) {
+        // Adopt the server's authoritative gold when provided (RPC path)
+        if (boughtResult.buyerGold !== undefined) {
+          this.character.stats.gold = boughtResult.buyerGold;
+        }
         // Add item to local inventory
         const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
         const existing = this.inventory.find(i => i.item_name === listing.item_name);

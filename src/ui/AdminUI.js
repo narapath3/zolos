@@ -24,40 +24,33 @@ export class AdminUI {
         this.isDbAdmin = false;
         this.currentUsername = 'Unknown';
 
-        if (isOfflineMode || !userId || userId.startsWith('guest_') || userId.startsWith('local_')) {
-            // For offline/guest, check if we manually set admin in localStorage
-            this.isAdmin = localStorage.getItem('zolos_admin_mode') === 'true';
-            this.currentUsername = (userId && userId.startsWith('guest_')) ? 'Guest' : 'Local/Offline';
-        } else {
+        // Admin status is decided ONLY by profiles.is_admin in the database.
+        // There is deliberately no localStorage / client override — that was a
+        // backdoor (anyone could set a flag in the console to reveal the panel).
+        // Note: even a revealed panel is now powerless — the server verifies
+        // is_admin on announcements and RLS gates every admin DB write.
+        this.isAdmin = false;
+        if (!isOfflineMode && userId && !userId.startsWith('guest_') && !userId.startsWith('local_')) {
             try {
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('username, is_admin')
                     .eq('id', userId)
                     .single();
-
-                if (error) {
-                    console.warn('[Admin] Failed to check admin status:', error.message);
-                    this.isAdmin = false;
-                } else {
-                    this.currentUsername = data?.username || 'Unknown';
-                    this.isDbAdmin = data?.is_admin || false;
+                if (!error && data) {
+                    this.currentUsername = data.username || 'Unknown';
+                    this.isDbAdmin = data.is_admin === true;
                     this.isAdmin = this.isDbAdmin;
                 }
             } catch (e) {
                 this.isAdmin = false;
             }
+        } else {
+            this.currentUsername = (userId && userId.startsWith('guest_')) ? 'Guest' : 'Local/Offline';
         }
 
-        // Allow manual override for front-end testing/offline mode
-        if (localStorage.getItem('zolos_admin_mode') === 'true') {
-            this.isAdmin = true;
-        }
-
-        if (this.isAdmin) {
-            const btn = document.getElementById('btn-admin');
-            if (btn) btn.style.display = 'flex';
-        }
+        const btn = document.getElementById('btn-admin');
+        if (btn) btn.style.display = this.isAdmin ? 'flex' : 'none';
 
         this._updateStatusText();
 
