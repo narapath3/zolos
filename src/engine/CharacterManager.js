@@ -16,6 +16,7 @@ export class CharacterManager {
         this.equippedGlasses = 'None';
         this.hatMesh = null;
         this.glassesMesh = null;
+        this.title = null; // achievement title over the name (e.g. 'master_angler')
 
         // State
         this.state = 'idle'; // idle, walking, attacking, fishing, swimming
@@ -971,32 +972,64 @@ export class CharacterManager {
         this.mesh.add(this.glassesMesh);
     }
 
+    // Achievement titles rendered above the name. Glow color feeds the canvas
+    // shadowBlur; the sprite itself gets a soft pulse in update().
+    static TITLE_META = {
+        master_angler: { text: '🏆 Master Angler', color: '#ffd24a', glow: '#ffb020' },
+    };
+
+    setTitle(titleId) {
+        const t = titleId && CharacterManager.TITLE_META[titleId] ? titleId : null;
+        if (t === this.title) return;
+        this.title = t;
+        this.updateNameTag();
+    }
+
     updateNameTag() {
         if (this.nameSprite) {
             this.mesh.remove(this.nameSprite);
         }
 
+        const meta = this.title ? CharacterManager.TITLE_META[this.title] : null;
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 64;
+        canvas.width = 320;
+        canvas.height = meta ? 100 : 64;
         const ctx = canvas.getContext('2d');
+        const nameY = meta ? 78 : 40;
+        const stripY = meta ? 54 : 16;
 
-        // Shadow/Background
+        // Shadow/Background behind the name line
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.fillRect(0, 16, 256, 32);
+        ctx.fillRect(0, stripY, 320, 32);
 
-        // Text
+        // Glowing title line (above the name)
+        if (meta) {
+            ctx.font = 'bold 26px Arial';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = meta.glow;
+            ctx.shadowBlur = 16;
+            const grad = ctx.createLinearGradient(60, 0, 260, 0);
+            grad.addColorStop(0, '#ffe9a0');
+            grad.addColorStop(0.5, meta.color);
+            grad.addColorStop(1, '#ffe9a0');
+            ctx.fillStyle = grad;
+            // Double-pass for a stronger halo
+            ctx.fillText(meta.text, 160, 34);
+            ctx.fillText(meta.text, 160, 34);
+            ctx.shadowBlur = 0;
+        }
+
+        // Name text
         ctx.font = 'bold 24px Arial';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-
-        ctx.fillText(`${this.stats.name} Lv.${this.stats.level}`, 128, 40);
+        ctx.fillText(`${this.stats.name} Lv.${this.stats.level}`, 160, nameY);
 
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.position.y = 2.7;
-        this.nameSprite.scale.set(2, 0.5, 1);
+        this.nameSprite.position.y = meta ? 2.85 : 2.7;
+        this.nameSprite.scale.set(2.5, meta ? 0.78 : 0.5, 1);
         this.mesh.add(this.nameSprite);
     }
 
@@ -1304,6 +1337,11 @@ export class CharacterManager {
     update(dt) {
         this.animTimer += dt;
         this.attackTimer += dt;
+
+        // Achievement title pulse — the glowing badge gently breathes
+        if (this.title && this.nameSprite && this.nameSprite.material) {
+            this.nameSprite.material.opacity = 0.86 + Math.sin(this.animTimer * 2.6) * 0.14;
+        }
 
         // Natural regeneration is now handled by CombatSystem.js to avoid double regen issues
 
@@ -1635,7 +1673,8 @@ export class CharacterManager {
             pantsColor: this.pantsColor,
             hat: this.equippedHat,
             glasses: this.equippedGlasses,
-            weapon: this.equippedWeapon
+            weapon: this.equippedWeapon,
+            title: this.title
         };
     }
 
@@ -1648,6 +1687,7 @@ export class CharacterManager {
         if (app.hat !== undefined) this.setHat(app.hat);
         if (app.glasses !== undefined) this.setGlasses(app.glasses);
         if (app.weapon !== undefined) this.equipWeapon(app.weapon);
+        if (app.title !== undefined) this.setTitle(app.title);
     }
 
     async saveStatsToDatabase() {

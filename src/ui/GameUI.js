@@ -699,6 +699,10 @@ export class GameUI {
     } catch (e) {
       console.error('[Zolos] Failed to load fishing almanac:', e);
     }
+    // Restore the Master Angler title for completed collectors
+    if (this.almanac.claimed.includes('all') && this.character && this.character.setTitle) {
+      this.character.setTitle('master_angler');
+    }
   }
 
   async _saveFishingAlmanac() {
@@ -802,6 +806,16 @@ export class GameUI {
     const label = { common: 'ธรรมดา', uncommon: 'พบบ่อย', rare: 'หายาก', legendary: 'ตำนาน', all: 'ครบทุกชนิด' }[tier];
     this.addCombatLog(`🏅 รับรางวัลสะสมปลา "${label}": +${(reward.gold || 0).toLocaleString()} Gold${reward.item ? ` + ${reward.item.emoji} ${reward.item.name}` : ''}!`, 'levelup');
     if (this.soundManager) this.soundManager.playLevelUpSound();
+
+    // Completing the whole almanac awards the glowing Master Angler title
+    if (tier === 'all' && this.character && this.character.setTitle) {
+      this.character.setTitle('master_angler');
+      this.addCombatLog('👑 ปลดล็อกฉายา "🏆 Master Angler" — เรืองแสงเหนือหัวให้ทุกคนเห็น!', 'levelup');
+      if (this.triggerScreenShake) this.triggerScreenShake(true);
+      try {
+        if (window.particles && this.character.getPosition) window.particles.createExplosion(this.character.getPosition(), 0xffd24a);
+      } catch (e) { /* non-fatal */ }
+    }
     this._renderAlmanac();
   }
 
