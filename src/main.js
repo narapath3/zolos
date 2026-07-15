@@ -3,7 +3,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-14.29 (bind-guest-migrate)';
+const BUILD_VERSION = '2026-07-14.30 (auto-skills)';
 console.log(`%c[Zolos] Build ${BUILD_VERSION}`, 'color:#4ade80;font-weight:bold');
 window.ZOLOS_BUILD = BUILD_VERSION;
 
@@ -1388,6 +1388,51 @@ function updateBossCombat(dt) {
     if (soundManager) soundManager.playAtkSound();
 }
 
+// ============ Auto-Skill (while AUTO farming) ============
+// When AUTO is on, cast the 3 skills automatically too: Heal when hurt, Magnum
+// Break on clustered monsters, Bash on the current target. castSkill() no-ops
+// when a skill is on cooldown or SP is short, and each skill has its own
+// cooldown, so they naturally rotate instead of all firing at once.
+let autoSkillTimer = 0;
+function autoCastSkills(dt) {
+    if (!gameUI || !combatSystem || !combatSystem.autoFarm) return;
+    if (!character || !character.isAlive()) return;
+    if (combatSystem.isFishing || window.duelState || window.bossEngaged) return;
+
+    autoSkillTimer -= dt;
+    if (autoSkillTimer > 0) return;
+    autoSkillTimer = 0.4; // evaluate ~2.5x per second (one skill per tick)
+
+    // Readiness gate — only cast when off cooldown with enough SP, so useSkill's
+    // "on cooldown / not enough SP" error logs never spam the combat feed.
+    const ready = (id) => {
+        const cd = (character.cooldowns && character.cooldowns[id]) || 0;
+        const sp = Number(character.stats.sp) || 0;
+        return cd <= 0 && sp >= ((SKILLS[id] && SKILLS[id].spCost) || 0);
+    };
+
+    const maxHp = Number(character.stats.max_hp) || 100;
+    const hpPct = (Number(character.stats.hp) || 0) / maxHp;
+
+    // 1) Heal when hurt (skips itself at high HP so SP isn't wasted)
+    if (hpPct < 0.6 && ready('heal')) { gameUI.castSkill('heal'); return; }
+
+    // Count monsters clustered around the player (for the AoE decision)
+    let nearby = 0;
+    if (monsters && monsters.getAlive) {
+        const p = character.getPosition();
+        for (const m of monsters.getAlive()) {
+            if (m && m.getPosition && p.distanceTo(m.getPosition()) <= 5) nearby++;
+        }
+    }
+
+    // 2) Magnum Break when 2+ monsters are clustered
+    if (nearby >= 2 && ready('magnumBreak')) { gameUI.castSkill('magnumBreak'); return; }
+
+    // 3) Bash the current/nearest target
+    if ((character.targetMonster || nearby >= 1) && ready('bash')) gameUI.castSkill('bash');
+}
+
 // ============ Game Loop ============
 // ===== Background simulation =====
 // The browser pauses requestAnimationFrame when the tab is hidden/minimized,
@@ -1414,6 +1459,7 @@ function backgroundTick() {
             const step = Math.min(0.1, remaining);
             character.update(step);
             if (combatSystem) combatSystem.update(step);       // auto-farm + fishing + attacks
+            autoCastSkills(step);                              // keep auto-skills going while hidden
             if (monsters) monsters.update(step, sceneManager.camera, character.stats.level);
             if (particles) particles.update(step);             // advance/cleanup effects
             remaining -= step;
@@ -1609,6 +1655,7 @@ function gameLoop(time) {
         sceneManager.updateAnimations(dt);
         if (particles) particles.update(dt);
         if (combatSystem) combatSystem.update(dt);
+        autoCastSkills(dt); // AUTO also casts the 3 skills
         if (gameUI) gameUI.updateTargetIndicator(sceneManager);
 
         // 6. Camera & Networking

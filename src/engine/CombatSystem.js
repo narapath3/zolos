@@ -142,12 +142,27 @@ export class CombatSystem {
             return;
         }
 
-        // Step 6.3: AUTO modeกลับมาทำงานอัตโนมัติเมื่อ HP ถึงเกณฑ์
+        // Step 6.3: หลังเกิดใหม่ ให้ "พัก" ฟื้นเลือดจนเต็มก่อน แล้วค่อยเปิด AUTO ต่อเอง.
+        // Respawn drops us to 20% HP and natural regen is slow (~2%/3s → ~2 min to
+        // full), so during this post-death recovery we heal fast (~15%/s) so the
+        // wait is only a few seconds. Auto-farm resumes the instant HP is full.
         if (this.wasAutoFarmingBeforeDeath && this.character.isAlive()) {
             const maxHp = isNaN(this.character.stats.max_hp) ? 100 : this.character.stats.max_hp;
-            if (this.character.stats.hp >= maxHp * 0.5) {
+            const maxSp = isNaN(this.character.stats.max_sp) ? 50 : this.character.stats.max_sp;
+            const curHp = isNaN(this.character.stats.hp) ? 0 : Number(this.character.stats.hp);
+            const curSp = isNaN(this.character.stats.sp) ? 0 : Number(this.character.stats.sp);
+
+            if (curHp < maxHp) {
+                // Accelerated recovery (at least +1 so it never stalls on rounding)
+                this.character.stats.hp = Math.min(maxHp, Math.floor(curHp + Math.max(1, maxHp * 0.15 * clampedDt)));
+                this.character.stats.sp = Math.min(maxSp, Math.floor(curSp + Math.max(1, maxSp * 0.15 * clampedDt)));
+            } else {
                 this.autoFarm = true;
                 this.wasAutoFarmingBeforeDeath = false;
+                // Fresh cooldowns so auto-skills are ready the moment we resume
+                if (this.character.cooldowns) {
+                    for (const k of Object.keys(this.character.cooldowns)) this.character.cooldowns[k] = 0;
+                }
                 if (this.onEvent) this.onEvent({ type: 'autoResume' });
             }
         }
