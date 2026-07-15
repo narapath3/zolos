@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b46ff"/>
+      <stop offset=".55" stop-color="#5a1fd6"/>
+      <stop offset="1" stop-color="#2c0f6b"/>
+    </linearGradient>
+    <linearGradient id="g" x1="20" y1="18" x2="44" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe89a"/>
+      <stop offset=".5" stop-color="#ffc046"/>
+      <stop offset="1" stop-color="#ff8a1e"/>
+    </linearGradient>
+    <radialGradient id="gl" cx="32" cy="18" r="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="1.2" stdDeviation="0.9" flood-color="#1a0640" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <!-- Full-bleed background so any mask shape (circle/squircle) looks solid -->
+  <rect x="0" y="0" width="64" height="64" fill="url(#bg)"/>
+  <rect x="0" y="0" width="64" height="64" fill="url(#gl)"/>
+  <!-- Bold Z, kept inside the maskable safe zone (center ~80%) -->
+  <g filter="url(#s)">
+    <path d="M20 18 H44 V25 L30 39 H44 V46 H20 V39 L34 25 H20 Z"
+          fill="url(#g)" stroke="#9a4a00" stroke-opacity=".4" stroke-width="1" stroke-linejoin="round"/>
+  </g>
+</svg>
