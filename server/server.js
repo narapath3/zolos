@@ -330,14 +330,13 @@ io.on('connection', (socket) => {
 
         msg = censorProfanity(msg);
 
-        // Never trust client identity for a player message — use the server's
-        // known username/level so nobody can impersonate another player from
-        // the console. (System/market messages keep their label but are still
-        // rate-limited + censored above.)
+        // Never trust client identity. Player messages use the server's known
+        // username; the system/market channel is forced to a FIXED label so a
+        // client can't pick a custom name to impersonate an admin or player.
         const out = {
             userId: isSystem ? 'system' : player.userId,
-            username: isSystem ? (payload.username || '📢 ระบบ') : player.username,
-            level: isSystem ? (payload.level || 99) : player.level,
+            username: isSystem ? '📢 ระบบตลาด' : player.username,
+            level: isSystem ? 99 : player.level,
             message: msg,
             mapId,
         };
