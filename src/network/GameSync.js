@@ -803,6 +803,15 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 if (onlinePlayersCallback) onlinePlayersCallback(players);
             });
 
+            // Full cross-map roster → drives the Online Players panel so it
+            // shows everyone online across all cities. Emitted after
+            // players_update, so this is what the panel ends up displaying.
+            socket.on('players_global', (players) => {
+                if (window.gameUI && typeof window.gameUI.updateOnlinePlayers === 'function') {
+                    window.gameUI.updateOnlinePlayers(players);
+                }
+            });
+
             socket.on('pos', (payload) => {
                 if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
                     onPlayerPositionUpdate(payload);

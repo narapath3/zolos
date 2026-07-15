@@ -1336,11 +1336,9 @@ export class GameUI {
         return a.username.localeCompare(b.username);
       });
     } else {
-      // Global view
-      const currentMapId = window.gameUI?.currentMapId || 'prontera';
-      const onlineInMap = onlinePlayers.filter(p => !p.mapId || p.mapId === currentMapId);
-      onlineCount = onlineInMap.length;
-      list = [...onlineInMap];
+      // Global view — everyone online across ALL cities/maps
+      onlineCount = onlinePlayers.length;
+      list = [...onlinePlayers];
 
       // Append offline friends who are not in the list
       const listUsernames = new Set(list.map(p => p.username));
@@ -1375,6 +1373,9 @@ export class GameUI {
     const totalCount = list.length;
     let html = `<div class="online-count-badge">${icon} ${onlineCount} online / ${totalCount} total</div>`;
 
+    // mapId → short city label (players are now listed across all cities)
+    const CITY = { prontera: 'Prontera', prontera_field: 'Prontera', payon: 'Payon', glast_heim: 'Glast Heim', mjolnir: 'Mjolnir', abyss_lake: 'Abyss Lake' };
+
     html += list.map(p => {
       const isFriend = friends.includes(p.username);
       const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
@@ -1382,11 +1383,15 @@ export class GameUI {
       const dotColor = p.isOffline ? '#666' : '#40e080';
       const nameColor = p.isOffline ? '#b0c0e0' : '#ffffff';
       const badgeStyle = p.isOffline ? 'background:rgba(0,0,0,0.5);color:#888;border-color:rgba(255,255,255,0.1);' : 'background:rgba(0,0,0,0.6);color:#ffffff;border-color:var(--primary-glow);';
+      const cityHtml = (!p.isOffline && p.mapId)
+        ? `<span class="player-city-tag" style="font-size:9px;color:#7fb0e0;background:rgba(60,110,180,0.18);border:1px solid rgba(120,170,230,0.3);border-radius:6px;padding:1px 6px;margin-left:4px;white-space:nowrap;">📍${CITY[p.mapId] || p.mapId}</span>`
+        : '';
 
       return `
         <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
           <span class="online-dot" style="background-color:${dotColor}"></span>
           <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
+          ${cityHtml}
           <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>
         </div>
       `;

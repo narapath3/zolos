@@ -585,11 +585,21 @@ function broadcastPlayerList(mapId) {
         }
     }
     
-    // Send map-specific list to players in that map
+    // Send map-specific list to players in that map (used for rendering the
+    // other heroes standing in the same city).
     io.to(`map:${mapId}`).emit('players_update', playersInMap);
-    
+
     // Global count can still be broadcast to everyone
     io.emit('online_count', globalCount);
+
+    // Also broadcast the FULL cross-map roster so the Online Players panel can
+    // list everyone regardless of which city/map they're in. Emitted right
+    // after players_update so it deterministically wins on the client.
+    const allPlayers = [];
+    for (const [, info] of onlinePlayers) {
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId });
+    }
+    io.emit('players_global', allPlayers);
 }
 
 // ============ PVP MMR (Elo, K=32) ============
