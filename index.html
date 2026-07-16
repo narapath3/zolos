@@ -582,14 +582,14 @@
     </div>
 
     <!-- Chat Panel -->
-    <div id="chat-panel" class="side-panel chat-panel" style="display: none;">
-      <div class="panel-header">
+    <div id="chat-panel" class="chat-panel preview-mode" style="display: flex;">
+      <div class="panel-header chat-header">
         <h3>💬 Chat / แนลแชท</h3>
         <button class="panel-close" data-close="chat-panel">✕</button>
       </div>
       <div class="panel-body chat-panel-body">
         <div id="chat-messages" class="chat-messages-container"></div>
-        <div class="chat-input-row">
+        <div class="chat-input-row" style="display: none;">
           <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
           <button id="btn-send-chat" class="btn-primary">Send</button>
         </div>

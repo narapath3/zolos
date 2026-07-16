@@ -3078,19 +3078,55 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== CHAT SYSTEM STYLE ========== */
 .chat-panel {
   width: 380px !important;
-  height: 380px !important;
+  height: 280px !important;
   position: fixed !important;
-  bottom: 120px !important;
+  bottom: 80px !important;
   left: 20px !important;
   transform: none !important;
   top: auto !important;
+  z-index: 900;
+  background: rgba(12, 18, 32, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+  pointer-events: auto;
+}
+
+.chat-panel.preview-mode {
+  background: transparent !important;
+  border-color: transparent !important;
+  backdrop-filter: none !important;
+  height: 200px !important;
+  pointer-events: none;
+}
+
+.chat-panel.preview-mode .chat-header,
+.chat-panel.preview-mode .chat-input-row {
+  display: none !important;
+}
+
+.chat-panel.preview-mode .chat-messages-container {
+  background: transparent !important;
+  border-color: transparent !important;
+  overflow: hidden !important;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 15%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%);
+}
+
+.chat-panel.preview-mode .chat-msg-row {
+  background: rgba(0, 0, 0, 0.45) !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  margin-bottom: 2px;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .chat-panel-body {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 47px) !important;
-  padding: 12px !important;
+  height: 100% !important;
+  padding: 10px !important;
 }
 
 .chat-messages-container {
@@ -3098,14 +3134,12 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
-  padding: 8px;
+  gap: 4px;
+  margin-bottom: 5px;
+  padding: 5px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-sm);
-  max-height: 240px;
-  min-height: 200px;
 }
 
 .chat-msg-row {

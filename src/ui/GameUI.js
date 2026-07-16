@@ -1854,14 +1854,17 @@ export class GameUI {
 
     if (btnToggle) {
       btnToggle.addEventListener('click', () => {
-        this._togglePanel('chat-panel');
+        if (chatPanel.classList.contains('preview-mode')) {
+          this._openChatFull();
+        } else {
+          this._closeChatToPreview();
+        }
       });
     }
 
     if (btnClose) {
       btnClose.addEventListener('click', () => {
-        if (chatPanel) chatPanel.style.display = 'none';
-        this.updateMobileControlsVisibility();
+        this._closeChatToPreview();
       });
     }
 
@@ -1875,6 +1878,9 @@ export class GameUI {
         this.chatSendCallback(text);
       }
       chatInput.value = '';
+      
+      // Roblox style: after sending, keep focused or close? 
+      // Usually it stays open until Escape or Enter again.
       chatInput.focus();
     };
 
@@ -1905,15 +1911,11 @@ export class GameUI {
           return;
         }
 
-        if (!chatPanel || chatPanel.style.display === 'none') {
-          // Open panel and focus
-          this._togglePanel('chat-panel');
-          if (chatInput) {
-            setTimeout(() => {
-              chatInput.focus();
-              chatInput.select();
-            }, 50);
-          }
+        if (!chatPanel) return;
+
+        if (chatPanel.classList.contains('preview-mode')) {
+          // Roblox style: Enter opens the chat input
+          this._openChatFull();
           e.preventDefault();
         } else {
           // Panel is open
@@ -1925,15 +1927,55 @@ export class GameUI {
             }
             e.preventDefault();
           } else {
-            // Focused and empty
-            chatPanel.style.display = 'none';
-            chatInput.blur();
-            this.updateMobileControlsVisibility();
-            e.preventDefault();
+            // If already focused and we press Enter, the sendMessage() listener handles it.
+            // But if it's empty, we close it back to preview.
+            if (chatInput.value.trim() === '') {
+              this._closeChatToPreview();
+              e.preventDefault();
+            }
           }
+        }
+      } else if (e.key === 'Escape') {
+        if (chatPanel && !chatPanel.classList.contains('preview-mode')) {
+          this._closeChatToPreview();
         }
       }
     });
+  }
+
+  _openChatFull() {
+    const chatPanel = document.getElementById('chat-panel');
+    const chatInput = document.getElementById('chat-input');
+    const chatInputRow = chatPanel.querySelector('.chat-input-row');
+    
+    chatPanel.classList.remove('preview-mode');
+    chatPanel.style.display = 'flex'; // Ensure it's visible
+    if (chatInputRow) chatInputRow.style.display = 'flex';
+    
+    if (chatInput) {
+      setTimeout(() => {
+        chatInput.focus();
+        chatInput.select();
+      }, 50);
+    }
+    
+    // Auto scroll to bottom when opening
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  _closeChatToPreview() {
+    const chatPanel = document.getElementById('chat-panel');
+    const chatInput = document.getElementById('chat-input');
+    const chatInputRow = chatPanel.querySelector('.chat-input-row');
+    
+    chatPanel.classList.add('preview-mode');
+    if (chatInputRow) chatInputRow.style.display = 'none';
+    if (chatInput) chatInput.blur();
+    
+    // Auto scroll to bottom
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
   setupChatSendCallback(callback) {
@@ -1989,12 +2031,8 @@ export class GameUI {
     // Auto scroll
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    // Also place in combat log if chat panel is closed
-    const chatPanel = document.getElementById('chat-panel');
-    const isClosed = !chatPanel || chatPanel.style.display === 'none';
-    if (isClosed) {
-      this.addCombatLog(`💬 ${username}: ${message}`, 'chat');
-    }
+    // Roblox style: messages are always visible in the preview, no need to mirror to combat log.
+    // (Optional: we could keep it for accessibility, but user wants it to look like Roblox).
   }
 
   // ============ Combat Log ============
