@@ -369,8 +369,12 @@ io.on('connection', (socket) => {
         if (!data || !data.characterId) return;
         const player = onlinePlayers.get(socket.id);
         if (player) {
-            player.lastSaveData = data;
-            pendingSaves.set(player.userId, data);
+            // SECURITY: stamp the save with the socket's server-trusted userId so
+            // the DB write can be gated on ownership. A client cannot save to a
+            // character it doesn't own by lying about characterId.
+            const trusted = { ...data, _ownerUserId: player.userId };
+            player.lastSaveData = trusted;
+            pendingSaves.set(player.userId, trusted);
         }
     });
 
@@ -538,6 +542,15 @@ io.on('connection', (socket) => {
 
         const dmg = Math.max(0, Math.min(5000, Number(payload.damage) || 0));
         if (dmg <= 0) return;
+
+        // Anti-spam: cap per-player throughput to a sane per-second budget so a
+        // bot can't machine-gun boss_hit to steal the #1 reward. Real attacks
+        // land a few times a second; 8 hits / 20k dmg per second is generous.
+        const nowH = Date.now();
+        if (!socket._bossWin || nowH - socket._bossWin.t > 1000) socket._bossWin = { t: nowH, dmg: 0, hits: 0 };
+        socket._bossWin.hits++;
+        socket._bossWin.dmg += dmg;
+        if (socket._bossWin.hits > 8 || socket._bossWin.dmg > 20000) return;
 
         worldBoss.hp = Math.max(0, worldBoss.hp - dmg);
         const rec = worldBoss.damage.get(player.userId) || { name: player.username, dmg: 0 };
@@ -733,6 +746,18 @@ async function saveCharacterToSupabase(saveData) {
     try {
         const { characterId, updates, inventory, dailyQuests, friendsList } = saveData;
 
+        // SECURITY GATE: only write if this character is owned by the socket's
+        // server-trusted user. Blocks cross-account stat/inventory overwrites
+        // (the server uses the service-role key, which bypasses RLS).
+        const ownerUserId = saveData._ownerUserId;
+        if (!ownerUserId) return;
+        const { data: owned, error: ownErr } = await supabase
+            .from('characters').select('id').eq('id', characterId).eq('user_id', ownerUserId).maybeSingle();
+        if (ownErr || !owned) {
+            console.warn(`[Server] 🚫 save_state ownership mismatch: char ${characterId} not owned by ${ownerUserId}`);
+            return;
+        }
+
         // 1. Save character stats
         if (updates && Object.keys(updates).length > 0) {
             const allowedFields = [
@@ -745,9 +770,12 @@ async function saveCharacterToSupabase(saveData) {
             for (const key of Object.keys(updates)) {
                 if (allowedFields.includes(key)) {
                     let val = updates[key];
-                    // Part 5.3: Server-side stat clamping
-                    if (key === 'level') val = Math.max(1, Math.min(999, parseInt(val) || 1));
-                    if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
+                    // Server-side stat clamping — aligned with the DB CHECK
+                    // constraints (level<=300, gold<=500M) so a cheat-range save
+                    // is capped here and never bounces the whole write.
+                    if (key === 'level') val = Math.max(1, Math.min(300, parseInt(val) || 1));
+                    if (key === 'gold') val = Math.max(0, Math.min(500000000, parseInt(val) || 0));
+                    if (key === 'exp') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
                     if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
                     if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
                     filtered[key] = val;
