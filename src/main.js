@@ -18,7 +18,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-16.45 (chat-moderation)';
+const BUILD_VERSION = '2026-07-16.47 (hud-shrink-hotkey-guard)';
 window.ZOLOS_BUILD = BUILD_VERSION;
 
 // Notify + offer reload when a newer build is deployed while this tab is open
@@ -769,6 +769,13 @@ async function initGame(charData) {
     window.addEventListener('keydown', (e) => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = true;
 
+        // Don't fire game hotkeys while typing in a text field (chat, forms).
+        // Otherwise typing "1/2/3" in chat would cast skills.
+        const tag = e.target && e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) {
+            return;
+        }
+
         // Skill hotkeys triggers: 1, 2, 3
         if (e.code === 'Digit1' || e.key === '1') {
             gameUI.castSkill('bash');
@@ -778,9 +785,8 @@ async function initGame(charData) {
             gameUI.castSkill('magnumBreak');
         }
 
-        // Reset the camera angle back to default (ignore while typing)
-        const tag = e.target && e.target.tagName;
-        if (e.code === 'KeyR' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+        // Reset the camera angle back to default
+        if (e.code === 'KeyR') {
             if (sceneManager && sceneManager.resetCameraYaw) sceneManager.resetCameraYaw();
         }
     });
