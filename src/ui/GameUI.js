@@ -1941,6 +1941,81 @@ export class GameUI {
         }
       }
     });
+
+    this._setupChatExtras(chatInput);
+  }
+
+  // Emoji picker + @mention autocomplete for the chat input.
+  _setupChatExtras(chatInput) {
+    if (!chatInput) return;
+    const emojiBtn = document.getElementById('btn-emoji');
+    const emojiPanel = document.getElementById('emoji-picker');
+    const mentionBox = document.getElementById('mention-suggest');
+
+    // ----- Emoji picker -----
+    const EMOJIS = ['😀','😄','😁','😂','🤣','😊','😉','😍','😘','😎','🤩','🥳','😴','🤔','😮','😢','😭','😡','👍','👎','👏','🙏','💪','🔥','✨','💯','⚔️','🛡️','🏹','🐉','💰','💎','🎣','🐟','🏆','❤️','💔','😱','😅','🤝'];
+    if (emojiPanel && !emojiPanel.dataset.built) {
+      emojiPanel.innerHTML = EMOJIS.map(e => `<button type="button" class="emoji-cell">${e}</button>`).join('');
+      emojiPanel.dataset.built = '1';
+      emojiPanel.querySelectorAll('.emoji-cell').forEach(cell => {
+        cell.addEventListener('click', () => {
+          this._insertAtCursor(chatInput, cell.textContent);
+          emojiPanel.style.display = 'none';
+          chatInput.focus();
+        });
+      });
+    }
+    if (emojiBtn && emojiPanel) {
+      emojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPanel.style.display = emojiPanel.style.display === 'none' ? 'grid' : 'none';
+        if (mentionBox) mentionBox.style.display = 'none';
+      });
+      document.addEventListener('click', (e) => {
+        if (emojiPanel.style.display !== 'none' && !emojiPanel.contains(e.target) && e.target !== emojiBtn) {
+          emojiPanel.style.display = 'none';
+        }
+      });
+    }
+
+    // ----- @mention autocomplete -----
+    const renderMentions = () => {
+      if (!mentionBox) return;
+      const val = chatInput.value;
+      const caret = chatInput.selectionStart ?? val.length;
+      const upto = val.slice(0, caret);
+      const m = upto.match(/@([^\s@]*)$/); // current @token being typed
+      if (!m) { mentionBox.style.display = 'none'; return; }
+      const q = m[1].toLowerCase();
+      const names = [...new Set((this.onlinePlayers || []).map(p => p.username).filter(Boolean))]
+        .filter(n => n.toLowerCase().includes(q) && n !== (this.character?.stats?.name))
+        .slice(0, 6);
+      if (!names.length) { mentionBox.style.display = 'none'; return; }
+      mentionBox.innerHTML = names.map(n => `<button type="button" class="mention-cell" data-name="${n.replace(/"/g, '&quot;')}">👤 ${n.replace(/</g, '&lt;')}</button>`).join('');
+      mentionBox.querySelectorAll('.mention-cell').forEach(cell => {
+        cell.addEventListener('click', () => {
+          const name = cell.getAttribute('data-name');
+          const start = upto.lastIndexOf('@');
+          chatInput.value = val.slice(0, start) + '@' + name + ' ' + val.slice(caret);
+          mentionBox.style.display = 'none';
+          chatInput.focus();
+          const pos = start + name.length + 2;
+          chatInput.setSelectionRange(pos, pos);
+        });
+      });
+      mentionBox.style.display = 'flex';
+    };
+    chatInput.addEventListener('input', renderMentions);
+    chatInput.addEventListener('blur', () => setTimeout(() => { if (mentionBox) mentionBox.style.display = 'none'; }, 150));
+  }
+
+  _insertAtCursor(input, text) {
+    const s = input.selectionStart ?? input.value.length;
+    const e = input.selectionEnd ?? input.value.length;
+    input.value = input.value.slice(0, s) + text + input.value.slice(e);
+    const pos = s + text.length;
+    input.setSelectionRange(pos, pos);
+    input.focus();
   }
 
   _openChatFull() {
@@ -2015,24 +2090,50 @@ export class GameUI {
     }
   }
 
+  // Emoticon → emoji shortcuts (applied to raw text before HTML-escaping).
+  static _EMOTICONS = [
+    ['<3', '❤️'], [':D', '😄'], [':)', '🙂'], ['=)', '🙂'], [':(', '🙁'], [';)', '😉'],
+    [':P', '😛'], [':p', '😛'], ['xD', '😆'], ['XD', '😆'], [':O', '😮'], [':o', '😮'],
+    ['B)', '😎'], ['8)', '😎'], [':|', '😐'], [":'(", '😢'], ['^^', '😊'], ['555', '😂'],
+  ];
+  _emojify(text) {
+    let out = text;
+    for (const [k, v] of GameUI._EMOTICONS) out = out.split(k).join(v);
+    return out;
+  }
+
   receiveChatMessage(username, message) {
     const chatMessages = document.getElementById('chat-messages');
     if (!chatMessages) return;
 
+    // SECURITY: escape everything — chat is untrusted input. (Rendering raw
+    // innerHTML here was an XSS hole: a message could inject <img onerror=…>.)
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    const myName = (this.character && this.character.stats && this.character.stats.name) || '';
+    let mentionedMe = false;
+
+    // emoji shortcuts on raw text, then escape, then highlight @mentions
+    let body = esc(this._emojify(String(message == null ? '' : message)));
+    body = body.replace(/@([^\s@<>&]{1,24})/g, (full, name) => {
+      const isMe = myName && name.toLowerCase() === myName.toLowerCase();
+      if (isMe) mentionedMe = true;
+      return `<span class="chat-mention${isMe ? ' me' : ''}">@${name}</span>`;
+    });
+
+    const isSystem = typeof username === 'string' && username.includes('ระบบ');
     const row = document.createElement('div');
-    row.className = 'chat-msg-row user';
-    row.innerHTML = `
-      <span class="chat-msg-username">[${username}]:</span>
-      <span class="chat-msg-text">${message}</span>
-    `;
-
+    row.className = 'chat-msg-row ' + (isSystem ? 'system' : 'user') + (mentionedMe ? ' mention-me' : '');
+    row.innerHTML = `<span class="chat-msg-username">[${esc(username)}]:</span> <span class="chat-msg-text">${body}</span>`;
     chatMessages.appendChild(row);
-
-    // Auto scroll
+    while (chatMessages.children.length > 80) chatMessages.removeChild(chatMessages.firstChild);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    // Roblox style: messages are always visible in the preview, no need to mirror to combat log.
-    // (Optional: we could keep it for accessibility, but user wants it to look like Roblox).
+    // Ping when someone tags you (not your own message)
+    if (mentionedMe && username !== myName) {
+      if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
+      this.addCombatLog(`💬 ${username} แท็กหาคุณในแชท!`, 'levelup');
+    }
   }
 
   // ============ Combat Log ============

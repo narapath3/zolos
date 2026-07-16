@@ -3213,6 +3213,89 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   .chat-input-row::before { content: ""; padding: 0; }
 }
 
+/* ===== Chat mentions, emoji picker, @-autocomplete ===== */
+.chat-mention {
+  color: #8fd0ff;
+  font-weight: 800;
+  background: rgba(80, 140, 210, 0.22);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+.chat-mention.me { color: #ffe08a; background: rgba(255, 200, 60, 0.28); }
+.chat-msg-row.mention-me {
+  background: rgba(255, 200, 60, 0.12) !important;
+  border-left: 2px solid #ffcf4a;
+  border-radius: 4px;
+  padding-left: 4px;
+}
+
+#btn-emoji {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+#btn-emoji:hover { background: rgba(255, 255, 255, 0.16); }
+
+.emoji-picker {
+  pointer-events: auto;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 6px;
+  background: rgba(10, 15, 26, 0.96);
+  border: 1px solid rgba(120, 150, 210, 0.4);
+  border-radius: 10px;
+  scrollbar-width: thin;
+}
+.emoji-cell {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1.2;
+  padding: 2px;
+  border-radius: 6px;
+}
+.emoji-cell:hover { background: rgba(255, 255, 255, 0.12); }
+
+.mention-suggest {
+  pointer-events: auto;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(10, 15, 26, 0.96);
+  border: 1px solid rgba(120, 150, 210, 0.4);
+  border-radius: 10px;
+}
+.mention-cell {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #dfe8f2;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mention-cell:hover { background: rgba(80, 140, 210, 0.3); color: #fff; }
+
 /* ========== MINIMAP HUD ========== */
 #minimap-container {
   position: fixed;
