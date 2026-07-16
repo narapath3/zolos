@@ -1002,8 +1002,12 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socketListenersAttached = true;
         }
 
-        // Join the game
-        socket.emit('join', { userId, username, level, mapId: currentMapId });
+        // Join the game — include the Supabase access token so the server can
+        // verify our identity (userId) instead of trusting it blindly. Guests
+        // have no token and stay unverified (can't impersonate a real account).
+        let accessToken = null;
+        try { accessToken = (await supabase?.auth?.getSession())?.data?.session?.access_token || null; } catch (e) { /* guest */ }
+        socket.emit('join', { userId, username, level, mapId: currentMapId, accessToken });
         console.log('[Zolos] ✅ Emitted join event to Map Server');
         return;
     }

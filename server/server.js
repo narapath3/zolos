@@ -235,10 +235,28 @@ io.on('connection', (socket) => {
     socket.emit('online_count', onlinePlayers.size);
 
     // --- JOIN ---
-    socket.on('join', (data) => {
+    socket.on('join', async (data) => {
         if (!data || !data.userId) return;
 
-        const { userId, username, level } = data;
+        let { userId, username, level } = data;
+
+        // AUTHENTICATE: verify the Supabase JWT so the client can't impersonate
+        // another account by simply claiming its userId. On success, the
+        // server-verified id is authoritative. A real-looking userId claimed
+        // WITHOUT a valid token is rejected (downgraded to a throwaway id) so it
+        // can never gain that account's admin rights or overwrite its saves.
+        let verified = false;
+        if (data.accessToken && supabase) {
+            try {
+                const { data: u, error } = await supabase.auth.getUser(data.accessToken);
+                if (!error && u && u.user) { userId = u.user.id; verified = true; }
+            } catch (e) { /* invalid token */ }
+        }
+        const isGuestId = String(userId).startsWith('guest_') || String(userId).startsWith('local_');
+        if (!verified && !isGuestId) {
+            console.warn(`[Server] 🚫 Unverified claim of real account ${userId} — downgrading`);
+            userId = 'unverified_' + socket.id;
+        }
 
         // Remove any existing connection for same userId (reconnect scenario)
         const existingSocketId = userSocketMap.get(userId);
@@ -257,7 +275,8 @@ io.on('connection', (socket) => {
             socketId: socket.id,
             mapId: data.mapId || 'prontera_field',
             joinedAt: Date.now(),
-            lastSaveData: null
+            lastSaveData: null,
+            verified,
         };
 
         // Join map-specific room
@@ -266,16 +285,15 @@ io.on('connection', (socket) => {
         onlinePlayers.set(socket.id, playerInfo);
         userSocketMap.set(userId, socket.id);
 
-        // Resolve admin status server-side (never trust the client). Cached on
-        // the player so the admin:announcement handler can gate on it.
+        // Admin status only for VERIFIED accounts (never trust the client).
         playerInfo.isAdmin = false;
-        if (supabase && userId && !userId.startsWith('guest_') && !userId.startsWith('local_')) {
+        if (verified && supabase) {
             supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle()
                 .then(({ data }) => { if (data && data.is_admin === true) playerInfo.isAdmin = true; })
                 .catch(() => { /* default non-admin */ });
         }
 
-        console.log(`[Server] ➕ Player joined: ${username} (${userId}) — Total: ${onlinePlayers.size}`);
+        console.log(`[Server] ➕ Player joined: ${username} (${userId})${verified ? ' ✓' : ''} — Total: ${onlinePlayers.size}`);
 
         // Broadcast updated player list to everyone in this map
         broadcastPlayerList(playerInfo.mapId);
