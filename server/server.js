@@ -10,7 +10,23 @@ import { createClient } from '@supabase/supabase-js';
 // ============ Configuration ============
 const PORT = parseInt(process.env.PORT) || 3001;
 const HOST = '0.0.0.0';
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.vercel.app,https://zolos-multiplayer.vercel.app').split(',').map(s => s.trim());
+// Exact-origin allowlist. Accept BOTH env names — the deploy guide documents
+// CORS_ORIGIN (singular) while the code historically read CORS_ORIGINS, and
+// that mismatch meant a configured value was silently ignored.
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.online,https://www.zolos.online,https://zolos.vercel.app,https://zolos-multiplayer.vercel.app').split(',').map(s => s.trim()).filter(Boolean);
+// Base domains whose subdomains are all allowed. Covers the apex + www of the
+// live site and Vercel preview deploys (zolos-<hash>.vercel.app) without having
+// to enumerate every one. localhost stays open for dev.
+const CORS_ALLOWED_HOSTS = ['zolos.online', 'vercel.app', 'localhost', '127.0.0.1'];
+
+function isAllowedOrigin(origin) {
+    if (CORS_ORIGINS.includes(origin)) return true;
+    try {
+        const host = new URL(origin).hostname;
+        return CORS_ALLOWED_HOSTS.some(base => host === base || host.endsWith('.' + base));
+    } catch { return false; }
+}
+
 // Add wildcard support for easier debugging
 if (process.env.CORS_ALLOW_ALL === 'true') {
     console.log('[Server] ⚠️ CORS_ALLOW_ALL is enabled');
@@ -39,7 +55,7 @@ const io = new Server(httpServer, {
             // Browsers always send one, so this can't be used to bypass the list.
             if (!origin) return callback(null, true);
             if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-            if (CORS_ORIGINS.includes(origin)) return callback(null, true);
+            if (isAllowedOrigin(origin)) return callback(null, true);
             console.warn(`[Server] 🚫 CORS rejected origin: ${origin}`);
             callback(new Error('Origin not allowed by CORS'));
         },
