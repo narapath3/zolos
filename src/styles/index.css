@@ -3248,7 +3248,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   border-radius: 50%;
   pointer-events: none;
   background: conic-gradient(from 0deg, rgba(240, 192, 64, 0.22) 0deg, rgba(240, 192, 64, 0.05) 45deg, rgba(240, 192, 64, 0) 120deg, rgba(240, 192, 64, 0) 360deg);
-  animation: radarRotate 3.5s linear infinite;
+  /* animation: radarRotate 3.5s linear infinite; -- Removed per user request */
   mix-blend-mode: screen;
 }
 
