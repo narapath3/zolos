@@ -581,18 +581,13 @@
       <span id="kill-count">0</span>
     </div>
 
-    <!-- Chat Panel -->
-    <div id="chat-panel" class="chat-panel preview-mode" style="display: flex;">
-      <div class="panel-header chat-header">
-        <h3>💬 Chat / แนลแชท</h3>
-        <button class="panel-close" data-close="chat-panel">✕</button>
-      </div>
-      <div class="panel-body chat-panel-body">
-        <div id="chat-messages" class="chat-messages-container"></div>
-        <div class="chat-input-row" style="display: none;">
-          <input type="text" id="chat-input" placeholder="พิมพ์ข้อความคุยกัน..." autocomplete="off">
-          <button id="btn-send-chat" class="btn-primary">Send</button>
-        </div>
+    <!-- Chat Panel (Ragnarok-style: compact, always-visible, bottom-left) -->
+    <div id="chat-panel" class="chat-panel preview-mode">
+      <div id="chat-messages" class="chat-messages-container"></div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" maxlength="200" placeholder="กด Enter เพื่อพิมพ์..."
+          autocomplete="off">
+        <button id="btn-send-chat" title="ส่ง">➤</button>
       </div>
     </div>
 
