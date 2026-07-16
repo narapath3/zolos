@@ -3198,17 +3198,18 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .chat-panel:not(.preview-mode) .chat-input-row { opacity: 1; background: rgba(8, 12, 22, 0.92); border-color: #6ea8ff; }
 .chat-panel:not(.preview-mode) .chat-messages-container { background: rgba(8, 12, 22, 0.66) !important; }
 
-/* Touch layouts: joystick sits bottom-left, so move chat to the upper-left
-   (under the HUD) where it never fights the joystick or action buttons. */
+/* Touch layouts: the movement joystick is a floating one (appears where you
+   press), so the bottom-left is free. Keep chat at the bottom, just above the
+   menu bar. Action buttons live on the bottom-right, so no conflict. */
 @media (max-width: 1024px) {
   .chat-panel {
     left: 8px !important;
-    top: 96px !important;
-    bottom: auto !important;
-    width: 58vw !important;
-    max-width: 58vw;
+    bottom: 84px !important;
+    top: auto !important;
+    width: 64vw !important;
+    max-width: 64vw;
   }
-  .chat-messages-container { max-height: 100px; }
+  .chat-messages-container { max-height: 92px; }
   .chat-input-row::before { content: ""; padding: 0; }
 }
 
