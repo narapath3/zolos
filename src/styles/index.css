@@ -3330,7 +3330,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 @media (max-width: 1024px) {
   .chat-panel {
     left: 8px !important;
-    bottom: 84px !important;
+    /* Sit clear above the bottom nav bar (which is bottom:6px + its own height +
+       the home-indicator safe area). Without the safe-area term the chat drops
+       onto the menu on notched phones. */
+    bottom: calc(92px + env(safe-area-inset-bottom)) !important;
     top: auto !important;
     width: 64vw !important;
     max-width: 64vw;

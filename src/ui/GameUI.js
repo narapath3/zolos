@@ -4230,7 +4230,25 @@ export class GameUI {
         target.closest('#hud-bottom') || target.closest('.side-panel') ||
         target.closest('.modal-popup') || target.closest('#hud-top') ||
         target.closest('#minimap-container') || target.closest('#target-indicator') ||
-        target.closest('#fps-counter') || target.closest('#kill-counter')) return;
+        target.closest('#fps-counter') || target.closest('#kill-counter') ||
+        target.closest('#chat-panel')) return;
+
+      // Never spawn the joystick over the chat UI. The chat panel is
+      // click-through in preview mode, so a touch there can fall past it to the
+      // canvas and move the character. Guard by geometry: always block the input
+      // bar; while the chat is open (typing), block the whole panel so tapping
+      // anywhere in the chat area doesn't walk the character off.
+      const chatPanel = document.getElementById('chat-panel');
+      if (chatPanel && window.getComputedStyle(chatPanel).display !== 'none') {
+        const chatOpen = !chatPanel.classList.contains('preview-mode');
+        const guardEl = chatOpen ? chatPanel : chatPanel.querySelector('.chat-input-row');
+        if (guardEl) {
+          const r = guardEl.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0 &&
+            touch.clientX >= r.left && touch.clientX <= r.right &&
+            touch.clientY >= r.top && touch.clientY <= r.bottom) return;
+        }
+      }
 
       e.preventDefault();
       joystickActive = true;
