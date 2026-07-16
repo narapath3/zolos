@@ -876,28 +876,58 @@ async function initGame(charData) {
 }
 
 async function showCharacterSelect(isGuest = false) {
-    // For now, load default character or create screen
     try {
         const char = await loadCharacter(userId);
         if (char) {
             char.isGuest = isGuest;
             initGame(char);
         } else {
-            // Fallback for new characters if loadCharacter didn't create one
-            const newChar = {
-                user_id: userId,
-                name: username,
-                level: 1,
-                hp: 100,
-                max_hp: 100
-            };
-            initGame(newChar);
+            // loadCharacter resolved without a character. This should not happen
+            // (it either returns one or creates one), so treat it as a load
+            // failure rather than fabricating a level-1 character — starting the
+            // game with defaults lets auto-save overwrite the real DB row.
+            showCharacterLoadError();
         }
     } catch (e) {
         console.error("Failed to load character:", e);
-        // Fallback to start game anyway for testing
-        initGame({ user_id: userId, name: username, level: 1 });
+        // CRITICAL: never fall through to a fresh level-1 character here. A
+        // transient read failure (network/RLS/timeout) used to start the game
+        // with default stats, and auto-save then wrote level 1 back over the
+        // player's real character (saveCharacterByUserId updates by user_id),
+        // permanently resetting accounts. Abort to a retry screen instead so
+        // nothing is ever saved on top of unknown existing data.
+        showCharacterLoadError();
     }
+}
+
+// Non-destructive failure screen: keeps the player OUT of the game (so no
+// auto-save can run) and offers a manual retry. Reloading re-attempts the load
+// from scratch; it never writes to the DB.
+function showCharacterLoadError() {
+    const authScreen = document.getElementById('auth-screen');
+    if (authScreen) authScreen.style.display = 'block';
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen) gameScreen.style.display = 'none';
+
+    let overlay = document.getElementById('char-load-error');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'char-load-error';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(6,10,20,.92);backdrop-filter:blur(4px);';
+        overlay.innerHTML = `
+            <div style="max-width:420px;text-align:center;padding:28px 26px;border:1px solid #4aa3ff;border-radius:14px;background:#0e1626;color:#e2e8f0;font-family:system-ui,sans-serif;">
+                <div style="font-size:38px;margin-bottom:8px;">⚠️</div>
+                <div style="font-weight:800;font-size:18px;color:#9fccff;margin-bottom:10px;">โหลดตัวละครไม่สำเร็จ</div>
+                <div style="font-size:13px;line-height:1.6;opacity:.9;margin-bottom:20px;">
+                    เชื่อมต่อฐานข้อมูลไม่ได้ชั่วคราว เพื่อความปลอดภัยของข้อมูล
+                    ระบบจะไม่เข้าเกมจนกว่าจะโหลดข้อมูลเดิมได้ครบ<br>กรุณาลองใหม่อีกครั้ง
+                </div>
+                <button id="char-load-retry" style="border:none;border-radius:10px;padding:11px 22px;cursor:pointer;font-weight:800;font-size:14px;background:#4aa3ff;color:#04101f;">ลองใหม่</button>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#char-load-retry').addEventListener('click', () => location.reload());
+    }
+    overlay.style.display = 'flex';
 }
 
 // ============ Input Handling ============
