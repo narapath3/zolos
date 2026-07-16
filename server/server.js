@@ -35,8 +35,13 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
         origin: (origin, callback) => {
-            // Allow all origins for now to fix connection issues
-            callback(null, true);
+            // No Origin header: non-browser clients (health checks, native apps).
+            // Browsers always send one, so this can't be used to bypass the list.
+            if (!origin) return callback(null, true);
+            if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
+            if (CORS_ORIGINS.includes(origin)) return callback(null, true);
+            console.warn(`[Server] 🚫 CORS rejected origin: ${origin}`);
+            callback(new Error('Origin not allowed by CORS'));
         },
         methods: ['GET', 'POST'],
         credentials: true
@@ -66,6 +71,18 @@ const userSocketMap = new Map();
 const pendingSaves = new Map();
 // Map<userId, DuelInfo> — both participants map to the same duel object
 const activeDuels = new Map();
+// Map<`${challengerId}->${targetId}`, timestamp> — duel challenges awaiting a
+// reply. A duel may only be registered if the server saw the challenge itself,
+// so a client can't fabricate a duel between two arbitrary players.
+const pendingDuelChallenges = new Map();
+const DUEL_CHALLENGE_TTL_MS = 60 * 1000;
+
+// Identity helper: every relayed payload is re-stamped with the socket's
+// server-trusted userId. Never echo a client-supplied identity field — the JWT
+// check at `join` is worthless if any later event can just claim another id.
+function trustedSender(socket) {
+    return onlinePlayers.get(socket.id) || null;
+}
 
 // PlayerInfo shape:
 // { userId, username, level, socketId, joinedAt, lastSaveData: null }
@@ -305,16 +322,19 @@ io.on('connection', (socket) => {
 
     // --- POSITION BROADCAST ---
     socket.on('pos', (payload) => {
-        if (!payload || !payload.userId) return;
-        const mapId = payload.mapId || 'prontera_field';
+        if (!payload) return;
+        const self = trustedSender(socket);
+        if (!self) return; // must be a joined player
+        const mapId = payload.mapId || self.mapId || 'prontera_field';
         // Remember the sender's latest position so friends can warp to them —
         // even across maps (positions are only relayed within a map room).
-        const self = onlinePlayers.get(socket.id);
-        if (self && typeof payload.x === 'number' && typeof payload.z === 'number') {
+        if (typeof payload.x === 'number' && typeof payload.z === 'number') {
             self.lastPos = { x: payload.x, y: payload.y, z: payload.z, mapId };
         }
-        // Broadcast position to all OTHER clients in the SAME map
-        socket.to(`map:${mapId}`).emit('pos', payload);
+        // Broadcast to all OTHER clients in the SAME map, stamped with the
+        // server's identity for this socket so a client can't puppet another
+        // player's avatar by claiming their userId.
+        socket.to(`map:${mapId}`).emit('pos', { ...payload, userId: self.userId, mapId });
     });
 
     // --- CHAT ---
@@ -396,46 +416,68 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- P2P TRADE ---
-    socket.on('trade_request', (payload) => {
-        if (!payload || !payload.targetUserId) return;
+    // --- P2P TRADE / FRIEND ---
+    // These are pure relays, so the only thing the receiver can trust is what
+    // the server stamps on. Note the field naming is asymmetric, and matches
+    // what the client filters on (GameSync.js):
+    //   requests  — receiver checks `targetUserId === me`; sender is `senderUserId`
+    //   responses — receiver checks `senderUserId === me` (the original asker),
+    //               so there `senderUserId` is the DESTINATION and the replier
+    //               is carried in `targetUserId`.
+    // Each direction therefore stamps a different field, but the rule is the
+    // same: the id identifying THIS socket is always overwritten server-side.
+
+    // Emitter is the initiator → deliver to payload.targetUserId.
+    function relayRequest(eventName, payload, sender) {
         const targetSocketId = userSocketMap.get(payload.targetUserId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('trade_request', payload);
-        }
+        if (!targetSocketId) return;
+        io.to(targetSocketId).emit(eventName, {
+            ...payload,
+            senderUserId: sender.userId,
+            senderName: sender.username,
+        });
+    }
+
+    // Emitter is the replier → deliver back to payload.senderUserId (the asker).
+    function relayResponse(eventName, payload, sender) {
+        const targetSocketId = userSocketMap.get(payload.senderUserId);
+        if (!targetSocketId) return;
+        io.to(targetSocketId).emit(eventName, {
+            ...payload,
+            targetUserId: sender.userId,
+            targetName: sender.username,
+        });
+    }
+
+    socket.on('trade_request', (payload) => {
+        const sender = trustedSender(socket);
+        if (!sender || !payload || !payload.targetUserId) return;
+        relayRequest('trade_request', payload, sender);
     });
 
     socket.on('trade_response', (payload) => {
-        if (!payload || !payload.senderUserId) return;
-        const targetSocketId = userSocketMap.get(payload.senderUserId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('trade_response', payload);
-        }
+        const sender = trustedSender(socket);
+        if (!sender || !payload || !payload.senderUserId) return;
+        relayResponse('trade_response', payload, sender);
     });
 
+    // Cancel travels the same direction as the request (asker → target).
     socket.on('trade_cancel', (payload) => {
-        if (!payload || !payload.targetUserId) return;
-        const targetSocketId = userSocketMap.get(payload.targetUserId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('trade_cancel', payload);
-        }
+        const sender = trustedSender(socket);
+        if (!sender || !payload || !payload.targetUserId) return;
+        relayRequest('trade_cancel', payload, sender);
     });
 
-    // --- P2P FRIEND ---
     socket.on('friend_request', (payload) => {
-        if (!payload || !payload.targetUserId) return;
-        const targetSocketId = userSocketMap.get(payload.targetUserId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('friend_request', payload);
-        }
+        const sender = trustedSender(socket);
+        if (!sender || !payload || !payload.targetUserId) return;
+        relayRequest('friend_request', payload, sender);
     });
 
     socket.on('friend_response', (payload) => {
-        if (!payload || !payload.senderUserId) return;
-        const targetSocketId = userSocketMap.get(payload.senderUserId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('friend_response', payload);
-        }
+        const sender = trustedSender(socket);
+        if (!sender || !payload || !payload.senderUserId) return;
+        relayResponse('friend_response', payload, sender);
     });
 
     // --- WARP TO FRIEND ---
@@ -473,65 +515,98 @@ io.on('connection', (socket) => {
 
     // --- Challenge another player ---
     socket.on('duel_request', (payload) => {
-        if (!payload || !payload.targetUserId) return;
-        const targetSocketId = userSocketMap.get(payload.targetUserId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('duel_request', payload);
-        }
+        const sender = trustedSender(socket);
+        if (!sender || !payload || !payload.targetUserId) return;
+        if (payload.targetUserId === sender.userId) return; // no self-duels
+        // Record the challenge so the accept can be checked against it.
+        pendingDuelChallenges.set(`${sender.userId}->${payload.targetUserId}`, Date.now());
+        relayRequest('duel_request', payload, sender);
     });
 
     // --- Accept / decline ---
     socket.on('duel_response', (payload) => {
-        if (!payload || !payload.senderUserId) return;
-        const challengerSocketId = userSocketMap.get(payload.senderUserId);
+        const accepter = trustedSender(socket);
+        if (!accepter || !payload || !payload.senderUserId) return;
+
+        // The replier is THIS socket — never payload.targetUserId. Previously
+        // both ids came from the client, so anyone could register a duel between
+        // two arbitrary players and then settle its Elo with duel_end.
+        const challengerId = payload.senderUserId;
+        const key = `${challengerId}->${accepter.userId}`;
+        const issuedAt = pendingDuelChallenges.get(key);
+        if (!issuedAt || Date.now() - issuedAt > DUEL_CHALLENGE_TTL_MS) {
+            pendingDuelChallenges.delete(key);
+            return; // no such challenge (or it expired) — ignore
+        }
+        pendingDuelChallenges.delete(key);
+
+        const challengerSocketId = userSocketMap.get(challengerId);
         if (!challengerSocketId) return;
 
-        io.to(challengerSocketId).emit('duel_response', payload);
+        relayResponse('duel_response', payload, accepter);
 
-        if (payload.accepted && payload.targetUserId) {
+        if (payload.accepted) {
+            // Refuse if either side is already in a duel.
+            if (activeDuels.has(challengerId) || activeDuels.has(accepter.userId)) return;
+
             const duelId = `duel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const duel = {
                 duelId,
-                a: payload.senderUserId,   // challenger
-                b: payload.targetUserId,   // accepter
+                a: challengerId,      // challenger
+                b: accepter.userId,   // accepter (server-verified)
                 settled: false,
                 startedAt: Date.now(),
             };
-            activeDuels.set(payload.senderUserId, duel);
-            activeDuels.set(payload.targetUserId, duel);
+            activeDuels.set(duel.a, duel);
+            activeDuels.set(duel.b, duel);
 
             // Arena spawn points (matches the arena built client-side at -14,14)
             const startPayload = {
                 duelId,
                 players: [
-                    { userId: payload.senderUserId, spawn: { x: -17, z: 14 } },
-                    { userId: payload.targetUserId, spawn: { x: -11, z: 14 } },
+                    { userId: duel.a, spawn: { x: -17, z: 14 } },
+                    { userId: duel.b, spawn: { x: -11, z: 14 } },
                 ],
             };
             io.to(challengerSocketId).emit('duel_start', startPayload);
-            const accepterSocketId = userSocketMap.get(payload.targetUserId);
-            if (accepterSocketId) io.to(accepterSocketId).emit('duel_start', startPayload);
-            console.log(`[Server] ⚔️ Duel started: ${payload.senderUserId} vs ${payload.targetUserId}`);
+            io.to(socket.id).emit('duel_start', startPayload);
+            console.log(`[Server] ⚔️ Duel started: ${duel.a} vs ${duel.b}`);
         }
     });
 
     // --- Relay a hit to the victim ---
     socket.on('duel_hit', (payload) => {
-        if (!payload || !payload.targetUserId) return;
-        const targetSocketId = userSocketMap.get(payload.targetUserId);
+        const attacker = trustedSender(socket);
+        if (!attacker || !payload || !payload.targetUserId) return;
+        // Only hit the opponent of a duel this socket is actually in, so a
+        // client can't spray duel_hit at players it isn't fighting.
+        const duel = activeDuels.get(attacker.userId);
+        if (!duel || duel.settled) return;
+        const opponentId = duel.a === attacker.userId ? duel.b : duel.a;
+        if (payload.targetUserId !== opponentId) return;
+
+        const targetSocketId = userSocketMap.get(opponentId);
         if (targetSocketId) {
-            io.to(targetSocketId).emit('duel_hit', payload);
+            io.to(targetSocketId).emit('duel_hit', {
+                ...payload,
+                attackerUserId: attacker.userId,
+                damage: Math.max(0, Math.min(5000, Number(payload.damage) || 0)),
+            });
         }
     });
 
     // --- Loser reports defeat; server settles MMR once ---
     socket.on('duel_end', async (payload) => {
-        if (!payload || !payload.winnerUserId || !payload.loserUserId) return;
+        const reporter = trustedSender(socket);
+        if (!reporter || !payload || !payload.winnerUserId || !payload.loserUserId) return;
         const duel = activeDuels.get(payload.loserUserId);
         if (!duel || duel.settled) return;
         // Validate the pair matches the registered duel
         const pair = [duel.a, duel.b];
         if (!pair.includes(payload.winnerUserId) || !pair.includes(payload.loserUserId)) return;
+        // ...and that the reporter is one of the two participants, so a
+        // bystander can't settle other people's duels.
+        if (!pair.includes(reporter.userId)) return;
         duel.settled = true;
         activeDuels.delete(duel.a);
         activeDuels.delete(duel.b);
@@ -642,6 +717,13 @@ io.on('connection', (socket) => {
         const player = onlinePlayers.get(socket.id);
         if (player) {
             console.log(`[Server] ➖ Player left: ${player.username} (${player.userId}) — reason: ${reason}`);
+
+            // Drop any duel challenges this player issued or received, so they
+            // don't linger and let a stale accept start a duel later.
+            for (const key of pendingDuelChallenges.keys()) {
+                const [from, to] = key.split('->');
+                if (from === player.userId || to === player.userId) pendingDuelChallenges.delete(key);
+            }
 
             // If mid-duel, the disconnector forfeits: opponent wins
             const duel = activeDuels.get(player.userId);
