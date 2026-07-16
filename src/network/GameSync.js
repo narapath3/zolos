@@ -51,28 +51,33 @@ export async function loadCharacter(userId) {
     if (error) throw error;
 
     let char = data;
-    if (char && isPlaceholderName(char.name)) {
-        try {
-            const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
-            const profile = await getProfile(userId);
-            if (profile && profile.username && !isPlaceholderName(profile.username)) {
-                char.name = profile.username;
+    // Part 2.2: Profile name always takes priority over character name
+    try {
+        const { getProfile, supabase: supabaseClient } = await import('./SupabaseClient.js');
+        const profile = await getProfile(userId);
+        if (profile && profile.username && !isPlaceholderName(profile.username)) {
+            char.name = profile.username;
+            // Sync character table if it was stale
+            if (data.name !== profile.username) {
                 await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
-            } else {
-                let isAnon = false;
-                if (supabaseClient) {
-                    const { data: { user } } = await supabaseClient.auth.getUser();
-                    if (user && user.is_anonymous) isAnon = true;
-                }
-                if (userId.startsWith('guest_') || isAnon) {
-                    char.name = getDeterministicGuestName(userId);
-                    await supabase.from('profiles').upsert({ id: userId, username: char.name });
+            }
+        } else {
+            let isAnon = false;
+            if (supabaseClient) {
+                const { data: { user } } = await supabaseClient.auth.getUser();
+                if (user && user.is_anonymous) isAnon = true;
+            }
+            if (userId.startsWith('guest_') || isAnon) {
+                char.name = getDeterministicGuestName(userId);
+                // Ensure profile exists for guests
+                await supabase.from('profiles').upsert({ id: userId, username: char.name });
+                if (data.name !== char.name) {
                     await supabase.from('characters').update({ name: char.name }).eq('id', char.id);
                 }
             }
-        } catch (e) {
-            console.warn('Failed to update character name from profile on load:', e);
         }
+    } catch (e) {
+        console.warn('Failed to update character name from profile on load:', e);
     }
     return char;
 }
@@ -210,11 +215,11 @@ export async function saveCharacter(characterId, updates) {
 
     // Core stats (always in DB)
     // Only include fields that actually exist in the DB schema
-    // sound_enabled, graphics_quality, fps_enabled do NOT exist in the Supabase characters table
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender'
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
+        'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
 
     // Optional appearance fields (may not be in DB yet)
@@ -227,7 +232,14 @@ export async function saveCharacter(characterId, updates) {
     const filteredUpdates = {};
     for (const key of Object.keys(dbUpdates)) {
         if (allowedFields.includes(key) || appearanceFields.includes(key)) {
-            filteredUpdates[key] = dbUpdates[key];
+            let val = dbUpdates[key];
+            // Part 5.3: Client-side stat validation/clamping
+            if (key === 'level') val = Math.max(1, Math.min(999, parseInt(val) || 1));
+            if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
+            if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
+            if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
+            
+            filteredUpdates[key] = val;
         }
     }
 
@@ -290,6 +302,12 @@ export async function saveCharacterByUserId(userId, updates) {
         if (updates.sound_enabled !== undefined) existingSettings.sound_enabled = updates.sound_enabled;
         if (updates.graphics_quality !== undefined) existingSettings.graphics_quality = updates.graphics_quality;
         localStorage.setItem(settingsKey, JSON.stringify(existingSettings));
+
+        // Also save to characterId key for backward compatibility/CharacterManager load logic
+        const charId = updates.characterId || updates.id;
+        if (charId) {
+            localStorage.setItem(`zolos_settings_${charId}`, JSON.stringify(existingSettings));
+        }
     } catch (e) { /* localStorage unavailable */ }
 
     if (isOfflineMode || !supabase || userId.startsWith('guest_') || userId.startsWith('local_')) {
@@ -303,17 +321,24 @@ export async function saveCharacterByUserId(userId, updates) {
     }
 
     // Only include fields that actually exist in the DB schema
-    // sound_enabled, graphics_quality, fps_enabled do NOT exist in the Supabase characters table
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender'
+        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
+        'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
 
     const filteredUpdates = {};
     for (const key of Object.keys(updates)) {
         if (allowedFields.includes(key)) {
-            filteredUpdates[key] = updates[key];
+            let val = updates[key];
+            // Part 5.3: Client-side stat validation/clamping
+            if (key === 'level') val = Math.max(1, Math.min(999, parseInt(val) || 1));
+            if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
+            if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
+            if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
+            
+            filteredUpdates[key] = val;
         }
     }
 

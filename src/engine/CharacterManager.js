@@ -641,16 +641,17 @@ export class CharacterManager {
     setBodyColor(color) {
         let colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         // Guard: never let NaN/undefined poison the color (it would persist as 0 = black)
-        if (!Number.isFinite(colorVal)) colorVal = this.bodyColor ?? 0x4060c0;
+        if (!Number.isFinite(colorVal)) colorVal = 0x4060c0;
         const oldColor = this.bodyColor;
         this.bodyColor = colorVal;
         if (!this.mesh) return;
         // Body is child 0, arms are children with matching material
         this.mesh.children.forEach(child => {
             if (child.material && child.material.color) {
-                // Body (index 0) and arms share the old body color
+                // Body (index 0) and arms share the body color
+                // We update them if they match the old color OR the default blue
                 const hex = child.material.color.getHex();
-                if (hex === 0x4060c0 || hex === oldColor) {
+                if (hex === 0x4060c0 || hex === oldColor || hex === 0x4219072) {
                     child.material.color.setHex(colorVal);
                 }
             }
@@ -1628,9 +1629,9 @@ export class CharacterManager {
 
         // Load appearance if available
         if (data.gender) this.setGender(data.gender);
-        if (data.body_color) this.setBodyColor(data.body_color);
-        if (data.hair_color) this.setHairColor(data.hair_color);
-        if (data.pants_color) this.setPantsColor(data.pants_color);
+        if (data.body_color !== undefined && data.body_color !== null) this.setBodyColor(data.body_color);
+        if (data.hair_color !== undefined && data.hair_color !== null) this.setHairColor(data.hair_color);
+        if (data.pants_color !== undefined && data.pants_color !== null) this.setPantsColor(data.pants_color);
         if (data.hat) this.setHat(data.hat);
         if (data.glasses) this.setGlasses(data.glasses);
         if (data.weapon) this.equipWeapon(data.weapon);
@@ -1638,8 +1639,9 @@ export class CharacterManager {
         // Load game settings — check DB data first, then fallback to localStorage
         let localSettings = {};
         try {
-            const settingsKey = `zolos_settings_${this.characterId}`;
-            localSettings = JSON.parse(localStorage.getItem(settingsKey) || '{}');
+            const userIdKey = `zolos_settings_${data.user_id}`;
+            const charIdKey = `zolos_settings_${this.characterId}`;
+            localSettings = JSON.parse(localStorage.getItem(userIdKey) || localStorage.getItem(charIdKey) || '{}');
         } catch (e) { /* localStorage unavailable */ }
 
         if (data.sound_enabled !== undefined && data.sound_enabled !== null) {

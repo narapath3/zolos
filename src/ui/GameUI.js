@@ -2115,13 +2115,26 @@ export class GameUI {
 
         // Sync audio config values when opening the Settings tab
         this._syncAudioSettingsUI();
-        const graphicsSelect = document.getElementById('settings-graphics-quality');
-        if (graphicsSelect && window.rendererSystem) {
-          graphicsSelect.value = window.rendererSystem.qualityLevel;
-        }
-        const fpsCheckbox = document.getElementById('settings-fps-enabled');
-        if (fpsCheckbox) {
-          fpsCheckbox.checked = localStorage.getItem('zolos_show_fps') === 'true';
+        
+        // Use persisted character settings if available
+        if (this.character && this.character.gameSettings) {
+          const graphicsSelect = document.getElementById('settings-graphics-quality');
+          if (graphicsSelect) {
+            graphicsSelect.value = this.character.gameSettings.graphics_quality || 'medium';
+          }
+          const fpsCheckbox = document.getElementById('settings-fps-enabled');
+          if (fpsCheckbox) {
+            fpsCheckbox.checked = !!this.character.gameSettings.fps_enabled;
+          }
+        } else {
+          const graphicsSelect = document.getElementById('settings-graphics-quality');
+          if (graphicsSelect && window.rendererSystem) {
+            graphicsSelect.value = window.rendererSystem.qualityLevel;
+          }
+          const fpsCheckbox = document.getElementById('settings-fps-enabled');
+          if (fpsCheckbox) {
+            fpsCheckbox.checked = localStorage.getItem('zolos_show_fps') === 'true';
+          }
         }
       });
     }
@@ -2329,6 +2342,12 @@ export class GameUI {
     const closeEditor = () => {
       modal.style.display = 'none';
       this.updateMobileControlsVisibility();
+      
+      // Part 1.4: Explicit save on close
+      if (this.character && this.character.saveStatsToDatabase) {
+        console.log('[Zolos] 💾 Profile/Settings panel closed, triggering save...');
+        this.character.saveStatsToDatabase();
+      }
     };
 
     // Open on click

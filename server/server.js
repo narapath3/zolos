@@ -738,13 +738,19 @@ async function saveCharacterToSupabase(saveData) {
             const allowedFields = [
                 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
                 'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
-                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color',
+                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
                 'sound_enabled', 'graphics_quality', 'fps_enabled'
             ];
             const filtered = {};
             for (const key of Object.keys(updates)) {
                 if (allowedFields.includes(key)) {
-                    filtered[key] = updates[key];
+                    let val = updates[key];
+                    // Part 5.3: Server-side stat clamping
+                    if (key === 'level') val = Math.max(1, Math.min(999, parseInt(val) || 1));
+                    if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
+                    if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
+                    if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
+                    filtered[key] = val;
                 }
             }
             if (Object.keys(filtered).length > 0) {

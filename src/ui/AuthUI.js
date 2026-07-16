@@ -319,11 +319,18 @@ export class AuthUI {
             const email = input.includes('@') ? input : `${input}@zolos.game`;
             const data = await signIn(email, password);
             const profile = await getProfile(data.user.id);
+            
+            // Part 2.1: Robust nickname fallback
+            let username = profile?.username;
+            if (!username || isPlaceholderName(username)) {
+                username = getDeterministicGuestName(data.user.id);
+            }
+
             this._setStatus('Welcome back! ⚔️', 'success');
             setTimeout(() => {
                 this.onAuthSuccess({
                     userId: data.user.id,
-                    username: profile?.username || input,
+                    username: username,
                     isGuest: false,
                 });
                 this.hide();
@@ -386,7 +393,14 @@ export class AuthUI {
         this._setStatus('Starting as guest...', 'info');
         try {
             const data = await signInAnonymously();
-            const username = data.guestName || getDeterministicGuestName(data.user?.id);
+            
+            // Part 2.1: Check profiles table for guest username fallback
+            const profile = await getProfile(data.user.id);
+            let username = profile?.username;
+            if (!username || isPlaceholderName(username)) {
+                username = getDeterministicGuestName(data.user.id);
+            }
+
             this._setStatus('Welcome, ' + username + '! 🎮', 'success');
             setTimeout(() => {
                 this.onAuthSuccess({

@@ -447,11 +447,32 @@ async function initGame(charData) {
     // Fix C: Wire profileSaveCallback in main.js
     if (gameUI) {
         gameUI.setupProfileSaveCallback(async (data) => {
-            // Step 3: Ensure all equipment and appearance updates are called
+            // Part 2.3: Update runtime username and presence immediately
             if (data.name !== undefined) {
                 character.stats.name = data.name;
                 character.updateNameTag();
+                
+                // Update module-level username for presence state
+                username = data.name;
+                
+                // Update presence state immediately
+                try {
+                    const { supabase, localDb, isOfflineMode } = await import('./network/SupabaseClient.js');
+                    if (isOfflineMode) {
+                        localDb.set(`profile_${charData.user_id}`, { id: charData.user_id, username: data.name, updated_at: new Date().toISOString() });
+                    } else if (supabase) {
+                        await supabase.from('profiles').upsert({ id: charData.user_id, username: data.name, updated_at: new Date().toISOString() });
+                    }
+                    
+                    // Force presence update if function exists
+                    if (typeof updatePresenceState === 'function') {
+                        updatePresenceState({ username: data.name });
+                    }
+                } catch (e) {
+                    console.warn('Failed to update profile name in DB:', e);
+                }
             }
+            // Step 3: Ensure all equipment and appearance updates are called
             if (data.shirtColor !== undefined) character.setBodyColor(data.shirtColor);
             if (data.hairColor !== undefined) character.setHairColor(data.hairColor);
             if (data.pantsColor !== undefined) character.setPantsColor(data.pantsColor);
