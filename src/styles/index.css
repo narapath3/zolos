@@ -1699,11 +1699,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== COMBAT LOG ========== */
 #combat-log {
   position: fixed;
-  bottom: 90px;
+  bottom: 188px; /* sits directly ABOVE the chat box (which is anchored bottom) */
   left: 16px;
   z-index: 100;
   width: 320px;
-  max-height: 150px;
+  max-height: 126px;
   overflow: hidden;
   pointer-events: none;
 }
@@ -3108,7 +3108,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   gap: 1px;
   width: 100%;
   box-sizing: border-box;
-  max-height: 158px;
+  max-height: 118px;
   min-height: 0;
   overflow-y: auto;
   padding: 6px 8px;
@@ -3209,7 +3209,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     width: 64vw !important;
     max-width: 64vw;
   }
-  .chat-messages-container { max-height: 92px; }
+  .chat-messages-container { max-height: 66px; }
   .chat-input-row::before { content: ""; padding: 0; }
 }
 
@@ -3926,13 +3926,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   /* Tablet-specific combat log placement at bottom-left */
   #combat-log {
-    bottom: 90px;
+    bottom: 200px;
     left: 10px;
     top: auto;
     right: auto;
     transform: none;
-    width: min(280px, 35vw);
-    max-height: 80px;
+    width: min(280px, 55vw);
+    max-height: 74px;
     z-index: 90;
   }
 
@@ -4090,13 +4090,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
   /* Combat log above bottom bar */
   #combat-log {
-    bottom: calc(74px + env(safe-area-inset-bottom));
+    bottom: calc(198px + env(safe-area-inset-bottom));
     top: auto;
     left: 10px;
     right: auto;
     transform: none;
-    width: min(220px, 50vw);
-    max-height: 70px;
+    width: min(240px, 58vw);
+    max-height: 66px;
     z-index: 90;
   }
 }
