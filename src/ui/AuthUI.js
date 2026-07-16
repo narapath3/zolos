@@ -56,12 +56,42 @@ export class AuthUI {
             styleGenderButtons();
         });
 
+        // Redesigned splash: welcome chip + secondary actions (session only)
+        this._welcomeEl = document.getElementById('auth-welcome');
+        this._welcomeAvatarEl = document.getElementById('auth-welcome-avatar');
+        this._welcomeNameEl = document.getElementById('auth-welcome-name');
+        this._splashAltEl = document.getElementById('auth-splash-alt');
+        this._splashSwitchBtn = document.getElementById('btn-splash-switch');
+        this._splashGuestBtn = document.getElementById('btn-splash-guest');
+
         if (this._startBtn) {
             this._startBtn.addEventListener('click', () => {
+                // With an active session we know who the player is — START enters
+                // the game directly (matches the redesigned welcome splash). With
+                // no session it opens the login form as before.
+                if (this._sessionData) {
+                    this._enterGameWithSession();
+                    return;
+                }
                 this._splashEl.style.display = 'none';
                 this._formWrapperEl.style.display = 'block';
                 this._formWrapperEl.classList.add('fade-in');
             });
+        }
+
+        // "เปลี่ยนบัญชี": drop the session and reveal the login form.
+        if (this._splashSwitchBtn) {
+            this._splashSwitchBtn.addEventListener('click', () => {
+                this._hideWelcomeChip();
+                this._splashEl.style.display = 'none';
+                this._formWrapperEl.style.display = 'block';
+                this._formWrapperEl.classList.add('fade-in');
+                this._handleSignOut();
+            });
+        }
+        // "เล่นเป็น Guest" straight from the splash.
+        if (this._splashGuestBtn) {
+            this._splashGuestBtn.addEventListener('click', () => this._handleGuest());
         }
 
         this._loginBtn.addEventListener('click', () => {
@@ -221,10 +251,27 @@ export class AuthUI {
                     this._setStatus('Found active session for ' + username + '.', 'info');
                 }
                 this._showSessionMode(username);
+                this._showWelcomeChip(username);
             }
         } catch (e) {
             // No session, show login
         }
+    }
+
+    _showWelcomeChip(username) {
+        const name = username || 'Adventurer';
+        if (this._welcomeNameEl) this._welcomeNameEl.textContent = name;
+        if (this._welcomeAvatarEl) {
+            const initial = name.trim().charAt(0).toUpperCase() || '?';
+            this._welcomeAvatarEl.textContent = initial;
+        }
+        if (this._welcomeEl) this._welcomeEl.style.display = 'flex';
+        if (this._splashAltEl) this._splashAltEl.style.display = 'flex';
+    }
+
+    _hideWelcomeChip() {
+        if (this._welcomeEl) this._welcomeEl.style.display = 'none';
+        if (this._splashAltEl) this._splashAltEl.style.display = 'none';
     }
 
     _showSessionMode(username) {

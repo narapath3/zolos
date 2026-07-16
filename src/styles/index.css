@@ -488,6 +488,132 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   }
 }
 
+/* ============ AUTH SCREEN REDESIGN (2026-07) ============ */
+/* Ambient god-rays behind the card — sits over the bg image, under particles/card */
+#auth-screen::before {
+  content: '';
+  position: absolute;
+  inset: -20% -20% auto -20%;
+  height: 85%;
+  z-index: 0;
+  background: conic-gradient(from 200deg at 50% -10%,
+      transparent 0deg, rgba(240, 192, 64, .10) 25deg, transparent 50deg,
+      rgba(96, 160, 255, .08) 80deg, transparent 110deg,
+      rgba(240, 192, 64, .08) 150deg, transparent 180deg);
+  filter: blur(8px);
+  animation: authRays 26s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes authRays {
+  to { transform: rotate(360deg); }
+}
+
+/* Soft glow halo behind the floating logo */
+.auth-logo { position: relative; }
+
+.auth-logo::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(90px, 26vw, 190px);
+  height: clamp(90px, 26vw, 190px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(240, 192, 64, .5), rgba(96, 160, 255, .22) 55%, transparent 72%);
+  filter: blur(20px);
+  z-index: 0;
+  animation: authHalo 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes authHalo {
+  0%, 100% { opacity: .65; transform: translateX(-50%) scale(1); }
+  50%      { opacity: .95; transform: translateX(-50%) scale(1.12); }
+}
+
+.auth-icon-img { position: relative; z-index: 1; }
+
+/* Juicier START button — brighter bevel + animated sheen + pulsing glow */
+.btn-start-game {
+  background: linear-gradient(180deg, #ffe89a, var(--primary) 45%, var(--primary-deep));
+  -webkit-text-stroke: clamp(1px, 0.3vw, 1.5px) #7a3d00;
+  text-shadow: 0 2px 0 rgba(122, 61, 0, .4);
+  animation: authStartGlow 2.6s ease-in-out infinite;
+}
+
+@keyframes authStartGlow {
+  0%, 100% { box-shadow: 0 15px 30px rgba(240, 192, 64, .42), inset 0 2px 5px rgba(255, 255, 255, .6); }
+  50%      { box-shadow: 0 18px 40px rgba(240, 192, 64, .66), inset 0 2px 5px rgba(255, 255, 255, .85); }
+}
+
+.btn-start-game::after { animation: authSheen 3.4s ease-in-out infinite; }
+
+@keyframes authSheen {
+  0%        { left: -120%; }
+  55%, 100% { left: 220%; }
+}
+
+/* Welcome-back chip (populated + shown by AuthUI when a session exists) */
+.auth-welcome {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  justify-content: center;
+  margin: 4px auto 0;
+  padding: 9px 16px 9px 9px;
+  width: fit-content;
+  max-width: 100%;
+  background: rgba(240, 192, 64, .10);
+  border: 1px solid rgba(240, 192, 64, .30);
+  border-radius: 40px;
+}
+
+.auth-welcome-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex: none;
+  background: linear-gradient(135deg, #ffe89a, var(--primary-deep));
+  color: var(--bg-dark);
+  font-family: var(--font-main);
+  font-weight: 800;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .4), inset 0 1px 2px rgba(255, 255, 255, .6);
+}
+
+.auth-welcome-txt { text-align: left; line-height: 1.25; }
+.auth-welcome-hi { font-size: 11px; color: rgba(255, 255, 255, .55); font-weight: 700; }
+.auth-welcome-name { font-size: 15px; color: #fff; font-weight: 800; font-family: var(--font-main); }
+
+/* Splash secondary (ghost) actions */
+.auth-splash-alt { display: flex; gap: 10px; margin: 14px auto 0; max-width: 340px; }
+
+.btn-ghost-alt {
+  flex: 1;
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: clamp(11px, 2.5vw, 13px);
+  color: #cdd8f0;
+  padding: 11px;
+  border-radius: 16px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .12);
+  transition: .2s;
+}
+
+.btn-ghost-alt:hover {
+  background: rgba(255, 255, 255, .10);
+  color: #fff;
+  border-color: rgba(96, 160, 255, .5);
+}
+
 /* ========== GAME CANVAS ========== */
 #game-canvas {
   position: fixed;

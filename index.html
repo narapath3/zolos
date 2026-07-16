@@ -38,7 +38,20 @@
 
       <!-- Start Game Splash -->
       <div id="auth-splash">
+        <!-- Welcome-back chip (shown only when an active session is found) -->
+        <div id="auth-welcome" class="auth-welcome" style="display: none;">
+          <div class="auth-welcome-avatar" id="auth-welcome-avatar">?</div>
+          <div class="auth-welcome-txt">
+            <div class="auth-welcome-hi">ยินดีต้อนรับกลับ</div>
+            <div class="auth-welcome-name" id="auth-welcome-name">Adventurer</div>
+          </div>
+        </div>
         <button id="btn-start-game" class="btn-start-game">⚔️ START GAME</button>
+        <!-- Secondary actions (shown only with an active session) -->
+        <div id="auth-splash-alt" class="auth-splash-alt" style="display: none;">
+          <button id="btn-splash-switch" class="btn-ghost-alt">🔄 เปลี่ยนบัญชี</button>
+          <button id="btn-splash-guest" class="btn-ghost-alt">🎮 เล่นเป็น Guest</button>
+        </div>
       </div>
 
       <!-- Login Form (Initially Hidden) -->
