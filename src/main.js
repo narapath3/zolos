@@ -820,6 +820,16 @@ async function initGame(charData) {
     window.addEventListener('mouseup', (e) => { if (e.button === 2) endCamDrag(); });
     window.addEventListener('blur', endCamDrag);
 
+    // ----- Mouse Wheel to Zoom (Roblox-style) -----
+    canvas.addEventListener('wheel', (e) => {
+        // Prevent default scroll behavior
+        e.preventDefault();
+        
+        if (sceneManager && sceneManager.adjustZoom) {
+            sceneManager.adjustZoom(e.deltaY);
+        }
+    }, { passive: false });
+
     // Mouse move for monster/player hovering with highlight glow
     canvas.addEventListener('mousemove', (e) => {
         if (camDragging) return; // don't fight the rotate cursor / waste raycasts

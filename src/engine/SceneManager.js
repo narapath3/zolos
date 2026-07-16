@@ -118,6 +118,12 @@ export class SceneManager {
         // Player-controlled camera yaw (right-drag to rotate). 0 = default
         // behind-the-shoulder angle, so nothing changes until the player rotates.
         this.cameraYaw = 0;
+        
+        // Roblox-style camera zoom (scroll to zoom). 1.0 = default distance.
+        // The actual distance is (defaultDist * zoom).
+        this.cameraZoom = 1.0;
+        this.minZoom = 0.35;  // Max zoom in (closer)
+        this.maxZoom = 2.5;   // Max zoom out (further)
 
         // Detect initial quality level
         const savedQuality = localStorage.getItem('zolos_graphics_quality');
@@ -3652,9 +3658,14 @@ export class SceneManager {
     // stableY: use the character's baseY instead of animated mesh.position.y
     //          to prevent camera shake from walking/running bounce animation
     followTarget(targetPos, stableY) {
-        const offsetY = 18;
-        const dist = 18;        // horizontal distance from the player
+        const baseOffsetY = 18;
+        const baseDist = 18;        // horizontal distance from the player
         const smoothing = 0.08;
+
+        // Apply Roblox-style zoom factor
+        const zoom = this.cameraZoom || 1.0;
+        const dist = baseDist * zoom;
+        const offsetY = baseOffsetY * zoom;
 
         // Orbit the horizontal offset by the player-controlled yaw. At yaw 0
         // this is (0, 18) — identical to the original fixed camera angle.
@@ -3675,6 +3686,17 @@ export class SceneManager {
 
         this.camera.lookAt(targetPos.x, followY, targetPos.z);
         this._weatherFocus = { x: targetPos.x, z: targetPos.z }; // rain follows the player
+    }
+
+    // Adjust camera zoom level (scroll wheel). Roblox-style: scroll up = zoom in, scroll down = zoom out.
+    adjustZoom(delta) {
+        // Roblox uses a non-linear zoom step usually, but a linear factor is a good start.
+        // delta > 0 is scroll down (zoom out), delta < 0 is scroll up (zoom in)
+        const zoomStep = 0.08;
+        let newZoom = this.cameraZoom + (delta > 0 ? zoomStep : -zoomStep);
+        
+        // Clamp to min/max
+        this.cameraZoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
     }
 
     // Rotate the follow camera around the player (right-drag). deltaYaw is in
