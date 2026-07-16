@@ -4703,6 +4703,12 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   display: none !important;
 }
 
+/* The bottom-left chat bar likewise must not float over an open menu/modal
+   (it sits at z-index 900, above the panels), so hide it while one is open. */
+.panels-open .chat-panel {
+  display: none !important;
+}
+
 /* ========== ADMIN BUTTON ========== */
 #btn-admin {
   position: relative;
