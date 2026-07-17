@@ -3826,6 +3826,10 @@ export class SceneManager {
         if (this.stallMeshes) {
             this.stallMeshes.forEach(s => { if (s.userData && s.userData.isStall) targets.push(s); });
         }
+        // Celestial Ore nodes (Svarrga) are clickable to mine
+        if (this.oreNodes) {
+            this.oreNodes.forEach(o => { if (o && !o.userData.mined) targets.push(o); });
+        }
         if (monsters && monsters.monsters) {
             monsters.monsters.forEach(m => {
                 if (m.alive && m.mesh) {
@@ -3850,6 +3854,9 @@ export class SceneManager {
                 while (obj) {
                     if (obj.userData && obj.userData.isStall) {
                         return { type: 'stall', point: hit.point, object: obj.userData.stall };
+                    }
+                    if (obj.userData && obj.userData.isOre) {
+                        return { type: 'ore', point: hit.point, object: obj };
                     }
                     if (npcs) {
                         if (Array.isArray(npcs)) {

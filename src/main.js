@@ -972,6 +972,26 @@ function handleMouseInteraction(event) {
         return;
     }
 
+    if (hit.type === 'ore') {
+        const node = hit.object;
+        const hasPickaxe = gameUI && gameUI.inventory.some(i => i.item_name === 'Celestial Pickaxe' && (i.quantity || 0) > 0);
+        if (!hasPickaxe) {
+            gameUI.addCombatLog('⛏️ ต้องมี Celestial Pickaxe ก่อนถึงจะขุดได้ — ซื้อจากพ่อค้าสวรรค์', 'system');
+            particles.createClickIndicator(hit.point, 0xff6060);
+            return;
+        }
+        // Walk to the node first if we're not close enough, then mine.
+        if (character.getPosition().distanceTo(node.position) > 3.5) {
+            autoPath = node.position.clone();
+            character.targetMonster = null;
+            particles.createClickIndicator(node.position, 0x7fe0ff);
+            return;
+        }
+        gameUI.mineOreNode(node);
+        particles.createClickIndicator(hit.point, 0x7fe0ff);
+        return;
+    }
+
     if (hit.type === 'monster') {
         character.targetMonster = hit.object;
         autoPath = hit.point;

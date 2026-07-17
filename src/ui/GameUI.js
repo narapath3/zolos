@@ -414,6 +414,8 @@ export class GameUI {
 
     // Gold
     document.getElementById('gold-amount').textContent = stats.gold.toLocaleString();
+    const zolEl = document.getElementById('zol-amount');
+    if (zolEl) zolEl.textContent = (Number(stats.zol) || 0).toLocaleString();
   }
 
   updateStats(stats) {
@@ -3042,6 +3044,31 @@ export class GameUI {
     this._renderHeavenShop();
     this._renderInventory();
     this.updateHUD(this.character.stats);
+  }
+
+  // Mine a Celestial Ore node: requires a pickaxe, yields 1 ore, depletes the
+  // node (it respawns after a cooldown, handled in the scene animation loop).
+  mineOreNode(node) {
+    if (!node || !node.userData || node.userData.mined) return;
+    if (!this.inventory.some(i => i.item_name === 'Celestial Pickaxe' && (i.quantity || 0) > 0)) {
+      this.addCombatLog('⛏️ ต้องมี Celestial Pickaxe ก่อนถึงจะขุดได้', 'system');
+      return;
+    }
+    // Deplete + schedule respawn (~25s); the animation loop restores it.
+    node.userData.mined = true;
+    node.visible = false;
+    node.userData.respawnAt = Date.now() + 25000;
+    if (node.userData.glow) node.userData.glow.intensity = 0;
+
+    const meta = ITEMS['Celestial Ore'];
+    const existing = this.inventory.find(i => i.item_name === 'Celestial Ore');
+    if (existing) existing.quantity = (existing.quantity || 0) + 1;
+    else this.inventory.push({ item_name: 'Celestial Ore', item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: 1, stats: {} });
+    if (this.characterId) saveInventoryItem(this.characterId, 'Celestial Ore', meta.type, 1).catch(() => { });
+
+    if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
+    this.addCombatLog('⛏️💠 ขุดได้ Celestial Ore ×1! นำไปแปลงเป็น ZOL ที่พ่อค้าสวรรค์', 'levelup');
+    this._renderInventory();
   }
 
   // ============ Login Streak — Daily Rewards ============
