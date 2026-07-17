@@ -2828,7 +2828,7 @@ export class SceneManager {
         };
 
         const PORTAL_MAP = {
-            prontera: [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }, { x: -25, z: -15, target: 'svarrga' }],
+            prontera: [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }, { x: -25, z: -22, target: 'svarrga' }],
             payon: [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
             glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
             mjolnir: [{ x: -25, z: 0, target: 'payon' }, { x: 25, z: 0, target: 'abyss_lake' }],

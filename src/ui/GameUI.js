@@ -4233,7 +4233,7 @@ export class GameUI {
       // delivers the item, removes the listing — all in one transaction)
       const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
 
-      if (boughtResult) {
+      if (boughtResult && boughtResult.success) {
         // Adopt the server's authoritative gold when provided (RPC path)
         if (boughtResult.buyerGold !== undefined) {
           this.character.stats.gold = boughtResult.buyerGold;
@@ -4271,9 +4271,18 @@ export class GameUI {
         this.updateHUD(this.character.stats);
         this.updateStats(this.character.stats);
       } else {
-        // Refund gold
+        // Refund the optimistic deduction and explain the real reason.
         this.character.stats.gold += listing.price;
-        this.addCombatLog('❌ การซื้อล้มเหลว! ไอเทมอาจถูกผู้เล่นอื่นซื้อไปแล้ว', 'system');
+        const reason = (boughtResult && boughtResult.reason) || 'unknown';
+        const msg = {
+          guest_account_required: '❌ ต้องผูกบัญชี (อีเมล) ก่อนจึงจะซื้อของจากแผงผู้เล่นได้',
+          own_listing: '❌ ซื้อของที่ตัวเองตั้งขายไม่ได้',
+          not_enough_gold: '❌ เงิน Zeny ไม่เพียงพอ',
+          no_character: '❌ ไม่พบตัวละคร ลองใหม่อีกครั้ง',
+          not_authed: '❌ ต้องเข้าสู่ระบบก่อนจึงจะซื้อได้',
+          gone: '❌ ไอเทมนี้ถูกซื้อไปแล้ว หรือไม่มีขายแล้ว',
+        }[reason] || '❌ ซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+        this.addCombatLog(msg, 'system');
         if (this.soundManager) this.soundManager.playErrorSound?.();
         this._renderMarket();
       }

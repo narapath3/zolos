@@ -1430,11 +1430,14 @@ export async function fetchStallListings(ownerUserId) {
 
 export async function buyMarketItem(listingId, buyerCharId, buyerName) {
     let listing = null;
-    let isLocalListing = false;
-
-    if (isOfflineMode || !supabase || buyerCharId.startsWith('guest_') || buyerCharId.startsWith('local_') || listingId.startsWith('mock_') || listingId.startsWith('listing_')) {
-        isLocalListing = true;
-    }
+    // A listing is "local" only when it actually lives in local storage (offline
+    // mode, or a mock/local id). It must NOT be decided by the buyer being a
+    // guest — a guest can be standing in a real player's stall, whose listings
+    // live in the DB. Routing guests to the local path was why every such buy
+    // failed with a misleading "already bought".
+    const idStr = String(listingId);
+    const isLocalListing = isOfflineMode || !supabase || idStr.startsWith('mock_') || idStr.startsWith('listing_');
+    const isGuestBuyer = buyerCharId.startsWith('guest_') || buyerCharId.startsWith('local_');
 
     if (isLocalListing) {
         const listings = initLocalMarketplace();
@@ -1445,15 +1448,18 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
             localDb.set('marketplace_listings', listings);
         }
     } else {
+        // A guest's character + gold live only in local storage, but the purchase
+        // RPC needs a real DB character. So guests genuinely can't buy from real
+        // player stalls — return a clear reason instead of a misleading error.
+        if (isGuestBuyer) return { success: false, reason: 'guest_account_required' };
+
         // Server-authoritative atomic purchase (SECURITY DEFINER RPC): checks the
         // buyer's gold, moves gold to the seller, delivers the item and removes
         // the listing in one transaction. The client can't skip payment.
         try {
             const { data, error } = await supabase.rpc('buy_market_item', { p_listing_id: listingId });
-            if (error || !data || !data.ok) {
-                console.error('[Zolos] ❌ Purchase rejected:', error?.message || data?.reason);
-                return false;
-            }
+            if (error) return { success: false, reason: 'error', detail: error.message };
+            if (!data || !data.ok) return { success: false, reason: data?.reason || 'unknown' };
             // Announce + hand back the authoritative buyer gold
             const socket2 = getSocket();
             if (socket2 && isSocketConnected()) {
@@ -1464,12 +1470,11 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
             }
             return { success: true, buyerGold: data.buyer_gold };
         } catch (err) {
-            console.error('[Zolos] ❌ Supabase buy failed:', err.message);
-            return false;
+            return { success: false, reason: 'error', detail: err.message };
         }
     }
 
-    if (!listing) return false;
+    if (!listing) return { success: false, reason: 'gone' };
 
     // Record history
     if (isOfflineMode || !supabase) {
@@ -1536,7 +1541,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
         });
     }
 
-    return listing;
+    return { success: true };
 }
 
 // ============ P2P DIRECT TRADE ============
