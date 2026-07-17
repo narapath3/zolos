@@ -2954,9 +2954,9 @@ export class GameUI {
       st.textContent = `
         #daily-modal{position:fixed;inset:0;z-index:1450;display:none;align-items:center;justify-content:center;
           background:rgba(0,0,0,.66);backdrop-filter:blur(4px);padding:12px;box-sizing:border-box;}
-        #daily-card{width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:18px;
-          background:linear-gradient(165deg,#241540,#120a24);border:1.5px solid #8a5cff;
-          box-shadow:0 0 40px rgba(138,92,255,.35),0 24px 70px rgba(0,0,0,.75);overflow:hidden;}
+        #daily-card{width:min(560px,94vw);max-height:88vh;display:flex;flex-direction:column;border-radius:16px;
+          background:var(--bg-panel);border:4px solid var(--gold-border);
+          box-shadow:0 10px 0 var(--primary-deep),0 24px 60px rgba(0,0,0,.7);overflow:hidden;}
         #daily-card .daily-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
         @keyframes dailyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
         @keyframes dailyGlow{0%,100%{box-shadow:0 0 10px rgba(255,207,74,.45);}50%{box-shadow:0 0 26px rgba(255,207,74,.95);}}
@@ -3016,7 +3016,7 @@ export class GameUI {
           <div style="font-size:9px;font-weight:800;color:${isToday && canClaim ? '#ffcf4a' : '#9aa5c0'};margin-bottom:3px;">${label}</div>
           <div style="font-size:${isDay7 ? '26px' : '20px'};">${isDay7 ? '🐉' : '💰'}</div>
           <div style="font-size:10px;color:#ffd97a;font-weight:700;">${r.gold.toLocaleString()}g</div>
-          ${r.items.length ? `<div style="font-size:10px;color:#c9b8ff;">${itemLine(r)}</div>` : ''}
+          ${r.items.length ? `<div style="font-size:10px;color:#9fccff;">${itemLine(r)}</div>` : ''}
           ${isDay7 ? `<div style="font-size:9px;color:#ff9a7a;font-weight:700;">Dragon Heart!</div>` : ''}
         </div>`;
     }).join('');
@@ -3029,14 +3029,14 @@ export class GameUI {
           color:#7de89a;font-weight:800;font-size:13px;">✅ รับแล้ววันนี้ — กลับมาพรุ่งนี้เพื่อรักษาสตรีค! 🔥</div>`;
 
     card.innerHTML = `
-      <div style="padding:18px 20px 14px;background:linear-gradient(90deg,#3a2170,#1c1040);border-bottom:1px solid #8a5cff;position:relative;">
-        <button id="daily-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.1);border:none;color:#d8ccff;
+      <div style="padding:18px 20px 14px;background:linear-gradient(90deg,rgba(240,192,64,.12),transparent);border-bottom:1px solid var(--border);position:relative;">
+        <button id="daily-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);
           width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="font-size:34px;">🎁</div>
           <div>
-            <div style="font-weight:900;color:#fff;font-size:19px;text-shadow:0 0 12px rgba(255,207,74,.5);">รางวัลเข้าเกมรายวัน</div>
-            <div style="font-size:12px;color:#c0b0f0;">สตรีคปัจจุบัน: <span style="color:#ffcf4a;font-weight:900;">🔥 ${streakShown} วัน</span>
+            <div style="font-family:var(--font-main);color:#fff;font-size:19px;text-shadow:0 0 12px rgba(240,192,64,.5);">รางวัลเข้าเกมรายวัน</div>
+            <div style="font-size:12px;color:var(--text-dim);">สตรีคปัจจุบัน: <span style="color:var(--primary);font-weight:900;">🔥 ${streakShown} วัน</span>
             ${brokeStreak ? '<span style="color:#ff9a8a;"> (สตรีคขาด — เริ่มใหม่วัน 1)</span>' : ''}</div>
           </div>
         </div>
@@ -3044,7 +3044,7 @@ export class GameUI {
       <div class="daily-body" style="padding:16px 18px;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">${slots}</div>
         ${claimArea}
-        <div style="margin-top:10px;text-align:center;font-size:10px;color:#8a7fb0;">เข้าเกมทุกวันเพื่อรางวัลใหญ่ขึ้นเรื่อยๆ — ขาดวันใดวันหนึ่ง สตรีคจะเริ่มนับใหม่</div>
+        <div style="margin-top:10px;text-align:center;font-size:10px;color:var(--text-dim);opacity:.75;">เข้าเกมทุกวันเพื่อรางวัลใหญ่ขึ้นเรื่อยๆ — ขาดวันใดวันหนึ่ง สตรีคจะเริ่มนับใหม่</div>
       </div>`;
 
     card.querySelector('#daily-close').onclick = () => {
