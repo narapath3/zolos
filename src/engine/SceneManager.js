@@ -2691,54 +2691,164 @@ export class SceneManager {
             const group = new THREE.Group();
             group.userData.targetMap = p.target;
 
-            // Portal color based on destination
             const portalColor = PORTAL_COLORS[p.target] || 0x40c0ff;
-
-            // Portal ring
-            const ringGeo = new THREE.TorusGeometry(1.5, 0.15, 8, 20);
-            const ringMat = new THREE.MeshBasicMaterial({ color: portalColor });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = Math.PI / 2;
-            ring.position.y = 1.8;
-            group.add(ring);
-
-            // Inner glow
-            const glowGeo = new THREE.CircleGeometry(1.3, 16);
-            const glowMat = new THREE.MeshBasicMaterial({
-                color: portalColor,
-                transparent: true,
-                opacity: 0.4,
-                side: THREE.DoubleSide,
-            });
-            const glow = new THREE.Mesh(glowGeo, glowMat);
-            glow.rotation.x = -Math.PI / 2;
-            glow.position.y = 1.8;
-            group.add(glow);
-
-            // Portal label (destination name)
+            const colorObj = new THREE.Color(portalColor);
             const destConfig = MAP_CONFIGS[p.target];
-            group.userData.destName = destConfig ? destConfig.name : p.target;
+            const destName = destConfig ? destConfig.name : p.target;
+            group.userData.destName = destName;
 
-            // Base pillars
-            [-1.2, 1.2].forEach(xOff => {
-                const pillarGeo = new THREE.BoxGeometry(0.4, 3.5, 0.4);
-                const pillarMat = new THREE.MeshLambertMaterial({ color: 0x5a6a8a });
-                const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-                pillar.position.set(xOff, 1.75, 0);
+            const anim = { runes: [], motes: [] };
+
+            // ---- Ground magic circle (flat glowing rune ring on the floor) ----
+            const baseMat = new THREE.MeshBasicMaterial({
+                color: portalColor, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending, depthWrite: false,
+            });
+            const baseCircle = new THREE.Mesh(new THREE.RingGeometry(1.7, 2.4, 40), baseMat);
+            baseCircle.rotation.x = -Math.PI / 2;
+            baseCircle.position.y = 0.06;
+            group.add(baseCircle);
+            anim.baseCircle = baseCircle;
+
+            // ---- Upright swirling energy vortex (inside the ring) ----
+            const swirlMat = new THREE.MeshBasicMaterial({
+                map: this._makePortalSwirlTexture(colorObj), transparent: true, opacity: 0.9,
+                side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false,
+            });
+            const swirl = new THREE.Mesh(new THREE.CircleGeometry(1.55, 40), swirlMat);
+            swirl.position.y = 2.4;
+            group.add(swirl);
+            anim.swirl = swirl;
+
+            // ---- Upright glowing doorway ring + faint outer halo ----
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(1.65, 0.16, 14, 44),
+                new THREE.MeshBasicMaterial({ color: portalColor }));
+            ring.position.y = 2.4;
+            group.add(ring);
+            anim.ring = ring;
+
+            const halo = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.32, 12, 44),
+                new THREE.MeshBasicMaterial({ color: portalColor, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }));
+            halo.position.y = 2.4;
+            group.add(halo);
+            anim.halo = halo;
+
+            // ---- Stone arch: two pillars, glowing runes, top keystone beam ----
+            const stoneMat = new THREE.MeshLambertMaterial({ color: 0x6a6f86 });
+            [-1.95, 1.95].forEach(xOff => {
+                const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.8, 0.5), stoneMat);
+                pillar.position.set(xOff, 2.4, 0);
                 pillar.castShadow = true;
                 group.add(pillar);
+                const rune = new THREE.Mesh(new THREE.BoxGeometry(0.09, 3.6, 0.56),
+                    new THREE.MeshBasicMaterial({ color: portalColor, transparent: true, opacity: 0.8 }));
+                rune.position.set(xOff + (xOff < 0 ? 0.29 : -0.29), 2.5, 0);
+                group.add(rune);
+                anim.runes.push(rune);
             });
+            const topBeam = new THREE.Mesh(new THREE.BoxGeometry(4.7, 0.6, 0.6), stoneMat);
+            topBeam.position.set(0, 4.95, 0);
+            topBeam.castShadow = true;
+            group.add(topBeam);
 
-            // Floating particles (point light)
-            const particleLight = new THREE.PointLight(portalColor, 0.8, 8);
-            particleLight.position.set(0, 2, 0);
-            group.add(particleLight);
+            // ---- Rising energy motes ----
+            for (let i = 0; i < 6; i++) {
+                const mote = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6),
+                    new THREE.MeshBasicMaterial({ color: portalColor, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+                mote.userData.phase = Math.random();
+                mote.userData.rx = (Math.random() - 0.5) * 2.6;
+                group.add(mote);
+                anim.motes.push(mote);
+            }
 
+            // ---- Portal light ----
+            const light = new THREE.PointLight(portalColor, 1.1, 13);
+            light.position.set(0, 2.4, 0);
+            group.add(light);
+            anim.light = light;
+
+            // ---- Floating destination label (billboard, always readable) ----
+            const label = this._makePortalLabel(destName, colorObj);
+            label.position.set(0, 6.2, 0);
+            group.add(label);
+            anim.label = label;
+
+            // Face the doorway toward the field centre (portals sit at ±25 on x).
+            group.rotation.y = p.x >= 0 ? -Math.PI / 2 : Math.PI / 2;
             group.position.set(p.x, 0, p.z);
+            group.userData.anim = anim;
             this.scene.add(group);
             this.envObjects.push(group);
             this.portalMeshes.push(group);
         });
+    }
+
+    // Radial energy-vortex texture for the portal's inner plane.
+    _makePortalSwirlTexture(color) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 256;
+        const ctx = c.getContext('2d');
+        const cx = 128, cy = 128;
+        const r = Math.round(color.r * 255), g = Math.round(color.g * 255), b = Math.round(color.b * 255);
+        const rgba = (a) => `rgba(${r},${g},${b},${a})`;
+        const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 128);
+        grad.addColorStop(0, 'rgba(255,255,255,1)');
+        grad.addColorStop(0.3, rgba(0.95));
+        grad.addColorStop(0.72, rgba(0.32));
+        grad.addColorStop(1, rgba(0));
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, 128, 0, Math.PI * 2); ctx.fill();
+        // spiral streaks for a swirling look
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 5; i++) {
+            ctx.beginPath();
+            for (let a = 0; a < Math.PI * 4; a += 0.15) {
+                const rr = a * 8.5;
+                const x = cx + Math.cos(a + i * 1.256) * rr;
+                const y = cy + Math.sin(a + i * 1.256) * rr;
+                a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.minFilter = THREE.LinearFilter;
+        return tex;
+    }
+
+    // Billboard label above the portal: "◈ วาปไป ◈" + destination name.
+    _makePortalLabel(text, color) {
+        const c = document.createElement('canvas');
+        c.width = 512; c.height = 160;
+        const ctx = c.getContext('2d');
+        const hex = '#' + color.getHexString();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round';
+        // header
+        ctx.font = '700 26px "Baloo 2","Fredoka One",system-ui,sans-serif';
+        ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.strokeText('◈ วาปไป ◈', 256, 34);
+        ctx.fillStyle = hex;
+        ctx.fillText('◈ วาปไป ◈', 256, 34);
+        // destination name (white with coloured glow + dark outline)
+        ctx.font = '700 58px "Fredoka One","Baloo 2",system-ui,sans-serif';
+        ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+        ctx.strokeText(text, 256, 100);
+        ctx.shadowColor = hex; ctx.shadowBlur = 30;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, 256, 100);
+        ctx.fillText(text, 256, 100); // second pass to intensify the glow
+        ctx.shadowBlur = 0;
+        const tex = new THREE.CanvasTexture(c);
+        tex.minFilter = THREE.LinearFilter;
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: tex, transparent: true, depthTest: false, depthWrite: false,
+        }));
+        sprite.scale.set(5.2, 1.625, 1); // 512:160 aspect
+        sprite.renderOrder = 999;
+        return sprite;
     }
 
     // ============ NPC — Kafra Shop Stall ============
@@ -3966,11 +4076,32 @@ export class SceneManager {
             });
         }
 
-        // Animate portal glow
+        // Animate portals (swirl spin, ring/halo pulse, rising motes, label bob)
+        const t = this.time;
         this.portalMeshes.forEach(portal => {
-            const scale = 1 + Math.sin(this.time * 3) * 0.05;
-            portal.children[0].scale.setScalar(scale); // ring pulse
-            portal.children[1].material.opacity = 0.3 + Math.sin(this.time * 2) * 0.15;
+            const a = portal.userData.anim;
+            if (!a) return;
+            if (a.swirl) {
+                a.swirl.rotation.z = t * 1.4;
+                a.swirl.material.opacity = 0.72 + Math.sin(t * 3) * 0.2;
+            }
+            if (a.ring) a.ring.scale.setScalar(1 + Math.sin(t * 3) * 0.04);
+            if (a.halo) {
+                a.halo.material.opacity = 0.16 + Math.sin(t * 2) * 0.12;
+                a.halo.scale.setScalar(1 + Math.sin(t * 2) * 0.05);
+            }
+            if (a.baseCircle) {
+                a.baseCircle.rotation.z = -t * 0.5;
+                a.baseCircle.material.opacity = 0.4 + Math.sin(t * 2.5) * 0.18;
+            }
+            if (a.light) a.light.intensity = 1.0 + Math.sin(t * 3) * 0.4;
+            if (a.runes) a.runes.forEach((r, i) => { r.material.opacity = 0.55 + Math.sin(t * 2.5 + i) * 0.35; });
+            if (a.motes) a.motes.forEach(m => {
+                const y = (t * 0.35 + m.userData.phase) % 1; // 0..1 rising loop
+                m.position.set(m.userData.rx * (1 - y * 0.35), 0.3 + y * 4.4, Math.sin(t + m.userData.phase * 6.28) * 0.35);
+                m.material.opacity = 0.9 * (1 - y);
+            });
+            if (a.label) a.label.position.y = 6.2 + Math.sin(t * 1.5) * 0.14;
         });
 
         // Animate fishing bobber & line
