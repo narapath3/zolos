@@ -3,6 +3,15 @@ import * as THREE from 'three';
 import { getExpRequired, getStatGains, SKILLS, ITEMS } from './GameData.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
+// Walkable half-extent. The ground is a 70x70 plane centred at the origin
+// (see SceneManager._createGround), so keep the player just inside the ±35 edge
+// so they can't walk off the map into the void.
+const WORLD_HALF = 34;
+function clampToWorld(pos) {
+    pos.x = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.x));
+    pos.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.z));
+}
+
 export class CharacterManager {
     constructor(scene) {
         this.scene = scene;
@@ -1157,12 +1166,17 @@ export class CharacterManager {
     moveToward(targetPoint, dt) {
         if (!this.mesh) return;
 
-        const dir = new THREE.Vector3().subVectors(targetPoint, this.mesh.position);
-        dir.y = 0; // Keep horizontal movement
+        // Clamp the destination into the map so click-to-move can't target the
+        // void — the character then stops cleanly at the edge instead of walking
+        // in place against the boundary.
+        const tx = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, targetPoint.x));
+        const tz = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, targetPoint.z));
+        const dir = new THREE.Vector3(tx - this.mesh.position.x, 0, tz - this.mesh.position.z);
 
         if (dir.length() > 0.1) {
             dir.normalize();
             this.mesh.position.add(dir.multiplyScalar(this.moveSpeed * dt));
+            clampToWorld(this.mesh.position);
 
             // Rotate to face movement direction
             const targetRotation = Math.atan2(dir.x, dir.z);
@@ -1184,6 +1198,7 @@ export class CharacterManager {
         if (dirX !== 0 || dirZ !== 0) {
             const moveVec = new THREE.Vector3(dirX, 0, dirZ).normalize();
             this.mesh.position.add(moveVec.multiplyScalar(this.moveSpeed * dt));
+            clampToWorld(this.mesh.position);
 
             const targetRotation = Math.atan2(dirX, dirZ);
             this.mesh.rotation.y = targetRotation;
