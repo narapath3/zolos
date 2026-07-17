@@ -4682,7 +4682,7 @@ export class GameUI {
       });
     }
 
-    this.currentWikiTab = 'monsters';
+    this.currentWikiTab = 'guide';
     this.selectedWikiItem = null;
   }
 
@@ -4691,7 +4691,85 @@ export class GameUI {
     this._renderWikiDetail();
   }
 
+  // How-to-play guide with the game's real formulas (kept in sync with
+  // GameData/CombatSystem/CharacterManager). Static reference content.
+  _guideHTML() {
+    const F = (s) => `<div style="font-family:monospace;font-size:11px;color:#ffe08a;background:rgba(0,0,0,.35);border:1px solid var(--border);border-radius:6px;padding:6px 9px;margin:5px 0;overflow-x:auto;white-space:nowrap;">${s}</div>`;
+    const sec = (emoji, title, body) => `
+      <div style="background:var(--bg-item);border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-bottom:10px;">
+        <div style="font-family:var(--font-main);color:var(--primary);font-size:14px;margin-bottom:7px;">${emoji} ${title}</div>
+        <div style="font-size:12px;line-height:1.6;color:#dbe4f2;">${body}</div>
+      </div>`;
+    return `
+      <div style="max-height:62vh;overflow-y:auto;padding:2px;-webkit-overflow-scrolling:touch;">
+        <div style="text-align:center;margin-bottom:10px;font-size:12px;color:var(--text-dim);">คู่มือสำหรับผู้เล่นใหม่ — รวมวิธีเล่นและสูตรคำนวณทั้งหมด</div>
+        ${sec('🎮', 'การควบคุม & เริ่มต้น', `
+          • <b>เดิน:</b> คลิกพื้น / ปุ่ม WASD / จอยสติ๊ก (มือถือ)<br>
+          • <b>โจมตี:</b> คลิกมอนสเตอร์เพื่อเข้าตี<br>
+          • <b>AUTO:</b> ปุ่มขวาล่าง — ฟาร์มอัตโนมัติ (หามอน + ตี + ร่ายสกิล + ฮีลเมื่อ HP ต่ำ)<br>
+          • <b>สกิล:</b> ปุ่ม 1 / 2 / 3<br>
+          • <b>วาปข้ามเมือง:</b> เดินเข้าประตูวาป (วงแหวนเรืองแสง) ที่ขอบแมป`)}
+        ${sec('⭐', 'เลเวล & EXP', `
+          ฆ่ามอนสเตอร์ได้ EXP ตามค่าของมอนแต่ละตัว สะสมครบแล้วเลเวลอัป (สูงสุดเลเวล 300)
+          ${F('EXP ที่ต้องใช้ต่อเลเวล = ⌊ 100 × 1.35^(เลเวล−1) ⌋')}`)}
+        ${sec('💪', 'ค่าสเตตัสที่ได้ต่อการเลเวลอัป', `
+          ทุกครั้งที่เลเวลอัป จะได้รับ (คิดจากเลเวลปัจจุบัน):
+          ${F('HP สูงสุด += 15 + ⌊ เลเวล × 2 ⌋')}
+          ${F('SP สูงสุด += 5 + ⌊ เลเวล × 0.8 ⌋')}
+          ${F('ATK += 2 + ⌊ เลเวล × 0.5 ⌋')}
+          ${F('DEF += 1 + ⌊ เลเวล × 0.3 ⌋')}`)}
+        ${sec('⚔️', 'การต่อสู้ (สูตรดาเมจ)', `
+          ${F('ดาเมจ = ATK + สุ่ม(0–4)')}
+          ${F('คริติคอล: โอกาส 10% → ดาเมจ × 1.8')}
+          ${F('ดาเมจจริง = max(1, ดาเมจ − ⌊ DEF ศัตรู × 0.3 ⌋)')}
+          มอนสเตอร์จะโต้กลับถ้าคุณอยู่ใกล้ (ระยะ &lt; 4) ด้วยสูตรเดียวกัน (มอนโจมตี = ATKมอน + สุ่ม(0–2))<br>
+          <b>ฟื้นฟู:</b> HP และ SP ฟื้นเอง ~15% ของค่าสูงสุดต่อวินาที`)}
+        ${sec('✨', 'สกิล (ปุ่ม 1 / 2 / 3)', `
+          ${F('Bash         ดาเมจ = ATK × 1.5   (ใช้ 8 SP)')}
+          ${F('Magnum Break ดาเมจ = ATK × 2.0 รอบตัว (ใช้ 20 SP)')}
+          ${F('Heal         ฟื้น HP = เลเวล × 8 + ⌊ ATK × 0.5 ⌋ (ใช้ 15 SP)')}
+          ดาเมจสกิลมีความแปรผัน ±10% แล้วลดด้วย DEF ศัตรูตามปกติ`)}
+        ${sec('💰', 'เงิน (Zeny) & ไอเทม', `
+          ฆ่ามอนได้ Zeny สุ่มในช่วงของมอนตัวนั้น + มีโอกาสดรอปไอเทมตามอัตราของแต่ละไอเทม<br>
+          • ซื้อ/ขายไอเทมที่ NPC ในเมือง<br>
+          • ตั้งแผงขายของ (Vending Stall) หรือใช้ตลาดกลางเพื่อเทรดกับผู้เล่นอื่น`)}
+        ${sec('🎣', 'ตกปลา', `
+          เข้าใกล้ริมน้ำแล้วกดปุ่ม <b>FISH</b> สะสมชนิดปลาในสมุดสะสมปลา (Almanac) เพื่อรับรางวัลโบนัสตามความหายากและครบเซ็ต`)}
+        ${sec('👹', 'บอสโลก (World Boss)', `
+          บอสยักษ์เกิดกลางสนามเป็นระยะ ทุกคนแชร์เลือดก้อนเดียว ต้องร่วมกันตี:
+          ${F('เลือดบอส = min( 45000 , 7000 + คนออนไลน์ × 3500 )')}
+          เกิดทุก ~12 นาที มีเวลา ~6 นาทีในการล้ม รางวัลจัดอันดับตามดาเมจที่ทำได้ — อันดับ 1 ได้ทอง/EXP ก้อนใหญ่ + ไอเทมหายาก (Dragon Heart)`)}
+        ${sec('🤺', 'ดวล PVP', `
+          ท้าดวลผู้เล่นอื่นจากหน้าโปรไฟล์ ผลแพ้ชนะคิดเรตติ้ง (MMR) แบบ Elo (ค่า K = 32) — ชนะคนเก่งกว่าได้แต้มเยอะกว่า`)}
+        ${sec('🎁', 'รางวัลเข้าเกมรายวัน', `
+          เข้าเกมทุกวันรับรางวัลไล่ระดับ 7 วัน (วัน 1 = 500 Zeny … วัน 7 = 15,000 Zeny + Dragon Heart) <b>ขาดวันใดวันหนึ่ง สตรีคเริ่มนับใหม่</b>`)}
+        ${sec('⛏️', 'เมืองสวรรค์ — ขุดแร่ & เหรียญ ZOL', `
+          วาปจากเมือง Prontera (ประตูทองฝั่งตะวันตก) ไปเมือง <b>Svarrga สรวงสวรรค์</b><br>
+          1. ซื้อ <b>พลั่วขุด</b> จากพ่อค้าสวรรค์ (ต้องเลเวล 25+) — มี 4 ระดับ ยิ่งแรร์ยิ่งขุดได้ต่อครั้งมาก:
+          ${F('Stone(1) · Mythril(2) · Celestial(3) · Divine(5) แร่/ครั้ง')}
+          2. คลิกก้อนแร่เรืองแสงเพื่อขุด (ได้ Celestial Ore, ก้อนแร่เกิดใหม่ใน ~25 วิ)<br>
+          3. นำแร่ไปแปลงที่พ่อค้าสวรรค์:
+          ${F('1 Celestial Ore = 100 ZOL')}
+          <b>ZOL เป็นสกุลเงินภายในเกม</b> ใช้/เทรดกันในเกมได้ (ไม่เกี่ยวกับเงินจริง)`)}
+      </div>`;
+  }
+
   _renderWikiList() {
+    // The คู่มือ tab shows a full-width how-to-play guide instead of the
+    // list/detail browser, so toggle those chrome pieces accordingly.
+    const guideEl = document.getElementById('wiki-guide');
+    const mainC = document.querySelector('.wiki-main-container');
+    const searchBox = document.querySelector('.wiki-search-box');
+    if (this.currentWikiTab === 'guide') {
+      if (guideEl) { guideEl.style.display = 'block'; if (!guideEl.dataset.built) { guideEl.innerHTML = this._guideHTML(); guideEl.dataset.built = '1'; } }
+      if (mainC) mainC.style.display = 'none';
+      if (searchBox) searchBox.style.display = 'none';
+      return;
+    }
+    if (guideEl) guideEl.style.display = 'none';
+    if (mainC) mainC.style.display = '';
+    if (searchBox) searchBox.style.display = '';
+
     const listContainer = document.getElementById('wiki-list');
     if (!listContainer) return;
     listContainer.innerHTML = '';
