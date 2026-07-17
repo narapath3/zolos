@@ -260,6 +260,7 @@ export class SceneManager {
         this.npcMesh = null;
         this.npcSellMesh = null;
         this.npcWeaponMesh = null;
+        this.npcHeavenMesh = null;
         this.clearVendingStalls();
         this.swayingObjects = [];
         this.birds = [];
@@ -455,6 +456,7 @@ export class SceneManager {
         if (this.npcMesh) list.push(this.npcMesh);
         if (this.npcSellMesh) list.push(this.npcSellMesh);
         if (this.npcWeaponMesh) list.push(this.npcWeaponMesh);
+        if (this.npcHeavenMesh) list.push(this.npcHeavenMesh);
         return list;
     }
 
@@ -2751,6 +2753,26 @@ export class SceneManager {
         this.scene.add(altar);
         this.envObjects.push(altar);
 
+        // ---- Heaven Merchant NPC (sells the pickaxe, converts ore -> ZOL) ----
+        const merchant = new THREE.Group();
+        const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.95, 1.9, 12), new THREE.MeshLambertMaterial({ color: 0xf7eed6 }));
+        robe.position.y = 0.95; robe.castShadow = true; merchant.add(robe);
+        const sash = new THREE.Mesh(new THREE.CylinderGeometry(0.53, 0.74, 0.42, 12), new THREE.MeshLambertMaterial({ color: 0xffcf4a }));
+        sash.position.y = 1.35; merchant.add(sash);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffe0bd }));
+        head.position.y = 2.15; merchant.add(head);
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.06, 8, 24), new THREE.MeshBasicMaterial({ color: 0xffe14a }));
+        halo.rotation.x = Math.PI / 2; halo.position.y = 2.78; merchant.add(halo);
+        const label = this._makePortalLabel('พ่อค้าสวรรค์', new THREE.Color(0xffe14a), '⛏️ ร้านค้าพิเศษ');
+        label.position.set(0, 3.7, 0); label.scale.set(4.2, 1.31, 1);
+        merchant.add(label);
+        merchant.userData.npcType = 'heaven_merchant';
+        merchant.position.set(0, 0, 4);
+        merchant.rotation.y = Math.PI; // face the player arriving from the portal
+        this.scene.add(merchant);
+        this.envObjects.push(merchant);
+        this.npcHeavenMesh = merchant;
+
         // ---- Celestial Ore nodes (minable) ----
         const oreCount = 9;
         for (let i = 0; i < oreCount; i++) {
@@ -2947,7 +2969,7 @@ export class SceneManager {
     }
 
     // Billboard label above the portal: "◈ วาปไป ◈" + destination name.
-    _makePortalLabel(text, color) {
+    _makePortalLabel(text, color, header = '◈ วาปไป ◈') {
         const c = document.createElement('canvas');
         c.width = 512; c.height = 160;
         const ctx = c.getContext('2d');
@@ -2958,9 +2980,9 @@ export class SceneManager {
         // header
         ctx.font = '700 26px "Baloo 2","Fredoka One",system-ui,sans-serif';
         ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-        ctx.strokeText('◈ วาปไป ◈', 256, 34);
+        ctx.strokeText(header, 256, 34);
         ctx.fillStyle = hex;
-        ctx.fillText('◈ วาปไป ◈', 256, 34);
+        ctx.fillText(header, 256, 34);
         // destination name (white with coloured glow + dark outline)
         ctx.font = '700 58px "Fredoka One","Baloo 2",system-ui,sans-serif';
         ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(0,0,0,0.9)';

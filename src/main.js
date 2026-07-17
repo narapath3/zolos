@@ -990,6 +990,8 @@ function handleMouseInteraction(event) {
         } else if (npcType === 'weaponsmith') {
             // Weapon smith opens the Forge (craft special weapons from materials)
             gameUI.openForge();
+        } else if (npcType === 'heaven_merchant') {
+            gameUI.openHeavenShop();
         } else {
             gameUI._togglePanel('shop-panel');
             gameUI._renderShop();
