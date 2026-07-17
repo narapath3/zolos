@@ -4401,6 +4401,7 @@ export class GameUI {
     if (!pad || !container || !base || !knob) return;
 
     let joystickActive = false;
+    let tapCandidate = false; // right-half touch: tap only, no movement joystick
     let joystickTouchId = null;
     let joystickStartTime = 0;
     let startX = 0;
@@ -4447,11 +4448,9 @@ export class GameUI {
       // Only active if the mobile control pad is visible on screen (responsive check)
       if (window.getComputedStyle(pad).display === 'none') return;
 
-      // Only respond to touches on the LEFT half of the screen
       const touch = e.touches ? e.touches[0] : e;
-      if (touch.clientX > window.innerWidth / 2) return;
 
-      // Ignore if touching an interactive element (buttons, etc.)
+      // Ignore if touching an interactive element (buttons, panels, HUD, chat).
       const target = e.target;
       if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
         target.closest('#hud-bottom') || target.closest('.side-panel') ||
@@ -4460,11 +4459,10 @@ export class GameUI {
         target.closest('#fps-counter') || target.closest('#kill-counter') ||
         target.closest('#chat-panel')) return;
 
-      // Never spawn the joystick over the chat UI. The chat panel is
+      // Never spawn the joystick / tap over the chat UI. The chat panel is
       // click-through in preview mode, so a touch there can fall past it to the
-      // canvas and move the character. Guard by geometry: always block the input
-      // bar; while the chat is open (typing), block the whole panel so tapping
-      // anywhere in the chat area doesn't walk the character off.
+      // canvas. Guard by geometry: always block the input bar; while the chat is
+      // open (typing), block the whole panel.
       const chatPanel = document.getElementById('chat-panel');
       if (chatPanel && window.getComputedStyle(chatPanel).display !== 'none') {
         const chatOpen = !chatPanel.classList.contains('preview-mode');
@@ -4478,16 +4476,24 @@ export class GameUI {
       }
 
       e.preventDefault();
-      joystickActive = true;
-      if (e.touches) joystickTouchId = e.touches[0].identifier;
-
       joystickStartTime = performance.now();
       startX = touch.clientX;
       startY = touch.clientY;
+      joystickTouchId = e.touches ? e.touches[0].identifier : null;
 
-      showJoystickAt(startX, startY);
-      knob.style.transform = 'translate(0px, 0px)';
-      base.style.borderColor = 'var(--primary)';
+      if (touch.clientX <= window.innerWidth / 2) {
+        // Left half → movement joystick (spawns where you press).
+        joystickActive = true;
+        showJoystickAt(startX, startY);
+        knob.style.transform = 'translate(0px, 0px)';
+        base.style.borderColor = 'var(--primary)';
+      } else {
+        // Right half → tap only (no joystick), so world interactions like mining
+        // an ore node, targeting a monster or talking to an NPC also work on the
+        // right side of the screen. (Previously the whole right half was ignored,
+        // so those taps did nothing on mobile.)
+        tapCandidate = true;
+      }
     };
 
     const handleMove = (e) => {
@@ -4533,7 +4539,7 @@ export class GameUI {
     };
 
     const handleEnd = (e) => {
-      if (!joystickActive) return;
+      if (!joystickActive && !tapCandidate) return;
 
       // Find the touch coordinates that ended
       let touch;
@@ -4549,23 +4555,29 @@ export class GameUI {
       const dy = touch.clientY - startY;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
+      const wasJoystick = joystickActive;
       joystickActive = false;
+      tapCandidate = false;
       joystickTouchId = null;
-      knob.style.transform = 'translate(0px, 0px)';
-      base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
-      hideJoystick();
 
-      const inputManager = this.character ? this.character.inputManager : null;
-      if (inputManager) {
-        inputManager.setJoystickInput(0, 0);
-      } else {
-        triggerKeyEvent('KeyW', false);
-        triggerKeyEvent('KeyS', false);
-        triggerKeyEvent('KeyA', false);
-        triggerKeyEvent('KeyD', false);
+      // Only the movement joystick (left half) needs its visual + input reset.
+      if (wasJoystick) {
+        knob.style.transform = 'translate(0px, 0px)';
+        base.style.borderColor = 'rgba(240, 192, 64, 0.4)';
+        hideJoystick();
+        const inputManager = this.character ? this.character.inputManager : null;
+        if (inputManager) {
+          inputManager.setJoystickInput(0, 0);
+        } else {
+          triggerKeyEvent('KeyW', false);
+          triggerKeyEvent('KeyS', false);
+          triggerKeyEvent('KeyA', false);
+          triggerKeyEvent('KeyD', false);
+        }
       }
 
-      // Tap detection: short tap with small movement
+      // Tap detection (both halves): a short tap with little movement acts on
+      // the world — targeting a monster, talking to an NPC, mining ore, etc.
       if (duration < 250 && distance < 15) {
         if (window.handleCanvasTap) {
           window.handleCanvasTap({
