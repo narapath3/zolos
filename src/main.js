@@ -1987,6 +1987,20 @@ function gameLoop(time) {
             lastMinimapTime = now;
         }
 
+        // Mining prompt: show the ⛏️ ขุด button when standing next to an
+        // un-mined Celestial Ore node in Svarrga, so mining is discoverable
+        // (a button) rather than needing a precise tap on the rock.
+        if (gameUI) {
+            let nearOre = null;
+            if (sceneManager.currentMap === 'svarrga' && sceneManager.getOreNodes) {
+                const pp = character.getPosition();
+                for (const n of sceneManager.getOreNodes()) {
+                    if (n.userData && !n.userData.mined && pp.distanceTo(n.position) < 4.5) { nearOre = n; break; }
+                }
+            }
+            gameUI.setMineTarget(nearOre);
+        }
+
         sceneManager.render();
     } catch (err) {
         console.error('[GameLoop] Error:', err);

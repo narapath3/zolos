@@ -186,6 +186,25 @@ export class GameUI {
         }
       });
     }
+
+    // ⛏️ Mine button — appears when standing near a Celestial Ore node (driven
+    // by the game loop via setMineTarget). Mines the node you're next to.
+    const mineBtn = document.getElementById('btn-mine');
+    if (mineBtn) {
+      mineBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this._mineTargetNode && !this._mineTargetNode.userData.mined) {
+          this.mineOreNode(this._mineTargetNode);
+        }
+      });
+    }
+  }
+
+  // Called each frame with the nearest un-mined ore node in range (or null).
+  setMineTarget(node) {
+    this._mineTargetNode = node || null;
+    const btn = document.getElementById('btn-mine');
+    if (btn) btn.style.display = node ? 'flex' : 'none';
   }
 
   show() {
@@ -1015,7 +1034,7 @@ export class GameUI {
     } else if (this.currentTab === 'equip') {
       filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(i.item_type));
     } else if (this.currentTab === 'etc') {
-      filtered = this.inventory.filter(i => i.item_type === 'material');
+      filtered = this.inventory.filter(i => i.item_type === 'material' || i.item_type === 'tool');
     } else if (this.currentTab === 'fish') {
       filtered = this.inventory.filter(i => i.item_type === 'fish');
     }
