@@ -91,6 +91,22 @@ const MAP_CONFIGS = {
         waterColor: 0x143257,
         treeTypes: ['dead', 'dead'],
         decorDensity: 0.3,
+    },
+    svarrga: {
+        name: 'Svarrga สรวงสวรรค์',
+        groundColor: 0xdfe8ff,
+        groundColor2: 0xc8d6f5,
+        pathColor: 0xf0e0a0,
+        fogColor: 0xdcecff,
+        skyTop: new THREE.Color(0x6fa8ff),
+        skyBottom: new THREE.Color(0xeaf4ff),
+        skyHorizon: new THREE.Color(0xfff2c8),
+        ambientColor: 0xbcd0f0,
+        sunColor: 0xfff4d8,
+        sunIntensity: 1.5,
+        waterColor: 0x9fd0ff,
+        treeTypes: [],
+        decorDensity: 1.0,
     }
 };
 
@@ -182,6 +198,7 @@ export class SceneManager {
         this.waterMesh = null;
         this.cloudSprites = [];
         this.portalMeshes = [];
+        this.oreNodes = [];
         this.npcMesh = null;
 
         // Lights
@@ -237,6 +254,7 @@ export class SceneManager {
         this.envObjects.forEach(obj => this.scene.remove(obj));
         this.envObjects = [];
         this.portalMeshes = [];
+        this.oreNodes = [];
         this.waterMesh = null;
         this.cloudSprites = [];
         this.npcMesh = null;
@@ -277,6 +295,8 @@ export class SceneManager {
             this._createMjolnirEnvironment(config);
         } else if (mapId === 'abyss_lake') {
             this._createAbyssLakeEnvironment(config);
+        } else if (mapId === 'svarrga') {
+            this._createSvarrgaEnvironment(config);
         } else {
             this._createEnvironment(config);
         }
@@ -420,6 +440,10 @@ export class SceneManager {
 
     getPortals() {
         return this.portalMeshes;
+    }
+
+    getOreNodes() {
+        return this.oreNodes || [];
     }
 
     getNPC() {
@@ -2669,6 +2693,106 @@ export class SceneManager {
         this.envObjects.push(group);
     }
 
+    // ============ Svarrga (Heaven city) environment + ore nodes ============
+    _createSvarrgaEnvironment(config) {
+        this.oreNodes = this.oreNodes || [];
+
+        // Fluffy cloud puffs floating around at various heights.
+        const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+        for (let i = 0; i < 26; i++) {
+            const cloud = new THREE.Group();
+            const puffs = 3 + Math.floor(Math.random() * 3);
+            for (let j = 0; j < puffs; j++) {
+                const r = 1.2 + Math.random() * 1.8;
+                const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), cloudMat);
+                puff.position.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 3);
+                puff.scale.y = 0.6;
+                cloud.add(puff);
+            }
+            const ang = Math.random() * Math.PI * 2;
+            const rad = 8 + Math.random() * 24;
+            cloud.position.set(Math.cos(ang) * rad, 3 + Math.random() * 9, Math.sin(ang) * rad);
+            cloud.userData.driftPhase = Math.random() * Math.PI * 2;
+            cloud.userData.baseX = cloud.position.x;
+            this.scene.add(cloud);
+            this.envObjects.push(cloud);
+        }
+
+        // Golden glowing spires around the rim to frame the heavenly city.
+        const spireMat = new THREE.MeshLambertMaterial({ color: 0xf3e0a0, emissive: 0xffcf4a, emissiveIntensity: 0.35 });
+        const capMat = new THREE.MeshBasicMaterial({ color: 0xfff2b0 });
+        for (let i = 0; i < 10; i++) {
+            const ang = (i / 10) * Math.PI * 2;
+            const rad = 30;
+            const spire = new THREE.Group();
+            const h = 6 + Math.random() * 4;
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, h, 8), spireMat);
+            shaft.position.y = h / 2;
+            shaft.castShadow = true;
+            spire.add(shaft);
+            const cap = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), capMat);
+            cap.position.y = h + 0.6;
+            spire.add(cap);
+            spire.position.set(Math.cos(ang) * rad, 0, Math.sin(ang) * rad);
+            this.scene.add(spire);
+            this.envObjects.push(spire);
+        }
+
+        // Central golden altar so the city has a clear focal landmark.
+        const altar = new THREE.Group();
+        const steps = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, 0.8, 24), new THREE.MeshLambertMaterial({ color: 0xf0e6c0 }));
+        steps.position.y = 0.4; steps.receiveShadow = true; altar.add(steps);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.2, 12, 32), new THREE.MeshBasicMaterial({ color: 0xffcf4a }));
+        ring.rotation.x = Math.PI / 2; ring.position.y = 3.2; altar.add(ring);
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 8, 24, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
+        beam.position.y = 4.8; altar.add(beam);
+        altar.position.set(0, 0, 0);
+        this.scene.add(altar);
+        this.envObjects.push(altar);
+
+        // ---- Celestial Ore nodes (minable) ----
+        const oreCount = 9;
+        for (let i = 0; i < oreCount; i++) {
+            const ang = (i / oreCount) * Math.PI * 2 + 0.3;
+            const rad = 12 + (i % 3) * 6;
+            const x = Math.cos(ang) * rad;
+            const z = Math.sin(ang) * rad;
+            const node = this._makeOreNode();
+            node.position.set(x, 0, z);
+            this.scene.add(node);
+            this.envObjects.push(node);
+            this.oreNodes.push(node);
+        }
+    }
+
+    // A cluster of glowing crystals that the player mines for Celestial Ore.
+    _makeOreNode() {
+        const group = new THREE.Group();
+        // rocky base
+        const base = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1),
+            new THREE.MeshLambertMaterial({ color: 0x8fa8c8 }));
+        base.position.y = 0.5; base.castShadow = true;
+        group.add(base);
+        // glowing crystals
+        const crystalMat = new THREE.MeshBasicMaterial({ color: 0x7fe0ff });
+        const crystals = [];
+        for (let i = 0; i < 4; i++) {
+            const c = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.1 + Math.random() * 0.6, 5), crystalMat);
+            const a = Math.random() * Math.PI * 2;
+            c.position.set(Math.cos(a) * 0.5, 0.9 + Math.random() * 0.3, Math.sin(a) * 0.5);
+            c.rotation.z = (Math.random() - 0.5) * 0.5;
+            c.rotation.x = (Math.random() - 0.5) * 0.5;
+            group.add(c);
+            crystals.push(c);
+        }
+        const glow = new THREE.PointLight(0x7fe0ff, 1.0, 6);
+        glow.position.y = 1.2;
+        group.add(glow);
+        group.userData = { isOre: true, oreType: 'Celestial Ore', mined: false, respawnAt: 0, crystals, glow, base };
+        return group;
+    }
+
     // ============ Portals ============
     _createPortals(mapId) {
         // Portal color by destination tier
@@ -2678,14 +2802,16 @@ export class SceneManager {
             glast_heim: 0xc040ff, // Purple — ruins
             mjolnir: 0xffa040,   // Orange — mountains
             abyss_lake: 0x2060ff, // Deep Blue — abyss
+            svarrga: 0xffe14a,   // Gold — heaven
         };
 
         const PORTAL_MAP = {
-            prontera: [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }],
+            prontera: [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }, { x: -25, z: -15, target: 'svarrga' }],
             payon: [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
             glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
             mjolnir: [{ x: -25, z: 0, target: 'payon' }, { x: 25, z: 0, target: 'abyss_lake' }],
             abyss_lake: [{ x: 25, z: 0, target: 'glast_heim' }, { x: -25, z: 0, target: 'mjolnir' }],
+            svarrga: [{ x: -25, z: 0, target: 'prontera' }],
         };
 
         const portalPositions = PORTAL_MAP[mapId] || [{ x: 25, z: 0, target: 'prontera' }];
@@ -4106,6 +4232,27 @@ export class SceneManager {
             });
             if (a.label) a.label.position.y = 6.2 + Math.sin(t * 1.5) * 0.14;
         });
+
+        // Animate Celestial Ore nodes: crystal glow pulse + spin, and respawn a
+        // depleted node once its cooldown elapses.
+        if (this.oreNodes && this.oreNodes.length) {
+            const nowMs = Date.now();
+            this.oreNodes.forEach(node => {
+                const u = node.userData;
+                if (u.mined) {
+                    if (u.respawnAt && nowMs >= u.respawnAt) {
+                        u.mined = false;
+                        node.visible = true;
+                        node.scale.setScalar(1);
+                    }
+                    return;
+                }
+                node.rotation.y = t * 0.4;
+                const pulse = 0.7 + Math.sin(t * 2.5) * 0.3;
+                if (u.glow) u.glow.intensity = pulse * 1.2;
+                if (u.crystals) u.crystals.forEach((c, i) => { c.position.y = 0.9 + Math.sin(t * 3 + i) * 0.06; });
+            });
+        }
 
         // Animate fishing bobber & line
         this._updateFishingAnimations(dt);

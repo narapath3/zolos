@@ -885,8 +885,11 @@ export class MonsterManager {
             this.monsters.push(monster);
         }
 
-        // Spawn water monsters (both maps since both have river and config.waterColor)
-        this._spawnWaterMonsters(playerLevel, rng);
+        // Spawn water monsters (most maps have a river). Svarrga (Heaven) is a
+        // peaceful mining city — no monsters there.
+        if (this.mapId !== 'svarrga') {
+            this._spawnWaterMonsters(playerLevel, rng);
+        }
     }
 
     _spawnWaterMonsters(playerLevel, rng) {
