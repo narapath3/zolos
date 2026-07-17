@@ -25,7 +25,11 @@ export const ITEMS = {
     'Hard Shell': { emoji: '🐚', type: 'material', rarity: 'common', desc: 'เปลือกสลักแกร่งหนาของสิ่งมีชีวิตหอยน้ำ ทนรอยขูดขีดสูงสุด', price: 35 },
     'Iron Ore': { emoji: '🪨', type: 'material', rarity: 'common', desc: 'ก้อนสินแร่เหล็กธรรมชาติ แหล่งแร่หลักในการทำอาวุธระดับต้น', price: 75 },
     // ---- Celestial mining (Svarrga / Heaven city) ----
-    'Celestial Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'epic', desc: 'อีเทอร์พิกแอกซ์ศักดิ์สิทธิ์ ตีแร่ในเมืองสวรรค์ได้ (ต้องเลเวล 25 ขึ้นไปจึงจะซื้อได้)', price: 25000 },
+    // Pickaxe ladder: rarer = pricier, higher level, and mines more ore per hit.
+    'Stone Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'uncommon', desc: 'พลั่วหินพื้นฐานสำหรับขุดแร่สวรรค์ ขุดได้ครั้งละ 1 แร่ (เลเวล 25+)', price: 8000, mineYield: 1, levelReq: 25 },
+    'Mythril Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'rare', desc: 'พลั่วมิธริลเนื้อแกร่ง ขุดได้ครั้งละ 2 แร่ (เลเวล 25+)', price: 30000, mineYield: 2, levelReq: 25 },
+    'Celestial Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'epic', desc: 'พลั่วศักดิ์สิทธิ์เปล่งประกาย ขุดได้ครั้งละ 3 แร่ (เลเวล 30+)', price: 90000, mineYield: 3, levelReq: 30 },
+    'Divine Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'legendary', desc: 'พลั่วเทวะระดับตำนาน ขุดได้ครั้งละ 5 แร่ (เลเวล 40+)', price: 250000, mineYield: 5, levelReq: 40 },
     'Celestial Ore': { emoji: '💠', type: 'material', rarity: 'legendary', desc: 'แร่เรืองแสงหายากจากเมืองสวรรค์ มูลค่าสูงมาก นำไปแปลงเป็นเหรียญ ZOL ได้ที่พ่อค้าสวรรค์', price: 0 },
     'Coal': { emoji: '🖤', type: 'material', rarity: 'common', desc: 'ถ่านดำอิ่มตัว ร้อนแรงและเผาไหม้ได้อุณหภูมิสม่ำเสมอยิ่ง', price: 80 },
     'Decay Tooth': { emoji: '🦷', type: 'material', rarity: 'common', desc: 'เศษฟันผุพังมีกลิ่นอับ บดคั้นกลั่นเป็นเครื่องรางเตือนภัย', price: 20 },
@@ -1038,6 +1042,10 @@ export const SKILLS = {
         color: 0xff4000,
     },
 };
+
+// Celestial mining pickaxe ladder, cheapest → rarest. The Heaven Merchant sells
+// these and mining uses the best one the player owns (ITEMS[name].mineYield).
+export const PICKAXES = ['Stone Pickaxe', 'Mythril Pickaxe', 'Celestial Pickaxe', 'Divine Pickaxe'];
 
 // ============ SHOP ITEMS ============
 // Update shop to list items in proper categories, for players to view and buy

@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
@@ -2889,7 +2889,25 @@ export class GameUI {
   // ============ Heaven Merchant (Svarrga) — pickaxe shop + ore→ZOL ============
   // Sells the Celestial Pickaxe (needed to mine, level 25+ only) and converts
   // mined Celestial Ore into the in-game ZOL currency.
-  static HEAVEN = { PICKAXE_PRICE: 25000, PICKAXE_MIN_LEVEL: 25, ORE_TO_ZOL: 100 };
+  static HEAVEN = { ORE_TO_ZOL: 100 };
+  static RARITY = {
+    common: { c: '#b8c4d0', b: '⚪', t: 'ธรรมดา' },
+    uncommon: { c: '#5fdd7a', b: '🟢', t: 'พบบ่อย' },
+    rare: { c: '#4aa3ff', b: '🔵', t: 'หายาก' },
+    epic: { c: '#c774ff', b: '🟣', t: 'มหากาพย์' },
+    legendary: { c: '#ffcf4a', b: '🟡', t: 'ตำนาน' },
+  };
+
+  // Highest mining yield among the pickaxes the player owns (0 = none).
+  bestPickaxeYield() {
+    let best = 0;
+    for (const name of PICKAXES) {
+      if (this.inventory.some(i => i.item_name === name && (i.quantity || 0) > 0)) {
+        best = Math.max(best, ITEMS[name].mineYield || 1);
+      }
+    }
+    return best;
+  }
 
   openHeavenShop() {
     if (!this.character) return;
@@ -2934,21 +2952,30 @@ export class GameUI {
     const level = s.level;
     const gold = Number(s.gold) || 0;
     const zol = Number(s.zol) || 0;
-    const hasPickaxe = !!this.inventory.find(i => i.item_name === 'Celestial Pickaxe' && (i.quantity || 0) > 0);
     const oreItem = this.inventory.find(i => i.item_name === 'Celestial Ore');
     const oreQty = oreItem ? (oreItem.quantity || 0) : 0;
 
-    // Buy button state
-    let buyBtn;
-    if (hasPickaxe) {
-      buyBtn = `<button class="heaven-btn" disabled>✅ มีพลั่วขุดอยู่แล้ว</button>`;
-    } else if (level < H.PICKAXE_MIN_LEVEL) {
-      buyBtn = `<button class="heaven-btn" disabled>🔒 ต้องเลเวล ${H.PICKAXE_MIN_LEVEL} ขึ้นไป (คุณเลเวล ${level})</button>`;
-    } else if (gold < H.PICKAXE_PRICE) {
-      buyBtn = `<button class="heaven-btn" disabled>💰 Zeny ไม่พอ (ต้องการ ${H.PICKAXE_PRICE.toLocaleString()})</button>`;
-    } else {
-      buyBtn = `<button id="heaven-buy" class="heaven-btn">🛒 ซื้อ (${H.PICKAXE_PRICE.toLocaleString()} Zeny)</button>`;
-    }
+    // Pickaxe ladder — each tier shows its rarity, yield and price, gated by level.
+    const pickaxeRows = PICKAXES.map(name => {
+      const it = ITEMS[name];
+      const r = GameUI.RARITY[it.rarity] || GameUI.RARITY.common;
+      const owned = this.inventory.some(i => i.item_name === name && (i.quantity || 0) > 0);
+      let btn;
+      if (owned) btn = `<button class="heaven-btn" disabled>✅ มีแล้ว</button>`;
+      else if (level < it.levelReq) btn = `<button class="heaven-btn" disabled>🔒 เลเวล ${it.levelReq}+</button>`;
+      else if (gold < it.price) btn = `<button class="heaven-btn" disabled>💰 Zeny ไม่พอ</button>`;
+      else btn = `<button class="heaven-btn" style="font-size:12px;padding:9px;" data-pick="${name}">🛒 ${it.price.toLocaleString()}</button>`;
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);">
+          <div style="font-size:26px;">${it.emoji}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;color:#fff;font-size:13px;">${name}
+              <span style="color:${r.c};font-size:10px;font-weight:800;">${r.b} ${r.t}</span></div>
+            <div style="font-size:10px;color:var(--text-dim);">ขุดครั้งละ <b style="color:#7fe0ff">${it.mineYield}</b> แร่ · ต้องเลเวล ${it.levelReq}+</div>
+          </div>
+          <div style="flex:0 0 auto;width:120px;">${btn}</div>
+        </div>`;
+    }).join('');
 
     const convertBtn = oreQty > 0
       ? `<button id="heaven-convert" class="heaven-btn">✨ แปลงทั้งหมด → +${(oreQty * H.ORE_TO_ZOL).toLocaleString()} ZOL</button>`
@@ -2967,14 +2994,9 @@ export class GameUI {
       </div>
       <div class="heaven-body">
         <div class="heaven-sec">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="font-size:30px;">⛏️</div>
-            <div>
-              <div style="font-weight:800;color:#fff;font-size:14px;">Celestial Pickaxe</div>
-              <div style="font-size:11px;color:var(--text-dim);line-height:1.4;">พลั่วศักดิ์สิทธิ์สำหรับขุดแร่ในเมืองสวรรค์ (ต้องเลเวล ${H.PICKAXE_MIN_LEVEL}+)</div>
-            </div>
-          </div>
-          ${buyBtn}
+          <div style="font-weight:800;color:#fff;font-size:13px;margin-bottom:2px;">⛏️ พลั่วขุดแร่</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">ยิ่งแรร์ ยิ่งขุดได้ต่อครั้งเยอะ — ใช้ตัวที่ดีที่สุดที่มีอัตโนมัติ</div>
+          ${pickaxeRows}
         </div>
         <div class="heaven-sec">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -2993,31 +3015,30 @@ export class GameUI {
       const m = document.getElementById('heaven-modal'); if (m) m.style.display = 'none';
       this.updateMobileControlsVisibility();
     };
-    const buy = card.querySelector('#heaven-buy');
-    if (buy) buy.onclick = () => this._buyCelestialPickaxe();
+    card.querySelectorAll('[data-pick]').forEach(b => { b.onclick = () => this._buyPickaxe(b.dataset.pick); });
     const conv = card.querySelector('#heaven-convert');
     if (conv) conv.onclick = () => this._convertOreToZol();
   }
 
-  async _buyCelestialPickaxe() {
-    const H = GameUI.HEAVEN;
+  async _buyPickaxe(name) {
+    const meta = ITEMS[name];
+    if (!meta) return;
     const s = this.character.stats;
-    if ((Number(s.level) || 1) < H.PICKAXE_MIN_LEVEL) { this.addCombatLog(`🔒 ต้องเลเวล ${H.PICKAXE_MIN_LEVEL} ขึ้นไปจึงจะซื้อได้`, 'system'); return; }
-    if ((Number(s.gold) || 0) < H.PICKAXE_PRICE) { this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system'); return; }
-    if (this.inventory.find(i => i.item_name === 'Celestial Pickaxe' && (i.quantity || 0) > 0)) return;
+    if ((Number(s.level) || 1) < meta.levelReq) { this.addCombatLog(`🔒 ต้องเลเวล ${meta.levelReq} ขึ้นไปจึงจะซื้อ ${name} ได้`, 'system'); return; }
+    if ((Number(s.gold) || 0) < meta.price) { this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system'); return; }
+    if (this.inventory.find(i => i.item_name === name && (i.quantity || 0) > 0)) return;
 
-    s.gold -= H.PICKAXE_PRICE;
-    const meta = ITEMS['Celestial Pickaxe'];
-    const existing = this.inventory.find(i => i.item_name === 'Celestial Pickaxe');
+    s.gold -= meta.price;
+    const existing = this.inventory.find(i => i.item_name === name);
     if (existing) existing.quantity = (existing.quantity || 0) + 1;
-    else this.inventory.push({ item_name: 'Celestial Pickaxe', item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price, quantity: 1, stats: {} });
+    else this.inventory.push({ item_name: name, item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price, quantity: 1, stats: {} });
 
     if (this.characterId) {
-      await saveInventoryItem(this.characterId, 'Celestial Pickaxe', meta.type, 1).catch(() => { });
+      await saveInventoryItem(this.characterId, name, meta.type, 1).catch(() => { });
       if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
     }
     if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
-    this.addCombatLog(`🛒 ซื้อ ⛏️ Celestial Pickaxe สำเร็จ! ไปขุดแร่ที่เมืองสวรรค์ได้เลย`, 'levelup');
+    this.addCombatLog(`🛒 ซื้อ ⛏️ ${name} สำเร็จ! ขุดได้ครั้งละ ${meta.mineYield} แร่`, 'levelup');
     this._renderHeavenShop();
     this._renderInventory();
     this.updateHUD(this.character.stats);
@@ -3050,8 +3071,9 @@ export class GameUI {
   // node (it respawns after a cooldown, handled in the scene animation loop).
   mineOreNode(node) {
     if (!node || !node.userData || node.userData.mined) return;
-    if (!this.inventory.some(i => i.item_name === 'Celestial Pickaxe' && (i.quantity || 0) > 0)) {
-      this.addCombatLog('⛏️ ต้องมี Celestial Pickaxe ก่อนถึงจะขุดได้', 'system');
+    const yield_ = this.bestPickaxeYield();
+    if (yield_ <= 0) {
+      this.addCombatLog('⛏️ ต้องมีพลั่วขุดก่อนถึงจะขุดได้ — ซื้อจากพ่อค้าสวรรค์', 'system');
       return;
     }
     // Deplete + schedule respawn (~25s); the animation loop restores it.
@@ -3062,12 +3084,12 @@ export class GameUI {
 
     const meta = ITEMS['Celestial Ore'];
     const existing = this.inventory.find(i => i.item_name === 'Celestial Ore');
-    if (existing) existing.quantity = (existing.quantity || 0) + 1;
-    else this.inventory.push({ item_name: 'Celestial Ore', item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: 1, stats: {} });
-    if (this.characterId) saveInventoryItem(this.characterId, 'Celestial Ore', meta.type, 1).catch(() => { });
+    if (existing) existing.quantity = (existing.quantity || 0) + yield_;
+    else this.inventory.push({ item_name: 'Celestial Ore', item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: yield_, stats: {} });
+    if (this.characterId) saveInventoryItem(this.characterId, 'Celestial Ore', meta.type, yield_).catch(() => { });
 
     if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
-    this.addCombatLog('⛏️💠 ขุดได้ Celestial Ore ×1! นำไปแปลงเป็น ZOL ที่พ่อค้าสวรรค์', 'levelup');
+    this.addCombatLog(`⛏️💠 ขุดได้ Celestial Ore ×${yield_}! นำไปแปลงเป็น ZOL ที่พ่อค้าสวรรค์`, 'levelup');
     this._renderInventory();
   }
 

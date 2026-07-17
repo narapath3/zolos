@@ -974,9 +974,9 @@ function handleMouseInteraction(event) {
 
     if (hit.type === 'ore') {
         const node = hit.object;
-        const hasPickaxe = gameUI && gameUI.inventory.some(i => i.item_name === 'Celestial Pickaxe' && (i.quantity || 0) > 0);
+        const hasPickaxe = gameUI && gameUI.bestPickaxeYield() > 0;
         if (!hasPickaxe) {
-            gameUI.addCombatLog('⛏️ ต้องมี Celestial Pickaxe ก่อนถึงจะขุดได้ — ซื้อจากพ่อค้าสวรรค์', 'system');
+            gameUI.addCombatLog('⛏️ ต้องมีพลั่วขุดก่อนถึงจะขุดได้ — ซื้อจากพ่อค้าสวรรค์', 'system');
             particles.createClickIndicator(hit.point, 0xff6060);
             return;
         }
