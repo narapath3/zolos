@@ -461,7 +461,9 @@ async function initGame(charData) {
                     if (isOfflineMode) {
                         localDb.set(`profile_${charData.user_id}`, { id: charData.user_id, username: data.name, updated_at: new Date().toISOString() });
                     } else if (supabase) {
-                        await supabase.from('profiles').upsert({ id: charData.user_id, username: data.name, updated_at: new Date().toISOString() });
+                        // profiles has no updated_at column — including it made the
+                        // whole upsert fail (PGRST204), so the name never synced.
+                        await supabase.from('profiles').upsert({ id: charData.user_id, username: data.name });
                     }
                     
                     // Force presence update if function exists

@@ -23,6 +23,12 @@ REVOKE INSERT, UPDATE ON public.profiles FROM anon, authenticated;
 GRANT  INSERT (id, username, gender) ON public.profiles TO anon, authenticated;
 GRANT  UPDATE (username, gender)     ON public.profiles TO anon, authenticated;
 
+-- 2026-07-17 follow-up: the grant above was too narrow and could deny legit
+-- profile writes that touch other (non-sensitive) columns. Broaden to every
+-- column EXCEPT is_admin — is_admin remains writable only by service_role.
+GRANT INSERT (id, username, created_at, gender) ON public.profiles TO anon, authenticated;
+GRANT UPDATE (username, created_at, gender)     ON public.profiles TO anon, authenticated;
+
 -- Verify (expect: no is_admin row for anon/authenticated):
 --   SELECT grantee, privilege_type, column_name
 --   FROM information_schema.column_privileges
