@@ -878,7 +878,7 @@ async function saveCharacterToSupabase(saveData) {
         if (updates && Object.keys(updates).length > 0) {
             const allowedFields = [
                 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
-                'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
+                'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
                 'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
                 'sound_enabled', 'graphics_quality', 'fps_enabled'
             ];
@@ -891,6 +891,7 @@ async function saveCharacterToSupabase(saveData) {
                     // is capped here and never bounces the whole write.
                     if (key === 'level') val = Math.max(1, Math.min(300, parseInt(val) || 1));
                     if (key === 'gold') val = Math.max(0, Math.min(500000000, parseInt(val) || 0));
+                    if (key === 'zol') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
                     if (key === 'exp') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
                     if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
                     if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));

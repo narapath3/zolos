@@ -135,6 +135,7 @@ export async function createCharacter(userId) {
         atk: 10,
         def: 5,
         gold: 0,
+        zol: 0,
         total_kills: 0,
         play_time: 0,
         last_map: 'prontera_field',
@@ -217,7 +218,7 @@ export async function saveCharacter(characterId, updates) {
     // Only include fields that actually exist in the DB schema
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
-        'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
+        'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
@@ -260,7 +261,7 @@ export async function saveCharacter(characterId, updates) {
             console.warn('[Zolos] Database schema mismatch (PGRST204). Retrying save with core columns only...');
             const coreFields = [
                 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
-                'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map'
+                'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map'
             ];
             const coreUpdates = {};
             for (const key of coreFields) {
@@ -323,7 +324,7 @@ export async function saveCharacterByUserId(userId, updates) {
     // Only include fields that actually exist in the DB schema
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
-        'atk', 'def', 'gold', 'total_kills', 'play_time', 'last_map',
+        'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];

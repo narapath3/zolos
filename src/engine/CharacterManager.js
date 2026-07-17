@@ -59,6 +59,7 @@ export class CharacterManager {
             atk: 10,
             def: 5,
             gold: 0,
+            zol: 0, // in-game ZOL currency (from converting Celestial Ore)
             total_kills: 0,
             play_time: 0,
         };
@@ -1328,6 +1329,7 @@ export class CharacterManager {
                 // reason as max_hp above.
                 def: this.stats._baseDef !== undefined ? this.stats._baseDef : this.stats.def,
                 gold: this.stats.gold,
+                zol: this.stats.zol,
                 total_kills: this.stats.total_kills,
                 play_time: this.stats.play_time,
                 // Game settings
@@ -1635,6 +1637,7 @@ export class CharacterManager {
         this.stats.atk = isNaN(Number(data.atk)) ? 10 : Number(data.atk);
         this.stats.def = isNaN(Number(data.def)) ? 5 : Number(data.def);
         this.stats.gold = isNaN(Number(data.gold)) ? 0 : Number(data.gold);
+        this.stats.zol = isNaN(Number(data.zol)) ? 0 : Number(data.zol);
         this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
         // PVP ranking (server-authoritative — written only by the map server)

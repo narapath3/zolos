@@ -24,6 +24,9 @@ export const ITEMS = {
     'Pointed Scale': { emoji: '🦈', type: 'material', rarity: 'common', desc: 'สะเก็ดแหลมจากปลายหางอสูรน้ำ แหลมคมราวกับใบเลื่อยเล็ก', price: 48 },
     'Hard Shell': { emoji: '🐚', type: 'material', rarity: 'common', desc: 'เปลือกสลักแกร่งหนาของสิ่งมีชีวิตหอยน้ำ ทนรอยขูดขีดสูงสุด', price: 35 },
     'Iron Ore': { emoji: '🪨', type: 'material', rarity: 'common', desc: 'ก้อนสินแร่เหล็กธรรมชาติ แหล่งแร่หลักในการทำอาวุธระดับต้น', price: 75 },
+    // ---- Celestial mining (Svarrga / Heaven city) ----
+    'Celestial Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'epic', desc: 'อีเทอร์พิกแอกซ์ศักดิ์สิทธิ์ ตีแร่ในเมืองสวรรค์ได้ (ต้องเลเวล 25 ขึ้นไปจึงจะซื้อได้)', price: 25000 },
+    'Celestial Ore': { emoji: '💠', type: 'material', rarity: 'legendary', desc: 'แร่เรืองแสงหายากจากเมืองสวรรค์ มูลค่าสูงมาก นำไปแปลงเป็นเหรียญ ZOL ได้ที่พ่อค้าสวรรค์', price: 0 },
     'Coal': { emoji: '🖤', type: 'material', rarity: 'common', desc: 'ถ่านดำอิ่มตัว ร้อนแรงและเผาไหม้ได้อุณหภูมิสม่ำเสมอยิ่ง', price: 80 },
     'Decay Tooth': { emoji: '🦷', type: 'material', rarity: 'common', desc: 'เศษฟันผุพังมีกลิ่นอับ บดคั้นกลั่นเป็นเครื่องรางเตือนภัย', price: 20 },
     'Rusty Screw': { emoji: '🔩', type: 'material', rarity: 'common', desc: 'สกรูสนิมเขรอะ ค้นพบได้ในซากโบราณและอู่เก็บเครื่องกลเก่า', price: 22 },
