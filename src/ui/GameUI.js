@@ -618,6 +618,18 @@ export class GameUI {
         this.character.setGlasses(null);
       }
 
+      // Migrate pickaxes saved before durability existed: a missing `durability`
+      // means "bought under the old rules", so give it a full bar rather than
+      // letting it read as broken.
+      for (const it of this.inventory) {
+        if (it.item_type !== 'tool' || !ITEMS[it.item_name] || !ITEMS[it.item_name].durability) continue;
+        if (!it.stats) it.stats = {};
+        if (it.stats.durability == null) {
+          it.stats.durability = ITEMS[it.item_name].durability;
+          if (this.characterId) updateInventoryItemStats(this.characterId, it.item_name, it.stats).catch(() => { });
+        }
+      }
+
       // Restore the equipped pickaxe (mining tool) so mining works after reload.
       const equippedPick = this.inventory.find(i => i.item_type === 'tool' && i.stats && i.stats.equipped === true);
       if (this.character) this.character.equippedPickaxe = equippedPick ? equippedPick.item_name : null;
@@ -3011,11 +3023,20 @@ export class GameUI {
   };
 
   // The equipped pickaxe inventory item that still has durability (or null).
+  // Pickaxes bought before durability existed have no `durability` field — treat
+  // those as a full bar (and fill it in) instead of reading them as broken,
+  // which would make an equipped pickaxe unusable.
   equippedPickaxe() {
-    return this.inventory.find(i =>
+    const p = this.inventory.find(i =>
       i.item_type === 'tool' && ITEMS[i.item_name] && ITEMS[i.item_name].mineYield &&
-      i.stats && i.stats.equipped === true && (i.stats.durability || 0) > 0
-    ) || null;
+      i.stats && i.stats.equipped === true
+    );
+    if (!p) return null;
+    if (p.stats.durability == null) {
+      p.stats.durability = ITEMS[p.item_name].durability || 1;
+      if (this.characterId) updateInventoryItemStats(this.characterId, p.item_name, p.stats).catch(() => { });
+    }
+    return p.stats.durability > 0 ? p : null;
   }
 
   // Mining yield of the equipped pickaxe (0 = none equipped / broken).
