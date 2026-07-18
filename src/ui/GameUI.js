@@ -4995,6 +4995,9 @@ export class GameUI {
     }
 
     s.job = jobId;
+    // Rebuild the class silhouette (hat/robe/cape/quiver/halo). Broadcasts to
+    // others automatically via getAppearance() on the next position tick.
+    if (this.character._applyJobAppearance) this.character._applyJobAppearance();
     // Old job's cooldowns are meaningless now — clear them so the new bar is live.
     if (this.character.cooldowns) {
       for (const k of Object.keys(this.character.cooldowns)) this.character.cooldowns[k] = 0;
