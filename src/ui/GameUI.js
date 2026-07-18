@@ -388,6 +388,18 @@ export class GameUI {
       }
     }
 
+    // Check the Job/Class picker overlay (standalone modal, id="job-modal").
+    // It sits at the same z-index as the mobile pad, so if we don't hide the
+    // controls the joystick / action buttons float over it and eat taps —
+    // which is why its buttons felt unresponsive / hard to close on mobile.
+    const jobModal = document.getElementById('job-modal');
+    if (jobModal) {
+      const display = jobModal.style.display || window.getComputedStyle(jobModal).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
     if (anyPanelOpen) {
       document.body.classList.add('panels-open');
     } else {
@@ -4855,7 +4867,7 @@ export class GameUI {
 
     card.innerHTML = `
       <div style="padding:16px 18px 12px;background:linear-gradient(90deg,rgba(240,192,64,.14),transparent);border-bottom:1px solid var(--border);position:relative;">
-        ${isChange ? `<button id="job-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>` : ''}
+        <button id="job-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;">✕</button>
         <div style="font-family:var(--font-main);color:#fff;font-size:19px;text-shadow:0 0 12px rgba(240,192,64,.5);">🎖️ สายอาชีพ</div>
         <div style="font-size:12px;color:var(--text-dim);margin-top:4px;line-height:1.5;">${header}</div>
       </div>
