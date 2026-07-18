@@ -1530,15 +1530,12 @@ export class GameUI {
         ? `<span class="player-city-tag" style="font-size:9px;color:#7fb0e0;background:rgba(60,110,180,0.18);border:1px solid rgba(120,170,230,0.3);border-radius:6px;padding:1px 6px;margin-left:4px;white-space:nowrap;">📍${CITY[p.mapId] || p.mapId}</span>`
         : '';
 
-      // Ping (ms): shown for online players we have latency data for (same-map
-      // peers self-report it via 'pos'; ourselves from the echo measurement).
+      // Ping (ms): the server measures each socket's latency and includes it in
+      // the roster (players_global), so it works for everyone, cross-map.
       let pingHtml = '';
-      if (!p.isOffline) {
-        const ping = (window.playerPings && p.userId != null) ? window.playerPings.get(p.userId) : undefined;
-        if (ping != null) {
-          const cls = ping < 80 ? 'ping-good' : ping < 160 ? 'ping-mid' : 'ping-bad';
-          pingHtml = `<span class="player-ping ${cls}">📶 ${ping}ms</span>`;
-        }
+      if (!p.isOffline && p.ping != null) {
+        const cls = p.ping < 80 ? 'ping-good' : p.ping < 160 ? 'ping-mid' : 'ping-bad';
+        pingHtml = `<span class="player-ping ${cls}">📶 ${p.ping}ms</span>`;
       }
 
       return `
