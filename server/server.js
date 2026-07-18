@@ -310,6 +310,7 @@ io.on('connection', (socket) => {
             joinedAt: Date.now(),
             lastSaveData: null,
             verified,
+            ping: null, // round-trip latency in ms, measured via srv_ping/srv_pong
         };
 
         // Join map-specific room
@@ -351,6 +352,16 @@ io.on('connection', (socket) => {
         // server's identity for this socket so a client can't puppet another
         // player's avatar by claiming their userId.
         socket.to(`map:${mapId}`).emit('pos', { ...payload, userId: self.userId, mapId });
+    });
+
+    // --- LATENCY PONG --- reply to our periodic srv_ping; RTT = now - echoed ts
+    socket.on('srv_pong', (t) => {
+        const info = onlinePlayers.get(socket.id);
+        if (!info) return;
+        const rtt = Date.now() - (typeof t === 'number' ? t : Date.now());
+        if (rtt >= 0 && rtt < 60000) {
+            info.ping = Math.round(info.ping == null ? rtt : info.ping * 0.5 + rtt * 0.5);
+        }
     });
 
     // --- CHAT ---
@@ -791,7 +802,8 @@ function broadcastPlayerList(mapId) {
                 userId: info.userId,
                 username: info.username,
                 level: info.level,
-                mapId: info.mapId
+                mapId: info.mapId,
+                ping: info.ping ?? null
             });
         }
     }
@@ -808,10 +820,28 @@ function broadcastPlayerList(mapId) {
     // after players_update so it deterministically wins on the client.
     const allPlayers = [];
     for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId });
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null });
     }
     io.emit('players_global', allPlayers);
 }
+
+// ===== Latency (ping) measurement =====
+// Every few seconds, ping each socket and refresh the global roster so the
+// Online panel shows live latency. The client replies to 'srv_ping' (echoing
+// the timestamp) with 'srv_pong'.
+setInterval(() => {
+    const now = Date.now();
+    for (const [socketId] of onlinePlayers) {
+        const s = io.sockets.sockets.get(socketId);
+        if (s) s.emit('srv_ping', now);
+    }
+    // Push the freshly-measured pings out to everyone's Online panel.
+    const allPlayers = [];
+    for (const [, info] of onlinePlayers) {
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null });
+    }
+    if (allPlayers.length) io.emit('players_global', allPlayers);
+}, 4000);
 
 // ============ PVP MMR (Elo, K=32) ============
 // Reads both players' MMR from `characters`, applies Elo, writes back new
