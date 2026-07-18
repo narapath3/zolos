@@ -239,6 +239,7 @@ export async function saveCharacter(characterId, updates) {
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
+        'job',
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
@@ -345,6 +346,7 @@ export async function saveCharacterByUserId(userId, updates) {
     const allowedFields = [
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
+        'job',
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
