@@ -1426,6 +1426,13 @@ export class GameUI {
 
     // Initial map ID
     this.currentMapId = 'prontera';
+
+    // Keep the ping badges fresh while the panel is open (offsetParent is null
+    // when the panel is hidden, so this is a no-op the rest of the time).
+    setInterval(() => {
+      const body = document.getElementById('players-body');
+      if (body && body.offsetParent !== null) this._renderOnlinePlayers();
+    }, 2000);
   }
 
   updateOnlinePlayers(players) {
@@ -1523,12 +1530,24 @@ export class GameUI {
         ? `<span class="player-city-tag" style="font-size:9px;color:#7fb0e0;background:rgba(60,110,180,0.18);border:1px solid rgba(120,170,230,0.3);border-radius:6px;padding:1px 6px;margin-left:4px;white-space:nowrap;">📍${CITY[p.mapId] || p.mapId}</span>`
         : '';
 
+      // Ping (ms): shown for online players we have latency data for (same-map
+      // peers self-report it via 'pos'; ourselves from the echo measurement).
+      let pingHtml = '';
+      if (!p.isOffline) {
+        const ping = (window.playerPings && p.userId != null) ? window.playerPings.get(p.userId) : undefined;
+        if (ping != null) {
+          const cls = ping < 80 ? 'ping-good' : ping < 160 ? 'ping-mid' : 'ping-bad';
+          pingHtml = `<span class="player-ping ${cls}">📶 ${ping}ms</span>`;
+        }
+      }
+
       return `
         <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
           <span class="online-dot" style="background-color:${dotColor}"></span>
           <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
           ${cityHtml}
           <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>
+          ${pingHtml}
         </div>
       `;
     }).join('');

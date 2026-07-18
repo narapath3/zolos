@@ -915,9 +915,25 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('pos', (payload) => {
-                if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
-                    onPlayerPositionUpdate(payload);
+                if (!payload) return;
+                // The server echoes our own 'pos' back to us (that's why the
+                // client filters own userId). We piggyback a send-timestamp `pt`
+                // on each broadcast, so the echo lets us measure round-trip ping
+                // without any dedicated server support.
+                if (payload.userId === userId) {
+                    if (payload.pt != null) {
+                        const rtt = Math.round(performance.now() - payload.pt);
+                        if (rtt >= 0 && rtt < 60000) {
+                            _myPing = (_myPing == null) ? rtt : Math.round(_myPing * 0.6 + rtt * 0.4);
+                            _playerPings.set(userId, _myPing);
+                        }
+                    }
+                    return;
                 }
+                // Other players self-report their ping in the pos payload — store
+                // it so the Online panel can show each player's latency.
+                if (payload.ping != null) _playerPings.set(payload.userId, payload.ping);
+                if (onPlayerPositionUpdate) onPlayerPositionUpdate(payload);
             });
 
             socket.on('chat', (payload) => {
@@ -1040,6 +1056,17 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
 }
 
+// ===== Player latency (ping) =====
+// Our own round-trip latency (ms), measured from the 'pos' echo, smoothed. Per
+// player pings (keyed by userId, including ourselves) live in _playerPings and
+// are mirrored to window.playerPings so the UI can read them synchronously.
+let _myPing = null;
+const _playerPings = new Map();
+if (typeof window !== 'undefined') window.playerPings = _playerPings;
+
+export function getMyPing() { return _myPing; }
+export function getPlayerPing(uid) { return _playerPings.get(uid); }
+
 export function broadcastPosition(userId, username, level, position, rotationY, state, appearance, currentMapId = 'prontera', atkSeq = 0, weaponSoundClass = null) {
     if (isOfflineMode) return;
 
@@ -1051,6 +1078,10 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
         // sound. aseq increments once per swing; the server relays the whole
         // payload, so no extra socket event is needed.
         if (atkSeq) { payload.aseq = atkSeq; payload.wsc = weaponSoundClass || 'sword'; }
+        // `pt` = send time (echoed back to us to measure ping); `ping` = our last
+        // measured latency, so other players can show it in their Online panel.
+        payload.pt = performance.now();
+        if (_myPing != null) payload.ping = _myPing;
         socket.emit('pos', payload);
         return;
     }
