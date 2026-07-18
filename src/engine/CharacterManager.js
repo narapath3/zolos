@@ -206,7 +206,7 @@ export class CharacterManager {
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
         if (w === 'Heavy Warhammer') return 'blunt';
-        if (w === 'Mage Staff') return 'staff';
+        if (w === 'Mage Staff' || w === 'Holy Rod') return 'staff';
         return 'sword';
     }
 
@@ -337,6 +337,50 @@ export class CharacterManager {
 
             group.position.set(0, -0.2, 0.15);
 
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Mage Staff') {
+            const group = new THREE.Group();
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.045, 1.1, 6),
+                new THREE.MeshLambertMaterial({ color: 0x6a4a2a }));
+            shaft.position.set(0, 0.15, 0);
+            shaft.castShadow = true;
+            group.add(shaft);
+            const orb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12, 12, 12),
+                new THREE.MeshBasicMaterial({ color: 0x66ccff }));
+            orb.position.set(0, 0.78, 0);
+            group.add(orb);
+            const orbGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.2, 12, 12),
+                new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.3 }));
+            orbGlow.position.copy(orb.position);
+            group.add(orbGlow);
+            group.position.set(0, -0.1, 0.12);
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Holy Rod') {
+            const group = new THREE.Group();
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.04, 1.0, 6),
+                new THREE.MeshLambertMaterial({ color: 0xd9b84a }));
+            shaft.position.set(0, 0.1, 0);
+            shaft.castShadow = true;
+            group.add(shaft);
+            const goldMat = new THREE.MeshBasicMaterial({ color: 0xfff0a0 });
+            const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.06), goldMat);
+            crossV.position.set(0, 0.72, 0);
+            group.add(crossV);
+            const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.06), goldMat);
+            crossH.position.set(0, 0.72, 0);
+            group.add(crossH);
+            const holyGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.18, 12, 12),
+                new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0.35 }));
+            holyGlow.position.set(0, 0.72, 0);
+            group.add(holyGlow);
+            group.position.set(0, -0.1, 0.12);
             this.weaponMesh = group;
             this.rightArm.add(this.weaponMesh);
         } else if (itemName === 'Fishing Rod') {
