@@ -137,6 +137,13 @@ export class SceneManager {
         // Player-controlled camera yaw (right-drag to rotate). 0 = default
         // behind-the-shoulder angle, so nothing changes until the player rotates.
         this.cameraYaw = 0;
+
+        // Camera perspective: 'third' (default follow cam) or 'first' (POV /
+        // Minecraft-style). In first-person, cameraYaw is the look direction and
+        // cameraPitch is the up/down look (radians, clamped). PC only.
+        this.cameraMode = 'third';
+        this.cameraPitch = 0;
+        this.fpEyeHeight = 0.7; // camera height above the character's base Y
         
         // Roblox-style camera zoom (scroll to zoom). 1.0 = default distance.
         // The actual distance is (defaultDist * zoom).
@@ -3926,6 +3933,23 @@ export class SceneManager {
     // stableY: use the character's baseY instead of animated mesh.position.y
     //          to prevent camera shake from walking/running bounce animation
     followTarget(targetPos, stableY) {
+        // First-person / POV: sit the camera at the character's eyes and look
+        // along the yaw+pitch the player controls with the mouse.
+        if (this.cameraMode === 'first') {
+            const baseY = (stableY !== undefined ? stableY : targetPos.y);
+            const eyeY = baseY + this.fpEyeHeight;
+            const yaw = this.cameraYaw || 0;
+            const pitch = this.cameraPitch || 0;
+            const cp = Math.cos(pitch);
+            const dirX = -Math.sin(yaw) * cp;
+            const dirY = Math.sin(pitch);
+            const dirZ = -Math.cos(yaw) * cp;
+            this.camera.position.set(targetPos.x, eyeY, targetPos.z);
+            this.camera.lookAt(targetPos.x + dirX, eyeY + dirY, targetPos.z + dirZ);
+            this._weatherFocus = { x: targetPos.x, z: targetPos.z };
+            return;
+        }
+
         const baseOffsetY = 18;
         const baseDist = 18;        // horizontal distance from the player
         const smoothing = 0.08;
@@ -3979,6 +4003,28 @@ export class SceneManager {
     // Snap the camera back to the default behind-the-shoulder angle.
     resetCameraYaw() {
         this.cameraYaw = 0;
+    }
+
+    // First-person mouse-look: adjust yaw (horizontal) and pitch (vertical).
+    // Pitch is clamped so you can't flip over the top/bottom.
+    adjustLook(deltaYaw, deltaPitch) {
+        let y = (this.cameraYaw || 0) + deltaYaw;
+        if (y > Math.PI) y -= Math.PI * 2;
+        else if (y < -Math.PI) y += Math.PI * 2;
+        this.cameraYaw = y;
+        const limit = 1.45; // ~83°
+        this.cameraPitch = Math.max(-limit, Math.min(limit, (this.cameraPitch || 0) + deltaPitch));
+    }
+
+    // Switch between 'third' and 'first' person. Returns the new mode.
+    toggleCameraMode() {
+        this.cameraMode = this.cameraMode === 'first' ? 'third' : 'first';
+        if (this.cameraMode === 'third') this.cameraPitch = 0;
+        return this.cameraMode;
+    }
+
+    getCameraMode() {
+        return this.cameraMode;
     }
 
     getCameraYaw() {
