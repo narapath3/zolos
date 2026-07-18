@@ -736,6 +736,95 @@
                 </div>
                 <input type="range" id="settings-sfx-volume" min="0" max="100" value="30"
                   style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+
+                <div style="height: 1px; background: var(--border); margin: 2px 0;"></div>
+
+                <!-- Skill sounds -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-skill-sfx-enabled" checked
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">✨ เสียงสกิล (Skill SFX)</span>
+                </div>
+
+                <!-- Master mute -->
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-mute-all"
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">🔇 ปิดเสียงทั้งหมด (Mute All)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Visual Effects -->
+            <div class="form-group" style="margin-top: 18px;">
+              <label style="display: block; margin-bottom: 6px;">🎆 Visual Effects / เอฟเฟกต์ภาพ</label>
+              <div
+                style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-hide-effects"
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500;">ปิดเอฟเฟกต์ภาพ (ระเบิด/ฮีล/ตัวเลขดาเมจ)</span>
+                </div>
+                <p style="font-size: 10px; color: var(--text-dim); margin: 0; line-height: 1.4;">
+                  ปิดอนุภาคและเอฟเฟกต์ทั้งหมดเพื่อลดภาระเครื่อง
+                </p>
+              </div>
+            </div>
+
+            <!-- Performance / low-end devices -->
+            <div class="form-group" style="margin-top: 18px;">
+              <label style="display: block; margin-bottom: 6px;">🐢 Performance / ประสิทธิภาพ (เครื่องไม่แรง)</label>
+              <div
+                style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-hide-others-gear"
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500;">ซ่อนชุดแต่งกายผู้เล่นอื่น (หมวก/แว่น/อาวุธ)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-hide-others"
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500;">ซ่อนตัวละครผู้เล่นอื่นทั้งหมด</span>
+                </div>
+                <p style="font-size: 10px; color: var(--text-dim); margin: 0; line-height: 1.4;">
+                  ซ่อนเฉพาะภาพบนจอเราเท่านั้น — ยังออนไลน์ ปาร์ตี้/แชท/เทรดทำงานปกติ และคู่ต่อสู้จะมองเห็นเสมอ
+                </p>
+              </div>
+            </div>
+
+            <!-- Auto potion -->
+            <div class="form-group" style="margin-top: 18px;">
+              <label style="display: block; margin-bottom: 6px;">🧪 Auto Potion / ออโต้ใช้ยา</label>
+              <div
+                style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-auto-hp"
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">❤️ ออโต้ยาเลือด</span>
+                  <span id="settings-auto-hp-label"
+                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">40%</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-dim);">ใช้เมื่อเลือดต่ำกว่า</div>
+                <input type="range" id="settings-auto-hp-threshold" min="10" max="90" value="40"
+                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+
+                <div style="height: 1px; background: var(--border); margin: 2px 0;"></div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <input type="checkbox" id="settings-auto-sp"
+                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
+                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">💧 ออโต้ยามานา</span>
+                  <span id="settings-auto-sp-label"
+                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">25%</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-dim);">ใช้เมื่อมานาต่ำกว่า</div>
+                <input type="range" id="settings-auto-sp-threshold" min="10" max="90" value="25"
+                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+
+                <p style="font-size: 10px; color: var(--text-dim); margin: 0; line-height: 1.4;">
+                  เกมจะใช้ขวดเล็กสุดที่พอฟื้นได้ก่อน และเว้นจังหวะระหว่างการใช้ราว 1.5 วินาที
+                </p>
               </div>
             </div>
 

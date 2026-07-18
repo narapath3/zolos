@@ -42,6 +42,10 @@ class ParticlePerformanceMonitor {
 export class ParticleSystem {
     constructor(scene) {
         this.scene = scene;
+        // Settings → "ปิดเอฟเฟกต์ภาพ": skips the particle bursts (hit/crit/
+        // explosion/heal) for low-end devices. Damage numbers and the
+        // click-to-move indicator stay on — they're information, not decoration.
+        this.effectsEnabled = true;
         this.particles = [];
         this.deathEffects = [];
         this.hitEffects = [];
@@ -123,6 +127,7 @@ export class ParticleSystem {
 
     // ============ Hit Spark Effect ============
     spawnHitEffect(position, isCritical = false) {
+        if (!this.effectsEnabled) return;
         // Adaptive spark count
         let sparkCount = isCritical ? 24 : 12;
         const particleScale = this.perfMonitor.getParticleCount();
@@ -216,6 +221,7 @@ export class ParticleSystem {
     }
 
     createExplosion(position, color) {
+        if (!this.effectsEnabled) return;
         // Simple explosion using hit effect logic with custom color
         let sparkCount = 30;
         const particleScale = this.perfMonitor.getParticleCount();
@@ -261,6 +267,7 @@ export class ParticleSystem {
     }
 
     createHealEffect(position) {
+        if (!this.effectsEnabled) return;
         // Green sparkles rising up
         let sparkCount = 15;
         const particleScale = this.perfMonitor.getParticleCount();

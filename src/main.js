@@ -754,6 +754,8 @@ async function initGame(charData) {
         gameUI.initHUD(character);
     }
     gameUI.updateStats(character.stats);
+    // Restore device settings (skill sounds, visual effects) onto the live systems.
+    if (gameUI.applyDeviceSettings) gameUI.applyDeviceSettings();
 
     isGameStarted = true;
     lastTime = performance.now();
@@ -1983,7 +1985,10 @@ function stepWorld(dt) {
     if (particles) particles.update(dt);
     if (combatSystem) combatSystem.update(dt);
     autoCastSkills(dt); // AUTO also casts the 3 skills
-    if (gameUI) gameUI.updateMining(); // timed mining "job" (also runs while hidden)
+    if (gameUI) {
+        gameUI.updateMining();        // timed mining "job" (also runs while hidden)
+        gameUI.updateAutoPotion(dt);  // auto HP/SP potions (also while hidden)
+    }
 }
 
 // Broadcast our position/state to other players, throttled. Runs from both the
@@ -2017,7 +2022,12 @@ function gameLoop(time) {
             return;
         }
 
-        if (gameUI) gameUI.updateTargetIndicator(sceneManager);
+        if (gameUI) {
+            gameUI.updateTargetIndicator(sceneManager);
+            // Performance settings: optionally hide other players' gear/bodies
+            // locally (never the duel opponent). Rendering-only, so foreground.
+            gameUI.applyRemoteVisibility(remotePlayersMap, duelState ? duelState.opponentUserId : null);
+        }
 
         // 6. Camera & Networking
         // During a duel, frame both fighters (extra pull-back on mobile).

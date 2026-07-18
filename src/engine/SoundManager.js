@@ -5,6 +5,9 @@ export class SoundManager {
     constructor() {
         this.ctx = null;
         this.enabled = true;
+        // Settings → "เสียงสกิล": skill casts can be muted on their own while
+        // the rest of the SFX (hits, pickups, level-ups) keep playing.
+        this.skillSoundsEnabled = true;
         this.masterVolume = 0.3;
         this._initOnInteraction();
     }
@@ -270,7 +273,7 @@ export class SoundManager {
 
     // ============ Skill Cast/Hit Sounds ============
     playSkillSound(skillId) {
-        if (!this.enabled) return;
+        if (!this.enabled || !this.skillSoundsEnabled) return;
         const ctx = this._ensureCtx();
         const t = ctx.currentTime;
 

@@ -2211,6 +2211,122 @@ export class GameUI {
     set('settings-sfx-vol-label', 'textContent', sfxVol + '%');
   }
 
+  // ===== Device settings (localStorage-backed, per-device not per-character) =====
+  _flag(key, def) { const v = localStorage.getItem(key); return v == null ? def : v === 'true'; }
+  _num(key, def) { const v = parseInt(localStorage.getItem(key), 10); return Number.isNaN(v) ? def : v; }
+
+  // Push persisted device settings into the live systems. Called once the game
+  // is running so a reload restores what the player picked.
+  applyDeviceSettings() {
+    if (this.soundManager) this.soundManager.skillSoundsEnabled = this._flag('zolos_skill_sfx_enabled', true);
+    if (window.particles) window.particles.effectsEnabled = !this._flag('zolos_hide_effects', false);
+  }
+
+  // Reflect the effects/performance/auto-potion controls from storage.
+  _syncGameplaySettingsUI() {
+    const set = (id, prop, val) => { const el = document.getElementById(id); if (el) el[prop] = val; };
+    const musicOn = this._flag('zolos_music_enabled', true);
+    const sfxOn = this._flag('zolos_sfx_enabled', true);
+    set('settings-skill-sfx-enabled', 'checked', this._flag('zolos_skill_sfx_enabled', true));
+    set('settings-mute-all', 'checked', !musicOn && !sfxOn);
+    set('settings-hide-effects', 'checked', this._flag('zolos_hide_effects', false));
+    set('settings-hide-others-gear', 'checked', this._flag('zolos_hide_others_gear', false));
+    set('settings-hide-others', 'checked', this._flag('zolos_hide_others', false));
+
+    const hpT = this._num('zolos_auto_hp_threshold', 40);
+    const spT = this._num('zolos_auto_sp_threshold', 25);
+    set('settings-auto-hp', 'checked', this._flag('zolos_auto_hp', false));
+    set('settings-auto-sp', 'checked', this._flag('zolos_auto_sp', false));
+    set('settings-auto-hp-threshold', 'value', hpT);
+    set('settings-auto-sp-threshold', 'value', spT);
+    set('settings-auto-hp-label', 'textContent', hpT + '%');
+    set('settings-auto-sp-label', 'textContent', spT + '%');
+  }
+
+  // ===== Performance: hide other players' gear / bodies on THIS screen only =====
+  // Purely local rendering — they stay online and everything else works. A duel
+  // opponent is never hidden, so you can always see who you're fighting.
+  applyRemoteVisibility(remotePlayersMap, protectedUserId = null) {
+    if (!remotePlayersMap) return;
+    const hideAll = this._flag('zolos_hide_others', false);
+    const hideGear = this._flag('zolos_hide_others_gear', false);
+    // Skip the walk entirely when nothing is hidden and nothing was hidden last
+    // frame (so we don't fight normal visibility every frame for no reason).
+    if (!hideAll && !hideGear && !this._remoteHidden) return;
+    this._remoteHidden = hideAll || hideGear;
+
+    for (const [uid, rp] of remotePlayersMap.entries()) {
+      if (!rp) continue;
+      const exempt = protectedUserId && uid === protectedUserId;
+      if (rp.mesh) rp.mesh.visible = exempt ? true : !hideAll;
+      const c = rp.character;
+      if (!c) continue;
+      const gearVisible = exempt ? true : (!hideAll && !hideGear);
+      if (c.hatMesh) c.hatMesh.visible = gearVisible;
+      if (c.glassesMesh) c.glassesMesh.visible = gearVisible;
+      if (c.weaponMesh) c.weaponMesh.visible = gearVisible;
+    }
+  }
+
+  // ===== Auto potion =====
+  // Drinks automatically when HP/SP falls under the configured percentage,
+  // preferring the smallest bottle that still covers what's missing so the good
+  // stuff isn't wasted. ~1.5s between sips. Driven from the game loop, so it
+  // also keeps you alive while the tab is backgrounded.
+  updateAutoPotion(dt) {
+    if (!this.character || !this.character.stats) return;
+    this._potionCd = Math.max(0, (this._potionCd || 0) - dt);
+    if (this._potionCd > 0) return;
+    if (this.character.isAlive && !this.character.isAlive()) return;
+
+    const s = this.character.stats;
+    if (this._flag('zolos_auto_hp', false) && s.max_hp > 0) {
+      const pct = (s.hp / s.max_hp) * 100;
+      if (pct < this._num('zolos_auto_hp_threshold', 40) && this._drinkBestPotion('hp')) {
+        this._potionCd = 1.5;
+        return;
+      }
+    }
+    if (this._flag('zolos_auto_sp', false) && s.max_sp > 0) {
+      const pct = (s.sp / s.max_sp) * 100;
+      if (pct < this._num('zolos_auto_sp_threshold', 25) && this._drinkBestPotion('sp')) {
+        this._potionCd = 1.5;
+      }
+    }
+  }
+
+  _drinkBestPotion(kind) {
+    const s = this.character.stats;
+    const missing = kind === 'hp' ? (s.max_hp - s.hp) : (s.max_sp - s.sp);
+    if (missing <= 0) return false;
+    const field = kind === 'hp' ? 'healHp' : 'restoreSp';
+    const amt = (i) => (ITEMS[i.item_name] && ITEMS[i.item_name][field]) || i[field] || 0;
+
+    const candidates = this.inventory.filter(i =>
+      i.item_type === 'consumable' && (i.quantity || 0) > 0 && amt(i) > 0);
+    if (!candidates.length) return false;
+
+    // Smallest bottle that still covers the gap; otherwise the biggest we have.
+    const enough = candidates.filter(i => amt(i) >= missing).sort((a, b) => amt(a) - amt(b));
+    const pick = enough[0] || candidates.slice().sort((a, b) => amt(b) - amt(a))[0];
+    const healed = amt(pick);
+
+    if (kind === 'hp') this.character.heal(healed);
+    else this.character.restoreSp(healed);
+
+    pick.quantity--;
+    if (this.characterId) saveInventoryItem(this.characterId, pick.item_name, pick.item_type, -1).catch(() => { });
+    if (pick.quantity <= 0) {
+      const idx = this.inventory.findIndex(i => i.item_name === pick.item_name);
+      if (idx >= 0) this.inventory.splice(idx, 1);
+    }
+    if (this.soundManager) this.soundManager.playUseItemSound();
+    this.addCombatLog(`${kind === 'hp' ? '❤️' : '💧'} ออโต้ใช้ ${pick.emoji || '🧪'} ${pick.item_name} (+${healed})`, 'heal');
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    return true;
+  }
+
   // Keep the legacy combined sound_enabled flag roughly in sync so anything
   // still reading it behaves sensibly (on if either music or SFX is on).
   _persistLegacySoundFlag() {
@@ -2389,6 +2505,7 @@ export class GameUI {
 
         // Sync audio config values when opening the Settings tab
         this._syncAudioSettingsUI();
+        this._syncGameplaySettingsUI();
         
         // Use persisted character settings if available
         if (this.character && this.character.gameSettings) {
@@ -2464,6 +2581,61 @@ export class GameUI {
         if (this.soundManager && this.soundManager.enabled) this.soundManager.playHitSound();
       });
     }
+
+    // ===== Effects / performance / auto-potion toggles =====
+    // All device-local (localStorage), applied straight to the live systems.
+    const bindFlag = (id, key, onChange) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', (e) => {
+        const on = e.target.checked;
+        localStorage.setItem(key, on ? 'true' : 'false');
+        if (onChange) onChange(on);
+      });
+    };
+
+    bindFlag('settings-skill-sfx-enabled', 'zolos_skill_sfx_enabled', (on) => {
+      if (this.soundManager) this.soundManager.skillSoundsEnabled = on;
+    });
+    bindFlag('settings-hide-effects', 'zolos_hide_effects', (on) => {
+      if (window.particles) window.particles.effectsEnabled = !on;
+      this.addCombatLog(on ? '🎆 ปิดเอฟเฟกต์ภาพแล้ว' : '🎆 เปิดเอฟเฟกต์ภาพแล้ว', 'system');
+    });
+    bindFlag('settings-hide-others-gear', 'zolos_hide_others_gear');
+    bindFlag('settings-hide-others', 'zolos_hide_others');
+    bindFlag('settings-auto-hp', 'zolos_auto_hp', (on) => {
+      this.addCombatLog(on ? `❤️ ออโต้ยาเลือด: เปิด (ต่ำกว่า ${this._num('zolos_auto_hp_threshold', 40)}%)` : '❤️ ออโต้ยาเลือด: ปิด', 'system');
+    });
+    bindFlag('settings-auto-sp', 'zolos_auto_sp', (on) => {
+      this.addCombatLog(on ? `💧 ออโต้ยามานา: เปิด (ต่ำกว่า ${this._num('zolos_auto_sp_threshold', 25)}%)` : '💧 ออโต้ยามานา: ปิด', 'system');
+    });
+
+    // Mute All — flips both music and SFX together, then re-syncs their rows.
+    const muteAll = document.getElementById('settings-mute-all');
+    if (muteAll) {
+      muteAll.addEventListener('change', (e) => {
+        const on = !e.target.checked; // checked = muted
+        if (window.youtubeBGM) window.youtubeBGM.setEnabled(on);
+        if (this.soundManager) this.soundManager.enabled = on;
+        localStorage.setItem('zolos_music_enabled', on ? 'true' : 'false');
+        localStorage.setItem('zolos_sfx_enabled', on ? 'true' : 'false');
+        this._persistLegacySoundFlag();
+        this._syncAudioSettingsUI();
+      });
+    }
+
+    const bindRange = (id, key, labelId) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', (e) => {
+        const v = parseInt(e.target.value, 10) || 0;
+        localStorage.setItem(key, String(v));
+        const lbl = document.getElementById(labelId);
+        if (lbl) lbl.textContent = v + '%';
+      });
+    };
+    bindRange('settings-auto-hp-threshold', 'zolos_auto_hp_threshold', 'settings-auto-hp-label');
+    bindRange('settings-auto-sp-threshold', 'zolos_auto_sp_threshold', 'settings-auto-sp-label');
 
     // Graphics settings listener
     const graphicsSelect = document.getElementById('settings-graphics-quality');
