@@ -657,15 +657,31 @@ export class CharacterManager {
         // Gender-specific hair (female = long hair down the back)
         this._applyGenderHair();
 
-        // Eyes
-        const eyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.05);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-        eyeL.position.set(-0.12, 1.72, 0.26);
-        this.mesh.add(eyeL);
-        const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-        eyeR.position.set(0.12, 1.72, 0.26);
-        this.mesh.add(eyeR);
+        // ---- Face: eyes (white + pupil), eyebrows, nose, mouth, cheeks ----
+        const faceMesh = (geo, matColor, x, y, z, basic = true) => {
+            const m = new THREE.Mesh(geo, basic
+                ? new THREE.MeshBasicMaterial({ color: matColor })
+                : new THREE.MeshLambertMaterial({ color: matColor }));
+            m.position.set(x, y, z);
+            this.mesh.add(m);
+            return m;
+        };
+        const scleraGeo = new THREE.BoxGeometry(0.12, 0.11, 0.04);
+        const pupilGeo = new THREE.BoxGeometry(0.06, 0.07, 0.05);
+        [-0.13, 0.13].forEach(x => {
+            faceMesh(scleraGeo, 0xffffff, x, 1.73, 0.255);         // eye white
+            faceMesh(pupilGeo, 0x241a14, x + (x < 0 ? 0.01 : -0.01), 1.725, 0.27); // pupil
+        });
+        // Eyebrows (match hair) — kept as refs so they recolor with the hair.
+        const browGeo = new THREE.BoxGeometry(0.13, 0.03, 0.04);
+        this.brows = [-0.13, 0.13].map(x => faceMesh(browGeo, this.hairColor, x, 1.84, 0.255, false));
+        // Nose — a small skin-tone wedge that sticks out.
+        faceMesh(new THREE.BoxGeometry(0.09, 0.12, 0.1), 0xecb391, 0, 1.65, 0.27, false);
+        // Mouth.
+        faceMesh(new THREE.BoxGeometry(0.16, 0.035, 0.03), 0x8a4038, 0, 1.55, 0.27);
+        // Rosy cheeks for a friendly look.
+        const cheekGeo = new THREE.BoxGeometry(0.09, 0.06, 0.03);
+        [-0.2, 0.2].forEach(x => { const c = faceMesh(cheekGeo, 0xff9aa8, x, 1.62, 0.255); c.material.transparent = true; c.material.opacity = 0.75; });
 
         // Arms
         const armGeo = new THREE.BoxGeometry(0.2, 0.6, 0.2);
@@ -915,6 +931,7 @@ export class CharacterManager {
         if (this.hair && this.hair.material) {
             this.hair.material.color.setHex(colorVal);
         }
+        if (this.brows) this.brows.forEach(b => b.material && b.material.color.setHex(colorVal));
     }
 
     setPantsColor(color) {

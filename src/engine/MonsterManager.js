@@ -77,6 +77,31 @@ class Monster {
         this.bodyMesh.receiveShadow = true;
         this.mesh.add(this.bodyMesh);
 
+        // ---- Shared builders for the humanoid / beast / dragon monsters below.
+        // Positions are unit-relative (× size); bodyMesh sits at world y=size*0.4
+        // so a part at y=-0.4 stands on the ground. hideBody() makes the default
+        // sphere invisible while its children (custom parts) still render + flash.
+        let ownEyes = false;
+        const box = (w, h, d) => new THREE.BoxGeometry(w * size, h * size, d * size);
+        const cyl = (rt, rb, h, s = 8) => new THREE.CylinderGeometry(rt * size, rb * size, h * size, s);
+        const cone = (r, h, s = 8) => new THREE.ConeGeometry(r * size, h * size, s);
+        const sph = (r, s = 10) => new THREE.SphereGeometry(r * size, s, s);
+        const put = (geo, material, x, y, z, rot) => {
+            const msh = new THREE.Mesh(geo, material);
+            msh.position.set(x * size, y * size, z * size);
+            if (rot) msh.rotation.set(rot[0] || 0, rot[1] || 0, rot[2] || 0);
+            msh.castShadow = true;
+            this.bodyMesh.add(msh);
+            return msh;
+        };
+        const glowEyes = (c, y = 0.15, spread = 0.13, z = 0.34, r = 0.06) => {
+            ownEyes = true;
+            const g = sph(r, 8);
+            put(g, new THREE.MeshBasicMaterial({ color: c }), -spread, y, z);
+            put(g, new THREE.MeshBasicMaterial({ color: c }), spread, y, z);
+        };
+        const hideBody = () => { this.bodyMesh.material.transparent = true; this.bodyMesh.material.opacity = 0; };
+
         // Feature decorations
         if (this.type === 'poring') {
             // Cute pink rosy cheeks
@@ -512,25 +537,225 @@ class Monster {
             }
         }
 
+        // ===== Mid / high-tier monsters — real silhouettes, not plain blobs =====
+        if (this.type === 'skeleton' || this.type === 'archer_skeleton') {
+            hideBody();
+            const bone = createMat(0xe8e4d6, 0.85, 0.0);
+            const rib = createMat(0x2a2620, 0.9, 0);
+            put(box(0.34, 0.44, 0.22), bone, 0, 0.06, 0);
+            for (let i = 0; i < 3; i++) put(box(0.4, 0.03, 0.24), rib, 0, 0.18 - i * 0.12, 0.02);
+            put(box(0.36, 0.34, 0.32), bone, 0, 0.45, 0);
+            put(box(0.2, 0.1, 0.05), rib, 0, 0.34, 0.16);
+            put(cyl(0.05, 0.05, 0.42), bone, -0.26, 0.02, 0, [0, 0, 0.15]);
+            put(cyl(0.05, 0.05, 0.42), bone, 0.26, 0.02, 0, [0, 0, -0.15]);
+            put(cyl(0.06, 0.06, 0.42), bone, -0.1, -0.35, 0);
+            put(cyl(0.06, 0.06, 0.42), bone, 0.1, -0.35, 0);
+            glowEyes(0xff3020, 0.47, 0.09, 0.17, 0.045);
+            if (this.type === 'archer_skeleton') {
+                const bow = put(cyl(0.03, 0.03, 0.7, 6), createMat(0x6a4020, 0.8, 0), 0.34, 0.1, 0.08);
+                bow.scale.set(0.4, 1, 0.4);
+            }
+        } else if (this.type === 'zombie') {
+            hideBody();
+            const flesh = createMat(color || 0x5a7a4a, 0.9, 0.0);
+            put(box(0.38, 0.5, 0.26), flesh, 0, 0.05, 0, [0.15, 0, 0]);
+            put(box(0.34, 0.32, 0.32), flesh, 0, 0.44, 0.06);
+            put(cyl(0.07, 0.06, 0.5), flesh, -0.26, 0.12, 0.16, [1.2, 0, 0.2]);
+            put(cyl(0.07, 0.06, 0.5), flesh, 0.26, 0.12, 0.16, [1.2, 0, -0.2]);
+            put(cyl(0.08, 0.07, 0.44), flesh, -0.1, -0.35, 0);
+            put(cyl(0.08, 0.07, 0.44), flesh, 0.1, -0.35, 0);
+            put(box(0.12, 0.16, 0.02), createMat(0x7a2020, 0.9, 0), 0.06, 0.06, 0.14);
+            glowEyes(0xd8e020, 0.46, 0.09, 0.2, 0.04);
+        } else if (this.type === 'raydric') {
+            hideBody();
+            const armor = createMat(0x2a2f45, 0.4, 0.6);
+            put(box(0.42, 0.5, 0.28), armor, 0, 0.05, 0);
+            put(box(0.5, 0.55, 0.02), createMat(0x5a1030, 0.85, 0.0), 0, 0.05, -0.16);
+            put(box(0.34, 0.3, 0.32), armor, 0, 0.44, 0);
+            put(box(0.22, 0.06, 0.34), createMat(0x101018, 0.5, 0.3), 0, 0.44, 0.03);
+            put(cyl(0.07, 0.07, 0.44), armor, -0.28, 0.02, 0, [0, 0, 0.1]);
+            put(cyl(0.07, 0.07, 0.44), armor, 0.28, 0.02, 0, [0, 0, -0.1]);
+            put(cyl(0.08, 0.08, 0.44), armor, -0.11, -0.35, 0);
+            put(cyl(0.08, 0.08, 0.44), armor, 0.11, -0.35, 0);
+            put(box(0.06, 0.72, 0.03), createMat(0xc8ccd8, 0.3, 0.7), 0.36, 0.15, 0.12);
+            glowEyes(0xff2020, 0.44, 0.08, 0.18, 0.04);
+        } else if (this.type === 'hunter_fly') {
+            hideBody();
+            const chitin = createMat(color || 0x30303a, 0.4, 0.4);
+            put(sph(0.28), chitin, 0, 0.1, 0);
+            put(sph(0.22), chitin, 0, 0.12, -0.32);
+            put(sph(0.24), chitin, 0, 0.2, 0.28);
+            const ce = () => new THREE.MeshBasicMaterial({ color: 0xff3040 });
+            put(sph(0.1, 8), ce(), -0.13, 0.24, 0.38);
+            put(sph(0.1, 8), ce(), 0.13, 0.24, 0.38);
+            ownEyes = true;
+            const wing = createMat(0xbfe0ff, 0.1, 0.2); wing.transparent = true; wing.opacity = 0.5;
+            [[-0.3, 0.35, -0.05, 0.4], [0.3, 0.35, -0.05, -0.4], [-0.28, 0.28, -0.3, 0.7], [0.28, 0.28, -0.3, -0.7]]
+                .forEach(([x, y, z, ry]) => put(box(0.5, 0.02, 0.24), wing, x, y, z, [0, ry, 0]));
+            for (let i = -1; i <= 1; i++) {
+                put(cyl(0.02, 0.01, 0.3, 4), chitin, -0.2, -0.12, i * 0.14, [0, 0, -0.7]);
+                put(cyl(0.02, 0.01, 0.3, 4), chitin, 0.2, -0.12, i * 0.14, [0, 0, 0.7]);
+            }
+        } else if (this.type === 'dullahan') {
+            hideBody();
+            const armor = createMat(0x23283c, 0.35, 0.7);
+            put(box(0.6, 0.7, 0.4), armor, 0, 0.15, 0);
+            put(box(0.72, 0.16, 0.44), createMat(0x9a7a30, 0.3, 0.8), 0, 0.5, 0);
+            put(cone(0.14, 0.34, 6), armor, -0.4, 0.56, 0, [0, 0, 0.3]);
+            put(cone(0.14, 0.34, 6), armor, 0.4, 0.56, 0, [0, 0, -0.3]);
+            put(sph(0.22), createMat(0xe8e4d6, 0.8, 0), 0, 0.98, 0.1);
+            put(sph(0.3, 8), new THREE.MeshBasicMaterial({ color: 0xff7020, transparent: true, opacity: 0.4 }), 0, 1.0, 0.1);
+            glowEyes(0xffaa20, 1.0, 0.08, 0.3, 0.04);
+            put(cyl(0.12, 0.12, 0.5), armor, -0.18, -0.32, 0);
+            put(cyl(0.12, 0.12, 0.5), armor, 0.18, -0.32, 0);
+            put(box(0.1, 1.1, 0.05), createMat(0xc8ccd8, 0.3, 0.7), 0.52, 0.2, 0.1);
+        } else if (this.type === 'golem') {
+            hideBody();
+            const rock = createMat(color || 0x8a8478, 0.95, 0.0);
+            put(new THREE.IcosahedronGeometry(0.42 * size, 0), rock, 0, 0.15, 0);
+            put(new THREE.IcosahedronGeometry(0.24 * size, 0), rock, 0, 0.56, 0);
+            put(new THREE.IcosahedronGeometry(0.2 * size, 0), rock, -0.44, 0.1, 0);
+            put(new THREE.IcosahedronGeometry(0.2 * size, 0), rock, 0.44, 0.1, 0);
+            put(cyl(0.16, 0.16, 0.3, 6), rock, -0.16, -0.32, 0);
+            put(cyl(0.16, 0.16, 0.3, 6), rock, 0.16, -0.32, 0);
+            glowEyes(0xffcf4a, 0.58, 0.09, 0.2, 0.05);
+        } else if (this.type === 'stone_golem') {
+            hideBody();
+            const stone = createMat(color || 0x9a9488, 0.95, 0.0);
+            put(box(0.5, 0.6, 0.4), stone, 0, 0.12, 0);
+            put(box(0.36, 0.3, 0.34), stone, 0, 0.55, 0);
+            put(box(0.52, 0.06, 0.42), createMat(0x3a6a30, 0.9, 0), 0, 0.36, 0);
+            put(box(0.18, 0.5, 0.18), stone, -0.4, 0.1, 0);
+            put(box(0.18, 0.5, 0.18), stone, 0.4, 0.1, 0);
+            put(box(0.2, 0.34, 0.2), stone, -0.16, -0.34, 0);
+            put(box(0.2, 0.34, 0.2), stone, 0.16, -0.34, 0);
+            glowEyes(0x60c0ff, 0.57, 0.09, 0.2, 0.045);
+        } else if (this.type === 'harpy') {
+            hideBody();
+            const feather = createMat(color || 0x9c6bd0, 0.6, 0.05);
+            put(box(0.3, 0.5, 0.22), feather, 0, 0.05, 0);
+            put(sph(0.2), createMat(0xe8c8a0, 0.7, 0), 0, 0.45, 0.02);
+            put(cone(0.06, 0.18, 6), createMat(0xffcf4a, 0.4, 0.2), 0, 0.44, 0.2, [1.2, 0, 0]);
+            put(cone(0.05, 0.3, 4), feather, 0, 0.7, -0.05);
+            put(box(0.5, 0.5, 0.03), feather, -0.34, 0.15, -0.05, [0, 0.5, 0.3]);
+            put(box(0.5, 0.5, 0.03), feather, 0.34, 0.15, -0.05, [0, -0.5, -0.3]);
+            put(cyl(0.05, 0.03, 0.3, 5), createMat(0xd0a020, 0.5, 0.2), -0.1, -0.35, 0.05);
+            put(cyl(0.05, 0.03, 0.3, 5), createMat(0xd0a020, 0.5, 0.2), 0.1, -0.35, 0.05);
+            glowEyes(0xffe060, 0.46, 0.08, 0.18, 0.04);
+        } else if (this.type === 'gargoyle') {
+            hideBody();
+            const stone = createMat(color || 0x6a6a70, 0.9, 0.05);
+            put(box(0.34, 0.42, 0.26), stone, 0, 0.02, 0, [0.2, 0, 0]);
+            put(sph(0.22), stone, 0, 0.4, 0.05);
+            put(cone(0.05, 0.2, 5), stone, -0.12, 0.6, 0.02, [0, 0, 0.3]);
+            put(cone(0.05, 0.2, 5), stone, 0.12, 0.6, 0.02, [0, 0, -0.3]);
+            put(box(0.45, 0.4, 0.03), stone, -0.34, 0.2, -0.08, [0, 0.6, 0.4]);
+            put(box(0.45, 0.4, 0.03), stone, 0.34, 0.2, -0.08, [0, -0.6, -0.4]);
+            put(cyl(0.08, 0.06, 0.3), stone, -0.14, -0.32, 0.06, [0.3, 0, 0]);
+            put(cyl(0.08, 0.06, 0.3), stone, 0.14, -0.32, 0.06, [0.3, 0, 0]);
+            glowEyes(0xff5020, 0.42, 0.08, 0.2, 0.04);
+        } else if (this.type === 'iron_golem') {
+            hideBody();
+            const iron = createMat(color || 0x60656e, 0.35, 0.85);
+            const dark = createMat(0x2a2d33, 0.4, 0.7);
+            put(box(0.5, 0.6, 0.4), iron, 0, 0.12, 0);
+            put(box(0.28, 0.28, 0.3), iron, 0, 0.55, 0);
+            put(sph(0.1, 10), new THREE.MeshBasicMaterial({ color: 0x40e0ff }), 0, 0.12, 0.22);
+            put(box(0.16, 0.5, 0.16), dark, -0.4, 0.1, 0);
+            put(box(0.16, 0.5, 0.16), dark, 0.4, 0.1, 0);
+            put(box(0.22, 0.34, 0.22), iron, -0.16, -0.34, 0);
+            put(box(0.22, 0.34, 0.22), iron, 0.16, -0.34, 0);
+            glowEyes(0x40e0ff, 0.57, 0.08, 0.17, 0.045);
+        } else if (this.type === 'storm_dragon') {
+            hideBody();
+            const scale = createMat(color || 0x3a6ea5, 0.5, 0.2);
+            put(sph(0.4), scale, 0, 0.12, -0.05);
+            put(cyl(0.16, 0.1, 0.6), scale, 0, 0.4, 0.28, [0.9, 0, 0]);
+            put(box(0.24, 0.22, 0.4), scale, 0, 0.72, 0.5);
+            put(cone(0.05, 0.24, 5), scale, -0.1, 0.9, 0.42, [-0.4, 0, 0.2]);
+            put(cone(0.05, 0.24, 5), scale, 0.1, 0.9, 0.42, [-0.4, 0, -0.2]);
+            put(box(0.7, 0.5, 0.03), scale, -0.45, 0.3, -0.15, [0, 0.7, 0.4]);
+            put(box(0.7, 0.5, 0.03), scale, 0.45, 0.3, -0.15, [0, -0.7, -0.4]);
+            put(cone(0.14, 0.7, 6), scale, 0, 0.0, -0.55, [-1.2, 0, 0]);
+            put(cyl(0.1, 0.1, 0.34), scale, -0.2, -0.32, 0.05);
+            put(cyl(0.1, 0.1, 0.34), scale, 0.2, -0.32, 0.05);
+            glowEyes(0xfff060, 0.74, 0.1, 0.68, 0.045);
+        } else if (this.type === 'dragon_egg') {
+            hideBody();
+            const egg = put(sph(0.45, 14), createMat(color || 0xb8d8c0, 0.7, 0.05), 0, 0.05, 0);
+            egg.scale.set(1, 1.25, 1);
+            put(box(0.03, 0.5, 0.02), createMat(0x2a2a2a, 0.9, 0), 0.1, 0.12, 0.42, [0, 0, 0.2]);
+            put(box(0.03, 0.3, 0.02), createMat(0x2a2a2a, 0.9, 0), -0.08, 0.22, 0.42, [0, 0, -0.3]);
+            put(sph(0.5, 10), new THREE.MeshBasicMaterial({ color: 0xff8020, transparent: true, opacity: 0.22 }), 0, 0.1, 0);
+            put(sph(0.16), createMat(0x3a6ea5, 0.5, 0.2), 0, 0.56, 0.1);
+            glowEyes(0xffe060, 0.59, 0.06, 0.22, 0.03);
+        } else if (this.type === 'sea_dragon') {
+            hideBody();
+            const scale = createMat(color || 0x2a8aa0, 0.5, 0.25);
+            const fin = createMat(0x60d0e0, 0.4, 0.2);
+            for (let i = 0; i < 4; i++) put(sph(0.26 - i * 0.04), scale, 0, 0.15 - Math.sin(i / 3 * 3) * 0.05, -i * 0.34);
+            put(box(0.26, 0.2, 0.36), scale, 0, 0.22, 0.3);
+            put(cone(0.16, 0.3, 3), fin, 0, 0.45, 0.15, [0.3, 0, 0]);
+            put(box(0.02, 0.28, 0.5), fin, 0, 0.15, -0.5);
+            put(box(0.5, 0.02, 0.24), fin, 0, 0.1, -0.1);
+            glowEyes(0xfff060, 0.26, 0.09, 0.44, 0.04);
+        } else if (this.type === 'leib_olmai') {
+            hideBody();
+            const fur = createMat(color || 0x3a2f4a, 0.9, 0.0);
+            put(sph(0.4), fur, 0, 0.1, 0);
+            put(sph(0.26), fur, 0, 0.5, 0.05);
+            put(sph(0.12), fur, -0.2, 0.68, 0);
+            put(sph(0.12), fur, 0.2, 0.68, 0);
+            put(sph(0.12), createMat(0x1a1420, 0.8, 0), 0, 0.44, 0.24);
+            put(sph(0.16), fur, -0.34, 0.0, 0.1);
+            put(sph(0.16), fur, 0.34, 0.0, 0.1);
+            glowEyes(0xa060ff, 0.52, 0.1, 0.22, 0.045);
+        } else if (this.type === 'dark_illusion') {
+            hideBody();
+            const shadow = createMat(color || 0x1a1428, 0.3, 0.1);
+            put(cone(0.45, 1.0, 10), shadow, 0, 0.1, 0);
+            put(sph(0.22), createMat(0x0a0812, 0.4, 0.1), 0, 0.5, 0.02);
+            put(cone(0.28, 0.4, 8), shadow, 0, 0.62, 0);
+            put(cone(0.06, 0.4, 5), shadow, -0.34, 0.2, 0.05, [0, 0, 0.5]);
+            put(cone(0.06, 0.4, 5), shadow, 0.34, 0.2, 0.05, [0, 0, -0.5]);
+            glowEyes(0x9020ff, 0.5, 0.08, 0.2, 0.05);
+        } else if (this.type === 'abyss_knight') {
+            hideBody();
+            const armor = createMat(color || 0x1c2036, 0.35, 0.75);
+            put(box(0.6, 0.72, 0.42), armor, 0, 0.16, 0);
+            put(box(0.66, 0.78, 0.02), createMat(0x3a0a1a, 0.85, 0.0), 0, 0.16, -0.24);
+            put(box(0.36, 0.34, 0.34), armor, 0, 0.6, 0);
+            put(cone(0.06, 0.3, 5), armor, -0.16, 0.82, 0, [0, 0, 0.4]);
+            put(cone(0.06, 0.3, 5), armor, 0.16, 0.82, 0, [0, 0, -0.4]);
+            put(box(0.74, 0.16, 0.46), createMat(0x7a2a3a, 0.4, 0.5), 0, 0.52, 0);
+            put(cyl(0.12, 0.12, 0.5), armor, -0.19, -0.3, 0);
+            put(cyl(0.12, 0.12, 0.5), armor, 0.19, -0.3, 0);
+            put(box(0.12, 1.3, 0.06), createMat(0x2a2f45, 0.3, 0.8), 0.52, 0.25, 0.12);
+            put(box(0.16, 0.4, 0.5), new THREE.MeshBasicMaterial({ color: 0x9020ff, transparent: true, opacity: 0.3 }), 0.52, 0.7, 0.12);
+            glowEyes(0xff2060, 0.6, 0.09, 0.19, 0.045);
+        }
+
         // Eyes (attached to main bodyMesh so they squish/bounce with slimes)
-        const eyeGeo = new THREE.SphereGeometry(0.05 * size, 8, 8);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: this.type === 'ghostring' ? 0xff2020 : 0x000000 });
-        const eyeWhiteGeo = new THREE.SphereGeometry(0.08 * size, 8, 8);
-        const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        if (!ownEyes) {
+            const eyeGeo = new THREE.SphereGeometry(0.05 * size, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: this.type === 'ghostring' ? 0xff2020 : 0x000000 });
+            const eyeWhiteGeo = new THREE.SphereGeometry(0.08 * size, 8, 8);
+            const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-        const eyeL = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
-        eyeL.position.set(-0.15 * size, 0.12 * size, 0.38 * size);
-        this.bodyMesh.add(eyeL);
-        const pupilL = new THREE.Mesh(eyeGeo, eyeMat);
-        pupilL.position.set(0, 0, 0.05 * size);
-        eyeL.add(pupilL);
+            const eyeL = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+            eyeL.position.set(-0.15 * size, 0.12 * size, 0.38 * size);
+            this.bodyMesh.add(eyeL);
+            const pupilL = new THREE.Mesh(eyeGeo, eyeMat);
+            pupilL.position.set(0, 0, 0.05 * size);
+            eyeL.add(pupilL);
 
-        const eyeR = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
-        eyeR.position.set(0.15 * size, 0.12 * size, 0.38 * size);
-        this.bodyMesh.add(eyeR);
-        const pupilR = new THREE.Mesh(eyeGeo, eyeMat);
-        pupilR.position.set(0, 0, 0.05 * size);
-        eyeR.add(pupilR);
+            const eyeR = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+            eyeR.position.set(0.15 * size, 0.12 * size, 0.38 * size);
+            this.bodyMesh.add(eyeR);
+            const pupilR = new THREE.Mesh(eyeGeo, eyeMat);
+            pupilR.position.set(0, 0, 0.05 * size);
+            eyeR.add(pupilR);
+        }
 
         // HP bar above monster
         const hpBarBg = new THREE.Mesh(
