@@ -1732,10 +1732,10 @@ export class CharacterManager {
             }
 
             if (particleSystem) {
-                if (particleSystem.createCriticalBurst) {
+                if (particleSystem.spawnSkillEffect) {
+                    particleSystem.spawnSkillEffect(skillId, this.mesh.position, currentTarget.mesh.position);
+                } else if (particleSystem.createCriticalBurst) {
                     particleSystem.createCriticalBurst(currentTarget.mesh.position);
-                } else if (particleSystem.createHitBurst) {
-                    particleSystem.createHitBurst(currentTarget.mesh.position);
                 }
             }
 
@@ -1749,7 +1749,9 @@ export class CharacterManager {
             const dmgBase = this.stats.atk * skill.damageMultiplier;
 
             if (gameUI) gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] โจมตีเป็นวงกว้าง!`, 'atk');
-            if (particleSystem && particleSystem.createExplosion) {
+            if (particleSystem && particleSystem.spawnSkillEffect) {
+                particleSystem.spawnSkillEffect(skillId, this.mesh.position);
+            } else if (particleSystem && particleSystem.createExplosion) {
                 particleSystem.createExplosion(this.mesh.position, skill.color || 0xff6600);
             }
 
@@ -1786,7 +1788,9 @@ export class CharacterManager {
             this.heal(healVal);
 
             if (gameUI) gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] ฟื้นฟู HP +${healVal}!`, 'heal');
-            if (particleSystem && particleSystem.createHealEffect) {
+            if (particleSystem && particleSystem.spawnSkillEffect) {
+                particleSystem.spawnSkillEffect(skillId, this.mesh.position);
+            } else if (particleSystem && particleSystem.createHealEffect) {
                 particleSystem.createHealEffect(this.mesh.position);
             }
             if (effectCallback) effectCallback(skillId, this, healVal);
@@ -1799,7 +1803,9 @@ export class CharacterManager {
                     `${skill.emoji} ใช้ [${skill.name}] ${label} +${Math.round(skill.buffPct * 100)}% นาน ${skill.buffDuration} วิ`,
                     'heal');
             }
-            if (particleSystem && particleSystem.createHealEffect) {
+            if (particleSystem && particleSystem.spawnSkillEffect) {
+                particleSystem.spawnSkillEffect(skillId, this.mesh.position);
+            } else if (particleSystem && particleSystem.createHealEffect) {
                 particleSystem.createHealEffect(this.mesh.position);
             }
             if (effectCallback) effectCallback(skillId, this, 0);
