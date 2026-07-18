@@ -1306,51 +1306,51 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
         table.push({ type: 'horn', weight: 30 });
         table.push({ type: 'spore', weight: 35 });
         table.push({ type: 'boa', weight: 25 });
-        if (playerLevel >= 5) table.push({ type: 'savage', weight: 20 });
-        if (playerLevel >= 8) table.push({ type: 'bigfoot', weight: 15 });
-        if (playerLevel >= 12) table.push({ type: 'nine_tail', weight: 8 });
+        if (playerLevel >= 3) table.push({ type: 'savage', weight: 20 });
+        if (playerLevel >= 5) table.push({ type: 'bigfoot', weight: 15 });
+        if (playerLevel >= 8) table.push({ type: 'nine_tail', weight: 8 });
         return table;
     }
 
     if (mapId === 'glast_heim') {
         table.push({ type: 'skeleton', weight: 35 });
         table.push({ type: 'zombie', weight: 30 });
-        if (playerLevel >= 22) table.push({ type: 'archer_skeleton', weight: 25 });
-        if (playerLevel >= 28) table.push({ type: 'hunter_fly', weight: 20 });
-        if (playerLevel >= 32) table.push({ type: 'raydric', weight: 12 });
-        if (playerLevel >= 38) table.push({ type: 'dullahan', weight: 3 }); // Boss rare spawn
+        if (playerLevel >= 10) table.push({ type: 'archer_skeleton', weight: 25 });
+        if (playerLevel >= 14) table.push({ type: 'hunter_fly', weight: 20 });
+        if (playerLevel >= 18) table.push({ type: 'raydric', weight: 12 });
+        if (playerLevel >= 24) table.push({ type: 'dullahan', weight: 3 }); // Boss rare spawn
         return table;
     }
 
     if (mapId === 'mjolnir') {
         table.push({ type: 'golem', weight: 35 });
         table.push({ type: 'stone_golem', weight: 28 });
-        if (playerLevel >= 32) table.push({ type: 'harpy', weight: 25 });
-        if (playerLevel >= 38) table.push({ type: 'gargoyle', weight: 18 });
-        if (playerLevel >= 44) table.push({ type: 'iron_golem', weight: 12 });
-        if (playerLevel >= 50) table.push({ type: 'storm_dragon', weight: 3 }); // Boss rare spawn
+        if (playerLevel >= 20) table.push({ type: 'harpy', weight: 25 });
+        if (playerLevel >= 26) table.push({ type: 'gargoyle', weight: 18 });
+        if (playerLevel >= 32) table.push({ type: 'iron_golem', weight: 12 });
+        if (playerLevel >= 40) table.push({ type: 'storm_dragon', weight: 3 }); // Boss rare spawn
         return table;
     }
 
     if (mapId === 'abyss_lake') {
         table.push({ type: 'dragon_egg', weight: 30 });
         table.push({ type: 'sea_dragon', weight: 25 });
-        if (playerLevel >= 48) table.push({ type: 'leib_olmai', weight: 20 });
-        if (playerLevel >= 55) table.push({ type: 'dark_illusion', weight: 15 });
-        if (playerLevel >= 62) table.push({ type: 'abyss_knight', weight: 3 }); // Boss rare spawn
+        if (playerLevel >= 35) table.push({ type: 'leib_olmai', weight: 20 });
+        if (playerLevel >= 42) table.push({ type: 'dark_illusion', weight: 15 });
+        if (playerLevel >= 50) table.push({ type: 'abyss_knight', weight: 3 }); // Boss rare spawn
         return table;
     }
 
     // Prontera Field
     table.push({ type: 'poring', weight: Math.max(10, 45 - playerLevel * 3) });
     if (playerLevel >= 1) table.push({ type: 'lunatic', weight: 30 });
-    if (playerLevel >= 3) table.push({ type: 'fabre', weight: 25 });
-    if (playerLevel >= 5) table.push({ type: 'rocker', weight: 20 });
-    if (playerLevel >= 8) table.push({ type: 'willow', weight: 18 });
-    if (playerLevel >= 11) table.push({ type: 'poporing', weight: 15 });
-    if (playerLevel >= 14) table.push({ type: 'drops', weight: 12 });
-    if (playerLevel >= 18) table.push({ type: 'deviruchi', weight: 8 });
-    if (playerLevel >= 22) table.push({ type: 'ghostring', weight: 3 }); // Boss rare spawn
+    if (playerLevel >= 2) table.push({ type: 'fabre', weight: 25 });
+    if (playerLevel >= 3) table.push({ type: 'rocker', weight: 20 });
+    if (playerLevel >= 5) table.push({ type: 'willow', weight: 18 });
+    if (playerLevel >= 7) table.push({ type: 'poporing', weight: 15 });
+    if (playerLevel >= 9) table.push({ type: 'drops', weight: 12 });
+    if (playerLevel >= 12) table.push({ type: 'deviruchi', weight: 8 });
+    if (playerLevel >= 16) table.push({ type: 'ghostring', weight: 3 }); // Boss rare spawn
 
     return table;
 }
@@ -1360,9 +1360,9 @@ export function getWaterSpawnTable(playerLevel) {
     const table = [];
     table.push({ type: 'shrimp', weight: 30 });
     table.push({ type: 'clam', weight: 20 });
-    if (playerLevel >= 3) table.push({ type: 'fish', weight: 25 });
-    if (playerLevel >= 6) table.push({ type: 'crab', weight: 20 });
-    if (playerLevel >= 10) table.push({ type: 'marina', weight: 12 });
+    if (playerLevel >= 2) table.push({ type: 'fish', weight: 25 });
+    if (playerLevel >= 4) table.push({ type: 'crab', weight: 20 });
+    if (playerLevel >= 7) table.push({ type: 'marina', weight: 12 });
     return table;
 }
 
