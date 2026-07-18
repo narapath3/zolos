@@ -852,9 +852,11 @@ async function initGame(charData) {
     // (added earlier) keeps the browser menu from popping up while dragging.
     let camDragging = false;
     let camDragLastX = 0;
+    let camDragLastY = 0;
     let camDownX = 0, camDownY = 0;  // where the right-button press started
-    let camDragDist = 0;             // accumulated horizontal drag, to tell a click from a rotate
-    const ROTATE_SENS = 0.006; // radians per pixel dragged
+    let camDragDist = 0;             // accumulated drag distance, to tell a click from a rotate
+    const ROTATE_SENS = 0.006; // radians per pixel dragged (horizontal yaw)
+    const PITCH_SENS = 0.005;  // radians per pixel dragged (vertical tilt)
     const RCLICK_MAX_MOVE = 6; // px: a right-press that moves less than this counts as a click, not a drag
     canvas.addEventListener('mousedown', (e) => {
         // In first-person the mouse controls look via pointer lock, not orbit.
@@ -862,6 +864,7 @@ async function initGame(charData) {
         if (e.button === 2) {
             camDragging = true;
             camDragLastX = e.clientX;
+            camDragLastY = e.clientY;
             camDownX = e.clientX; camDownY = e.clientY;
             camDragDist = 0;
             canvas.style.cursor = 'grabbing';
@@ -871,8 +874,14 @@ async function initGame(charData) {
     window.addEventListener('mousemove', (e) => {
         if (!camDragging) return;
         const dx = e.clientX - camDragLastX;
+        const dy = e.clientY - camDragLastY;
         camDragLastX = e.clientX;
-        camDragDist += Math.abs(dx);
+        camDragLastY = e.clientY;
+        camDragDist += Math.abs(dx) + Math.abs(dy);
+        // Vertical drag tilts the camera up/down (drag up = look down from higher).
+        if (sceneManager && sceneManager.orbitCameraPitch) {
+            sceneManager.orbitCameraPitch(-dy * PITCH_SENS);
+        }
         if (sceneManager && sceneManager.rotateCamera) {
             sceneManager.rotateCamera(-dx * ROTATE_SENS);
         }

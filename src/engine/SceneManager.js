@@ -138,6 +138,12 @@ export class SceneManager {
         // behind-the-shoulder angle, so nothing changes until the player rotates.
         this.cameraYaw = 0;
 
+        // Third-person camera up/down tilt (right-drag vertically). Elevation
+        // angle in radians: 45° reproduces the original fixed high angle.
+        this.cameraElev = Math.PI / 4;
+        this.minElev = 0.30; // ~17° — low, near behind-the-shoulder
+        this.maxElev = 1.45; // ~83° — high, near top-down
+
         // Camera perspective: 'third' (default follow cam) or 'first' (POV /
         // Minecraft-style). In first-person, cameraYaw is the look direction and
         // cameraPitch is the up/down look (radians, clamped). PC only.
@@ -3956,14 +3962,19 @@ export class SceneManager {
 
         // Apply Roblox-style zoom factor
         const zoom = this.cameraZoom || 1.0;
-        const dist = baseDist * zoom;
-        const offsetY = baseOffsetY * zoom;
 
-        // Orbit the horizontal offset by the player-controlled yaw. At yaw 0
-        // this is (0, 18) — identical to the original fixed camera angle.
+        // Orbit on a sphere around the player: cameraElev is the up/down tilt
+        // (right-drag vertically), cameraYaw the left/right spin. The sphere
+        // radius keeps the default (elev 45°) identical to the old fixed
+        // (0, 18, 18) angle: R·cos45 = 18 and R·sin45 = 18.
+        const R = Math.hypot(baseDist, baseOffsetY) * zoom;
+        const elev = this.cameraElev != null ? this.cameraElev : Math.PI / 4;
+        const hDist = R * Math.cos(elev);
+        const offsetY = R * Math.sin(elev);
+
         const yaw = this.cameraYaw || 0;
-        const offsetX = Math.sin(yaw) * dist;
-        const offsetZ = Math.cos(yaw) * dist;
+        const offsetX = Math.sin(yaw) * hDist;
+        const offsetZ = Math.cos(yaw) * hDist;
 
         // Use stableY (baseY) for camera Y to avoid bounce-induced shake
         const followY = stableY !== undefined ? stableY : targetPos.y;
@@ -4003,6 +4014,14 @@ export class SceneManager {
     // Snap the camera back to the default behind-the-shoulder angle.
     resetCameraYaw() {
         this.cameraYaw = 0;
+        this.cameraElev = Math.PI / 4;
+    }
+
+    // Tilt the third-person camera up/down (right-drag vertically). deltaElev in
+    // radians; clamped so the camera can't go under the ground or fully overhead.
+    orbitCameraPitch(deltaElev) {
+        const e = (this.cameraElev != null ? this.cameraElev : Math.PI / 4) + deltaElev;
+        this.cameraElev = Math.max(this.minElev, Math.min(this.maxElev, e));
     }
 
     // First-person mouse-look: adjust yaw (horizontal) and pitch (vertical).
