@@ -722,178 +722,161 @@
 
           <!-- Tab 2: Settings -->
           <div id="tab-content-settings" class="tab-pane" style="display: none;">
-            <div class="form-group">
-              <label style="display: block; margin-bottom: 6px;">🔊 Game Audio / ระบบเสียง</label>
-              <div
-                style="display: flex; flex-direction: column; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
 
-                <!-- Music (BGM) -->
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-music-enabled" checked
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">🎵 เพลงประกอบ (Music)</span>
-                  <span id="settings-music-vol-label"
-                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">25%</span>
+            <!-- Audio -->
+            <div class="settings-section">
+              <div class="settings-section-title">🔊 Game Audio / ระบบเสียง</div>
+
+              <!-- Music (BGM) -->
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">🎵 เพลงประกอบ (Music)</div>
                 </div>
-                <input type="range" id="settings-music-volume" min="0" max="100" value="25"
-                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+                <span id="settings-music-vol-label" class="settings-value">25%</span>
+                <input type="checkbox" id="settings-music-enabled" class="settings-switch" checked />
+              </div>
+              <input type="range" id="settings-music-volume" class="settings-slider" min="0" max="100" value="25" />
 
-                <div style="height: 1px; background: var(--border); margin: 2px 0;"></div>
+              <hr class="settings-divider" />
 
-                <!-- Sound Effects (SFX) -->
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-sfx-enabled" checked
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">🔊 เสียงเอฟเฟกต์ (SFX)</span>
-                  <span id="settings-sfx-vol-label"
-                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">30%</span>
+              <!-- Sound Effects (SFX) -->
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">🔊 เสียงเอฟเฟกต์ (SFX)</div>
                 </div>
-                <input type="range" id="settings-sfx-volume" min="0" max="100" value="30"
-                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
+                <span id="settings-sfx-vol-label" class="settings-value">30%</span>
+                <input type="checkbox" id="settings-sfx-enabled" class="settings-switch" checked />
+              </div>
+              <input type="range" id="settings-sfx-volume" class="settings-slider" min="0" max="100" value="30" />
 
-                <div style="height: 1px; background: var(--border); margin: 2px 0;"></div>
+              <hr class="settings-divider" />
 
-                <!-- Skill sounds -->
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-skill-sfx-enabled" checked
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">✨ เสียงสกิล (Skill SFX)</span>
+              <!-- Skill sounds -->
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">✨ เสียงสกิล (Skill SFX)</div>
                 </div>
+                <input type="checkbox" id="settings-skill-sfx-enabled" class="settings-switch" checked />
+              </div>
 
-                <!-- Master mute -->
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-mute-all"
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">🔇 ปิดเสียงทั้งหมด (Mute All)</span>
+              <!-- Master mute -->
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">🔇 ปิดเสียงทั้งหมด (Mute All)</div>
                 </div>
+                <input type="checkbox" id="settings-mute-all" class="settings-switch" />
               </div>
             </div>
 
             <!-- Visual Effects -->
-            <div class="form-group" style="margin-top: 18px;">
-              <label style="display: block; margin-bottom: 6px;">🎆 Visual Effects / เอฟเฟกต์ภาพ</label>
-              <div
-                style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-hide-effects"
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500;">ปิดเอฟเฟกต์ภาพ (ระเบิด/ฮีล/ตัวเลขดาเมจ)</span>
+            <div class="settings-section">
+              <div class="settings-section-title">🎆 Visual Effects / เอฟเฟกต์ภาพ</div>
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">ปิดเอฟเฟกต์ภาพ</div>
+                  <div class="settings-row-sub">ปิดอนุภาคและเอฟเฟกต์ทั้งหมด (ระเบิด/ฮีล/ตัวเลขดาเมจ) เพื่อลดภาระเครื่อง</div>
                 </div>
-                <p style="font-size: 10px; color: var(--text-dim); margin: 0; line-height: 1.4;">
-                  ปิดอนุภาคและเอฟเฟกต์ทั้งหมดเพื่อลดภาระเครื่อง
-                </p>
+                <input type="checkbox" id="settings-hide-effects" class="settings-switch" />
               </div>
             </div>
 
             <!-- Performance / low-end devices -->
-            <div class="form-group" style="margin-top: 18px;">
-              <label style="display: block; margin-bottom: 6px;">🐢 Performance / ประสิทธิภาพ (เครื่องไม่แรง)</label>
-              <div
-                style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-hide-others-gear"
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500;">ซ่อนชุดแต่งกายผู้เล่นอื่น (หมวก/แว่น/อาวุธ)</span>
+            <div class="settings-section">
+              <div class="settings-section-title">🐢 Performance / ประสิทธิภาพ (เครื่องไม่แรง)</div>
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">ซ่อนชุดแต่งกายผู้เล่นอื่น</div>
+                  <div class="settings-row-sub">ซ่อนหมวก / แว่น / อาวุธ ของผู้เล่นอื่น</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-hide-others"
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500;">ซ่อนตัวละครผู้เล่นอื่นทั้งหมด</span>
-                </div>
-                <p style="font-size: 10px; color: var(--text-dim); margin: 0; line-height: 1.4;">
-                  ซ่อนเฉพาะภาพบนจอเราเท่านั้น — ยังออนไลน์ ปาร์ตี้/แชท/เทรดทำงานปกติ และคู่ต่อสู้จะมองเห็นเสมอ
-                </p>
+                <input type="checkbox" id="settings-hide-others-gear" class="settings-switch" />
               </div>
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">ซ่อนตัวละครผู้เล่นอื่นทั้งหมด</div>
+                </div>
+                <input type="checkbox" id="settings-hide-others" class="settings-switch" />
+              </div>
+              <p class="settings-hint">
+                ซ่อนเฉพาะภาพบนจอเราเท่านั้น — ยังออนไลน์ ปาร์ตี้/แชท/เทรดทำงานปกติ และคู่ต่อสู้จะมองเห็นเสมอ
+              </p>
             </div>
 
             <!-- Auto potion -->
-            <div class="form-group" style="margin-top: 18px;">
-              <label style="display: block; margin-bottom: 6px;">🧪 Auto Potion / ออโต้ใช้ยา</label>
-              <div
-                style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <div class="settings-section">
+              <div class="settings-section-title">🧪 Auto Potion / ออโต้ใช้ยา</div>
 
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-auto-hp"
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">❤️ ออโต้ยาเลือด</span>
-                  <span id="settings-auto-hp-label"
-                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">40%</span>
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">❤️ ออโต้ยาเลือด</div>
+                  <div class="settings-row-sub">ใช้เมื่อเลือดต่ำกว่าค่าที่ตั้ง</div>
                 </div>
-                <div style="font-size: 11px; color: var(--text-dim);">ใช้เมื่อเลือดต่ำกว่า</div>
-                <input type="range" id="settings-auto-hp-threshold" min="10" max="90" value="40"
-                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
-
-                <div style="height: 1px; background: var(--border); margin: 2px 0;"></div>
-
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <input type="checkbox" id="settings-auto-sp"
-                    style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                  <span style="font-size: 13px; color: var(--text); font-weight: 500; flex: 1;">💧 ออโต้ยามานา</span>
-                  <span id="settings-auto-sp-label"
-                    style="font-size: 12px; color: var(--text-dim); width: 40px; text-align: right;">25%</span>
-                </div>
-                <div style="font-size: 11px; color: var(--text-dim);">ใช้เมื่อมานาต่ำกว่า</div>
-                <input type="range" id="settings-auto-sp-threshold" min="10" max="90" value="25"
-                  style="width: 100%; accent-color: var(--primary); cursor: pointer;" />
-
-                <p style="font-size: 10px; color: var(--text-dim); margin: 0; line-height: 1.4;">
-                  เกมจะใช้ขวดเล็กสุดที่พอฟื้นได้ก่อน และเว้นจังหวะระหว่างการใช้ราว 1.5 วินาที
-                </p>
+                <span id="settings-auto-hp-label" class="settings-value">40%</span>
+                <input type="checkbox" id="settings-auto-hp" class="settings-switch" />
               </div>
+              <input type="range" id="settings-auto-hp-threshold" class="settings-slider" min="10" max="90" value="40" />
+
+              <hr class="settings-divider" />
+
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">💧 ออโต้ยามานา</div>
+                  <div class="settings-row-sub">ใช้เมื่อมานาต่ำกว่าค่าที่ตั้ง</div>
+                </div>
+                <span id="settings-auto-sp-label" class="settings-value">25%</span>
+                <input type="checkbox" id="settings-auto-sp" class="settings-switch" />
+              </div>
+              <input type="range" id="settings-auto-sp-threshold" class="settings-slider" min="10" max="90" value="25" />
+
+              <p class="settings-hint">
+                เกมจะใช้ขวดเล็กสุดที่พอฟื้นได้ก่อน และเว้นจังหวะระหว่างการใช้ราว 1.5 วินาที
+              </p>
             </div>
 
-            <div class="form-group" style="margin-top: 18px;">
-              <label for="settings-graphics-quality" style="display: block; margin-bottom: 6px;">🖥️ Graphics Quality /
-                คุณภาพกราฟิก</label>
-              <select id="settings-graphics-quality" class="form-select"
-                style="width: 100%; padding: 10px; background: rgba(8, 12, 24, 0.85); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px; outline: none; transition: border-color 0.25s;">
+            <!-- Graphics -->
+            <div class="settings-section">
+              <div class="settings-section-title">🖥️ Graphics Quality / คุณภาพกราฟิก</div>
+              <select id="settings-graphics-quality" class="form-select settings-form-select">
                 <option value="auto">🤖 Auto (Adaptive / ปรับอัตโนมัติ)</option>
                 <option value="high">🌟 High (Soft Shadows & Anti-aliasing)</option>
                 <option value="medium">⚡ Medium (Basic Shadows & Performance)</option>
                 <option value="low">💨 Low (No Shadows & Maximum FPS)</option>
                 <option value="ultra-low">🐢 Ultra Low (Extreme Performance)</option>
               </select>
-            </div>
 
-            <div class="form-group" style="margin-top: 18px;">
-              <label style="display: block; margin-bottom: 6px;">📊 Performance Hud / แสดงประสิทธิภาพ</label>
-              <div
-                style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                <input type="checkbox" id="settings-fps-enabled"
-                  style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" />
-                <span style="font-size: 13px; color: var(--text); font-weight: 500;">Show Performance Stats (FPS)</span>
+              <div class="settings-divider"></div>
+
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">📊 แสดงประสิทธิภาพ (FPS)</div>
+                  <div class="settings-row-sub">Show Performance Stats</div>
+                </div>
+                <input type="checkbox" id="settings-fps-enabled" class="settings-switch" />
               </div>
             </div>
 
-            <div class="form-group" style="margin-top: 18px;">
-              <label style="display: block; margin-bottom: 6px;">🎨 UI Layout / ปรับแต่งตำแหน่ง UI</label>
-              <div style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                <button id="btn-edit-layout" class="btn-primary" style="width: 100%; padding: 8px; font-size: 12px; background: var(--primary) !important; color: #000;">🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)</button>
-                <button id="btn-reset-layout" class="btn-secondary" style="width: 100%; padding: 8px; font-size: 11px;">🔄 Reset to Default (คืนค่าเริ่มต้น)</button>
-                <p style="font-size: 10px; color: var(--text-dim); margin-top: 4px; text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง และกดปุ่มเดิมเพื่อบันทึก</p>
-              </div>
+            <!-- UI Layout -->
+            <div class="settings-section">
+              <div class="settings-section-title">🎨 UI Layout / ปรับแต่งตำแหน่ง UI</div>
+              <button id="btn-edit-layout" class="btn-primary settings-btn">🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)</button>
+              <button id="btn-reset-layout" class="btn-secondary settings-btn">🔄 Reset to Default (คืนค่าเริ่มต้น)</button>
+              <p class="settings-hint" style="text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง แล้วกดปุ่มเดิมอีกครั้งเพื่อบันทึก</p>
             </div>
 
             <!-- Guest Account Linking Section -->
-            <div id="settings-guest-link-section" class="form-group" style="margin-top: 24px; padding-top: 18px; border-top: 1px dashed rgba(255,255,255,0.1); display: none;">
-              <label style="display: block; margin-bottom: 10px; color: var(--primary); font-weight: bold;">🔗 Bind Account / ผูกบัญชีถาวร</label>
-              <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4;">
-                ผูกบัญชี Guest ของคุณด้วย Email และ Password เพื่อป้องกันตัวละครหายและสามารถเข้าสู่ระบบจากเครื่องอื่นได้
+            <div id="settings-guest-link-section" class="settings-section" style="display: none;">
+              <div class="settings-section-title">🔗 Bind Account / ผูกบัญชีถาวร</div>
+              <p class="settings-hint" style="margin-top: 0; margin-bottom: 14px;">
+                ผูกบัญชี Guest ด้วย Email และ Password เพื่อป้องกันตัวละครหายและเข้าสู่ระบบจากเครื่องอื่นได้
               </p>
-              <div class="form-group" style="margin-bottom: 12px;">
-                <input type="email" id="link-account-email" placeholder="อีเมล (Email)" 
-                  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px;" />
-              </div>
-              <div class="form-group" style="margin-bottom: 15px;">
-                <input type="password" id="link-account-password" placeholder="รหัสผ่าน (Password)" 
-                  style="width: 100%; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-ui); font-size: 13px;" />
-              </div>
-              <button id="btn-link-account" class="btn-primary" style="width: 100%; padding: 10px; background: #40e080 !important; border-color: #30c070 !important; color: #000; font-weight: bold;">⚔️ Bind Account / ยืนยันการผูกบัญชี</button>
-              <div id="link-account-status" style="margin-top: 10px; font-size: 11px; text-align: center; min-height: 15px;"></div>
+              <input type="email" id="link-account-email" class="settings-input" placeholder="อีเมล (Email)" />
+              <input type="password" id="link-account-password" class="settings-input" placeholder="รหัสผ่าน (Password)" />
+              <button id="btn-link-account" class="btn-primary settings-btn"
+                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">⚔️ Bind Account / ยืนยันการผูกบัญชี</button>
+              <div id="link-account-status" class="settings-bind-status"></div>
             </div>
           </div>
 
-          <div class="popup-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+          <div class="popup-actions">
             <button id="btn-save-profile" class="btn-primary" style="flex: 1;">💾 Save & Apply</button>
             <button id="btn-cancel-profile" class="btn-secondary" style="flex: 1;">Cancel</button>
           </div>
