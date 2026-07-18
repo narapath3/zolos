@@ -834,6 +834,12 @@ async function initGame(charData) {
         if (e.code === 'KeyR') {
             if (sceneManager && sceneManager.resetCameraYaw) sceneManager.resetCameraYaw();
         }
+
+        // Toggle first-person / third-person view (PC only). Like Minecraft's
+        // F5, but F5 reloads the browser — use V instead.
+        if (e.code === 'KeyV' && !IS_MOBILE && sceneManager && sceneManager.toggleCameraMode) {
+            applyCameraMode(sceneManager.toggleCameraMode());
+        }
     });
     window.addEventListener('keyup', (e) => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = false;
@@ -851,6 +857,8 @@ async function initGame(charData) {
     const ROTATE_SENS = 0.006; // radians per pixel dragged
     const RCLICK_MAX_MOVE = 6; // px: a right-press that moves less than this counts as a click, not a drag
     canvas.addEventListener('mousedown', (e) => {
+        // In first-person the mouse controls look via pointer lock, not orbit.
+        if (e.button === 2 && sceneManager && sceneManager.getCameraMode?.() === 'first') return;
         if (e.button === 2) {
             camDragging = true;
             camDragLastX = e.clientX;
@@ -898,11 +906,47 @@ async function initGame(charData) {
     canvas.addEventListener('wheel', (e) => {
         // Prevent default scroll behavior
         e.preventDefault();
-        
+
         if (sceneManager && sceneManager.adjustZoom) {
             sceneManager.adjustZoom(e.deltaY);
         }
     }, { passive: false });
+
+    // ----- First-person mouse-look (pointer lock) -----
+    const FP_LOOK_SENS = 0.0025; // radians per pixel of mouse movement
+    let fpHint = null;
+    const ensureFpHint = () => {
+        if (fpHint) return fpHint;
+        fpHint = document.createElement('div');
+        fpHint.id = 'fp-hint';
+        fpHint.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:120;background:rgba(8,12,24,0.82);color:#cfe0ff;border:1px solid rgba(120,170,230,0.35);border-radius:8px;padding:6px 12px;font-size:12px;pointer-events:none;display:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+        document.body.appendChild(fpHint);
+        return fpHint;
+    };
+    // Function declaration so the earlier keydown handler can call it (hoisted).
+    function applyCameraMode(mode) {
+        const first = mode === 'first';
+        // Hide our own body in first-person so the camera (inside the head)
+        // doesn't render the model; other players still see us normally.
+        if (character && character.mesh) character.mesh.visible = !first;
+        const hint = ensureFpHint();
+        if (first) {
+            hint.textContent = '🎥 มุมมองบุคคลที่ 1 — คลิกเพื่อล็อกเมาส์แล้วขยับมองรอบ · ESC ปล่อยเมาส์ · กด V กลับมุมปกติ';
+            hint.style.display = 'block';
+            canvas.requestPointerLock?.();
+        } else {
+            hint.style.display = 'none';
+            if (document.pointerLockElement) document.exitPointerLock?.();
+        }
+    }
+    // Expose so other code (e.g. leaving a duel/map) can force third-person.
+    window.applyCameraMode = applyCameraMode;
+
+    document.addEventListener('mousemove', (e) => {
+        if (!sceneManager || sceneManager.getCameraMode?.() !== 'first') return;
+        if (document.pointerLockElement !== canvas) return; // only while locked
+        sceneManager.adjustLook(-e.movementX * FP_LOOK_SENS, -e.movementY * FP_LOOK_SENS);
+    });
 
     // Mouse move for monster/player hovering with highlight glow
     canvas.addEventListener('mousemove', (e) => {
@@ -1004,6 +1048,14 @@ function handleMouseInteraction(event) {
     // Only the left button (or touch, which has no button) moves/targets.
     // Right button is reserved for camera rotation (see below).
     if (event.button === 2 || event.button === 1) return;
+
+    // In first-person, a left click captures the mouse for look control instead
+    // of click-to-move (there's no cursor to aim on the ground).
+    if (sceneManager && sceneManager.getCameraMode && sceneManager.getCameraMode() === 'first') {
+        const cv = sceneManager.renderer?.domElement;
+        if (cv && document.pointerLockElement !== cv) cv.requestPointerLock?.();
+        return;
+    }
 
     const hit = sceneManager.getMouseIntersection(event, monsters, sceneManager.getNPCs(), remotePlayersMap);
     if (!hit) return;
@@ -1148,6 +1200,14 @@ window.duelManager = {
 
         duelState = { duelId: payload.duelId, opponentUserId: foe.userId, cooldown: 1.0 };
         window.duelState = duelState;
+
+        // A duel uses a cinematic two-fighter camera, so drop out of first-person
+        // (which also un-hides our own body for the fight).
+        if (sceneManager && sceneManager.getCameraMode && sceneManager.getCameraMode() === 'first') {
+            sceneManager.cameraMode = 'third';
+            sceneManager.cameraPitch = 0;
+            if (window.applyCameraMode) window.applyCameraMode('third');
+        }
 
         if (gameUI) {
             if (gameUI.showDuelBanner) gameUI.showDuelBanner('start');
@@ -1959,6 +2019,13 @@ function stepWorld(dt) {
         } else {
             if (!character.moveToward(autoPath, dt)) autoPath = null;
         }
+    }
+
+    // First-person: keep the body facing where the camera looks (FPS-style), so
+    // strafing doesn't spin the model and other players see us aiming correctly.
+    if (character && character.mesh && sceneManager && sceneManager.getCameraMode
+        && sceneManager.getCameraMode() === 'first') {
+        character.mesh.rotation.y = (sceneManager.cameraYaw || 0) + Math.PI;
     }
 
     // Clamp inside PvP Arena during active duel
