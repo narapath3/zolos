@@ -762,10 +762,8 @@ async function initGame(charData) {
         window.__zolosLoopStarted = true;
         requestAnimationFrame(gameLoop);
     }
-    // Background simulation loop (keeps AUTO bot running when tab is hidden)
-    if (!bgIntervalId) {
-        bgIntervalId = setInterval(backgroundTick, 500);
-    }
+    // Background simulation loop (keeps the whole game running when tab is hidden)
+    startBackgroundHeartbeat();
 
     // Input listeners — Shift key for sprinting
     window.addEventListener('keydown', (e) => {
@@ -1788,14 +1786,20 @@ function autoCastSkills(dt) {
 
 // ============ Game Loop ============
 // ===== Background simulation =====
-// The browser pauses requestAnimationFrame when the tab is hidden/minimized,
-// which would freeze the AUTO bot (farming & fishing). This setInterval keeps
-// the simulation advancing while hidden. It only does work when the tab is
-// hidden (rAF handles the visible case), and advances in fixed sub-steps so
-// combat/fishing progress at real speed even though hidden-tab intervals are
-// throttled to ~1s.
+// The browser pauses requestAnimationFrame and throttles main-thread timers
+// (down to ~1/min under "intensive throttling") when the tab is hidden or
+// minimized, which would freeze/slow the game. To keep it running at 100% while
+// backgrounded we:
+//   1. Drive the tick from a Web Worker heartbeat — worker timers keep firing
+//      reliably even when the page is hidden (a main-thread setInterval is the
+//      fallback if the worker can't start).
+//   2. Advance the exact real elapsed time in fixed sub-steps through the SAME
+//      stepWorld() the visible loop uses, so movement, combat, farming, fishing,
+//      duels, world-boss and networking all progress identically — just without
+//      rendering to the hidden canvas.
 let bgLastTime = 0;
 let bgIntervalId = null;
+let bgWorker = null;
 
 function backgroundTick() {
     if (!isGameStarted || !document.hidden || !character) return;
@@ -1804,22 +1808,46 @@ function backgroundTick() {
     let elapsed = (now - bgLastTime) / 1000;
     bgLastTime = now;
     if (elapsed <= 0) return;
-    elapsed = Math.min(elapsed, 5); // cap catch-up after long sleep/background
+    // Cap catch-up so a long OS suspend (laptop sleep / discarded tab, where no
+    // JS runs at all) doesn't try to simulate hours in one frame and freeze the
+    // thread. Normal background throttling only delays ticks by ~1s, well under
+    // this, so no real game-time is lost while merely backgrounded.
+    elapsed = Math.min(elapsed, 60);
 
     try {
         let remaining = elapsed;
         while (remaining > 0) {
             const step = Math.min(0.1, remaining);
-            character.update(step);
-            if (combatSystem) combatSystem.update(step);       // auto-farm + fishing + attacks
-            autoCastSkills(step);                              // keep auto-skills going while hidden
-            if (monsters) monsters.update(step, sceneManager.camera, character.stats.level);
-            if (particles) particles.update(step);             // advance/cleanup effects
+            stepWorld(step);   // full parity with the visible loop (sans render)
             remaining -= step;
         }
+        broadcastIfDue();      // stay live to other players while hidden
         if (gameUI) gameUI.updateHUD(character.stats);
     } catch (e) {
         console.warn('[Zolos] background tick error:', e);
+    }
+}
+
+// Spin up a Web Worker whose only job is to post a steady heartbeat. Worker
+// timers are exempt from most of the hidden-tab throttling that would otherwise
+// choke a main-thread setInterval, keeping the background sim on real time.
+function startBackgroundHeartbeat() {
+    if (bgWorker) return;
+    try {
+        const src = 'let id=setInterval(()=>postMessage(0),250);onmessage=(e)=>{if(e.data==="stop"){clearInterval(id);}};';
+        const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+        bgWorker = new Worker(url);
+        URL.revokeObjectURL(url);
+        bgWorker.onmessage = () => { if (document.hidden) backgroundTick(); };
+    } catch (e) {
+        console.warn('[Zolos] background heartbeat worker unavailable, using timer fallback:', e);
+    }
+    // Main-thread fallback (also covers the moment before the worker's first
+    // message). Harmless when the worker is running — backgroundTick is a no-op
+    // unless the tab is actually hidden, and it advances by real elapsed time so
+    // running from two sources can't double-speed the simulation.
+    if (!bgIntervalId) {
+        bgIntervalId = setInterval(() => { if (document.hidden) backgroundTick(); }, 500);
     }
 }
 
@@ -1832,135 +1860,162 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
+// ===== Shared simulation step =====
+// Everything the world needs to advance, independent of rendering. Both the
+// visible rAF loop and the hidden-tab background loop call this with a dt, so
+// the game behaves identically whether or not the tab is in the foreground.
+function stepWorld(dt) {
+    // Dead-state guard: only effects/combat cleanup advance while dead.
+    if (character && !character.isAlive()) {
+        if (particles) particles.update(dt);
+        if (combatSystem) combatSystem.update(dt);
+        return;
+    }
+
+    if (portalCooldown > 0) portalCooldown -= dt;
+
+    // 1. Movement
+    const isFishingActive = combatSystem && combatSystem.isFishing;
+    const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
+
+    if (moveDir) {
+        autoPath = null;
+        character.moveSpeed = isShiftPressed ? 9 : 5.5;
+        // Rotate the input by the camera yaw so "forward" always means
+        // "away from the camera", regardless of how it's been rotated.
+        const yaw = sceneManager.getCameraYaw ? sceneManager.getCameraYaw() : 0;
+        const s = Math.sin(yaw), c = Math.cos(yaw);
+        const wx = moveDir.z * s + moveDir.x * c;
+        const wz = moveDir.z * c - moveDir.x * s;
+        character.manualMove(wx, wz, dt);
+    } else if (autoPath && !isFishingActive) {
+        // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
+        if (combatSystem && combatSystem.autoFarm) {
+            autoPath = null;
+        } else {
+            if (!character.moveToward(autoPath, dt)) autoPath = null;
+        }
+    }
+
+    // Clamp inside PvP Arena during active duel
+    if (duelState) {
+        const arenaCenterX = -14;
+        const arenaCenterZ = 14;
+        const dx = character.mesh.position.x - arenaCenterX;
+        const dz = character.mesh.position.z - arenaCenterZ;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const limitRange = 5.8; // Arena floor radius is 6.2, keep player inside 5.8
+        if (dist > limitRange) {
+            character.mesh.position.x = arenaCenterX + (dx / dist) * limitRange;
+            character.mesh.position.z = arenaCenterZ + (dz / dist) * limitRange;
+        }
+    }
+
+    // 2. Environment Check (Water)
+    const env = sceneManager.getEnvironmentAt(character.getPosition());
+    if (env === 'water') {
+        character.state = 'swimming';
+        character.moveSpeed = 2.2;
+        character.baseY = -0.5; // Partially submerged, visible while swimming
+    } else {
+        character.baseY = 1.2; // Default ground height
+        // Reset to normal speed when not in water
+        if (character.state === 'swimming') {
+            character.state = 'idle';
+        }
+        // Ensure speed is reset to 5.5 (or higher if shift is pressed)
+        const baseSpeed = isShiftPressed ? 9.0 : 5.5;
+        if (character.moveSpeed < 5.5) {
+            character.moveSpeed = baseSpeed;
+        }
+    }
+
+    // Step 10 Part A: Force swimming state if in water, regardless of what CombatSystem or moveToward set.
+    // This ensures the 'swimming' state is always the one broadcast.
+    if (env === 'water') {
+        character.state = 'swimming';
+    }
+
+    // 3. Combat
+    if (character.targetMonster) {
+        const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
+        if (dist <= character.getAttackRange()) {
+            autoPath = null;
+        } else {
+            // Keep walking towards the target monster (works for water monsters too)
+            autoPath = character.targetMonster.mesh.position.clone();
+        }
+    }
+
+    // 4. Portal Check
+    if (portalCooldown <= 0) {
+        const portals = sceneManager.getPortals();
+        portals.forEach(portal => {
+            if (character.getPosition().distanceTo(portal.position) < 1.8) {
+                const targetMap = portal.userData.targetMap;
+                if (targetMap) {
+                    console.log(`[Warp] Portal warp to ${targetMap}`);
+                    loadMapAndSpawn(targetMap, { x: 0, y: 1.2, z: 10 });
+                }
+            }
+        });
+    }
+
+    // 5. Updates
+    character.update(dt);
+
+    // Fishing line follows the live rod tip (incl. the catch yank)
+    if (isFishingActive && sceneManager && character.getRodTipPosition) {
+        sceneManager.updateFishingRodTip(
+            character.getRodTipPosition(rodTipTmp),
+            character.getRodYankProgress()
+        );
+    }
+
+    // PVP duel: auto-swing at the opponent when in range, and stay caged
+    updateDuelCombat(dt);
+    clampToArena();
+    // World boss: keep the mesh in sync and swing when in range
+    if (window.worldBossManager) window.worldBossManager.reconcileMesh();
+    updateBossCombat(dt);
+    monsters.update(dt, sceneManager.camera, character.stats.level);
+    sceneManager.updateAnimations(dt);
+    if (particles) particles.update(dt);
+    if (combatSystem) combatSystem.update(dt);
+    autoCastSkills(dt); // AUTO also casts the 3 skills
+}
+
+// Broadcast our position/state to other players, throttled. Runs from both the
+// visible and hidden loops so we stay live to everyone while backgrounded.
+function broadcastIfDue() {
+    if (!character) return;
+    const now = performance.now();
+    if (now - lastBroadcastTime > 100) {
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
+        lastBroadcastTime = now;
+    }
+}
+
 function gameLoop(time) {
     requestAnimationFrame(gameLoop);
     if (!isGameStarted) return;
-    // While hidden, the background interval drives the simulation instead.
+    // While hidden, the background loop drives the simulation instead — no point
+    // rendering to an invisible canvas.
     if (document.hidden) return;
 
     try {
         const dt = Math.min(0.1, (time - lastTime) / 1000);
         lastTime = time;
 
-        // 1a. Dead-state guard: stop processing updates if character is dead
+        // Advance the whole world (movement, combat, monsters, effects, skills).
+        stepWorld(dt);
+
+        // Dead: skip camera/HUD work, just present the scene.
         if (character && !character.isAlive()) {
-            if (particles) particles.update(dt);
-            if (combatSystem) combatSystem.update(dt);
             sceneManager.render();
             return;
         }
 
-        if (portalCooldown > 0) portalCooldown -= dt;
-
-        // 1. Movement
-        const isFishingActive = combatSystem && combatSystem.isFishing;
-        const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
-
-        if (moveDir) {
-            autoPath = null;
-            character.moveSpeed = isShiftPressed ? 9 : 5.5;
-            // Rotate the input by the camera yaw so "forward" always means
-            // "away from the camera", regardless of how it's been rotated.
-            const yaw = sceneManager.getCameraYaw ? sceneManager.getCameraYaw() : 0;
-            const s = Math.sin(yaw), c = Math.cos(yaw);
-            const wx = moveDir.z * s + moveDir.x * c;
-            const wz = moveDir.z * c - moveDir.x * s;
-            character.manualMove(wx, wz, dt);
-        } else if (autoPath && !isFishingActive) {
-            // If auto-farm is active, we should clear autoPath to let CombatSystem handle movement
-            if (combatSystem && combatSystem.autoFarm) {
-                autoPath = null;
-            } else {
-                if (!character.moveToward(autoPath, dt)) autoPath = null;
-            }
-        }
-
-        // Clamp inside PvP Arena during active duel
-        if (duelState) {
-            const arenaCenterX = -14;
-            const arenaCenterZ = 14;
-            const dx = character.mesh.position.x - arenaCenterX;
-            const dz = character.mesh.position.z - arenaCenterZ;
-            const dist = Math.sqrt(dx * dx + dz * dz);
-            const limitRange = 5.8; // Arena floor radius is 6.2, keep player inside 5.8
-            if (dist > limitRange) {
-                character.mesh.position.x = arenaCenterX + (dx / dist) * limitRange;
-                character.mesh.position.z = arenaCenterZ + (dz / dist) * limitRange;
-            }
-        }
-
-        // 2. Environment Check (Water)
-        const env = sceneManager.getEnvironmentAt(character.getPosition());
-        if (env === 'water') {
-            character.state = 'swimming';
-            character.moveSpeed = 2.2;
-            character.baseY = -0.5; // Partially submerged, visible while swimming
-        } else {
-            character.baseY = 1.2; // Default ground height
-            // Reset to normal speed when not in water
-            if (character.state === 'swimming') {
-                character.state = 'idle';
-            }
-            // Ensure speed is reset to 5.5 (or higher if shift is pressed)
-            const baseSpeed = isShiftPressed ? 9.0 : 5.5;
-            if (character.moveSpeed < 5.5) {
-                character.moveSpeed = baseSpeed;
-            }
-        }
-
-        // Step 10 Part A: Force swimming state if in water, regardless of what CombatSystem or moveToward set.
-        // This ensures the 'swimming' state is always the one broadcast.
-        if (env === 'water') {
-            character.state = 'swimming';
-        }
-
-        // 3. Combat
-        if (character.targetMonster) {
-            const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
-            if (dist <= character.getAttackRange()) {
-                autoPath = null;
-            } else {
-                // Keep walking towards the target monster (works for water monsters too)
-                autoPath = character.targetMonster.mesh.position.clone();
-            }
-        }
-
-        // 4. Portal Check
-        if (portalCooldown <= 0) {
-            const portals = sceneManager.getPortals();
-            portals.forEach(portal => {
-                if (character.getPosition().distanceTo(portal.position) < 1.8) {
-                    const targetMap = portal.userData.targetMap;
-                    if (targetMap) {
-                        console.log(`[Warp] Portal warp to ${targetMap}`);
-                        loadMapAndSpawn(targetMap, { x: 0, y: 1.2, z: 10 });
-                    }
-                }
-            });
-        }
-
-        // 5. Updates
-        character.update(dt);
-
-        // Fishing line follows the live rod tip (incl. the catch yank)
-        if (isFishingActive && sceneManager && character.getRodTipPosition) {
-            sceneManager.updateFishingRodTip(
-                character.getRodTipPosition(rodTipTmp),
-                character.getRodYankProgress()
-            );
-        }
-
-        // PVP duel: auto-swing at the opponent when in range, and stay caged
-        updateDuelCombat(dt);
-        clampToArena();
-        // World boss: keep the mesh in sync and swing when in range
-        if (window.worldBossManager) window.worldBossManager.reconcileMesh();
-        updateBossCombat(dt);
-        monsters.update(dt, sceneManager.camera, character.stats.level);
-        sceneManager.updateAnimations(dt);
-        if (particles) particles.update(dt);
-        if (combatSystem) combatSystem.update(dt);
-        autoCastSkills(dt); // AUTO also casts the 3 skills
         if (gameUI) gameUI.updateTargetIndicator(sceneManager);
 
         // 6. Camera & Networking
@@ -1972,12 +2027,9 @@ function gameLoop(time) {
             sceneManager.followTarget(character.getPosition(), character.baseY);
         }
 
-        const now = performance.now();
-        if (now - lastBroadcastTime > 100) {
-            broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
-            lastBroadcastTime = now;
-        }
+        broadcastIfDue();
 
+        const now = performance.now();
         if (now - lastHUDTime > 100) {
             updateBossHud();
             if (gameUI) {
