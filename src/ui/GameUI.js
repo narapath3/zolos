@@ -1344,6 +1344,23 @@ export class GameUI {
         this._refreshLeaderboard();
       });
     });
+
+    // Clicking a leaderboard row opens that player's profile popup (same as the
+    // Online list). Delegated on the body since rows are re-rendered each refresh.
+    const lbBody = document.getElementById('leaderboard-body');
+    if (lbBody) {
+      lbBody.addEventListener('click', (e) => {
+        const row = e.target.closest('.lb-row');
+        if (!row) return;
+        const userId = row.getAttribute('data-user-id');
+        if (!userId) return; // mock/guest entries with no real account
+        this._showPlayerPopup({
+          username: row.getAttribute('data-username'),
+          level: Number(row.getAttribute('data-level')) || 1,
+          userId,
+        });
+      });
+    }
   }
 
   async _refreshLeaderboard() {
@@ -1377,10 +1394,15 @@ export class GameUI {
           const wr = total > 0 ? Math.round((w / total) * 100) : 0;
           valueText = `🎖️ ${(entry.mmr ?? 1000).toLocaleString()} MMR &nbsp;·&nbsp; ${w}W/${l}L (${wr}%)`;
         }
+        const zolText = `🪙 ${(entry.zol ?? 0).toLocaleString()} Zol`;
+        const uid = entry.user_id || '';
         return `
-          <div class="lb-row">
+          <div class="lb-row${uid ? ' lb-clickable' : ''}" data-user-id="${uid}" data-username="${username}" data-level="${entry.level ?? 1}">
             <span class="lb-rank">${rankIcon}</span>
-            <span class="lb-name">${username}</span>
+            <span class="lb-name">
+              <span class="lb-username">${username}</span>
+              <span class="lb-zol">${zolText}</span>
+            </span>
             <span class="lb-level">${valueText}</span>
           </div>
         `;
