@@ -999,7 +999,7 @@ function handleMouseInteraction(event) {
         const node = hit.object;
         const hasPickaxe = gameUI && gameUI.bestPickaxeYield() > 0;
         if (!hasPickaxe) {
-            gameUI.addCombatLog('⛏️ ต้องมีพลั่วขุดก่อนถึงจะขุดได้ — ซื้อจากพ่อค้าสวรรค์', 'system');
+            gameUI.addCombatLog('⛏️ ต้องสวมพลั่วขุดก่อน — ซื้อจากพ่อค้าสวรรค์แล้วสวมใส่ในกระเป๋า', 'system');
             particles.createClickIndicator(hit.point, 0xff6060);
             return;
         }
@@ -1983,6 +1983,7 @@ function stepWorld(dt) {
     if (particles) particles.update(dt);
     if (combatSystem) combatSystem.update(dt);
     autoCastSkills(dt); // AUTO also casts the 3 skills
+    if (gameUI) gameUI.updateMining(); // timed mining "job" (also runs while hidden)
 }
 
 // Broadcast our position/state to other players, throttled. Runs from both the
@@ -2076,14 +2077,17 @@ function gameLoop(time) {
         // un-mined Celestial Ore node in Svarrga, so mining is discoverable
         // (a button) rather than needing a precise tap on the rock.
         if (gameUI) {
+            const inSvarrga = sceneManager.currentMap === 'svarrga';
             let nearOre = null;
-            if (sceneManager.currentMap === 'svarrga' && sceneManager.getOreNodes) {
+            if (inSvarrga && sceneManager.getOreNodes) {
                 const pp = character.getPosition();
                 for (const n of sceneManager.getOreNodes()) {
                     if (n.userData && !n.userData.mined && pp.distanceTo(n.position) < 4.5) { nearOre = n; break; }
                 }
             }
             gameUI.setMineTarget(nearOre);
+            // Leaving the mining city ends any running mining job.
+            if (!inSvarrga && gameUI.miningActive) gameUI.stopMining('⛏️ ออกจากเมืองสวรรค์ — หยุดขุด');
         }
 
         sceneManager.render();

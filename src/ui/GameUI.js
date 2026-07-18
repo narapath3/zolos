@@ -188,23 +188,23 @@ export class GameUI {
     }
 
     // ⛏️ Mine button — appears when standing near a Celestial Ore node (driven
-    // by the game loop via setMineTarget). Mines the node you're next to.
+    // by the game loop via setMineTarget). Toggles the auto-mining job on/off.
     const mineBtn = document.getElementById('btn-mine');
     if (mineBtn) {
       mineBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (this._mineTargetNode && !this._mineTargetNode.userData.mined) {
-          this.mineOreNode(this._mineTargetNode);
-        }
+        this.mineOreNode(this._mineTargetNode);
       });
     }
   }
 
   // Called each frame with the nearest un-mined ore node in range (or null).
+  // When mining, a null target just means "the node is depleted / respawning"
+  // (or you stepped away) — the job idles and resumes automatically once an ore
+  // node is back in range, so it keeps "working" without falsely stopping.
   setMineTarget(node) {
     this._mineTargetNode = node || null;
-    const btn = document.getElementById('btn-mine');
-    if (btn) btn.style.display = node ? 'flex' : 'none';
+    this._updateMineButton();
   }
 
   show() {
@@ -617,6 +617,10 @@ export class GameUI {
       } else if (this.character) {
         this.character.setGlasses(null);
       }
+
+      // Restore the equipped pickaxe (mining tool) so mining works after reload.
+      const equippedPick = this.inventory.find(i => i.item_type === 'tool' && i.stats && i.stats.equipped === true);
+      if (this.character) this.character.equippedPickaxe = equippedPick ? equippedPick.item_name : null;
 
       // Already handled weapon restoration above
     } catch (e) {
@@ -1129,14 +1133,20 @@ export class GameUI {
     } else {
       droppedByHtml = `<br/><br/><strong style="color:var(--text-dim)">👾 Dropped By:</strong> ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)`;
     }
-    document.getElementById('detail-desc').innerHTML = item.desc + droppedByHtml;
+    let durHtml = '';
+    if (item.item_type === 'tool' && ITEMS[item.item_name] && ITEMS[item.item_name].durability) {
+      const durLeft = item.stats ? (item.stats.durability || 0) : 0;
+      const maxDur = ITEMS[item.item_name].durability;
+      durHtml = `<br/><br/><strong style="color:${durLeft > 0 ? '#7fe0ff' : '#ff6060'}">🔧 ความทนทาน:</strong> ${durLeft}/${maxDur} ครั้ง${durLeft <= 0 ? ' (พังแล้ว)' : ''}`;
+    }
+    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + droppedByHtml;
     document.getElementById('detail-price-val').textContent = item.price;
 
     const useBtn = document.getElementById('btn-use-item');
     if (item.item_type === 'consumable') {
       useBtn.style.display = 'block';
       useBtn.textContent = `ใช้งาน (x${item.quantity})`;
-    } else if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(item.item_type)) {
+    } else if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool'].includes(item.item_type)) {
       useBtn.style.display = 'block';
       const isEquipped = item.stats && item.stats.equipped === true;
       useBtn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
@@ -1153,7 +1163,7 @@ export class GameUI {
 
     const item = this.inventory[itemIdx];
 
-    if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(item.item_type)) {
+    if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool'].includes(item.item_type)) {
       await this._toggleEquipItem(item);
       return;
     }
@@ -1226,9 +1236,14 @@ export class GameUI {
         this.character.setHat(null);
       } else if (item.item_type === 'glasses') {
         this.character.setGlasses(null);
+      } else if (item.item_type === 'tool') {
+        // Unequipping the pickaxe stops any mining in progress.
+        this.character.equippedPickaxe = null;
+        this.stopMining();
       }
       if (this.characterId) {
-        await updateInventoryItemStats(this.characterId, item.item_name, {});
+        // Send the full stats object (not {}) so a tool's durability survives.
+        await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
       }
       this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
     } else {
@@ -1243,7 +1258,7 @@ export class GameUI {
         if (isSameSlot && otherItem.stats && otherItem.stats.equipped === true) {
           otherItem.stats.equipped = false;
           if (this.characterId) {
-            await updateInventoryItemStats(this.characterId, otherItem.item_name, {});
+            await updateInventoryItemStats(this.characterId, otherItem.item_name, otherItem.stats);
           }
         }
       }
@@ -1267,10 +1282,13 @@ export class GameUI {
         this.character.setHat(item.item_name);
       } else if (item.item_type === 'glasses') {
         this.character.setGlasses(item.item_name);
+      } else if (item.item_type === 'tool') {
+        this.character.equippedPickaxe = item.item_name;
       }
 
       if (this.characterId) {
-        await updateInventoryItemStats(this.characterId, item.item_name, { equipped: true });
+        // Send the full stats object so a tool's durability isn't wiped.
+        await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
       }
       this.addCombatLog(`⚔️ สวมใส่ ${item.emoji} ${item.item_name} เพิ่มความแข็งแกร่ง!`, 'system');
     }
@@ -2992,15 +3010,18 @@ export class GameUI {
     legendary: { c: '#ffcf4a', b: '🟡', t: 'ตำนาน' },
   };
 
-  // Highest mining yield among the pickaxes the player owns (0 = none).
+  // The equipped pickaxe inventory item that still has durability (or null).
+  equippedPickaxe() {
+    return this.inventory.find(i =>
+      i.item_type === 'tool' && ITEMS[i.item_name] && ITEMS[i.item_name].mineYield &&
+      i.stats && i.stats.equipped === true && (i.stats.durability || 0) > 0
+    ) || null;
+  }
+
+  // Mining yield of the equipped pickaxe (0 = none equipped / broken).
   bestPickaxeYield() {
-    let best = 0;
-    for (const name of PICKAXES) {
-      if (this.inventory.some(i => i.item_name === name && (i.quantity || 0) > 0)) {
-        best = Math.max(best, ITEMS[name].mineYield || 1);
-      }
-    }
-    return best;
+    const p = this.equippedPickaxe();
+    return p ? (ITEMS[p.item_name].mineYield || 1) : 0;
   }
 
   openHeavenShop() {
@@ -3053,19 +3074,25 @@ export class GameUI {
     const pickaxeRows = PICKAXES.map(name => {
       const it = ITEMS[name];
       const r = GameUI.RARITY[it.rarity] || GameUI.RARITY.common;
-      const owned = this.inventory.some(i => i.item_name === name && (i.quantity || 0) > 0);
+      const ownedItem = this.inventory.find(i => i.item_name === name && (i.quantity || 0) > 0);
+      const owned = !!ownedItem;
+      const isEquipped = ownedItem && ownedItem.stats && ownedItem.stats.equipped === true;
+      const durLeft = ownedItem && ownedItem.stats ? (ownedItem.stats.durability || 0) : 0;
       let btn;
-      if (owned) btn = `<button class="heaven-btn" disabled>✅ มีแล้ว</button>`;
+      if (owned) btn = `<button class="heaven-btn" disabled>${isEquipped ? '⛏️ สวมอยู่' : '✅ มีแล้ว'}</button>`;
       else if (level < it.levelReq) btn = `<button class="heaven-btn" disabled>🔒 เลเวล ${it.levelReq}+</button>`;
       else if (gold < it.price) btn = `<button class="heaven-btn" disabled>💰 Zeny ไม่พอ</button>`;
       else btn = `<button class="heaven-btn" style="font-size:12px;padding:9px;" data-pick="${name}">🛒 ${it.price.toLocaleString()}</button>`;
+      const durLine = owned
+        ? `<span style="color:${durLeft > 0 ? '#7fe0ff' : '#ff6060'}">🔧 ทน ${durLeft}/${it.durability}</span>`
+        : `🔧 ทน ${it.durability} ครั้ง`;
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);">
           <div style="font-size:26px;">${it.emoji}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:800;color:#fff;font-size:13px;">${name}
               <span style="color:${r.c};font-size:10px;font-weight:800;">${r.b} ${r.t}</span></div>
-            <div style="font-size:10px;color:var(--text-dim);">ขุดครั้งละ <b style="color:#7fe0ff">${it.mineYield}</b> แร่ · ต้องเลเวล ${it.levelReq}+</div>
+            <div style="font-size:10px;color:var(--text-dim);">ขุดครั้งละ <b style="color:#7fe0ff">${it.mineYield}</b> แร่ · ⏱️ ${it.mineTime} วิ · ${durLine} · Lv.${it.levelReq}+</div>
           </div>
           <div style="flex:0 0 auto;width:120px;">${btn}</div>
         </div>`;
@@ -3089,7 +3116,7 @@ export class GameUI {
       <div class="heaven-body">
         <div class="heaven-sec">
           <div style="font-weight:800;color:#fff;font-size:13px;margin-bottom:2px;">⛏️ พลั่วขุดแร่</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">ยิ่งแรร์ ยิ่งขุดได้ต่อครั้งเยอะ — ใช้ตัวที่ดีที่สุดที่มีอัตโนมัติ</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;">ซื้อแล้ว <b>สวมใส่</b>ในกระเป๋าเพื่อขุด · ยิ่งแรร์ ยิ่งขุดเยอะ+เร็ว+ทนกว่า · ใช้ครบพัง ต้องซื้อใหม่</div>
           ${pickaxeRows}
         </div>
         <div class="heaven-sec">
@@ -3123,16 +3150,23 @@ export class GameUI {
     if (this.inventory.find(i => i.item_name === name && (i.quantity || 0) > 0)) return;
 
     s.gold -= meta.price;
+    // A fresh pickaxe comes full: durability = max swings before it breaks.
+    // Auto-equip it if no pickaxe is currently equipped, so mining just works.
+    const alreadyEquipped = this.inventory.some(i => i.item_type === 'tool' && i.stats && i.stats.equipped === true);
+    const newStats = { durability: meta.durability || 1, equipped: !alreadyEquipped };
     const existing = this.inventory.find(i => i.item_name === name);
-    if (existing) existing.quantity = (existing.quantity || 0) + 1;
-    else this.inventory.push({ item_name: name, item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price, quantity: 1, stats: {} });
+    if (existing) { existing.quantity = (existing.quantity || 0) + 1; existing.stats = newStats; }
+    else this.inventory.push({ item_name: name, item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price, quantity: 1, stats: newStats });
+    if (newStats.equipped && this.character) this.character.equippedPickaxe = name;
 
     if (this.characterId) {
-      await saveInventoryItem(this.characterId, name, meta.type, 1).catch(() => { });
+      await saveInventoryItem(this.characterId, name, meta.type, 1, newStats).catch(() => { });
+      // saveInventoryItem only writes stats on insert; make sure they persist.
+      await updateInventoryItemStats(this.characterId, name, newStats).catch(() => { });
       if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
     }
     if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
-    this.addCombatLog(`🛒 ซื้อ ⛏️ ${name} สำเร็จ! ขุดได้ครั้งละ ${meta.mineYield} แร่`, 'levelup');
+    this.addCombatLog(`🛒 ซื้อ ⛏️ ${name} สำเร็จ! ขุดครั้งละ ${meta.mineYield} แร่ · ทน ${meta.durability} ครั้ง${newStats.equipped ? ' · สวมใส่ให้อัตโนมัติแล้ว' : ''}`, 'levelup');
     this._renderHeavenShop();
     this._renderInventory();
     this.updateHUD(this.character.stats);
@@ -3161,30 +3195,131 @@ export class GameUI {
     this.updateHUD(this.character.stats);
   }
 
-  // Mine a Celestial Ore node: requires a pickaxe, yields 1 ore, depletes the
-  // node (it respawns after a cooldown, handled in the scene animation loop).
+  // ============ Celestial Mining (timed, auto-repeating "job") ============
+  // Mining is a continuous task: each swing takes the equipped pickaxe's
+  // mineTime seconds, yields ore, and costs 1 durability. It auto-repeats on
+  // whatever ore node is in range until the pickaxe breaks or the player stops.
+  // updateMining() is driven every frame from the game loop (foreground AND the
+  // hidden-tab background loop, so mining keeps "working" while backgrounded).
+
+  // Entry point from tapping an ore node / pressing the Mine button: toggle the
+  // mining job on/off.
   mineOreNode(node) {
-    if (!node || !node.userData || node.userData.mined) return;
-    const yield_ = this.bestPickaxeYield();
-    if (yield_ <= 0) {
-      this.addCombatLog('⛏️ ต้องมีพลั่วขุดก่อนถึงจะขุดได้ — ซื้อจากพ่อค้าสวรรค์', 'system');
+    if (node) this._mineTargetNode = node;
+    if (this.miningActive) { this.stopMining('⛏️ หยุดขุดแล้ว'); return; }
+    this.startMining();
+  }
+
+  startMining() {
+    if (this.miningActive) return;
+    const pick = this.equippedPickaxe();
+    if (!pick) {
+      this.addCombatLog('⛏️ ต้องสวมพลั่วขุดก่อน — ซื้อจากพ่อค้าสวรรค์แล้วสวมใส่ในกระเป๋า', 'system');
       return;
     }
-    // Deplete + schedule respawn (~25s); the animation loop restores it.
+    this.miningActive = true;
+    this._miningSwing = null; // { node, finishAt, duration }
+    this.addCombatLog(`⛏️ เริ่มขุดแร่ด้วย ${pick.emoji || '⛏️'} ${pick.item_name}...`, 'system');
+    this._updateMineButton();
+  }
+
+  stopMining(msg) {
+    if (!this.miningActive && !this._miningSwing) { this._updateMineButton(); return; }
+    this.miningActive = false;
+    this._miningSwing = null;
+    if (msg) this.addCombatLog(msg, 'system');
+    this._updateMineButton();
+  }
+
+  // Called each frame by the game loop. Advances the current swing and, when it
+  // finishes, awards ore + spends durability, then lines up the next swing.
+  updateMining() {
+    if (!this.miningActive) return;
+    const pick = this.equippedPickaxe();
+    if (!pick) { this.stopMining('💥 ไม่มีพลั่วที่ใช้ได้ — หยุดขุด'); return; }
+
+    if (!this._miningSwing) {
+      // Wait until a live ore node is in range (setMineTarget keeps it fresh).
+      const node = this._mineTargetNode;
+      if (!node || !node.userData || node.userData.mined) return;
+      const dur = ITEMS[pick.item_name].mineTime || 4;
+      this._miningSwing = { node, finishAt: Date.now() + dur * 1000, duration: dur };
+      this._updateMineButton();
+      return;
+    }
+
+    const swing = this._miningSwing;
+    if (!swing.node || !swing.node.userData || swing.node.userData.mined) {
+      // The node got depleted from under us — drop this swing and re-target.
+      this._miningSwing = null;
+      return;
+    }
+    if (Date.now() >= swing.finishAt) {
+      this._completeMineSwing(swing.node, pick);
+      this._miningSwing = null;
+    } else {
+      this._updateMineButton();
+    }
+  }
+
+  _completeMineSwing(node, pick) {
+    // Deplete the node + schedule respawn (~25s); the scene loop restores it.
     node.userData.mined = true;
     node.visible = false;
     node.userData.respawnAt = Date.now() + 25000;
     if (node.userData.glow) node.userData.glow.intensity = 0;
 
+    // Award ore.
+    const yield_ = ITEMS[pick.item_name].mineYield || 1;
     const meta = ITEMS['Celestial Ore'];
     const existing = this.inventory.find(i => i.item_name === 'Celestial Ore');
     if (existing) existing.quantity = (existing.quantity || 0) + yield_;
     else this.inventory.push({ item_name: 'Celestial Ore', item_type: meta.type, emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: yield_, stats: {} });
     if (this.characterId) saveInventoryItem(this.characterId, 'Celestial Ore', meta.type, yield_).catch(() => { });
 
+    // Spend durability.
+    const maxDur = ITEMS[pick.item_name].durability || 1;
+    pick.stats.durability = (pick.stats.durability || 0) - 1;
+    if (this.characterId) updateInventoryItemStats(this.characterId, pick.item_name, pick.stats).catch(() => { });
+
     if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
-    this.addCombatLog(`⛏️💠 ขุดได้ Celestial Ore ×${yield_}! นำไปแปลงเป็น ZOL ที่พ่อค้าสวรรค์`, 'levelup');
+
+    if (pick.stats.durability <= 0) {
+      // The pickaxe breaks — remove it and stop the job.
+      this.addCombatLog(`💥 ${pick.emoji || '⛏️'} ${pick.item_name} พังแล้ว! ต้องซื้อพลั่วใหม่ที่พ่อค้าสวรรค์`, 'system');
+      const idx = this.inventory.findIndex(i => i.item_name === pick.item_name);
+      if (idx >= 0) this.inventory.splice(idx, 1);
+      if (this.character) this.character.equippedPickaxe = null;
+      if (this.characterId) saveInventoryItem(this.characterId, pick.item_name, pick.item_type, -1).catch(() => { });
+      this.stopMining();
+    } else {
+      this.addCombatLog(`⛏️💠 ขุดได้ Celestial Ore ×${yield_}! · พลั่วเหลือ ${pick.stats.durability}/${maxDur}`, 'levelup');
+    }
     this._renderInventory();
+    this._updateMineButton();
+  }
+
+  // Reflect the mining state on the ⛏️ button (label + fill progress).
+  _updateMineButton() {
+    const btn = document.getElementById('btn-mine');
+    if (!btn) return;
+    // Visible when a node is near OR a mining job is running (so you can stop it).
+    btn.style.display = (this._mineTargetNode || this.miningActive) ? 'flex' : 'none';
+    const txt = btn.querySelector('.fishing-text');
+    if (this.miningActive) {
+      btn.classList.add('mining-active');
+      let pct = 0;
+      if (this._miningSwing) {
+        const s = this._miningSwing;
+        pct = Math.max(0, Math.min(100, 100 * (1 - (s.finishAt - Date.now()) / (s.duration * 1000))));
+      }
+      btn.style.background = `linear-gradient(90deg, rgba(127,224,255,.55) ${pct}%, rgba(0,0,0,.35) ${pct}%)`;
+      if (txt) txt.textContent = this._miningSwing ? `ขุด ${Math.round(pct)}%` : 'หยุด';
+    } else {
+      btn.classList.remove('mining-active');
+      btn.style.background = '';
+      if (txt) txt.textContent = 'ขุด';
+    }
   }
 
   // ============ Login Streak — Daily Rewards ============
