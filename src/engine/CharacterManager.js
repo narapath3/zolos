@@ -1,6 +1,6 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods } from './GameData.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
 // Walkable half-extent. The ground is a 70x70 plane centred at the origin
@@ -94,7 +94,7 @@ export class CharacterManager {
             get: () => {
                 const bonus = this.getWeaponAtkBonus(this.equippedWeapon);
                 const base = isNaN(this.stats._baseAtk) ? 10 : this.stats._baseAtk;
-                return Math.floor((base + bonus) * (1 + this.getBuffPct('atk')));
+                return Math.floor((base + bonus) * this._jobMod('atk') * (1 + this.getBuffPct('atk')));
             },
             set: (val) => {
                 this.stats._baseAtk = isNaN(val) ? 10 : val;
@@ -107,7 +107,7 @@ export class CharacterManager {
             get: () => {
                 const bonus = this.getWeaponSpBonus(this.equippedWeapon) + this.getArmorSpBonus(this.equippedArmor);
                 const base = isNaN(this.stats._baseMaxSp) ? 50 : this.stats._baseMaxSp;
-                return base + bonus;
+                return Math.floor(base * this._jobMod('sp')) + bonus;
             },
             set: (val) => {
                 this.stats._baseMaxSp = isNaN(val) ? 50 : val;
@@ -120,7 +120,7 @@ export class CharacterManager {
             get: () => {
                 const bonus = this.getArmorHpBonus(this.equippedArmor);
                 const base = isNaN(this.stats._baseMaxHp) ? 100 : this.stats._baseMaxHp;
-                return base + bonus;
+                return Math.floor(base * this._jobMod('hp')) + bonus;
             },
             set: (val) => {
                 this.stats._baseMaxHp = isNaN(val) ? 100 : val;
@@ -133,7 +133,7 @@ export class CharacterManager {
             get: () => {
                 const bonus = this.getArmorDefBonus(this.equippedArmor) + this.getShieldDefBonus(this.equippedShield);
                 const base = isNaN(this.stats._baseDef) ? 5 : this.stats._baseDef;
-                return Math.floor((base + bonus) * (1 + this.getBuffPct('def')));
+                return Math.floor((base + bonus) * this._jobMod('def') * (1 + this.getBuffPct('def')));
             },
             set: (val) => {
                 this.stats._baseDef = isNaN(val) ? 5 : val;
@@ -1640,6 +1640,14 @@ export class CharacterManager {
     getBuffPct(stat) {
         const b = this.activeBuffs && this.activeBuffs[stat];
         return b && b.remaining > 0 ? b.pct : 0;
+    }
+
+    // Per-class combat multiplier for hp/sp/atk/def (1.0 for a job-less Novice).
+    // Applied at read time in the stat getters, so it never corrupts the saved
+    // base stats and reverts cleanly on a job change.
+    _jobMod(key) {
+        const m = getJobMods(this.stats && this.stats.job);
+        return (m && m[key]) || 1;
     }
 
     applyBuff(skill) {

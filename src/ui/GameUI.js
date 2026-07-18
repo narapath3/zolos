@@ -4894,20 +4894,52 @@ export class GameUI {
       st.id = 'job-style';
       st.textContent = `
         #job-modal{position:fixed;inset:0;z-index:1500;display:none;align-items:center;justify-content:center;
-          background:rgba(0,0,0,.72);backdrop-filter:blur(4px);padding:12px;box-sizing:border-box;}
-        #job-card{width:min(600px,95vw);max-height:90vh;display:flex;flex-direction:column;border-radius:16px;
-          background:var(--bg-panel);border:4px solid var(--gold-border);
-          box-shadow:0 10px 0 var(--primary-deep),0 24px 60px rgba(0,0,0,.7);overflow:hidden;}
-        #job-card .job-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px 18px;}
-        .job-row{display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:10px;border-radius:12px;
-          background:var(--bg-item);border:1px solid var(--border);cursor:pointer;transition:border-color .2s,transform .1s;}
-        .job-row:hover{border-color:var(--primary);transform:translateY(-1px);}
-        .job-row.current{border-color:var(--primary);background:rgba(240,192,64,.10);}
-        .job-btn{border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-family:var(--font-main);
-          font-weight:800;font-size:13px;color:#3a2000;background:linear-gradient(135deg,#ffe89a,var(--primary) 50%,var(--primary-deep));}
-        .job-btn:disabled{filter:grayscale(.7);opacity:.55;cursor:not-allowed;color:#5a5a5a;}
-        @media (max-width:768px){#job-modal{align-items:flex-start;padding:8px 8px 116px;}
-          #job-card{width:100%;max-height:calc(100dvh - 132px);}}`;
+          background:rgba(4,8,18,.80);backdrop-filter:blur(6px);padding:12px;box-sizing:border-box;}
+        #job-card{width:min(780px,96vw);max-height:92vh;display:flex;flex-direction:column;border-radius:18px;
+          background:linear-gradient(180deg,#151b30,#0d1120);border:1px solid rgba(240,192,64,.35);
+          box-shadow:0 24px 70px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden;}
+        .job-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+          border-bottom:1px solid var(--border);background:linear-gradient(90deg,rgba(240,192,64,.14),transparent);}
+        .job-head h2{font-family:var(--font-main);font-size:17px;color:#fff;text-shadow:0 0 14px rgba(240,192,64,.5);margin:0;}
+        .job-head .sub{font-size:11px;color:var(--text-dim);margin-top:3px;}
+        .job-x{background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);width:36px;height:36px;
+          border-radius:9px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+        .job-main{display:flex;gap:16px;padding:16px 18px;overflow-y:auto;min-height:0;}
+        .job-pv-col{flex:0 0 44%;display:flex;flex-direction:column;gap:10px;}
+        #job-canvas{width:100%;height:236px;border-radius:14px;border:1px solid var(--border);display:block;
+          background:radial-gradient(circle at 50% 32%, rgba(96,130,210,.28), rgba(10,14,28,.55) 70%);}
+        .job-title{text-align:center;}
+        .job-title .n{font-size:20px;font-weight:800;color:#fff;}
+        .job-title .en{font-size:12px;color:var(--text-dim);font-weight:600;margin-left:4px;}
+        .job-title .r{font-size:11px;color:var(--primary);margin-top:2px;font-weight:700;}
+        .job-chips{display:flex;gap:8px;}
+        .job-chip{flex:1;padding:8px 2px;border-radius:11px;border:1px solid var(--border);background:rgba(255,255,255,.04);
+          cursor:pointer;text-align:center;transition:all .18s;}
+        .job-chip:hover{background:rgba(255,255,255,.08);}
+        .job-chip .e{font-size:22px;line-height:1;}
+        .job-chip .nm{font-size:10px;color:var(--text-dim);margin-top:3px;font-weight:800;}
+        .job-chip.active{border-color:var(--primary);background:rgba(240,192,64,.15);box-shadow:0 0 16px rgba(240,192,64,.25);}
+        .job-chip.active .nm{color:var(--primary);}
+        .job-info-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;}
+        .job-desc{font-size:12px;color:var(--text-dim);line-height:1.55;}
+        .job-sec-t{font-family:var(--font-pixel,inherit);font-size:9px;letter-spacing:.5px;color:var(--primary);margin-bottom:8px;}
+        .stat-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+        .stat-row .lbl{width:64px;font-size:11px;font-weight:800;color:#fff;}
+        .stat-bar{flex:1;height:12px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden;}
+        .stat-bar > i{display:block;height:100%;border-radius:6px;transition:width .3s;}
+        .stat-row .val{width:22px;text-align:right;font-size:11px;color:var(--text-dim);font-variant-numeric:tabular-nums;}
+        .mod-pill{display:inline-block;font-size:10px;font-weight:800;border-radius:16px;padding:3px 9px;margin:3px 4px 0 0;border:1px solid transparent;}
+        .mod-up{color:#57e08a;background:rgba(64,224,128,.14);border-color:rgba(64,224,128,.32);}
+        .mod-dn{color:#ff8098;background:rgba(255,96,128,.14);border-color:rgba(255,96,128,.32);}
+        .skill-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#cfe6ff;background:rgba(90,140,220,.14);
+          border:1px solid rgba(120,170,230,.3);border-radius:20px;padding:3px 9px;margin:3px 4px 0 0;}
+        .job-foot{padding:12px 18px 16px;border-top:1px solid var(--border);}
+        #job-select-btn{width:100%;padding:13px;border:none;border-radius:12px;cursor:pointer;font-family:var(--font-main);
+          font-weight:800;font-size:15px;color:#2a1c00;background:linear-gradient(135deg,#ffe89a,var(--primary) 50%,var(--primary-deep));
+          box-shadow:0 6px 18px rgba(240,192,64,.3);}
+        #job-select-btn:disabled{filter:grayscale(.7);opacity:.55;cursor:not-allowed;}
+        @media (max-width:680px){.job-main{flex-direction:column;}.job-pv-col{flex:none;}#job-canvas{height:210px;}
+          #job-card{max-height:calc(100dvh - 116px);}#job-modal{align-items:flex-start;padding:8px 8px 108px;}}`;
       document.head.appendChild(st);
     }
 
@@ -4929,55 +4961,111 @@ export class GameUI {
     const s = this.character.stats;
     const gold = Number(s.gold) || 0;
     const current = s.job;
+    this._jobIsChange = isChange;
 
-    const rows = Object.values(JOBS).map(job => {
-      const isCurrent = current === job.id;
-      const skillList = job.skills.map(id => {
-        const sk = SKILLS[id];
-        return sk ? `${sk.emoji} ${sk.name}` : id;
-      }).join(' · ');
-      let btn;
-      if (isCurrent) btn = `<button class="job-btn" disabled>อาชีพปัจจุบัน</button>`;
-      else if (isChange && gold < JOB_CHANGE_COST) btn = `<button class="job-btn" disabled>Zeny ไม่พอ</button>`;
-      else btn = `<button class="job-btn" data-job="${job.id}">${isChange ? 'เปลี่ยนเป็นสายนี้' : 'เลือกสายนี้'}</button>`;
-      return `
-        <div class="job-row ${isCurrent ? 'current' : ''}">
-          <div style="font-size:34px;flex:0 0 auto;">${job.emoji}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:800;color:#fff;font-size:15px;">${job.name}
-              <span style="color:var(--text-dim);font-size:11px;font-weight:600;">${job.nameEn}</span></div>
-            <div style="font-size:11px;color:var(--text-dim);line-height:1.45;margin:2px 0 4px;">${job.desc}</div>
-            <div style="font-size:11px;color:#7fe0ff;">${skillList}</div>
-          </div>
-          <div style="flex:0 0 auto;">${btn}</div>
-        </div>`;
-    }).join('');
+    const headerSub = isChange
+      ? `เปลี่ยนสายอาชีพ — ค่าใช้จ่าย <b style="color:var(--primary)">${JOB_CHANGE_COST.toLocaleString()}</b> Zeny (มี ${gold.toLocaleString()})`
+      : `เลือกได้ตั้งแต่เลเวล 1 · หมุนดูฮีโร่แต่ละสาย แล้วเลือกที่ใช่`;
 
-    const header = isChange
-      ? `เปลี่ยนสายอาชีพ — มีค่าใช้จ่าย <b style="color:var(--primary)">${JOB_CHANGE_COST.toLocaleString()}</b> Zeny (คุณมี ${gold.toLocaleString()})`
-      : `ถึงเลเวล ${JOB_UNLOCK_LEVEL} แล้ว! เลือกสายอาชีพของคุณ — เปลี่ยนภายหลังได้โดยเสีย ${JOB_CHANGE_COST.toLocaleString()} Zeny`;
+    const chips = Object.values(JOBS).map(j =>
+      `<div class="job-chip" data-job="${j.id}"><div class="e">${j.emoji}</div><div class="nm">${j.name}</div></div>`
+    ).join('');
 
     card.innerHTML = `
-      <div style="padding:16px 18px 12px;background:linear-gradient(90deg,rgba(240,192,64,.14),transparent);border-bottom:1px solid var(--border);position:relative;">
-        <button id="job-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;">✕</button>
-        <div style="font-family:var(--font-main);color:#fff;font-size:19px;text-shadow:0 0 12px rgba(240,192,64,.5);">🎖️ สายอาชีพ</div>
-        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;line-height:1.5;">${header}</div>
+      <div class="job-head">
+        <div><h2>🎖️ เลือกสายอาชีพ</h2><div class="sub">${headerSub}</div></div>
+        <button class="job-x" id="job-close">✕</button>
       </div>
-      <div class="job-body">${rows}
-        <div style="text-align:center;font-size:10px;color:var(--text-dim);opacity:.75;margin-top:4px;">
-          ทุกสายมีสเตตัสและใช้อุปกรณ์ได้เหมือนกัน — ต่างกันที่ชุดสกิลเท่านั้น
+      <div class="job-main">
+        <div class="job-pv-col">
+          <canvas id="job-canvas"></canvas>
+          <div class="job-title" id="job-title"></div>
+          <div class="job-chips">${chips}</div>
         </div>
-      </div>`;
+        <div class="job-info-col" id="job-info"></div>
+      </div>
+      <div class="job-foot"><button id="job-select-btn"></button></div>`;
 
-    const closeBtn = card.querySelector('#job-close');
-    if (closeBtn) closeBtn.onclick = () => {
-      const m = document.getElementById('job-modal');
-      if (m) m.style.display = 'none';
-      this.updateMobileControlsVisibility();
+    card.querySelector('#job-close').onclick = () => this._closeJobSelect();
+    card.querySelectorAll('.job-chip').forEach(c => { c.onclick = () => this._setPreviewJob(c.dataset.job); });
+
+    // Spin up the rotating 3D hero preview.
+    const canvas = card.querySelector('#job-canvas');
+    const startJob = (current && JOBS[current]) ? current : 'swordsman';
+    this._previewJob = startJob;
+    import('../engine/JobPreview.js').then(({ JobPreview }) => {
+      if (!document.getElementById('job-canvas')) return; // closed before load
+      try {
+        if (this._jobPreview) this._jobPreview.dispose();
+        this._jobPreview = new JobPreview(canvas);
+        this._jobPreview.setJob(this._previewJob);
+        this._jobPreview.start();
+      } catch (e) { /* no WebGL — the info panel still works */ }
+    }).catch(() => { });
+
+    this._setPreviewJob(startJob);
+  }
+
+  // Switch the previewed class: rotate model + refresh the info panel.
+  _setPreviewJob(jobId) {
+    if (!JOBS[jobId]) return;
+    this._previewJob = jobId;
+    if (this._jobPreview) this._jobPreview.setJob(jobId);
+    const card = document.getElementById('job-card');
+    if (card) card.querySelectorAll('.job-chip').forEach(c => c.classList.toggle('active', c.dataset.job === jobId));
+    this._renderJobInfo(jobId);
+  }
+
+  _renderJobInfo(jobId) {
+    const job = JOBS[jobId];
+    if (!job) return;
+    const s = this.character.stats;
+    const gold = Number(s.gold) || 0;
+    const isChange = this._jobIsChange;
+    const current = s.job;
+
+    const titleEl = document.getElementById('job-title');
+    if (titleEl) titleEl.innerHTML = `<div class="n">${job.emoji} ${job.name}<span class="en">${job.nameEn}</span></div><div class="r">${job.role || ''}</div>`;
+
+    const bar = (label, val, color) => `
+      <div class="stat-row"><span class="lbl">${label}</span>
+        <span class="stat-bar"><i style="width:${Math.min(100, val * 10)}%;background:${color};"></i></span>
+        <span class="val">${val}</span></div>`;
+    const st = job.stats || { str: 0, agi: 0, int: 0 };
+    const mods = job.mods || {};
+    const modPill = (label, v) => {
+      if (v == null || v === 1) return '';
+      const pct = Math.round((v - 1) * 100);
+      return `<span class="mod-pill ${pct >= 0 ? 'mod-up' : 'mod-dn'}">${label} ${pct >= 0 ? '+' : ''}${pct}%</span>`;
     };
-    card.querySelectorAll('[data-job]').forEach(b => {
-      b.onclick = () => this.chooseJob(b.dataset.job, isChange);
-    });
+    const skills = job.skills.map(id => { const sk = SKILLS[id]; return sk ? `<span class="skill-pill">${sk.emoji} ${sk.name}</span>` : ''; }).join('');
+
+    const info = document.getElementById('job-info');
+    if (info) info.innerHTML = `
+      <div class="job-desc">${job.desc}</div>
+      <div><div class="job-sec-t">📊 พลังพื้นฐาน (STR / AGI / INT)</div>
+        ${bar('STR', st.str, '#ff6a6a')}${bar('AGI', st.agi, '#7be08a')}${bar('INT', st.int, '#7fb0ff')}</div>
+      <div><div class="job-sec-t">⚖️ ค่าต่อสู้เทียบสายกลาง</div>
+        ${modPill('HP', mods.hp)}${modPill('DEF', mods.def)}${modPill('ATK', mods.atk)}${modPill('SP', mods.sp)}</div>
+      <div><div class="job-sec-t">✨ สกิลประจำสาย</div>${skills}</div>`;
+
+    const btn = document.getElementById('job-select-btn');
+    if (btn) {
+      if (current === jobId) { btn.textContent = '✔ อาชีพปัจจุบันของคุณ'; btn.disabled = true; btn.onclick = null; }
+      else if (isChange && gold < JOB_CHANGE_COST) { btn.textContent = `Zeny ไม่พอ (ต้องการ ${JOB_CHANGE_COST.toLocaleString()})`; btn.disabled = true; btn.onclick = null; }
+      else {
+        btn.disabled = false;
+        btn.textContent = isChange ? `เปลี่ยนเป็น ${job.name} · ${JOB_CHANGE_COST.toLocaleString()} Zeny` : `⚔️ เลือกเป็น ${job.name}`;
+        btn.onclick = () => this.chooseJob(jobId, isChange);
+      }
+    }
+  }
+
+  _closeJobSelect() {
+    const m = document.getElementById('job-modal');
+    if (m) m.style.display = 'none';
+    if (this._jobPreview) { this._jobPreview.dispose(); this._jobPreview = null; }
+    this.updateMobileControlsVisibility();
   }
 
   async chooseJob(jobId, isChange) {
@@ -5040,9 +5128,7 @@ export class GameUI {
     }
     this._renderInventory();
 
-    const m = document.getElementById('job-modal');
-    if (m) m.style.display = 'none';
-    this.updateMobileControlsVisibility();
+    this._closeJobSelect();
 
     if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
     if (window.particles && this.character.getPosition) {

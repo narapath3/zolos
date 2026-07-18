@@ -1179,42 +1179,61 @@ export const SKILLS = {
 // Four paths that differ purely by their skill set (stats and gear are shared).
 // Chosen at JOB_UNLOCK_LEVEL; changeable later for JOB_CHANGE_COST Zeny.
 // A character with job = null is still a Novice and uses NOVICE_SKILLS.
-export const JOB_UNLOCK_LEVEL = 10;
+export const JOB_UNLOCK_LEVEL = 1; // pick a class from the very start
 export const JOB_CHANGE_COST = 50000;
 export const NOVICE_SKILLS = ['bash', 'heal'];
 
+// Each job carries an identity stat profile (STR/AGI/INT, 1–10 for display) and
+// combat modifiers applied non-destructively over the character's base stats,
+// so the four classes actually play differently:
+//   Swordsman — STR bruiser: most HP/DEF, low SP.
+//   Archer    — AGI marksman: highest ATK, fragile, agile.
+//   Mage      — INT nuker: huge SP + spell power, very squishy.
+//   Priest    — INT support: big SP, durable, lower ATK.
 export const JOBS = {
     swordsman: {
         id: 'swordsman',
         name: 'นักดาบ',
         nameEn: 'Swordsman',
         emoji: '⚔️',
+        role: 'แนวหน้า ถึกทน (Tank / Bruiser)',
         desc: 'สายประชิดตัวถึกทน ตีหนักและยืนรับได้นาน เหมาะกับการบุกเข้าไปกลางฝูง',
         skills: ['bash', 'magnumBreak', 'endure'],
+        stats: { str: 9, agi: 5, int: 2 },
+        mods: { hp: 1.30, sp: 0.70, atk: 1.05, def: 1.30 },
     },
     mage: {
         id: 'mage',
         name: 'จอมเวทย์',
         nameEn: 'Mage',
         emoji: '🔮',
-        desc: 'สายเวทมนตร์ระยะไกล เก่งการกวาดศัตรูเป็นกลุ่มด้วยเวทพลังสูง',
+        role: 'เวทกวาดล้าง (Burst Caster)',
+        desc: 'สายเวทมนตร์ระยะไกล เก่งการกวาดศัตรูเป็นกลุ่มด้วยเวทพลังสูง แต่ตัวบอบบาง',
         skills: ['fireBolt', 'frostNova', 'energyCoat'],
+        stats: { str: 2, agi: 4, int: 10 },
+        mods: { hp: 0.75, sp: 1.60, atk: 1.15, def: 0.80 },
     },
     archer: {
         id: 'archer',
         name: 'นักธนู',
         nameEn: 'Archer',
         emoji: '🏹',
-        desc: 'สายยิงระยะไกล ดาเมจต่อเป้าหมายเดี่ยวสูงที่สุด และเสริมพลังโจมตีตัวเองได้',
+        role: 'ยิงไกล ดาเมจสูง (Agile DPS)',
+        desc: 'สายยิงระยะไกล ดาเมจต่อเป้าหมายเดี่ยวสูงที่สุด ว่องไว และเสริมพลังโจมตีตัวเองได้',
         skills: ['doubleStrafe', 'arrowShower', 'concentration'],
+        stats: { str: 6, agi: 9, int: 3 },
+        mods: { hp: 0.90, sp: 0.90, atk: 1.20, def: 0.85 },
     },
     priest: {
         id: 'priest',
         name: 'พระ',
         nameEn: 'Priest',
         emoji: '✨',
-        desc: 'สายสายัณห์ศักดิ์สิทธิ์ ฟื้นฟูพลังชีวิตได้เก่ง อยู่รอดได้นานที่สุดในสนาม',
+        role: 'สายซัพพอร์ต อึด (Support)',
+        desc: 'สายสายัณห์ศักดิ์สิทธิ์ ฟื้นฟูพลังชีวิตได้เก่ง มานาเยอะ อยู่รอดได้นานที่สุดในสนาม',
         skills: ['heal', 'holyLight', 'blessing'],
+        stats: { str: 3, agi: 5, int: 8 },
+        mods: { hp: 1.05, sp: 1.45, atk: 0.85, def: 1.05 },
     },
 };
 
@@ -1222,6 +1241,12 @@ export const JOBS = {
 export function getJobSkills(jobId) {
     const job = JOBS[jobId];
     return job ? job.skills : NOVICE_SKILLS;
+}
+
+// Per-job combat multipliers ({hp,sp,atk,def}); all 1.0 for a job-less Novice.
+export function getJobMods(jobId) {
+    const job = JOBS[jobId];
+    return (job && job.mods) ? job.mods : { hp: 1, sp: 1, atk: 1, def: 1 };
 }
 
 // The weapon each job is handed free the moment it's chosen, so every class
