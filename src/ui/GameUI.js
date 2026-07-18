@@ -1628,6 +1628,9 @@ export class GameUI {
     if (popupName) popupName.textContent = player.username;
     if (popupLevel) popupLevel.textContent = `Lv.${player.level}`;
 
+    // Full profile (stats + equipped gear) — anyone can view anyone.
+    this._renderPlayerProfileDetails(player);
+
     if (addFriendBtn) {
       // Don't allow friending yourself
       const myName = this.character && this.character.stats ? this.character.stats.name : '';
@@ -1666,6 +1669,78 @@ export class GameUI {
       popup.style.display = 'flex';
       this.updateMobileControlsVisibility();
     }
+  }
+
+  // Populate the profile popup with the target's stats + equipped gear.
+  // Full stats come from the DB (characters is public-read); equipped gear also
+  // falls back to the live remote avatar so guests still show their gear.
+  async _renderPlayerProfileDetails(player) {
+    const box = document.getElementById('player-popup-details');
+    if (!box) return;
+    box.style.width = '100%';
+    box.innerHTML = '<div style="opacity:.6;font-size:12px;padding:6px 0;">กำลังโหลดข้อมูล...</div>';
+
+    // Immediate equipped gear from the live remote avatar (works for guests too).
+    let liveGear = null;
+    const rp = window.remotePlayersMap && window.remotePlayersMap.get(player.userId);
+    if (rp && rp.character) {
+      liveGear = { weapon: rp.character.equippedWeapon, hat: rp.character.equippedHat, glasses: rp.character.equippedGlasses };
+    }
+
+    // Full stats from the DB (real accounts only).
+    let ch = null;
+    try {
+      const { fetchPublicCharacter } = await import('../network/GameSync.js');
+      ch = await fetchPublicCharacter(player.userId);
+    } catch (e) { /* ignore */ }
+
+    // Bail if the popup moved on to a different player while awaiting.
+    if (this.selectedProfilePlayer !== player) return;
+
+    if (ch && ch.level != null) {
+      const lvlEl = document.getElementById('player-popup-level');
+      if (lvlEl) lvlEl.textContent = `Lv.${ch.level}`;
+    }
+
+    if (!ch && !liveGear) {
+      box.innerHTML = '<div style="opacity:.6;font-size:12px;padding:6px 0;">ผู้เล่นชั่วคราว (Guest) — ดูข้อมูลเต็มไม่ได้</div>';
+      return;
+    }
+
+    const gear = (name) => {
+      if (!name || name === 'None') return null;
+      return { emoji: (ITEMS[name] || {}).emoji || '📦', name };
+    };
+    const weapon = gear((ch && ch.weapon) || (liveGear && liveGear.weapon));
+    const hat = gear((ch && ch.hat) || (liveGear && liveGear.hat));
+    const glasses = gear((ch && ch.glasses) || (liveGear && liveGear.glasses));
+
+    const stat = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:6px;"><span style="color:var(--text-dim);font-size:11px;">${label}</span><span style="font-weight:800;font-size:12px;color:#fff;">${val}</span></div>`;
+    const slot = (label, item) => `<div style="flex:1;text-align:center;padding:8px 4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
+        <div style="font-size:22px;">${item ? item.emoji : '➖'}</div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:2px;">${label}</div>
+        <div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item ? item.name : '-'}</div>
+      </div>`;
+
+    let statsHtml = '';
+    if (ch) {
+      statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;">
+          ${stat('⚔️ ATK', ch.atk ?? '-')}
+          ${stat('🛡️ DEF', ch.def ?? '-')}
+          ${stat('❤️ HP', `${ch.hp ?? '-'}/${ch.max_hp ?? '-'}`)}
+          ${stat('💧 SP', `${ch.sp ?? '-'}/${ch.max_sp ?? '-'}`)}
+          ${stat('💀 Kills', (ch.total_kills ?? 0).toLocaleString())}
+          ${stat('💰 Zeny', (ch.gold ?? 0).toLocaleString())}
+        </div>`;
+    }
+
+    box.innerHTML = `${statsHtml}
+      <div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;text-align:left;">🎽 อุปกรณ์ที่สวมใส่</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        ${slot('อาวุธ', weapon)}
+        ${slot('หมวก', hat)}
+        ${slot('แว่นตา', glasses)}
+      </div>`;
   }
 
   _toggleFriend(player) {

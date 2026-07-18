@@ -82,6 +82,26 @@ export async function loadCharacter(userId) {
     return char;
 }
 
+// Read-only fetch of another player's character for the profile popup. Unlike
+// loadCharacter this never creates a row. characters is publicly readable
+// (RLS SELECT USING true), so any player's stats + equipped gear are viewable.
+export async function fetchPublicCharacter(userId) {
+    if (!supabase || isOfflineMode || !userId || userId.startsWith('guest_') || userId.startsWith('local_')) return null;
+    try {
+        const { data, error } = await supabase
+            .from('characters')
+            .select('name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (error) return null;
+        return data;
+    } catch (e) {
+        return null;
+    }
+}
+
 export async function createCharacter(userId) {
     let name = getDeterministicGuestName(userId);
     let gender = 'male';
