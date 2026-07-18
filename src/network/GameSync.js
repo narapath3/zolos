@@ -819,10 +819,10 @@ export async function fetchLeaderboard(category = 'level') {
         let lb = localDb.get('leaderboard');
         if (!lb || lb.length === 0) {
             lb = [
-                { name: 'Lord_Knight', level: 99, total_kills: 9999, gold: 5000000, play_time: 154800, profiles: { username: 'Ragnarok' } },
-                { name: 'Sniper_Alice', level: 85, total_kills: 4521, gold: 1200000, play_time: 75600, profiles: { username: 'ArcherGuy' } },
-                { name: 'High_Priest', level: 76, total_kills: 1205, gold: 850000, play_time: 32400, profiles: { username: 'Support' } },
-                { name: 'Assassin_Cross', level: 60, total_kills: 887, gold: 350000, play_time: 18000, profiles: { username: 'Katars' } },
+                { name: 'Lord_Knight', level: 99, total_kills: 9999, gold: 5000000, zol: 25000, play_time: 154800, profiles: { username: 'Ragnarok' } },
+                { name: 'Sniper_Alice', level: 85, total_kills: 4521, gold: 1200000, zol: 12000, play_time: 75600, profiles: { username: 'ArcherGuy' } },
+                { name: 'High_Priest', level: 76, total_kills: 1205, gold: 850000, zol: 8000, play_time: 32400, profiles: { username: 'Support' } },
+                { name: 'Assassin_Cross', level: 60, total_kills: 887, gold: 350000, zol: 3500, play_time: 18000, profiles: { username: 'Katars' } },
             ];
             localDb.set('leaderboard', lb);
         }
@@ -851,7 +851,7 @@ export async function fetchLeaderboard(category = 'level') {
         return q.order('level', { ascending: false }).order('total_kills', { ascending: false });
     };
 
-    const cols = 'name, level, total_kills, gold, play_time, mmr, pvp_wins, pvp_losses, user_id';
+    const cols = 'name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses, user_id';
     let query = applyOrder(supabase.from('characters').select(`${cols}, profiles(username)`));
 
     let { data, error } = await query.limit(20);
