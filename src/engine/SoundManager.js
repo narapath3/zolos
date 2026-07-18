@@ -70,6 +70,135 @@ export class SoundManager {
         osc2.stop(t + 0.12);
     }
 
+    // ============ Weapon-specific Attack Sounds ============
+    // Each weapon class gets a distinct signature so you can tell what someone
+    // is swinging by ear (sword rings, gun bangs, bow twangs). `opts.volume`
+    // (0..1) scales the whole sound — used to attenuate other players' attacks
+    // by how far away they are.
+    playWeaponAttack(weaponClass = 'sword', opts = {}) {
+        if (!this.enabled) return;
+        const vol = Math.max(0, Math.min(1, opts.volume == null ? 1 : opts.volume));
+        if (vol <= 0.02) return;
+        switch (weaponClass) {
+            case 'gun': return this._sfxGun(vol);
+            case 'bow': return this._sfxBow(vol);
+            case 'blunt': return this._sfxBlunt(vol);
+            case 'staff': return this._sfxStaff(vol);
+            case 'unarmed': return this._sfxPunch(vol);
+            case 'sword':
+            case 'melee':
+            default: return this._sfxSword(vol);
+        }
+    }
+
+    // Metallic "ching" — a short slash whoosh plus two detuned rings sweeping down.
+    _sfxSword(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        this._playNoiseBurst(ctx, t, 0.07, m * 0.35, 2500, 6000);
+        [1, 1.5].forEach((mult, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime((1400 + Math.random() * 300) * mult, t);
+            osc.frequency.exponentialRampToValueAtTime(600 * mult, t + 0.14);
+            gain.gain.setValueAtTime(m * (i === 0 ? 0.3 : 0.18), t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t); osc.stop(t + 0.16);
+        });
+    }
+
+    // Gunshot "bang" — a sharp broadband crack over a low recoil thump.
+    _sfxGun(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        this._playNoiseBurst(ctx, t, 0.05, m * 0.9, 3000, 9000);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, t);
+        osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+        gain.gain.setValueAtTime(m * 0.7, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.14);
+    }
+
+    // Bowstring release "thwip" — a woody pitch-drop pluck plus the arrow's air whoosh.
+    _sfxBow(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const lp = ctx.createBiquadFilter();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(420, t);
+        osc.frequency.exponentialRampToValueAtTime(130, t + 0.09);
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(1800, t);
+        gain.gain.setValueAtTime(m * 0.35, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        osc.connect(lp).connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.1);
+        this._playNoiseBurst(ctx, t + 0.01, 0.09, m * 0.22, 1200, 3500);
+    }
+
+    // Heavy blunt thud (warhammer).
+    _sfxBlunt(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(140, t);
+        osc.frequency.exponentialRampToValueAtTime(38, t + 0.2);
+        gain.gain.setValueAtTime(m * 0.8, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.22);
+        this._playNoiseBurst(ctx, t, 0.06, m * 0.3, 200, 900);
+    }
+
+    // Magic staff — a soft rising bell shimmer.
+    _sfxStaff(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        [660, 990].forEach((f, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, t);
+            osc.frequency.linearRampToValueAtTime(f * 1.5, t + 0.18);
+            gain.gain.setValueAtTime(m * (i === 0 ? 0.3 : 0.16), t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t); osc.stop(t + 0.28);
+        });
+    }
+
+    // Bare-handed punch — a dull thud.
+    _sfxPunch(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(70, t + 0.1);
+        gain.gain.setValueAtTime(m * 0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.11);
+        this._playNoiseBurst(ctx, t, 0.04, m * 0.2, 800, 2000);
+    }
+
     // ============ Critical Hit Sound ============
     playCriticalSound() {
         if (!this.enabled) return;

@@ -197,6 +197,19 @@ export class CharacterManager {
         return 'melee';
     }
 
+    // Finer weapon class used only to pick an attack SOUND (sword/bow/gun/
+    // blunt/staff/unarmed). Kept separate from getWeaponClass() — which drives
+    // attack VISUALS as melee/bow/gun — so tuning sounds never changes visuals.
+    getWeaponSoundClass() {
+        const w = this.equippedWeapon;
+        if (!w || w === 'None') return 'unarmed';
+        if (w === 'Gun') return 'gun';
+        if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
+        if (w === 'Heavy Warhammer') return 'blunt';
+        if (w === 'Mage Staff') return 'staff';
+        return 'sword';
+    }
+
     // Signature effect id for forged weapons ('fire'|'frost'|'storm'|'soul'|'nova'), else null
     getForgeEffect() {
         const w = this.equippedWeapon;
