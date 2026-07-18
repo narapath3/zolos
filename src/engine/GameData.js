@@ -85,6 +85,7 @@ export const ITEMS = {
     'Adventurer Suit': { emoji: '🥋', type: 'armor', rarity: 'rare', desc: 'ชุดนักผจญภัยหนังสลักลาย เดินตะคุยมอนสเตอร์เหนียวแน่นปลอดภัย (DEF +8, HP +80)', price: 800, defBonus: 8, hpBonus: 80 },
     'Iron Shield': { emoji: '🛡️', type: 'shield', rarity: 'rare', desc: 'โล่ทำจากแผ่นเหล็กหนาร่วมตอกหมุด ทนแรงกระแทกจากเขาควายได้ยอด (DEF +12)', price: 750, defBonus: 12 },
     'Mage Staff': { emoji: '🪄', type: 'weapon', rarity: 'rare', desc: 'ไม้เท้าแอปเปิ้ลโอ๊คร่ายเวท ส่งประกายคาถามินิ (ATK +8, SP +30)', price: 600, atkBonus: 8, spBonus: 30 },
+    'Holy Rod': { emoji: '🔆', type: 'weapon', rarity: 'rare', desc: 'คทาศักดิ์สิทธิ์ประจำตัวพระ ปลายเรืองแสงสีทอง เสริมพลังฟื้นฟูและเวทแสง (ATK +10, SP +40)', price: 700, atkBonus: 10, spBonus: 40 },
     'Iron Helm': { emoji: '🪖', type: 'armor', rarity: 'rare', desc: 'หมวกเหล็กอัศวิน Novice หนักแน่นและบดบังการฟันหัวได้ดี (DEF +6, HP +50)', price: 50, defBonus: 6, hpBonus: 50 },
     'Silver Ring': { emoji: '💍', type: 'armor', rarity: 'rare', desc: 'แหวนเงินแท้น้ำหนักบางเบา ช่วยรักษาชีพจรหัวใจ (DEF +2, HP +30)', price: 450, defBonus: 2, hpBonus: 30 },
     'Speed Boots': { emoji: '🥾', type: 'armor', rarity: 'rare', desc: 'รองเท้าหนังเสือทอเหนียวทน เดินทางสะดวกเคลื่อนที่ว่องไว (DEF +5, HP +40)', price: 900, defBonus: 5, hpBonus: 40 },
@@ -1221,6 +1222,55 @@ export const JOBS = {
 export function getJobSkills(jobId) {
     const job = JOBS[jobId];
     return job ? job.skills : NOVICE_SKILLS;
+}
+
+// The weapon each job is handed free the moment it's chosen, so every class
+// starts with an iconic, usable weapon (Priest had none in the game before).
+JOBS.swordsman.signatureWeapon = 'Sword';
+JOBS.mage.signatureWeapon = 'Mage Staff';
+JOBS.archer.signatureWeapon = 'Bow';
+JOBS.priest.signatureWeapon = 'Holy Rod';
+
+// ============ JOB EQUIP RESTRICTIONS ============
+// Every worn item (weapon / hat / glasses) belongs to a job, or is universal.
+// A character may equip an item only if it is universal or its job matches the
+// character's. Novices (no job yet) may use universal items only. Stat armor is
+// intentionally left universal — it's progression gear, not a class identity.
+const ITEM_JOB = {
+    // --- Weapons ---
+    // Swordsman (melee)
+    'Sword': 'swordsman', 'Katana': 'swordsman', 'Silver Dagger': 'swordsman',
+    'Heavy Warhammer': 'swordsman', 'Excalibur': 'swordsman', 'Ragnarok Blade': 'swordsman',
+    'Ember Fang': 'swordsman', 'Frost Cleaver': 'swordsman', 'Soulreaper': 'swordsman',
+    'Godslayer': 'swordsman',
+    // Archer (ranged)
+    'Bow': 'archer', 'Gun': 'archer', 'Crossbow': 'archer', 'Rudra Bow': 'archer',
+    'Stormcaller Bow': 'archer',
+    // Mage
+    'Mage Staff': 'mage',
+    // Priest
+    'Holy Rod': 'priest',
+    // 'Novice Cutter' and 'Fishing Rod' stay universal (starter / tool).
+    // --- Hats ---
+    'Wizard Hat': 'mage', 'Cowboy Hat': 'archer', 'Crown': 'priest',
+    // --- Glasses ---
+    'Classic Glasses': 'mage', 'Sunglasses': 'swordsman',
+};
+for (const [name, job] of Object.entries(ITEM_JOB)) {
+    if (ITEMS[name]) ITEMS[name].job = job;
+}
+
+// The job an item is locked to, or null if anyone can wear it.
+export function itemJob(itemName) {
+    const it = ITEMS[itemName];
+    return it && it.job ? it.job : null;
+}
+
+// Can a character of `jobId` (null = Novice) equip this item?
+export function canEquipItem(itemName, jobId) {
+    const locked = itemJob(itemName);
+    if (!locked) return true;        // universal
+    return jobId === locked;         // must be that exact job
 }
 
 // Celestial mining pickaxe ladder, cheapest → rarest. The Heaven Merchant sells

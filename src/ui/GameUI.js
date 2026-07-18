@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
@@ -590,6 +590,17 @@ export class GameUI {
     try {
       const rawInv = await loadInventory(characterId);
       this.inventory = rawInv.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
+
+      // Job locking: auto-unequip any worn item (weapon/hat/glasses) this class
+      // can't use — e.g. gear equipped before this update or before a job change.
+      const myJob = this.character?.stats?.job || null;
+      for (const it of this.inventory) {
+        if (it.item_type !== 'weapon' && it.item_type !== 'hat' && it.item_type !== 'glasses') continue;
+        if (it.stats && it.stats.equipped === true && !canEquipItem(it.item_name, myJob)) {
+          it.stats.equipped = false;
+          if (this.characterId) updateInventoryItemStats(this.characterId, it.item_name, it.stats).catch(() => { });
+        }
+      }
 
       // Auto equip equipment on load if present in inventory
       const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
@@ -1271,6 +1282,17 @@ export class GameUI {
       }
       this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
     } else {
+      // Job lock: worn items (weapon / hat / glasses) are restricted to their
+      // class. Novices (no job) may only wear universal items.
+      if ((item.item_type === 'weapon' || item.item_type === 'hat' || item.item_type === 'glasses')
+        && !canEquipItem(item.item_name, this.character.stats.job)) {
+        const need = itemJob(item.item_name);
+        const jobName = JOBS[need]?.name || need;
+        this.addCombatLog(`🔒 ${item.emoji || ''} ${item.item_name} ใช้ได้เฉพาะอาชีพ ${jobName} เท่านั้น`, 'warning');
+        if (this.soundManager) this.soundManager.playErrorSound?.();
+        return;
+      }
+
       // Un-equip any currently equipped item of the SAME slot type
       for (const otherItem of this.inventory) {
         let isSameSlot = false;
@@ -2830,6 +2852,10 @@ export class GameUI {
           });
           glassesSelect.value = this.character.equippedGlasses || 'None';
         }
+
+        this._markLockedOptions(weaponSelect);
+        this._markLockedOptions(hatSelect);
+        this._markLockedOptions(glassesSelect);
       }
 
       modal.style.display = 'flex';
@@ -2868,6 +2894,17 @@ export class GameUI {
           hat: document.getElementById('profile-edit-hat')?.value || 'None',
           glasses: document.getElementById('profile-edit-glasses')?.value || 'None',
         };
+
+        // Job lock: never apply a worn item this class can't use (guards against
+        // a stale/forced selection). Blocked slots fall back to unequipped.
+        const job = this.character?.stats?.job || null;
+        for (const slot of ['weapon', 'hat', 'glasses']) {
+          if (data[slot] && data[slot] !== 'None' && !canEquipItem(data[slot], job)) {
+            const jobName = JOBS[itemJob(data[slot])]?.name || 'อื่น';
+            this.addCombatLog(`🔒 ${data[slot]} ใช้ได้เฉพาะอาชีพ ${jobName} — ข้ามการสวมใส่`, 'warning');
+            data[slot] = 'None';
+          }
+        }
 
         if (this.profileSaveCallback) {
           this.profileSaveCallback(data);
@@ -2938,6 +2975,19 @@ export class GameUI {
    * Refresh the Profile Editor equipment dropdowns to match current inventory state.
    * Called when equipment changes from the Inventory panel to keep Profile in sync.
    */
+  // Disable (and 🔒-mark) equip-dropdown options this class can't wear.
+  _markLockedOptions(selectEl) {
+    if (!selectEl || !this.character) return;
+    const job = this.character.stats?.job || null;
+    Array.from(selectEl.options).forEach(opt => {
+      if (!opt.value || opt.value === 'None') return;
+      if (!canEquipItem(opt.value, job)) {
+        opt.disabled = true;
+        if (!opt.textContent.startsWith('🔒')) opt.textContent = `🔒 ${opt.textContent}`;
+      }
+    });
+  }
+
   _refreshProfileEditorEquipment() {
     const modal = document.getElementById('profile-editor-modal');
     if (!modal || modal.style.display === 'none') return; // Only refresh if profile editor is open
@@ -2990,6 +3040,10 @@ export class GameUI {
       const equippedGlasses = glassesItems.find(i => i.stats && i.stats.equipped === true);
       glassesSelect.value = equippedGlasses ? equippedGlasses.item_name : 'None';
     }
+
+    this._markLockedOptions(weaponSelect);
+    this._markLockedOptions(hatSelect);
+    this._markLockedOptions(glassesSelect);
   }
 
   // ============ Auto Farm Button ============
@@ -4941,11 +4995,50 @@ export class GameUI {
     }
 
     s.job = jobId;
+    // Rebuild the class silhouette (hat/robe/cape/quiver/halo). Broadcasts to
+    // others automatically via getAppearance() on the next position tick.
+    if (this.character._applyJobAppearance) this.character._applyJobAppearance();
     // Old job's cooldowns are meaningless now — clear them so the new bar is live.
     if (this.character.cooldowns) {
       for (const k of Object.keys(this.character.cooldowns)) this.character.cooldowns[k] = 0;
     }
     this.renderSkillBar();
+
+    // Hand out this job's free signature weapon and equip it, then drop any
+    // worn gear the new class can't use.
+    const sig = job.signatureWeapon;
+    if (sig && ITEMS[sig]) {
+      if (!this.inventory.find(i => i.item_name === sig)) {
+        await this.addItem({ name: sig, type: 'weapon', emoji: ITEMS[sig].emoji });
+      }
+      for (const it of this.inventory) {
+        if ((it.item_type === 'weapon' || it.item_type === 'fishing_rod') && it.stats && it.stats.equipped) {
+          it.stats.equipped = false;
+          if (this.characterId) updateInventoryItemStats(this.characterId, it.item_name, it.stats).catch(() => { });
+        }
+      }
+      const sigItem = this.inventory.find(i => i.item_name === sig);
+      if (sigItem) {
+        sigItem.stats = sigItem.stats || {};
+        sigItem.stats.equipped = true;
+        if (this.characterId) updateInventoryItemStats(this.characterId, sig, sigItem.stats).catch(() => { });
+        this.character.equipWeapon(sig);
+        if (this.setFishingButtonVisible) this.setFishingButtonVisible(false);
+      }
+      this.addCombatLog(`${ITEMS[sig].emoji || '🗡️'} ได้รับอาวุธประจำอาชีพ: ${sig} (สวมใส่ให้แล้ว)`, 'loot');
+    }
+    // Remove hats/glasses (and any lingering weapon) the new job can't wear.
+    for (const it of this.inventory) {
+      if (it.item_type !== 'weapon' && it.item_type !== 'hat' && it.item_type !== 'glasses') continue;
+      if (it.stats && it.stats.equipped && !canEquipItem(it.item_name, jobId)) {
+        it.stats.equipped = false;
+        if (this.characterId) updateInventoryItemStats(this.characterId, it.item_name, it.stats).catch(() => { });
+        if (it.item_type === 'hat') this.character.setHat(null);
+        else if (it.item_type === 'glasses') this.character.setGlasses(null);
+        else this.character.equipWeapon(null);
+      }
+    }
+    this._renderInventory();
 
     const m = document.getElementById('job-modal');
     if (m) m.style.display = 'none';

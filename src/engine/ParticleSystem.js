@@ -299,6 +299,154 @@ export class ParticleSystem {
         }
     }
 
+    // ============ Skill FX primitives ============
+    // Small composable pieces that reuse the existing hitEffects / shockwaves
+    // update pools, so per-skill effects can be built dramatically but cheaply.
+    _fxBurst(pos, color, count, speed, opts = {}) {
+        if (!this.effectsEnabled) return;
+        const n = Math.max(1, Math.floor(count * this.perfMonitor.getParticleCount()));
+        const seg = this.perfMonitor.getGeometrySegments();
+        const size = opts.size || 0.12;
+        const yOff = opts.yOff != null ? opts.yOff : 0.5;
+        for (let i = 0; i < n; i++) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(size, seg, seg),
+                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+            mesh.position.set(pos.x, pos.y + yOff, pos.z);
+            const a = Math.random() * Math.PI * 2, up = Math.random() * Math.PI;
+            const s = speed * (0.4 + Math.random() * 0.8);
+            this.scene.add(mesh);
+            this.hitEffects.push({
+                mesh,
+                velocity: new THREE.Vector3(Math.cos(a) * Math.sin(up) * s, Math.cos(up) * s + (opts.rise || 0), Math.sin(a) * Math.sin(up) * s),
+                life: opts.life || 0.9,
+                gravity: opts.gravity != null ? opts.gravity : 4,
+            });
+        }
+    }
+
+    _fxRing(pos, color, maxLife = 0.6, y = 0.06, r0 = 0.2, r1 = 0.6) {
+        if (!this.effectsEnabled) return;
+        const mesh = new THREE.Mesh(
+            new THREE.RingGeometry(r0, r1, 32),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+        mesh.position.set(pos.x, pos.y + y, pos.z);
+        mesh.rotation.x = -Math.PI / 2;
+        this.scene.add(mesh);
+        this.shockwaves.push({ mesh, life: maxLife, maxLife, type: 'ripple' });
+    }
+
+    _fxPillar(pos, color, maxLife = 0.7, h = 3, r = 0.7) {
+        if (!this.effectsEnabled) return;
+        const mesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(r * 0.35, r, h, 16, 1, true),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+        mesh.position.set(pos.x, pos.y + h / 2, pos.z);
+        this.scene.add(mesh);
+        this.shockwaves.push({ mesh, life: maxLife, maxLife, type: 'column' });
+    }
+
+    // A protective bubble that flashes and fades (no scaling) — for shield buffs.
+    _fxDome(pos, color, r = 0.95, opacity = 0.28, maxLife = 0.6) {
+        if (!this.effectsEnabled) return;
+        const seg = Math.max(8, this.perfMonitor.getGeometrySegments() * 2);
+        const mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(r, seg, seg),
+            new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide }));
+        mesh.position.set(pos.x, pos.y + 1.0, pos.z);
+        this.scene.add(mesh);
+        this.shockwaves.push({ mesh, life: maxLife, maxLife, type: 'dot' });
+    }
+
+    // Projectiles / shards raining straight down onto an area.
+    _fxRain(pos, color, count, radius = 3) {
+        if (!this.effectsEnabled) return;
+        const n = Math.max(1, Math.floor(count * this.perfMonitor.getParticleCount()));
+        for (let i = 0; i < n; i++) {
+            const mesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.02, 0.02, 0.5, 4),
+                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+            const a = Math.random() * Math.PI * 2, rr = Math.random() * radius;
+            mesh.position.set(pos.x + Math.cos(a) * rr, pos.y + 4 + Math.random() * 2.5, pos.z + Math.sin(a) * rr);
+            this.scene.add(mesh);
+            this.hitEffects.push({ mesh, velocity: new THREE.Vector3(0, -(9 + Math.random() * 5), 0), life: 0.7 + Math.random() * 0.3, gravity: -6 });
+        }
+    }
+
+    // ============ Per-skill spectacular effect ============
+    // Dispatched by skill id so each of the 12 skills has its own signature.
+    spawnSkillEffect(skillId, origin, targetPos) {
+        if (!this.effectsEnabled || !origin) return;
+        const at = targetPos || origin;
+        switch (skillId) {
+            // --- Novice / shared ---
+            case 'bash':
+                this._fxBurst(at, 0xff7a30, 22, 6, { life: 0.6 });
+                this._fxRing(at, 0xffb060, 0.4, 0.06, 0.2, 0.9);
+                break;
+            case 'heal':
+                this._fxBurst(origin, 0x66ff88, 22, 2, { rise: 3, gravity: -1, life: 1.1, size: 0.08 });
+                this._fxRing(origin, 0x8effa0, 0.7, 0.06, 0.2, 1.1);
+                this._fxPillar(origin, 0x66ff88, 0.7, 2.6, 0.7);
+                break;
+            case 'magnumBreak':
+                this._fxBurst(origin, 0xff4010, 40, 9, { rise: 2, life: 0.9 });
+                this._fxRing(origin, 0xff6020, 0.7, 0.06, 0.4, 5.5);
+                this._fxPillar(origin, 0xff5020, 0.6, 3.6, 1.3);
+                break;
+            // --- Swordsman ---
+            case 'endure':
+                this._fxDome(origin, 0xbcd0ff, 0.95, 0.3, 0.7);
+                this._fxRing(origin, 0xcfe0ff, 0.7, 0.06, 0.3, 1.3);
+                this._fxBurst(origin, 0xdfe8ff, 14, 3, { rise: 2, gravity: -1, life: 0.9, size: 0.08 });
+                break;
+            // --- Mage ---
+            case 'fireBolt':
+                this._fxBurst(at, 0xff6020, 30, 7, { life: 0.8, rise: 1 });
+                this._fxRing(at, 0xffa040, 0.5, 0.5, 0.2, 1.2);
+                this._fxPillar(at, 0xff7020, 0.5, 2.2, 0.5);
+                break;
+            case 'frostNova':
+                this._fxBurst(origin, 0x9fe8ff, 36, 8, { rise: 1, life: 0.9, size: 0.14 });
+                this._fxRing(origin, 0x66d0ff, 0.8, 0.06, 0.4, 6);
+                this._fxRing(origin, 0xffffff, 0.6, 0.06, 0.3, 4);
+                break;
+            case 'energyCoat':
+                this._fxDome(origin, 0xa070ff, 0.95, 0.3, 0.7);
+                this._fxBurst(origin, 0xb890ff, 20, 3, { rise: 2.5, gravity: -1.2, life: 1.1, size: 0.09 });
+                this._fxRing(origin, 0x9060ff, 0.7, 0.06, 0.3, 1.3);
+                break;
+            // --- Archer ---
+            case 'doubleStrafe':
+                this._fxBurst(at, 0x9dff70, 16, 6, { life: 0.5 });
+                this._fxBurst(at, 0xd8ffb0, 16, 7, { life: 0.5, yOff: 0.8 });
+                this._fxRing(at, 0xa0ff60, 0.4, 0.5, 0.2, 0.8);
+                break;
+            case 'arrowShower':
+                this._fxRain(origin, 0xc8ff90, 40, 5.5);
+                this._fxRing(origin, 0xa0ff60, 0.8, 0.06, 0.4, 5.5);
+                break;
+            case 'concentration':
+                this._fxRing(origin, 0xffd24a, 0.8, 0.06, 1.6, 0.2); // ring converging inward look
+                this._fxBurst(origin, 0xffe27a, 22, 3, { rise: 2.5, gravity: -1.2, life: 1.0, size: 0.09 });
+                this._fxPillar(origin, 0xffd24a, 0.7, 2.8, 0.7);
+                break;
+            // --- Priest ---
+            case 'holyLight':
+                this._fxPillar(at, 0xfff2a0, 0.8, 4.5, 1.0);
+                this._fxBurst(at, 0xffffc0, 30, 6, { rise: 2, gravity: 1, life: 0.9, size: 0.1 });
+                this._fxRing(at, 0xfff0a0, 0.6, 0.06, 0.3, 1.6);
+                break;
+            case 'blessing':
+                this._fxBurst(origin, 0xfff0a0, 26, 3, { rise: 3, gravity: -1.2, life: 1.2, size: 0.09 });
+                this._fxRing(origin, 0xffe98a, 0.8, 0.06, 0.3, 1.4);
+                this._fxPillar(origin, 0xfff2b0, 0.7, 3.2, 0.7);
+                break;
+            default:
+                this._fxBurst(at, 0xffffff, 20, 6, { life: 0.7 });
+        }
+    }
+
     createClickIndicator(position, color = 0xffffff) {
         // Step 11: Three layered effects for click-to-move indicator
 

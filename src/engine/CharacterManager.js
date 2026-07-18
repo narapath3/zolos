@@ -206,7 +206,7 @@ export class CharacterManager {
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
         if (w === 'Heavy Warhammer') return 'blunt';
-        if (w === 'Mage Staff') return 'staff';
+        if (w === 'Mage Staff' || w === 'Holy Rod') return 'staff';
         return 'sword';
     }
 
@@ -337,6 +337,50 @@ export class CharacterManager {
 
             group.position.set(0, -0.2, 0.15);
 
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Mage Staff') {
+            const group = new THREE.Group();
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.045, 1.1, 6),
+                new THREE.MeshLambertMaterial({ color: 0x6a4a2a }));
+            shaft.position.set(0, 0.15, 0);
+            shaft.castShadow = true;
+            group.add(shaft);
+            const orb = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12, 12, 12),
+                new THREE.MeshBasicMaterial({ color: 0x66ccff }));
+            orb.position.set(0, 0.78, 0);
+            group.add(orb);
+            const orbGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.2, 12, 12),
+                new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.3 }));
+            orbGlow.position.copy(orb.position);
+            group.add(orbGlow);
+            group.position.set(0, -0.1, 0.12);
+            this.weaponMesh = group;
+            this.rightArm.add(this.weaponMesh);
+        } else if (itemName === 'Holy Rod') {
+            const group = new THREE.Group();
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.04, 1.0, 6),
+                new THREE.MeshLambertMaterial({ color: 0xd9b84a }));
+            shaft.position.set(0, 0.1, 0);
+            shaft.castShadow = true;
+            group.add(shaft);
+            const goldMat = new THREE.MeshBasicMaterial({ color: 0xfff0a0 });
+            const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.06), goldMat);
+            crossV.position.set(0, 0.72, 0);
+            group.add(crossV);
+            const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.06), goldMat);
+            crossH.position.set(0, 0.72, 0);
+            group.add(crossH);
+            const holyGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.18, 12, 12),
+                new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0.35 }));
+            holyGlow.position.set(0, 0.72, 0);
+            group.add(holyGlow);
+            group.position.set(0, -0.1, 0.12);
             this.weaponMesh = group;
             this.rightArm.add(this.weaponMesh);
         } else if (itemName === 'Fishing Rod') {
@@ -666,7 +710,88 @@ export class CharacterManager {
         this.mesh.position.set(0, 1.2, 10);
         this.scene.add(this.mesh);
 
+        this._applyJobAppearance();
         this.updateNameTag();
+    }
+
+    // Adds class-specific silhouette pieces (pauldrons, robe, hat, quiver, halo)
+    // over the player's chosen colors so each job is instantly recognisable —
+    // for yourself and for everyone else (job is synced via getAppearance()).
+    _applyJobAppearance() {
+        if (!this.mesh) return;
+        if (this._jobDecor) {
+            for (const m of this._jobDecor) {
+                this.mesh.remove(m);
+                m.traverse?.(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) Array.isArray(c.material) ? c.material.forEach(x => x.dispose()) : c.material.dispose();
+                });
+            }
+        }
+        this._jobDecor = [];
+        const job = this.stats && this.stats.job;
+        if (!job) return;
+
+        const add = (obj) => { this.mesh.add(obj); this._jobDecor.push(obj); };
+        const lambert = (color) => new THREE.MeshLambertMaterial({ color });
+        const glow = (color, opacity = 0.5) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
+
+        if (job === 'swordsman') {
+            const steel = lambert(0x9aa4b2);
+            [-0.37, 0.37].forEach(x => {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.16, 0.36), steel);
+                p.position.set(x, 1.3, 0);
+                p.castShadow = true;
+                add(p);
+            });
+            const cape = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.95, 0.05), lambert(0x8a1a2a));
+            cape.position.set(0, 0.95, -0.24);
+            add(cape);
+        } else if (job === 'mage') {
+            const purple = lambert(0x5b3a9a);
+            const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 12), purple);
+            brim.position.set(0, 2.12, 0);
+            add(brim);
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.55, 12), purple);
+            cone.position.set(0, 2.42, 0);
+            cone.castShadow = true;
+            add(cone);
+            const star = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), glow(0x9fd8ff, 0.9));
+            star.position.set(0, 2.72, 0);
+            add(star);
+            const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.56, 0.95, 10), lambert(0x4030a0));
+            robe.position.set(0, 0.5, 0);
+            robe.castShadow = true;
+            add(robe);
+        } else if (job === 'archer') {
+            const hood = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.36, 0.62), lambert(0x2f5a2f));
+            hood.position.set(0, 1.98, -0.02);
+            hood.castShadow = true;
+            add(hood);
+            const quiver = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), lambert(0x6a4a2a));
+            quiver.position.set(0.16, 1.15, -0.26);
+            quiver.rotation.z = 0.35;
+            quiver.castShadow = true;
+            add(quiver);
+            const tipMat = glow(0xe8e0c0, 1);
+            [-0.05, 0, 0.05].forEach((dx, i) => {
+                const tip = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 6), tipMat);
+                tip.position.set(0.16 + dx, 1.45 + i * 0.02, -0.28);
+                add(tip);
+            });
+        } else if (job === 'priest') {
+            const halo = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.035, 8, 20), glow(0xffe98a, 0.95));
+            halo.position.set(0, 2.28, 0);
+            halo.rotation.x = Math.PI / 2;
+            add(halo);
+            const collar = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.16, 0.5), lambert(0xf2efe2));
+            collar.position.set(0, 1.32, 0);
+            add(collar);
+            const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.54, 0.95, 10), lambert(0xece4d0));
+            robe.position.set(0, 0.5, 0);
+            robe.castShadow = true;
+            add(robe);
+        }
     }
 
     // Set body & arm color dynamically (for username-based consistent coloring)
@@ -1607,10 +1732,10 @@ export class CharacterManager {
             }
 
             if (particleSystem) {
-                if (particleSystem.createCriticalBurst) {
+                if (particleSystem.spawnSkillEffect) {
+                    particleSystem.spawnSkillEffect(skillId, this.mesh.position, currentTarget.mesh.position);
+                } else if (particleSystem.createCriticalBurst) {
                     particleSystem.createCriticalBurst(currentTarget.mesh.position);
-                } else if (particleSystem.createHitBurst) {
-                    particleSystem.createHitBurst(currentTarget.mesh.position);
                 }
             }
 
@@ -1624,7 +1749,9 @@ export class CharacterManager {
             const dmgBase = this.stats.atk * skill.damageMultiplier;
 
             if (gameUI) gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] โจมตีเป็นวงกว้าง!`, 'atk');
-            if (particleSystem && particleSystem.createExplosion) {
+            if (particleSystem && particleSystem.spawnSkillEffect) {
+                particleSystem.spawnSkillEffect(skillId, this.mesh.position);
+            } else if (particleSystem && particleSystem.createExplosion) {
                 particleSystem.createExplosion(this.mesh.position, skill.color || 0xff6600);
             }
 
@@ -1661,7 +1788,9 @@ export class CharacterManager {
             this.heal(healVal);
 
             if (gameUI) gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] ฟื้นฟู HP +${healVal}!`, 'heal');
-            if (particleSystem && particleSystem.createHealEffect) {
+            if (particleSystem && particleSystem.spawnSkillEffect) {
+                particleSystem.spawnSkillEffect(skillId, this.mesh.position);
+            } else if (particleSystem && particleSystem.createHealEffect) {
                 particleSystem.createHealEffect(this.mesh.position);
             }
             if (effectCallback) effectCallback(skillId, this, healVal);
@@ -1674,7 +1803,9 @@ export class CharacterManager {
                     `${skill.emoji} ใช้ [${skill.name}] ${label} +${Math.round(skill.buffPct * 100)}% นาน ${skill.buffDuration} วิ`,
                     'heal');
             }
-            if (particleSystem && particleSystem.createHealEffect) {
+            if (particleSystem && particleSystem.spawnSkillEffect) {
+                particleSystem.spawnSkillEffect(skillId, this.mesh.position);
+            } else if (particleSystem && particleSystem.createHealEffect) {
                 particleSystem.createHealEffect(this.mesh.position);
             }
             if (effectCallback) effectCallback(skillId, this, 0);
@@ -1707,6 +1838,7 @@ export class CharacterManager {
         this.stats.zol = isNaN(Number(data.zol)) ? 0 : Number(data.zol);
         // Job: null/unknown means Novice (hasn't chosen a path yet).
         this.stats.job = JOBS[data.job] ? data.job : null;
+        this._applyJobAppearance(); // render the class silhouette once the job is known
         this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
         // PVP ranking (server-authoritative — written only by the map server)
@@ -1763,6 +1895,7 @@ export class CharacterManager {
             hat: this.equippedHat,
             glasses: this.equippedGlasses,
             weapon: this.equippedWeapon,
+            job: this.stats ? (this.stats.job || null) : null,
             title: this.title
         };
     }
@@ -1776,6 +1909,14 @@ export class CharacterManager {
         if (app.hat !== undefined) this.setHat(app.hat);
         if (app.glasses !== undefined) this.setGlasses(app.glasses);
         if (app.weapon !== undefined) this.equipWeapon(app.weapon);
+        // Sync class so other players see this hero's job-specific look.
+        if (app.job !== undefined) {
+            if (!this.stats) this.stats = {};
+            if (this.stats.job !== app.job) {
+                this.stats.job = app.job;
+                this._applyJobAppearance();
+            }
+        }
         if (app.title !== undefined) this.setTitle(app.title);
     }
 
