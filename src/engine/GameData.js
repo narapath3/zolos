@@ -28,10 +28,10 @@ export const ITEMS = {
     // Pickaxe ladder: rarer = pricier, higher level, mines more ore per swing,
     // swings faster (mineTime, seconds) and lasts longer (durability = swings
     // before it breaks and must be re-bought). Pickaxes are equippable tools.
-    'Stone Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'uncommon', desc: 'พลั่วหินพื้นฐานสำหรับขุดแร่สวรรค์ ขุดได้ครั้งละ 1 แร่ (เลเวล 25+) · ทน 15 ครั้ง · ขุด 5 วิ/ครั้ง', price: 8000, mineYield: 1, levelReq: 25, durability: 15, mineTime: 5 },
-    'Mythril Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'rare', desc: 'พลั่วมิธริลเนื้อแกร่ง ขุดได้ครั้งละ 2 แร่ (เลเวล 25+) · ทน 30 ครั้ง · ขุด 4 วิ/ครั้ง', price: 30000, mineYield: 2, levelReq: 25, durability: 30, mineTime: 4 },
-    'Celestial Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'epic', desc: 'พลั่วศักดิ์สิทธิ์เปล่งประกาย ขุดได้ครั้งละ 3 แร่ (เลเวล 30+) · ทน 60 ครั้ง · ขุด 3 วิ/ครั้ง', price: 90000, mineYield: 3, levelReq: 30, durability: 60, mineTime: 3 },
-    'Divine Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'legendary', desc: 'พลั่วเทวะระดับตำนาน ขุดได้ครั้งละ 5 แร่ (เลเวล 40+) · ทน 150 ครั้ง · ขุด 2 วิ/ครั้ง', price: 250000, mineYield: 5, levelReq: 40, durability: 150, mineTime: 2 },
+    'Stone Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'uncommon', desc: 'พลั่วหินพื้นฐานสำหรับขุดแร่สวรรค์ ขุดได้ครั้งละ 1 แร่ (เลเวล 25+) · ทน 15 ครั้ง · ขุด 10 วิ/ครั้ง', price: 8000, mineYield: 1, levelReq: 25, durability: 15, mineTime: 10 },
+    'Mythril Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'rare', desc: 'พลั่วมิธริลเนื้อแกร่ง ขุดได้ครั้งละ 2 แร่ (เลเวล 25+) · ทน 30 ครั้ง · ขุด 8 วิ/ครั้ง', price: 30000, mineYield: 2, levelReq: 25, durability: 30, mineTime: 8 },
+    'Celestial Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'epic', desc: 'พลั่วศักดิ์สิทธิ์เปล่งประกาย ขุดได้ครั้งละ 3 แร่ (เลเวล 30+) · ทน 60 ครั้ง · ขุด 6 วิ/ครั้ง', price: 90000, mineYield: 3, levelReq: 30, durability: 60, mineTime: 6 },
+    'Divine Pickaxe': { emoji: '⛏️', type: 'tool', rarity: 'legendary', desc: 'พลั่วเทวะระดับตำนาน ขุดได้ครั้งละ 5 แร่ (เลเวล 40+) · ทน 150 ครั้ง · ขุด 4 วิ/ครั้ง', price: 250000, mineYield: 5, levelReq: 40, durability: 150, mineTime: 4 },
     'Celestial Ore': { emoji: '💠', type: 'material', rarity: 'legendary', desc: 'แร่เรืองแสงหายากจากเมืองสวรรค์ มูลค่าสูงมาก นำไปแปลงเป็นเหรียญ ZOL ได้ที่พ่อค้าสวรรค์', price: 0 },
     'Coal': { emoji: '🖤', type: 'material', rarity: 'common', desc: 'ถ่านดำอิ่มตัว ร้อนแรงและเผาไหม้ได้อุณหภูมิสม่ำเสมอยิ่ง', price: 80 },
     'Decay Tooth': { emoji: '🦷', type: 'material', rarity: 'common', desc: 'เศษฟันผุพังมีกลิ่นอับ บดคั้นกลั่นเป็นเครื่องรางเตือนภัย', price: 20 },

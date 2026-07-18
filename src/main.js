@@ -332,6 +332,9 @@ async function initGame(charData) {
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
     window.gameUI = gameUI;
+    // Exposed alongside the other systems (particles / rendererSystem /
+    // remotePlayersMap) so the scene is reachable for debugging.
+    window.sceneManager = sceneManager;
     gameUI.particles = particles;
 
     // Build the World Boss HUD (countdown, HP bar, summary board)
@@ -1986,8 +1989,51 @@ function stepWorld(dt) {
     if (combatSystem) combatSystem.update(dt);
     autoCastSkills(dt); // AUTO also casts the 3 skills
     if (gameUI) {
+        updateOreTargeting(dt);       // ore in range + AUTO walks to ore and mines
         gameUI.updateMining();        // timed mining "job" (also runs while hidden)
         gameUI.updateAutoPotion(dt);  // auto HP/SP potions (also while hidden)
+    }
+}
+
+// Ore targeting + AUTO mining. Finds the ore node you're standing next to (which
+// drives the ⛏️ button), and when AUTO is on in Svarrga — a peaceful city with no
+// monsters, so the combat bot has nothing to do — walks to the nearest node and
+// keeps the mining job running. Called from stepWorld so it also works while the
+// tab is backgrounded.
+function updateOreTargeting(dt) {
+    if (!gameUI || !sceneManager || !character) return;
+
+    const inSvarrga = sceneManager.currentMap === 'svarrga';
+    let nearOre = null;                 // in mining range right now
+    let nearest = null, nearestDist = Infinity; // closest node at any distance
+
+    if (inSvarrga && sceneManager.getOreNodes) {
+        const pp = character.getPosition();
+        for (const n of sceneManager.getOreNodes()) {
+            if (!n.userData || n.userData.mined) continue;
+            const d = pp.distanceTo(n.position);
+            if (d < 4.5 && !nearOre) nearOre = n;
+            if (d < nearestDist) { nearestDist = d; nearest = n; }
+        }
+    }
+    gameUI.setMineTarget(nearOre);
+
+    // Leaving the mining city ends any running mining job.
+    if (!inSvarrga) {
+        if (gameUI.miningActive) gameUI.stopMining('⛏️ ออกจากเมืองสวรรค์ — หยุดขุด');
+        return;
+    }
+
+    // ----- AUTO mines too -----
+    if (!combatSystem || !combatSystem.autoFarm) return;
+    if (gameUI.bestPickaxeYield() <= 0) return;   // no usable pickaxe equipped
+    if (!gameUI.miningActive) gameUI.startMining();
+    // Nothing in range yet → walk to the closest node. Move directly rather than
+    // via autoPath: stepWorld clears autoPath every frame while autoFarm is on
+    // (CombatSystem owns movement then), so an autoPath here would never stick.
+    if (!nearOre && nearest && nearestDist > 3.0) {
+        character.targetMonster = null;
+        character.moveToward(nearest.position, dt);
     }
 }
 
@@ -2083,22 +2129,8 @@ function gameLoop(time) {
             lastMinimapTime = now;
         }
 
-        // Mining prompt: show the ⛏️ ขุด button when standing next to an
-        // un-mined Celestial Ore node in Svarrga, so mining is discoverable
-        // (a button) rather than needing a precise tap on the rock.
-        if (gameUI) {
-            const inSvarrga = sceneManager.currentMap === 'svarrga';
-            let nearOre = null;
-            if (inSvarrga && sceneManager.getOreNodes) {
-                const pp = character.getPosition();
-                for (const n of sceneManager.getOreNodes()) {
-                    if (n.userData && !n.userData.mined && pp.distanceTo(n.position) < 4.5) { nearOre = n; break; }
-                }
-            }
-            gameUI.setMineTarget(nearOre);
-            // Leaving the mining city ends any running mining job.
-            if (!inSvarrga && gameUI.miningActive) gameUI.stopMining('⛏️ ออกจากเมืองสวรรค์ — หยุดขุด');
-        }
+        // (Ore targeting + AUTO mining now live in stepWorld so they keep
+        // running while the tab is hidden — see updateOreTargeting.)
 
         sceneManager.render();
     } catch (err) {
