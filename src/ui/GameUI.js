@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
@@ -2725,6 +2725,7 @@ export class GameUI {
           const uid = rawId.substring(0, 8).toUpperCase();
           uidDisplay.textContent = `UID: #${uid}`;
         }
+        this._renderProfileJob();
         if (nameInput) nameInput.value = this.character.stats?.name || '';
         if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
         if (pantsInput) pantsInput.value = hexToStr(this.character.pantsColor || 0x3a3a5a);
@@ -4773,6 +4774,227 @@ export class GameUI {
     }
   }
 
+  // ============ Jobs ============
+  // Opens the job picker. `isChange` is the paid re-spec path (JOB_CHANGE_COST
+  // Zeny); the first pick at JOB_UNLOCK_LEVEL is free.
+  openJobSelect(isChange = false) {
+    if (!this.character) return;
+    const s = this.character.stats;
+    if ((Number(s.level) || 1) < JOB_UNLOCK_LEVEL) {
+      this.addCombatLog(`🔒 ต้องถึงเลเวล ${JOB_UNLOCK_LEVEL} ก่อนถึงจะเลือกอาชีพได้`, 'system');
+      return;
+    }
+
+    if (!document.getElementById('job-style')) {
+      const st = document.createElement('style');
+      st.id = 'job-style';
+      st.textContent = `
+        #job-modal{position:fixed;inset:0;z-index:1500;display:none;align-items:center;justify-content:center;
+          background:rgba(0,0,0,.72);backdrop-filter:blur(4px);padding:12px;box-sizing:border-box;}
+        #job-card{width:min(600px,95vw);max-height:90vh;display:flex;flex-direction:column;border-radius:16px;
+          background:var(--bg-panel);border:4px solid var(--gold-border);
+          box-shadow:0 10px 0 var(--primary-deep),0 24px 60px rgba(0,0,0,.7);overflow:hidden;}
+        #job-card .job-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:16px 18px;}
+        .job-row{display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:10px;border-radius:12px;
+          background:var(--bg-item);border:1px solid var(--border);cursor:pointer;transition:border-color .2s,transform .1s;}
+        .job-row:hover{border-color:var(--primary);transform:translateY(-1px);}
+        .job-row.current{border-color:var(--primary);background:rgba(240,192,64,.10);}
+        .job-btn{border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-family:var(--font-main);
+          font-weight:800;font-size:13px;color:#3a2000;background:linear-gradient(135deg,#ffe89a,var(--primary) 50%,var(--primary-deep));}
+        .job-btn:disabled{filter:grayscale(.7);opacity:.55;cursor:not-allowed;color:#5a5a5a;}
+        @media (max-width:768px){#job-modal{align-items:flex-start;padding:8px 8px 116px;}
+          #job-card{width:100%;max-height:calc(100dvh - 132px);}}`;
+      document.head.appendChild(st);
+    }
+
+    let modal = document.getElementById('job-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'job-modal';
+      modal.innerHTML = `<div id="job-card"></div>`;
+      document.body.appendChild(modal);
+    }
+    this._renderJobSelect(isChange);
+    modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+  }
+
+  _renderJobSelect(isChange) {
+    const card = document.getElementById('job-card');
+    if (!card) return;
+    const s = this.character.stats;
+    const gold = Number(s.gold) || 0;
+    const current = s.job;
+
+    const rows = Object.values(JOBS).map(job => {
+      const isCurrent = current === job.id;
+      const skillList = job.skills.map(id => {
+        const sk = SKILLS[id];
+        return sk ? `${sk.emoji} ${sk.name}` : id;
+      }).join(' · ');
+      let btn;
+      if (isCurrent) btn = `<button class="job-btn" disabled>อาชีพปัจจุบัน</button>`;
+      else if (isChange && gold < JOB_CHANGE_COST) btn = `<button class="job-btn" disabled>Zeny ไม่พอ</button>`;
+      else btn = `<button class="job-btn" data-job="${job.id}">${isChange ? 'เปลี่ยนเป็นสายนี้' : 'เลือกสายนี้'}</button>`;
+      return `
+        <div class="job-row ${isCurrent ? 'current' : ''}">
+          <div style="font-size:34px;flex:0 0 auto;">${job.emoji}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;color:#fff;font-size:15px;">${job.name}
+              <span style="color:var(--text-dim);font-size:11px;font-weight:600;">${job.nameEn}</span></div>
+            <div style="font-size:11px;color:var(--text-dim);line-height:1.45;margin:2px 0 4px;">${job.desc}</div>
+            <div style="font-size:11px;color:#7fe0ff;">${skillList}</div>
+          </div>
+          <div style="flex:0 0 auto;">${btn}</div>
+        </div>`;
+    }).join('');
+
+    const header = isChange
+      ? `เปลี่ยนสายอาชีพ — มีค่าใช้จ่าย <b style="color:var(--primary)">${JOB_CHANGE_COST.toLocaleString()}</b> Zeny (คุณมี ${gold.toLocaleString()})`
+      : `ถึงเลเวล ${JOB_UNLOCK_LEVEL} แล้ว! เลือกสายอาชีพของคุณ — เปลี่ยนภายหลังได้โดยเสีย ${JOB_CHANGE_COST.toLocaleString()} Zeny`;
+
+    card.innerHTML = `
+      <div style="padding:16px 18px 12px;background:linear-gradient(90deg,rgba(240,192,64,.14),transparent);border-bottom:1px solid var(--border);position:relative;">
+        ${isChange ? `<button id="job-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>` : ''}
+        <div style="font-family:var(--font-main);color:#fff;font-size:19px;text-shadow:0 0 12px rgba(240,192,64,.5);">🎖️ สายอาชีพ</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;line-height:1.5;">${header}</div>
+      </div>
+      <div class="job-body">${rows}
+        <div style="text-align:center;font-size:10px;color:var(--text-dim);opacity:.75;margin-top:4px;">
+          ทุกสายมีสเตตัสและใช้อุปกรณ์ได้เหมือนกัน — ต่างกันที่ชุดสกิลเท่านั้น
+        </div>
+      </div>`;
+
+    const closeBtn = card.querySelector('#job-close');
+    if (closeBtn) closeBtn.onclick = () => {
+      const m = document.getElementById('job-modal');
+      if (m) m.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    };
+    card.querySelectorAll('[data-job]').forEach(b => {
+      b.onclick = () => this.chooseJob(b.dataset.job, isChange);
+    });
+  }
+
+  async chooseJob(jobId, isChange) {
+    const job = JOBS[jobId];
+    if (!job || !this.character) return;
+    const s = this.character.stats;
+    if (s.job === jobId) return;
+
+    if (isChange) {
+      if ((Number(s.gold) || 0) < JOB_CHANGE_COST) {
+        this.addCombatLog('❌ Zeny ไม่พอสำหรับเปลี่ยนอาชีพ', 'system');
+        return;
+      }
+      s.gold -= JOB_CHANGE_COST;
+    }
+
+    s.job = jobId;
+    // Old job's cooldowns are meaningless now — clear them so the new bar is live.
+    if (this.character.cooldowns) {
+      for (const k of Object.keys(this.character.cooldowns)) this.character.cooldowns[k] = 0;
+    }
+    this.renderSkillBar();
+
+    const m = document.getElementById('job-modal');
+    if (m) m.style.display = 'none';
+    this.updateMobileControlsVisibility();
+
+    if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
+    if (window.particles && this.character.getPosition) {
+      window.particles.createExplosion(this.character.getPosition(), 0xffd24a);
+    }
+    this.addCombatLog(
+      `${job.emoji} ${isChange ? 'เปลี่ยนอาชีพเป็น' : 'คุณคือ'} ${job.name} แล้ว! สกิลใหม่: ` +
+      job.skills.map(id => SKILLS[id] ? SKILLS[id].name : id).join(', '), 'levelup');
+
+    if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+    this.updateHUD(s);
+    this.updateStats(s);
+    this._renderProfileJob();
+  }
+
+  // Fill the Job row in the Profile tab and wire its change button.
+  _renderProfileJob() {
+    if (!this.character) return;
+    const job = JOBS[this.character.stats.job] || null;
+    const ids = this.character.getSkills ? this.character.getSkills() : [];
+    const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+
+    set('profile-job-emoji', job ? job.emoji : '🌱');
+    set('profile-job-name', job ? `${job.name} (${job.nameEn})` : 'Novice — ยังไม่ได้เลือกอาชีพ');
+    set('profile-job-skills', ids.map(id => SKILLS[id] ? `${SKILLS[id].emoji} ${SKILLS[id].name}` : id).join(' · '));
+
+    const btn = document.getElementById('btn-change-job');
+    if (btn) {
+      const lv = Number(this.character.stats.level) || 1;
+      if (lv < JOB_UNLOCK_LEVEL) {
+        btn.textContent = `🔒 Lv.${JOB_UNLOCK_LEVEL}`;
+        btn.disabled = true;
+      } else {
+        btn.disabled = false;
+        // No job yet → the first pick is free; otherwise it's the paid change.
+        btn.textContent = job ? `เปลี่ยน (${JOB_CHANGE_COST.toLocaleString()})` : 'เลือกอาชีพ';
+        btn.onclick = () => this.openJobSelect(!!job);
+      }
+    }
+  }
+
+  // Called after leveling / on load: nudge an eligible character with no job
+  // into picking one. Fires once per session so it can't nag every level-up.
+  maybePromptJobSelect() {
+    if (!this.character || this._jobPromptShown) return;
+    const s = this.character.stats;
+    if (s.job) return;
+    if ((Number(s.level) || 1) < JOB_UNLOCK_LEVEL) return;
+    this._jobPromptShown = true;
+    this.openJobSelect(false);
+  }
+
+  // Cast whatever skill sits in a given bar slot (0-2) for the current job.
+  // Hotkeys and the mobile buttons go through here so they follow a job change
+  // without any rebinding.
+  castSkillSlot(index) {
+    if (!this.character || !this.character.getSkills) return false;
+    const id = this.character.getSkills()[index];
+    if (!id) return false;
+    return this.castSkill(id);
+  }
+
+  // Paint the 3 skill slots (desktop bar + mobile buttons) from the active job.
+  renderSkillBar() {
+    if (!this.character || !this.character.getSkills) return;
+    const ids = this.character.getSkills();
+
+    document.querySelectorAll('.skill-slot').forEach((slot, i) => {
+      const id = ids[i];
+      const skill = id ? SKILLS[id] : null;
+      slot.setAttribute('data-skill', id || '');
+      slot.style.display = skill ? '' : 'none';
+      if (!skill) return;
+      slot.title = `[${i + 1}] ${skill.name}`;
+      const icon = slot.querySelector('.skill-icon');
+      if (icon) icon.textContent = skill.emoji;
+      const overlay = slot.querySelector('.skill-cooldown-overlay');
+      if (overlay) overlay.id = `cooldown-${id}`;
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const btn = document.getElementById(`btn-mobile-skill-${i + 1}`);
+      if (!btn) continue;
+      const id = ids[i];
+      const skill = id ? SKILLS[id] : null;
+      btn.style.display = skill ? '' : 'none';
+      if (!skill) continue;
+      btn.title = skill.name;
+      const icon = btn.querySelector('.skill-icon') || btn.querySelector('span');
+      if (icon) icon.textContent = skill.emoji;
+      const mob = btn.querySelector('.skill-cooldown-overlay') || document.getElementById(`mobile-cooldown-${id}`);
+      if (mob) mob.id = `mobile-cooldown-${id}`;
+    }
+  }
+
   castSkill(skillId) {
     if (!this.character || !this.character.isAlive()) return false;
 
@@ -4784,11 +5006,15 @@ export class GameUI {
       if (opponent) {
         target = opponent.character;
       }
-    } else if (skillId === 'bash' && !target) {
+    } else if (!target && SKILLS[skillId]
+      && (SKILLS[skillId].type === 'physical' || SKILLS[skillId].type === 'magic')) {
+      // Any single-target damage skill auto-snaps to the nearest monster when
+      // nothing is targeted (this used to be hardcoded to Bash only).
       if (this.combatSystem && this.combatSystem.monsters) {
         target = this.combatSystem.monsters.findNearest(this.character.getPosition());
-        // Snap target if within reasonable range (3x normal melee range)
-        if (target && this.character.getPosition().distanceTo(target.getPosition()) > this.character.getAttackRange() * 3) {
+        // Ranged skills may snap out to their cast range; melee gets 3x its reach.
+        const reach = SKILLS[skillId].castRange || this.character.getAttackRange() * 3;
+        if (target && this.character.getPosition().distanceTo(target.getPosition()) > reach) {
           target = null;
         }
       }
@@ -5087,17 +5313,18 @@ export class GameUI {
       });
     }
 
-    // Skill buttons touch and click triggers
-    ['bash', 'heal', 'magnumBreak'].forEach((skillId, index) => {
+    // Skill buttons touch and click triggers. Bound by SLOT, resolving the skill
+    // at press time, so they keep working after a job change.
+    [0, 1, 2].forEach((index) => {
       const btn = document.getElementById(`btn-mobile-skill-${index + 1}`);
       if (btn) {
         btn.addEventListener('touchstart', (e) => {
           e.preventDefault();
-          this.castSkill(skillId);
+          this.castSkillSlot(index);
         });
         btn.addEventListener('click', (e) => {
           e.preventDefault();
-          this.castSkill(skillId);
+          this.castSkillSlot(index);
         });
       }
     });

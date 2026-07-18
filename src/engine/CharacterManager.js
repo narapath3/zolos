@@ -1,6 +1,6 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS, ITEMS } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills } from './GameData.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
 // Walkable half-extent. The ground is a 70x70 plane centred at the origin
@@ -58,6 +58,9 @@ export class CharacterManager {
             max_sp: 50,
             atk: 10,
             def: 5,
+            // Job/class id (swordsman | mage | archer | priest). null = Novice,
+            // i.e. hasn't picked a path yet — see JOBS in GameData.
+            job: null,
             gold: 0,
             zol: 0, // in-game ZOL currency (from converting Celestial Ore)
             total_kills: 0,
@@ -75,6 +78,12 @@ export class CharacterManager {
             fps_enabled: true,
         };
 
+        // Temporary skill buffs, e.g. { atk: { pct: 0.4, remaining: 12 } }.
+        // Applied as a multiplier inside the atk/def getters below. The setters
+        // (and getSaveData) only ever touch _baseAtk/_baseDef, so a buff can
+        // never leak into the saved character.
+        this.activeBuffs = { atk: null, def: null };
+
         // Custom property getters for base stats + equipment bonuses
         this.stats._baseAtk = 10;
         this.stats._baseMaxSp = 50;
@@ -85,7 +94,7 @@ export class CharacterManager {
             get: () => {
                 const bonus = this.getWeaponAtkBonus(this.equippedWeapon);
                 const base = isNaN(this.stats._baseAtk) ? 10 : this.stats._baseAtk;
-                return base + bonus;
+                return Math.floor((base + bonus) * (1 + this.getBuffPct('atk')));
             },
             set: (val) => {
                 this.stats._baseAtk = isNaN(val) ? 10 : val;
@@ -124,7 +133,7 @@ export class CharacterManager {
             get: () => {
                 const bonus = this.getArmorDefBonus(this.equippedArmor) + this.getShieldDefBonus(this.equippedShield);
                 const base = isNaN(this.stats._baseDef) ? 5 : this.stats._baseDef;
-                return base + bonus;
+                return Math.floor((base + bonus) * (1 + this.getBuffPct('def')));
             },
             set: (val) => {
                 this.stats._baseDef = isNaN(val) ? 5 : val;
@@ -1330,6 +1339,7 @@ export class CharacterManager {
                 def: this.stats._baseDef !== undefined ? this.stats._baseDef : this.stats.def,
                 gold: this.stats.gold,
                 zol: this.stats.zol,
+                job: this.stats.job || null,
                 total_kills: this.stats.total_kills,
                 play_time: this.stats.play_time,
                 // Game settings
@@ -1369,6 +1379,9 @@ export class CharacterManager {
                 this.cooldowns[skillId] = Math.max(0, this.cooldowns[skillId] - dt);
             }
         }
+
+        // Expire temporary ATK/DEF buffs
+        this.updateBuffs(dt);
 
         // Idle bobbing
         if (this.state === 'idle') {
@@ -1479,6 +1492,40 @@ export class CharacterManager {
     }
 
     // ============ Skill System Action ============
+    // The 3 skill ids this character can cast, from its job (Novice until one
+    // is chosen). Single source of truth for the skill bar and AUTO casting.
+    getSkills() {
+        return getJobSkills(this.stats.job);
+    }
+
+    // ---- Temporary skill buffs ----
+    getBuffPct(stat) {
+        const b = this.activeBuffs && this.activeBuffs[stat];
+        return b && b.remaining > 0 ? b.pct : 0;
+    }
+
+    applyBuff(skill) {
+        if (!this.activeBuffs) this.activeBuffs = { atk: null, def: null };
+        // Recasting refreshes rather than stacks.
+        this.activeBuffs[skill.buffStat] = {
+            pct: skill.buffPct,
+            remaining: skill.buffDuration,
+            name: skill.name,
+            emoji: skill.emoji,
+        };
+    }
+
+    // Count buffs down; called from update(dt).
+    updateBuffs(dt) {
+        if (!this.activeBuffs) return;
+        for (const stat of Object.keys(this.activeBuffs)) {
+            const b = this.activeBuffs[stat];
+            if (!b) continue;
+            b.remaining -= dt;
+            if (b.remaining <= 0) this.activeBuffs[stat] = null;
+        }
+    }
+
     useSkill(skillId, currentTarget, monsterManager, gameUI, soundManager, particleSystem, effectCallback) {
         if (!this.isAlive()) return false;
 
@@ -1510,22 +1557,31 @@ export class CharacterManager {
             soundManager.playSkillSound(skillId);
         }
 
-        // Execute action
-        if (skillId === 'bash') {
+        // ---- Execute: dispatched on skill.type, so every skill is pure data ----
+        const refund = () => { this.stats.sp += skill.spCost; this.cooldowns[skillId] = 0; };
+        // Damage roll: ±spread around the base (single target ±10%, AoE ±20%).
+        const roll = (base, spread) => Math.max(1, Math.floor(base * (1 - spread + Math.random() * spread * 2)));
+
+        if (skill.type === 'physical' || skill.type === 'magic') {
             if (!currentTarget) {
-                if (gameUI) gameUI.addCombatLog('❌ ต้องการเป้าหมายในการใช้ Bash!', 'system');
-                // Refund
-                this.stats.sp += skill.spCost;
-                this.cooldowns[skillId] = 0;
+                if (gameUI) gameUI.addCombatLog(`❌ ต้องการเป้าหมายในการใช้ ${skill.name}!`, 'system');
+                refund();
                 return false;
             }
+            // Ranged skills reach further than a melee swing; melee ones have no
+            // castRange and rely on the caller's own range check.
+            if (skill.castRange && currentTarget.mesh) {
+                const d = this.mesh.position.distanceTo(currentTarget.mesh.position);
+                if (d > skill.castRange) {
+                    if (gameUI) gameUI.addCombatLog(`❌ ${skill.name} ไกลเกินไป (ระยะ ${skill.castRange})`, 'system');
+                    refund();
+                    return false;
+                }
+            }
 
-            // Deal 1.5x damage
-            const dmgBase = this.stats.atk * skill.damageMultiplier;
-            const finalDmg = Math.max(1, Math.floor(dmgBase * (0.9 + Math.random() * 0.2)));
+            const finalDmg = roll(this.stats.atk * skill.damageMultiplier, 0.1);
             const actualDmg = currentTarget.takeDamage(finalDmg);
 
-            // If casting on player in duel:
             if (window.duelState && currentTarget.stats) {
                 import('../network/GameSync.js').then(({ sendDuelHit }) => {
                     sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
@@ -1534,10 +1590,9 @@ export class CharacterManager {
 
             if (gameUI) {
                 const targetName = currentTarget.stats ? currentTarget.stats.name : (currentTarget.data ? currentTarget.data.name : currentTarget.name);
-                gameUI.addCombatLog(`⚔️ ใช้ [Bash] โจมตี ${targetName}! สร้างความเสียหาย ${actualDmg}`, 'atk');
+                gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] โจมตี ${targetName}! สร้างความเสียหาย ${actualDmg}`, 'atk');
             }
 
-            // Spawn skill burst particles
             if (particleSystem) {
                 if (particleSystem.createCriticalBurst) {
                     particleSystem.createCriticalBurst(currentTarget.mesh.position);
@@ -1546,71 +1601,70 @@ export class CharacterManager {
                 }
             }
 
-            if (effectCallback) effectCallback('bash', currentTarget, actualDmg);
+            if (effectCallback) effectCallback(skillId, currentTarget, actualDmg);
 
-        } else if (skillId === 'heal') {
-            // Heal calculation
-            const healVal = this.stats.level * skill.healBase + Math.floor(this.stats.atk * 0.5);
-            this.heal(healVal);
-
-            if (gameUI) {
-                gameUI.addCombatLog(`✨ ใช้ [Heal] ฟื้นฟู HP +${healVal}!`, 'heal');
-            }
-
-            // Particles
-            if (particleSystem && particleSystem.createHealEffect) {
-                particleSystem.createHealEffect(this.mesh.position);
-            }
-
-            if (effectCallback) effectCallback('heal', this, healVal);
-
-        } else if (skillId === 'magnumBreak') {
-            // AOE Damage
+        } else if (skill.type === 'physical_aoe' || skill.type === 'magic_aoe') {
+            // NOTE: this used to read skill.radius, which no skill defines — the
+            // radius came out undefined so every `distance <= radius` test was
+            // false and AoE skills reliably hit nothing. The field is aoeRange.
+            const radius = skill.aoeRange || 5;
             const dmgBase = this.stats.atk * skill.damageMultiplier;
-            const radius = skill.radius;
 
-            if (gameUI) {
-                gameUI.addCombatLog(`🔥 ใช้ [Magnum Break] ระเบิดพลังรอบตัว!`, 'atk');
-            }
-
-            // Particles
+            if (gameUI) gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] โจมตีเป็นวงกว้าง!`, 'atk');
             if (particleSystem && particleSystem.createExplosion) {
-                particleSystem.createExplosion(this.mesh.position, 0xff6600);
+                particleSystem.createExplosion(this.mesh.position, skill.color || 0xff6600);
             }
 
-            // Hit all nearby targets
             let hits = 0;
             if (window.duelState) {
                 const opponent = window.remotePlayersMap?.get(window.duelState.opponentUserId);
-                if (opponent && opponent.character && opponent.character.isAlive()) {
-                    if (opponent.mesh.position.distanceTo(this.mesh.position) <= radius) {
-                        const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
-                        const actualDmg = opponent.character.takeDamage(finalDmg);
-                        hits++;
-
-                        import('../network/GameSync.js').then(({ sendDuelHit }) => {
-                            sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
-                        });
-
-                        if (effectCallback) effectCallback('magnumBreak', opponent.character, actualDmg);
-                    }
-                }
-            } else {
-                if (monsterManager && monsterManager.monsters) {
-                    monsterManager.monsters.forEach(m => {
-                        if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
-                            const finalDmg = Math.max(1, Math.floor(dmgBase * (0.8 + Math.random() * 0.4)));
-                            const actualDmg = m.takeDamage(finalDmg);
-                            hits++;
-                            if (effectCallback) effectCallback('magnumBreak', m, actualDmg);
-                        }
+                if (opponent && opponent.character && opponent.character.isAlive()
+                    && opponent.mesh.position.distanceTo(this.mesh.position) <= radius) {
+                    const finalDmg = roll(dmgBase, 0.2);
+                    const actualDmg = opponent.character.takeDamage(finalDmg);
+                    hits++;
+                    import('../network/GameSync.js').then(({ sendDuelHit }) => {
+                        sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
                     });
+                    if (effectCallback) effectCallback(skillId, opponent.character, actualDmg);
                 }
+            } else if (monsterManager && monsterManager.monsters) {
+                monsterManager.monsters.forEach(m => {
+                    if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
+                        const finalDmg = roll(dmgBase, 0.2);
+                        const actualDmg = m.takeDamage(finalDmg);
+                        hits++;
+                        if (effectCallback) effectCallback(skillId, m, actualDmg);
+                    }
+                });
             }
 
             if (hits === 0 && gameUI) {
                 gameUI.addCombatLog('...แต่ไม่มีศัตรูอยู่ในระยะ', 'system');
             }
+
+        } else if (skill.type === 'heal') {
+            const healVal = this.stats.level * skill.healBase + Math.floor(this.stats.atk * 0.5);
+            this.heal(healVal);
+
+            if (gameUI) gameUI.addCombatLog(`${skill.emoji} ใช้ [${skill.name}] ฟื้นฟู HP +${healVal}!`, 'heal');
+            if (particleSystem && particleSystem.createHealEffect) {
+                particleSystem.createHealEffect(this.mesh.position);
+            }
+            if (effectCallback) effectCallback(skillId, this, healVal);
+
+        } else if (skill.type === 'buff') {
+            this.applyBuff(skill);
+            if (gameUI) {
+                const label = skill.buffStat === 'atk' ? 'ATK' : 'DEF';
+                gameUI.addCombatLog(
+                    `${skill.emoji} ใช้ [${skill.name}] ${label} +${Math.round(skill.buffPct * 100)}% นาน ${skill.buffDuration} วิ`,
+                    'heal');
+            }
+            if (particleSystem && particleSystem.createHealEffect) {
+                particleSystem.createHealEffect(this.mesh.position);
+            }
+            if (effectCallback) effectCallback(skillId, this, 0);
         }
 
         return true;
@@ -1638,6 +1692,8 @@ export class CharacterManager {
         this.stats.def = isNaN(Number(data.def)) ? 5 : Number(data.def);
         this.stats.gold = isNaN(Number(data.gold)) ? 0 : Number(data.gold);
         this.stats.zol = isNaN(Number(data.zol)) ? 0 : Number(data.zol);
+        // Job: null/unknown means Novice (hasn't chosen a path yet).
+        this.stats.job = JOBS[data.job] ? data.job : null;
         this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);
         // PVP ranking (server-authoritative — written only by the map server)

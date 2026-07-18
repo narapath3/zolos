@@ -1043,7 +1043,185 @@ export const SKILLS = {
         hotkey: '3',
         color: 0xff4000,
     },
+
+    // ---- Swordsman ----
+    endure: {
+        id: 'endure',
+        name: 'Endure',
+        emoji: '🛡️',
+        desc: 'ตั้งการ์ดรับแรง เพิ่มพลังป้องกัน DEF +60% นาน 12 วินาที',
+        type: 'buff',
+        target: 'self',
+        buffStat: 'def',
+        buffPct: 0.6,
+        buffDuration: 12,
+        spCost: 14,
+        cooldown: 20,
+        color: 0xc0c0ff,
+    },
+
+    // ---- Mage ----
+    fireBolt: {
+        id: 'fireBolt',
+        name: 'Fire Bolt',
+        emoji: '🔥',
+        desc: 'ยิงลูกไฟใส่เป้าหมายเดี่ยวจากระยะไกล ดีลดาเมจ 2.2 เท่า',
+        type: 'magic',
+        target: 'single',
+        damageMultiplier: 2.2,
+        castRange: 9,
+        spCost: 12,
+        cooldown: 3,
+        color: 0xff6020,
+    },
+    frostNova: {
+        id: 'frostNova',
+        name: 'Frost Nova',
+        emoji: '❄️',
+        desc: 'แผ่ความเย็นเยือกรอบตัว ดีลดาเมจ 1.8 เท่าแก่ศัตรูรอบ 6 หน่วย',
+        type: 'magic_aoe',
+        target: 'aoe',
+        damageMultiplier: 1.8,
+        aoeRange: 6,
+        spCost: 24,
+        cooldown: 9,
+        color: 0x60d0ff,
+    },
+    energyCoat: {
+        id: 'energyCoat',
+        name: 'Energy Coat',
+        emoji: '🔮',
+        desc: 'ห่อหุ้มร่างด้วยมานา เพิ่มพลังป้องกัน DEF +45% นาน 15 วินาที',
+        type: 'buff',
+        target: 'self',
+        buffStat: 'def',
+        buffPct: 0.45,
+        buffDuration: 15,
+        spCost: 18,
+        cooldown: 22,
+        color: 0x9060ff,
+    },
+
+    // ---- Archer ----
+    doubleStrafe: {
+        id: 'doubleStrafe',
+        name: 'Double Strafe',
+        emoji: '🏹',
+        desc: 'ยิงธนูสองดอกรวดเดียวจากระยะไกล ดีลดาเมจ 2.4 เท่าต่อเป้าหมายเดี่ยว',
+        type: 'physical',
+        target: 'single',
+        damageMultiplier: 2.4,
+        castRange: 10,
+        spCost: 14,
+        cooldown: 4,
+        color: 0x80ff80,
+    },
+    arrowShower: {
+        id: 'arrowShower',
+        name: 'Arrow Shower',
+        emoji: '🌧️',
+        desc: 'ระดมยิงธนูลงมาเป็นวงกว้าง ดีลดาเมจ 1.6 เท่าแก่ศัตรูรอบ 6 หน่วย',
+        type: 'physical_aoe',
+        target: 'aoe',
+        damageMultiplier: 1.6,
+        aoeRange: 6,
+        spCost: 20,
+        cooldown: 7,
+        color: 0xa0ff60,
+    },
+    concentration: {
+        id: 'concentration',
+        name: 'Concentration',
+        emoji: '🎯',
+        desc: 'เพ่งสมาธิเล็งเป้า เพิ่มพลังโจมตี ATK +40% นาน 15 วินาที',
+        type: 'buff',
+        target: 'self',
+        buffStat: 'atk',
+        buffPct: 0.4,
+        buffDuration: 15,
+        spCost: 16,
+        cooldown: 22,
+        color: 0xffd24a,
+    },
+
+    // ---- Priest ----
+    holyLight: {
+        id: 'holyLight',
+        name: 'Holy Light',
+        emoji: '✨',
+        desc: 'สาดลำแสงศักดิ์สิทธิ์ใส่เป้าหมายเดี่ยว ดีลดาเมจ 2 เท่าจากระยะไกล',
+        type: 'magic',
+        target: 'single',
+        damageMultiplier: 2.0,
+        castRange: 9,
+        spCost: 13,
+        cooldown: 4,
+        color: 0xffffa0,
+    },
+    blessing: {
+        id: 'blessing',
+        name: 'Blessing',
+        emoji: '🙏',
+        desc: 'สวดอวยพรให้ตนเอง เพิ่มพลังโจมตี ATK +35% นาน 18 วินาที',
+        type: 'buff',
+        target: 'self',
+        buffStat: 'atk',
+        buffPct: 0.35,
+        buffDuration: 18,
+        spCost: 18,
+        cooldown: 25,
+        color: 0xfff0a0,
+    },
 };
+
+// ============ JOBS ============
+// Four paths that differ purely by their skill set (stats and gear are shared).
+// Chosen at JOB_UNLOCK_LEVEL; changeable later for JOB_CHANGE_COST Zeny.
+// A character with job = null is still a Novice and uses NOVICE_SKILLS.
+export const JOB_UNLOCK_LEVEL = 10;
+export const JOB_CHANGE_COST = 50000;
+export const NOVICE_SKILLS = ['bash', 'heal'];
+
+export const JOBS = {
+    swordsman: {
+        id: 'swordsman',
+        name: 'นักดาบ',
+        nameEn: 'Swordsman',
+        emoji: '⚔️',
+        desc: 'สายประชิดตัวถึกทน ตีหนักและยืนรับได้นาน เหมาะกับการบุกเข้าไปกลางฝูง',
+        skills: ['bash', 'magnumBreak', 'endure'],
+    },
+    mage: {
+        id: 'mage',
+        name: 'จอมเวทย์',
+        nameEn: 'Mage',
+        emoji: '🔮',
+        desc: 'สายเวทมนตร์ระยะไกล เก่งการกวาดศัตรูเป็นกลุ่มด้วยเวทพลังสูง',
+        skills: ['fireBolt', 'frostNova', 'energyCoat'],
+    },
+    archer: {
+        id: 'archer',
+        name: 'นักธนู',
+        nameEn: 'Archer',
+        emoji: '🏹',
+        desc: 'สายยิงระยะไกล ดาเมจต่อเป้าหมายเดี่ยวสูงที่สุด และเสริมพลังโจมตีตัวเองได้',
+        skills: ['doubleStrafe', 'arrowShower', 'concentration'],
+    },
+    priest: {
+        id: 'priest',
+        name: 'พระ',
+        nameEn: 'Priest',
+        emoji: '✨',
+        desc: 'สายสายัณห์ศักดิ์สิทธิ์ ฟื้นฟูพลังชีวิตได้เก่ง อยู่รอดได้นานที่สุดในสนาม',
+        skills: ['heal', 'holyLight', 'blessing'],
+    },
+};
+
+// The 3 skill ids a character currently has (Novice until they pick a job).
+export function getJobSkills(jobId) {
+    const job = JOBS[jobId];
+    return job ? job.skills : NOVICE_SKILLS;
+}
 
 // Celestial mining pickaxe ladder, cheapest → rarest. The Heaven Merchant sells
 // these and mining uses the best one the player owns (ITEMS[name].mineYield).

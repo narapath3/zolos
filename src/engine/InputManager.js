@@ -29,11 +29,11 @@ export class InputManager {
 
         this.keys[e.code] = true;
 
-        // Skill hotkeys triggers: 1, 2, 3
+        // Skill hotkeys triggers: 1, 2, 3 → skill bar SLOT index (0-2). Which
+        // skill that is depends on the character's job, so the slot is what gets
+        // reported rather than a fixed skill id.
         if ((e.key === '1' || e.key === '2' || e.key === '3') && this.onSkillHotkeyCallback) {
-            // Map key '1' -> 'bash', '2' -> 'heal', '3' -> 'magnumBreak'
-            const skillId = e.key === '1' ? 'bash' : e.key === '2' ? 'heal' : 'magnumBreak';
-            this.onSkillHotkeyCallback(skillId);
+            this.onSkillHotkeyCallback(Number(e.key) - 1);
         }
     }
 

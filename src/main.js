@@ -266,6 +266,10 @@ async function initGame(charData) {
             case 'levelUp':
                 if (soundManager) soundManager.playLevelUpSound();
                 if (gameUI) gameUI.addCombatLog(`🎉 LEVEL UP! You are now level ${event.level}!`, 'levelup');
+                // Hitting the unlock level opens the job picker (once per session).
+                if (gameUI && gameUI.maybePromptJobSelect) {
+                    setTimeout(() => gameUI.maybePromptJobSelect(), 800);
+                }
                 break;
             case 'lootDrop':
                 if (gameUI) gameUI.addCombatLog(`🎁 Dropped: ${event.item.name}`, 'loot');
@@ -759,6 +763,10 @@ async function initGame(charData) {
     gameUI.updateStats(character.stats);
     // Restore device settings (skill sounds, visual effects) onto the live systems.
     if (gameUI.applyDeviceSettings) gameUI.applyDeviceSettings();
+    // Paint the skill bar from the character's job (Novice until one is chosen).
+    if (gameUI.renderSkillBar) gameUI.renderSkillBar();
+    // Existing Lv.10+ characters that predate jobs get the picker on entry.
+    if (gameUI.maybePromptJobSelect) setTimeout(() => gameUI.maybePromptJobSelect(), 1200);
 
     isGameStarted = true;
     lastTime = performance.now();
@@ -781,13 +789,13 @@ async function initGame(charData) {
             return;
         }
 
-        // Skill hotkeys triggers: 1, 2, 3
+        // Skill hotkeys 1/2/3 — cast whatever sits in that slot for the current job
         if (e.code === 'Digit1' || e.key === '1') {
-            gameUI.castSkill('bash');
+            gameUI.castSkillSlot(0);
         } else if (e.code === 'Digit2' || e.key === '2') {
-            gameUI.castSkill('heal');
+            gameUI.castSkillSlot(1);
         } else if (e.code === 'Digit3' || e.key === '3') {
-            gameUI.castSkill('magnumBreak');
+            gameUI.castSkillSlot(2);
         }
 
         // Reset the camera angle back to default
@@ -1767,11 +1775,28 @@ function autoCastSkills(dt) {
         return cd <= 0 && sp >= ((SKILLS[id] && SKILLS[id].spCost) || 0);
     };
 
+    // Pick skills by ROLE out of whatever the current job has, so AUTO works for
+    // every job rather than only the old fixed bash/heal/magnumBreak trio.
+    const mySkills = character.getSkills ? character.getSkills() : [];
+    const byType = (...types) => mySkills.find(id => SKILLS[id] && types.includes(SKILLS[id].type));
+    const healId = byType('heal');
+    const aoeId = byType('physical_aoe', 'magic_aoe');
+    const singleId = byType('physical', 'magic');
+    const buffId = byType('buff');
+
     const maxHp = Number(character.stats.max_hp) || 100;
     const hpPct = (Number(character.stats.hp) || 0) / maxHp;
 
     // 1) Heal when hurt (skips itself at high HP so SP isn't wasted)
-    if (hpPct < 0.6 && ready('heal')) { gameUI.castSkill('heal'); return; }
+    if (hpPct < 0.6 && healId && ready(healId)) { gameUI.castSkill(healId); return; }
+
+    // 1b) Keep the self-buff up while fighting — it's cheap uptime.
+    const buffActive = buffId && SKILLS[buffId]
+        && character.getBuffPct && character.getBuffPct(SKILLS[buffId].buffStat) > 0;
+    if (buffId && !buffActive && character.targetMonster && ready(buffId)) {
+        gameUI.castSkill(buffId);
+        return;
+    }
 
     // Count monsters clustered around the player (for the AoE decision)
     let nearby = 0;
@@ -1782,11 +1807,13 @@ function autoCastSkills(dt) {
         }
     }
 
-    // 2) Magnum Break when 2+ monsters are clustered
-    if (nearby >= 2 && ready('magnumBreak')) { gameUI.castSkill('magnumBreak'); return; }
+    // 2) AoE when 2+ monsters are clustered
+    if (nearby >= 2 && aoeId && ready(aoeId)) { gameUI.castSkill(aoeId); return; }
 
-    // 3) Bash the current/nearest target
-    if ((character.targetMonster || nearby >= 1) && ready('bash')) gameUI.castSkill('bash');
+    // 3) Single-target the current/nearest monster
+    if ((character.targetMonster || nearby >= 1) && singleId && ready(singleId)) {
+        gameUI.castSkill(singleId);
+    }
 }
 
 // ============ Game Loop ============
@@ -2099,11 +2126,13 @@ function gameLoop(time) {
 
                 // Update skill cooldown progress bars on mobile and desktop slots
                 if (character.cooldowns) {
-                    const SKILLS_LIST = ['bash', 'heal', 'magnumBreak'];
+                    const SKILLS_LIST = character.getSkills ? character.getSkills() : [];
                     SKILLS_LIST.forEach(skillId => {
                         const current = character.cooldowns[skillId] || 0;
-                        const maxMax = skillId === 'bash' ? 3 : skillId === 'heal' ? 5 : 8; // Max cooldown levels
-                        gameUI.updateSkillCooldown(skillId, current, maxMax);
+                        // Take the max straight off the skill instead of a hardcoded
+                        // per-name table, so every job's skills fill correctly.
+                        const maxCd = (SKILLS[skillId] && SKILLS[skillId].cooldown) || 1;
+                        gameUI.updateSkillCooldown(skillId, current, maxCd);
                     });
                 }
 
