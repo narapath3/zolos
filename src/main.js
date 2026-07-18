@@ -78,6 +78,15 @@ let username = 'Adventurer';
 const remotePlayersMap = new Map();
 window.remotePlayersMap = remotePlayersMap;
 let lastBroadcastTime = 0;
+// Attack signal broadcast to other players so they hear our weapon. `localAtkSeq`
+// bumps once per swing; `localWsc` is the current weapon's sound class.
+let localAtkSeq = 0;
+let localWsc = 'unarmed';
+function registerLocalAttack(wsc) {
+    localWsc = wsc || 'sword';
+    localAtkSeq = (localAtkSeq + 1) & 0xffff; // wrap so the number stays small
+    if (soundManager) soundManager.playWeaponAttack(localWsc);
+}
 let lastHUDTime = 0;
 let lastStatsTime = 0;
 let lastMinimapTime = 0;
@@ -223,11 +232,13 @@ async function initGame(charData) {
                     };
                     if (wc === 'gun') {
                         particles.spawnBullet(event.startPos, event.target, resolveHit);
-                        if (soundManager) soundManager.playAtkSound();
                     } else {
                         particles.spawnArrow(event.startPos, event.target, resolveHit);
                     }
                 }
+                // Ranged weapons sound at release (gun bang / bow twang); this
+                // also broadcasts the attack so nearby players hear it.
+                registerLocalAttack(event.weaponClass || 'bow');
                 break;
             case 'playerAttack':
                 if (particles) {
@@ -241,7 +252,11 @@ async function initGame(charData) {
                     const dmgType = event.critical ? 'critical-dmg' : 'player-dmg';
                     particles.spawnDamageNumber(screenPos.x, screenPos.y, event.damage, dmgType);
                 }
-                if (soundManager) soundManager.playAtkSound();
+                // Melee weapons sound on the hit itself (ranged weapons already
+                // sounded at release, so don't double up). Broadcasts to others.
+                if (event.weaponClass === 'melee') {
+                    registerLocalAttack(character && character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword');
+                }
                 if (gameUI) {
                     gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
                     // Step 5: Screen shake on critical hits only
@@ -638,6 +653,23 @@ async function initGame(charData) {
                 rp.character.syncFishingLine(rp.character.state === 'fishing');
                 // Update animations for remote player
                 rp.character.update(1 / 60);
+            }
+
+            // Remote attack SFX — when the attacker's swing counter changes,
+            // play their weapon's sound attenuated by how far away they are, so
+            // you actually hear other players fighting near you.
+            if (p.aseq !== undefined && soundManager && character && character.getPosition) {
+                if (rp.lastAseq === undefined) {
+                    rp.lastAseq = p.aseq; // first sighting: arm, don't fire a sound
+                } else if (p.aseq !== rp.lastAseq) {
+                    rp.lastAseq = p.aseq;
+                    const me = character.getPosition();
+                    const dx = (p.x ?? me.x) - me.x;
+                    const dz = (p.z ?? me.z) - me.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    const vol = Math.max(0, 1 - dist / 34); // fades out past ~34 units
+                    if (vol > 0.02) soundManager.playWeaponAttack(p.wsc || 'sword', { volume: vol * 0.9 });
+                }
             }
         },
         // Step 9: Use consistent object format for chat messages
@@ -1335,7 +1367,7 @@ function updateDuelCombat(dt) {
                 particles.spawnDamageNumber(screenPos.x, screenPos.y, dmg, isCritical ? 'critical-dmg' : 'player-dmg');
                 particles.spawnHitEffect(foePos.clone(), isCritical);
             }
-            if (soundManager) soundManager.playAtkSound();
+            registerLocalAttack(character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword');
         } else if (duelState.cooldown < character.getAttackCooldown() * 0.5 && character.state === 'attacking') {
             character.state = 'idle';
         }
@@ -1749,7 +1781,7 @@ function updateBossCombat(dt) {
         applyHit();
     }
     if (isCrit && gameUI) gameUI.triggerScreenShake(true);
-    if (soundManager) soundManager.playAtkSound();
+    registerLocalAttack(character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword');
 }
 
 // ============ Auto-Skill (while AUTO farming) ============
@@ -2070,7 +2102,7 @@ function broadcastIfDue() {
     if (!character) return;
     const now = performance.now();
     if (now - lastBroadcastTime > 100) {
-        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap);
+        broadcastPosition(userId, username, character.stats.level, character.getPosition(), character.mesh.rotation.y, character.state, character.getAppearance(), sceneManager.currentMap, localAtkSeq, localWsc);
         lastBroadcastTime = now;
     }
 }

@@ -1040,13 +1040,17 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
 }
 
-export function broadcastPosition(userId, username, level, position, rotationY, state, appearance, currentMapId = 'prontera') {
+export function broadcastPosition(userId, username, level, position, rotationY, state, appearance, currentMapId = 'prontera', atkSeq = 0, weaponSoundClass = null) {
     if (isOfflineMode) return;
 
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         const payload = { userId, username, level, x: position.x, y: position.y, z: position.z, rY: rotationY, state, mapId: currentMapId };
         if (appearance) payload.appearance = appearance;
+        // Piggyback the latest attack signal so others can play our weapon's
+        // sound. aseq increments once per swing; the server relays the whole
+        // payload, so no extra socket event is needed.
+        if (atkSeq) { payload.aseq = atkSeq; payload.wsc = weaponSoundClass || 'sword'; }
         socket.emit('pos', payload);
         return;
     }
