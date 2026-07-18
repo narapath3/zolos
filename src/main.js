@@ -803,11 +803,16 @@ async function initGame(charData) {
     // (added earlier) keeps the browser menu from popping up while dragging.
     let camDragging = false;
     let camDragLastX = 0;
+    let camDownX = 0, camDownY = 0;  // where the right-button press started
+    let camDragDist = 0;             // accumulated horizontal drag, to tell a click from a rotate
     const ROTATE_SENS = 0.006; // radians per pixel dragged
+    const RCLICK_MAX_MOVE = 6; // px: a right-press that moves less than this counts as a click, not a drag
     canvas.addEventListener('mousedown', (e) => {
         if (e.button === 2) {
             camDragging = true;
             camDragLastX = e.clientX;
+            camDownX = e.clientX; camDownY = e.clientY;
+            camDragDist = 0;
             canvas.style.cursor = 'grabbing';
             e.preventDefault();
         }
@@ -816,6 +821,7 @@ async function initGame(charData) {
         if (!camDragging) return;
         const dx = e.clientX - camDragLastX;
         camDragLastX = e.clientX;
+        camDragDist += Math.abs(dx);
         if (sceneManager && sceneManager.rotateCamera) {
             sceneManager.rotateCamera(-dx * ROTATE_SENS);
         }
@@ -825,7 +831,24 @@ async function initGame(charData) {
         camDragging = false;
         canvas.style.cursor = "url('/assets/cute_cursor_32.png'), default";
     };
-    window.addEventListener('mouseup', (e) => { if (e.button === 2) endCamDrag(); });
+    window.addEventListener('mouseup', (e) => {
+        if (e.button !== 2) return;
+        // A right-click that barely moved = "view profile" gesture on PC; an actual
+        // drag = camera rotate (handled in mousemove above). Capture the click test
+        // before endCamDrag() clears camDragging.
+        const wasClick = camDragging
+            && camDragDist <= RCLICK_MAX_MOVE
+            && Math.abs(e.clientX - camDownX) <= RCLICK_MAX_MOVE
+            && Math.abs(e.clientY - camDownY) <= RCLICK_MAX_MOVE;
+        endCamDrag();
+        if (wasClick && isGameStarted && sceneManager) {
+            const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPCs(), remotePlayersMap);
+            if (hit && hit.type === 'player' && gameUI) {
+                particles.createClickIndicator(hit.point, 0x60a0ff);
+                gameUI._showPlayerPopup(hit.object);
+            }
+        }
+    });
     window.addEventListener('blur', endCamDrag);
 
     // ----- Mouse Wheel to Zoom (Roblox-style) -----
@@ -1000,9 +1023,17 @@ function handleMouseInteraction(event) {
         // Step 11: Monster click: red indicator
         particles.createClickIndicator(hit.point, 0xff4444);
     } else if (hit.type === 'player') {
-        // Click other player: blue indicator & open player profile popup
-        particles.createClickIndicator(hit.point, 0x60a0ff);
-        if (gameUI) gameUI._showPlayerPopup(hit.object);
+        if (event.fromTouch) {
+            // Mobile: tapping a character opens their profile popup.
+            particles.createClickIndicator(hit.point, 0x60a0ff);
+            if (gameUI) gameUI._showPlayerPopup(hit.object);
+        } else if (!(combatSystem && combatSystem.isFishing)) {
+            // PC left-click on a player: walk toward them (profile opens on
+            // right-click instead). Suppressed while fishing so the pose holds.
+            autoPath = hit.point;
+            character.targetMonster = null;
+            particles.createClickIndicator(hit.point, 0x44ff44);
+        }
     } else if (hit.type === 'npc') {
         // Open Shop based on NPC type
         const npcType = hit.object.userData.npcType;

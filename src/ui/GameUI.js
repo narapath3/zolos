@@ -4542,6 +4542,11 @@ export class GameUI {
       // Only active if the mobile control pad is visible on screen (responsive check)
       if (window.getComputedStyle(pad).display === 'none') return;
 
+      // Mouse fallback: only the left button drives movement/tap. Right-click is
+      // reserved for the camera-rotate / view-profile gesture (see main.js), so
+      // ignore it here to avoid a stray walk. Touch events have no `button`.
+      if (e.button != null && e.button !== 0) return;
+
       const touch = e.touches ? e.touches[0] : e;
 
       // Ignore if touching an interactive element (buttons, panels, HUD, chat).
@@ -4676,7 +4681,11 @@ export class GameUI {
         if (window.handleCanvasTap) {
           window.handleCanvasTap({
             clientX: touch.clientX,
-            clientY: touch.clientY
+            clientY: touch.clientY,
+            // Real touch (mobile) opens a player's profile on tap; the desktop
+            // mouse fallback below must not, so main.js can route left-click to
+            // walking instead. e.changedTouches is only present on touch events.
+            fromTouch: !!e.changedTouches
           });
         }
       }
