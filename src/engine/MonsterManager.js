@@ -1059,6 +1059,13 @@ class Monster {
         }
         this.hpBarFill.scale.x = 1;
         this.hitFlash = 0;
+        
+        // BUGFIX: Reset aggro state when monster respawns
+        // Prevents monster from immediately attacking player after respawn
+        this._aggroUntil = 0;
+        this._atkCd = 0;
+        this.wanderTarget = null;
+        this.wanderTimer = 0;
     }
 
     destroy() {
