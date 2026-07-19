@@ -1,6 +1,7 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
+import { PlayerProfileModal } from './PlayerProfileModal.js';
 
 
 export class GameUI {
@@ -48,6 +49,7 @@ export class GameUI {
     this._setupChat();
     this._setupMinimap();
     this._setupProfileEditor();
+    this.playerProfileModal = new PlayerProfileModal();
     this._setupLeaderboardTabs();
     this._setupOnlineTabs();
     this._setupAutoBot();
@@ -2031,54 +2033,22 @@ export class GameUI {
 
   _showPlayerPopup(player) {
     this.selectedProfilePlayer = player;
-    const popup = document.getElementById('player-popup');
-    const popupName = document.getElementById('player-popup-name');
-    const popupLevel = document.getElementById('player-popup-level');
-    const addFriendBtn = document.getElementById('btn-add-friend');
+    
+    // Fetch full character data and show beautiful profile modal
+    this._fetchAndShowPlayerProfile(player);
+  }
 
-    if (popupName) popupName.textContent = player.username;
-    if (popupLevel) popupLevel.textContent = `Lv.${player.level}`;
-
-    // Full profile (stats + equipped gear) — anyone can view anyone.
-    this._renderPlayerProfileDetails(player);
-
-    if (addFriendBtn) {
-      // Don't allow friending yourself
-      const myName = this.character && this.character.stats ? this.character.stats.name : '';
-      if (player.username === myName) {
-        addFriendBtn.textContent = '❌ You (Self)';
-        addFriendBtn.style.opacity = '0.5';
-        addFriendBtn.style.pointerEvents = 'none';
-      } else {
-        addFriendBtn.style.opacity = '1';
-        addFriendBtn.style.pointerEvents = 'auto';
-        const isFriend = this.friends.includes(player.username);
-        addFriendBtn.innerHTML = isFriend ? '❌ Remove Friend' : '⭐ Add Friend';
-      }
-    }
-
-    const popupTradeBtn = document.getElementById('btn-popup-trade');
-    if (popupTradeBtn) {
-      const myName = this.character && this.character.stats ? this.character.stats.name : '';
-      if (player.username === myName) {
-        popupTradeBtn.style.display = 'none';
-      } else {
-        popupTradeBtn.style.display = 'block';
-      }
-    }
-
-    // Warp — only to an online friend (not yourself, not offline)
-    const popupWarpBtn = document.getElementById('btn-popup-warp');
-    if (popupWarpBtn) {
-      const myName = this.character && this.character.stats ? this.character.stats.name : '';
-      const isFriend = this.friends.includes(player.username);
-      const canWarp = !player.isOffline && player.username !== myName && isFriend && !!player.userId;
-      popupWarpBtn.style.display = canWarp ? 'block' : 'none';
-    }
-
-    if (popup) {
-      popup.style.display = 'flex';
-      this.updateMobileControlsVisibility();
+  async _fetchAndShowPlayerProfile(player) {
+    try {
+      const { fetchPublicCharacter } = await import('../network/GameSync.js');
+      const characterData = await fetchPublicCharacter(player.userId);
+      
+      // Show the beautiful profile modal
+      this.playerProfileModal.show(player, characterData);
+    } catch (e) {
+      console.error('Failed to fetch player profile:', e);
+      // Fallback to basic info
+      this.playerProfileModal.show(player, null);
     }
   }
 
