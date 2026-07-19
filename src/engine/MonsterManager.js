@@ -878,8 +878,8 @@ class Monster {
             const adz = player.mesh.position.z - this.mesh.position.z;
             const pdist = Math.hypot(adx, adz) || 0.001;
             const t = this.animTimer;
-            // Wandering within 4.5 units provokes it; a hit provokes it for longer.
-            if (pdist < 4.5) this._aggroUntil = Math.max(this._aggroUntil, t + 4);
+            // Only provoked monsters hunt — never aggro on approach alone. The
+            // aggro window is armed in takeDamage() when the player hits it.
             aggroActive = t < this._aggroUntil && pdist < 20;
             if (aggroActive) {
                 const reach = 1.0 + this.data.size * (this._scale || 1) * 0.6;
