@@ -1121,11 +1121,18 @@ export class GameUI {
           slot.classList.add('selected');
         }
 
+        const equippable = ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(item.item_type);
         slot.addEventListener('click', () => {
           document.querySelectorAll('.inv-slot').forEach(s => s.classList.remove('selected'));
           slot.classList.add('selected');
           this.selectedItemName = item.item_name;
           this._updateDetailBox();
+          // On the Equip screen a single tap equips/unequips right away — the
+          // detail box's "สวมใส่" button sits below the paper-doll and is easy
+          // to miss on mobile, which made gear feel un-equippable.
+          if (this.currentTab === 'equip' && equippable) {
+            this._toggleEquipItem(item);
+          }
         });
       }
 
