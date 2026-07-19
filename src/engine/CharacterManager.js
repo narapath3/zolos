@@ -1167,6 +1167,125 @@ export class CharacterManager {
         this.mesh.add(this.glassesMesh);
     }
 
+    // ===== Worn gear visuals (helmet / body armor / cape / boots / shield) =====
+    // Armor items only gave stats before; now each equipped piece shows on the
+    // hero. Colours are chosen per item so a steel plate, a gold set and a dark
+    // scale mail all look different. Rebuilt whenever gear changes.
+    _disposeMesh(m) {
+        if (!m) return;
+        this.mesh.remove(m);
+        m.traverse?.(c => {
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) Array.isArray(c.material) ? c.material.forEach(x => x.dispose()) : c.material.dispose();
+        });
+    }
+
+    // Signature colour for a piece of gear, by item name (falls back by rarity).
+    _gearColor(name, fallback = 0x9aa4b2) {
+        const MAP = {
+            // shields
+            'Wooden Buckler': 0x8a5a2b, 'Iron Shield': 0x9aa4b2, 'Tear Shield': 0xb9873f,
+            'Golden Shield': 0xffcc33, 'Aegis of Olympus': 0x7fd0ff,
+            // head
+            'Iron Helm': 0xb8c0cc, 'Ranger Hood': 0x3f6d3f,
+            // body
+            'Cotton Shirt': 0xdcdce6, 'Adventurer Suit': 0x7a5a3a, 'Steel Plate Mail': 0x9aa4b2,
+            'Valkyrie Armor': 0xffcc44, 'Dragon Scale Mail': 0x3a5a44,
+            // garment
+            'Leather Cloak': 0x6b4a2a, 'Shadow Garment': 0x2a2140, 'Odin Garment': 0x2f5fbf,
+            // feet
+            'Speed Boots': 0x6b4a2a,
+        };
+        if (MAP[name] != null) return MAP[name];
+        const it = ITEMS[name];
+        const byRarity = { common: 0xcfd3dd, rare: 0x6aa8ff, epic: 0xbf7bff, legendary: 0xffbe46, mythic: 0xff5a8c };
+        return (it && byRarity[it.rarity]) || fallback;
+    }
+
+    // Rebuild all armor/shield meshes from equippedGear + equippedShield.
+    updateGearVisuals() {
+        if (!this.mesh) return;
+        if (!this.gearMeshes) this.gearMeshes = {};
+        for (const k of Object.keys(this.gearMeshes)) { this._disposeMesh(this.gearMeshes[k]); this.gearMeshes[k] = null; }
+
+        const g = this.equippedGear || {};
+        const lambert = (color, opts = {}) => new THREE.MeshLambertMaterial({ color, ...opts });
+
+        // ---- Helmet (head armor) ----
+        if (g.head) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(g.head));
+            const dome = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+            dome.position.y = 1.82; grp.add(dome);
+            const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.08, 12), mat);
+            rim.position.y = 1.8; grp.add(rim);
+            if (g.head === 'Ranger Hood') {
+                // Hood drapes back instead of a metal crest.
+                const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.12), mat);
+                back.position.set(0, 1.72, -0.24); grp.add(back);
+            } else {
+                const crest = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.34), lambert(0xffd24a));
+                crest.position.y = 2.02; grp.add(crest);
+            }
+            this.mesh.add(grp); this.gearMeshes.head = grp;
+        }
+
+        // ---- Body armor (chest plate + pauldrons over the torso) ----
+        if (g.body) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(g.body), { emissive: 0x000000 });
+            const chest = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.62, 0.46), mat);
+            chest.position.y = 1.06; grp.add(chest);
+            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), lambert(0x3a2a1a));
+            belt.position.y = 0.72; grp.add(belt);
+            [-0.42, 0.42].forEach(x => {
+                const pad = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.3), mat);
+                pad.position.set(x, 1.32, 0); grp.add(pad);
+            });
+            this.mesh.add(grp); this.gearMeshes.body = grp;
+        }
+
+        // ---- Garment (cape down the back) ----
+        if (g.garment) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(g.garment), { side: THREE.DoubleSide });
+            const cape = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.0, 0.06), mat);
+            cape.position.set(0, 0.95, -0.26); cape.rotation.x = 0.06; grp.add(cape);
+            const collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.18), mat);
+            collar.position.set(0, 1.42, -0.16); grp.add(collar);
+            this.mesh.add(grp); this.gearMeshes.garment = grp;
+        }
+
+        // ---- Boots (feet) ----
+        if (g.feet) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(g.feet, 0x6b4a2a));
+            [-0.15, 0.15].forEach(x => {
+                const boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.32), mat);
+                boot.position.set(x, 0.22, 0.02); grp.add(boot);
+                const toe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.14), mat);
+                toe.position.set(x, 0.1, 0.2); grp.add(toe);
+            });
+            this.mesh.add(grp); this.gearMeshes.feet = grp;
+        }
+
+        // ---- Shield (off-hand, on the left arm) ----
+        if (this.equippedShield) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(this.equippedShield));
+            const round = ['Wooden Buckler', 'Iron Shield', 'Golden Shield', 'Aegis of Olympus'].includes(this.equippedShield);
+            const plate = round
+                ? new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 16), mat)
+                : new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.08), mat);
+            if (round) plate.rotation.x = Math.PI / 2;
+            plate.position.set(-0.62, 1.0, 0.08);
+            grp.add(plate);
+            const boss = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), lambert(0xffe08a));
+            boss.position.set(-0.66, 1.0, 0.12); grp.add(boss);
+            this.mesh.add(grp); this.gearMeshes.shield = grp;
+        }
+    }
+
     // Achievement titles rendered above the name. Glow color feeds the canvas
     // shadowBlur; the sprite itself gets a soft pulse in update().
     static TITLE_META = {
@@ -1940,6 +2059,8 @@ export class CharacterManager {
             hat: this.equippedHat,
             glasses: this.equippedGlasses,
             weapon: this.equippedWeapon,
+            shield: this.equippedShield || null,
+            gear: { ...(this.equippedGear || {}) }, // helmet/body/cape/boots so others see them
             job: this.stats ? (this.stats.job || null) : null,
             title: this.title
         };
@@ -1954,6 +2075,12 @@ export class CharacterManager {
         if (app.hat !== undefined) this.setHat(app.hat);
         if (app.glasses !== undefined) this.setGlasses(app.glasses);
         if (app.weapon !== undefined) this.equipWeapon(app.weapon);
+        // Worn armor/shield → visible on remote heroes too.
+        if (app.gear !== undefined && app.gear) {
+            for (const k of Object.keys(this.equippedGear)) this.equippedGear[k] = app.gear[k] || null;
+        }
+        if (app.shield !== undefined) this.equippedShield = app.shield || null;
+        if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
         // Sync class so other players see this hero's job-specific look.
         if (app.job !== undefined) {
             if (!this.stats) this.stats = {};
