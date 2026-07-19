@@ -1277,6 +1277,29 @@ export class GameUI {
     return name.length > 11 ? name.slice(0, 10) + '…' : name;
   }
 
+  // A brief message that floats over the inventory panel — the combat log sits
+  // behind it, so equip failures/successes need their own visible cue.
+  _equipToast(msg, ok = true) {
+    let t = document.getElementById('equip-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'equip-toast';
+      t.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:99999;' +
+        'padding:11px 18px;border-radius:12px;font-size:14px;font-weight:700;color:#fff;pointer-events:none;' +
+        'box-shadow:0 8px 28px rgba(0,0,0,.5);opacity:0;transition:opacity .18s,top .18s;max-width:82vw;text-align:center;';
+      document.body.appendChild(t);
+    }
+    t.style.background = ok
+      ? 'linear-gradient(135deg,#2e9e5b,#1f7a45)'
+      : 'linear-gradient(135deg,#c0392b,#8a2820)';
+    t.textContent = msg;
+    // restart the fade/slide
+    t.style.opacity = '0'; t.style.top = '20%';
+    requestAnimationFrame(() => { t.style.opacity = '1'; t.style.top = '22%'; });
+    clearTimeout(this._equipToastTimer);
+    this._equipToastTimer = setTimeout(() => { t.style.opacity = '0'; }, 1700);
+  }
+
   _updateDetailBox() {
     const placeholder = document.getElementById('detail-placeholder');
     const content = document.getElementById('detail-content');
@@ -1314,9 +1337,15 @@ export class GameUI {
     } else if (item.item_type === 'fishing_rod') {
       typeStr = 'Fishing Tool';
     } else if (item.item_type === 'armor') {
-      typeStr = 'Armor';
+      // Name the body-part slot so the label matches the paper-doll.
+      const SLOT_LABEL = { head: 'ศีรษะ', body: 'เสื้อเกราะ', garment: 'ผ้าคลุม', ring: 'แหวน', wrist: 'ข้อมือ', pants: 'กางเกง', feet: 'รองเท้า', accessory: 'เครื่องประดับ' };
+      typeStr = 'Armor · ' + (SLOT_LABEL[getEquipSlot(item.item_name)] || 'เกราะ');
     } else if (item.item_type === 'shield') {
       typeStr = 'Shield';
+    } else if (item.item_type === 'hat') {
+      typeStr = 'Hat · หมวก';
+    } else if (item.item_type === 'glasses') {
+      typeStr = 'Glasses · แว่นตา';
     } else if (item.item_type === 'fish') {
       typeStr = 'Fish';
     }
@@ -1442,6 +1471,7 @@ export class GameUI {
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
       }
       this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
+      this._equipToast(`ถอด ${item.item_name}`, true);
     } else {
       // Job lock: worn items (weapon / hat / glasses) are restricted to their
       // class. Novices (no job) may only wear universal items.
@@ -1449,7 +1479,9 @@ export class GameUI {
         && !canEquipItem(item.item_name, this.character.stats.job)) {
         const need = itemJob(item.item_name);
         const jobName = JOBS[need]?.name || need;
-        this.addCombatLog(`🔒 ${item.emoji || ''} ${item.item_name} ใช้ได้เฉพาะอาชีพ ${jobName} เท่านั้น`, 'warning');
+        const msg = `🔒 ${item.item_name} ใช้ได้เฉพาะอาชีพ ${jobName}`;
+        this.addCombatLog(msg, 'warning');
+        this._equipToast(msg, false); // visible over the inventory panel
         if (this.soundManager) this.soundManager.playErrorSound?.();
         return;
       }
@@ -1503,6 +1535,7 @@ export class GameUI {
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
       }
       this.addCombatLog(`⚔️ สวมใส่ ${item.emoji} ${item.item_name} เพิ่มความแข็งแกร่ง!`, 'system');
+      this._equipToast(`สวมใส่ ${item.item_name}`, true);
     }
 
     // Fix: Ensure the character row itself is updated with the new appearance/weapon

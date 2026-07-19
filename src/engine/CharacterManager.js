@@ -1195,6 +1195,10 @@ export class CharacterManager {
             'Leather Cloak': 0x6b4a2a, 'Shadow Garment': 0x2a2140, 'Odin Garment': 0x2f5fbf,
             // feet
             'Speed Boots': 0x6b4a2a,
+            // pants
+            'Leather Pants': 0x6b4a2a, 'Plate Legguards': 0x9aa4b2, 'Dragon Greaves': 0x3a5a44,
+            // wrist
+            'Leather Bracer': 0x6b4a2a, 'Steel Bracer': 0x9aa4b2, 'Guardian Wristguard': 0xffbe46,
         };
         if (MAP[name] != null) return MAP[name];
         const it = ITEMS[name];
@@ -1254,6 +1258,30 @@ export class CharacterManager {
             const collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.18), mat);
             collar.position.set(0, 1.42, -0.16); grp.add(collar);
             this.mesh.add(grp); this.gearMeshes.garment = grp;
+        }
+
+        // ---- Legguards (pants) over the upper legs ----
+        if (g.pants) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(g.pants, 0x3a3a5a));
+            [-0.15, 0.15].forEach(x => {
+                const guard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.42, 0.3), mat);
+                guard.position.set(x, 0.45, 0); grp.add(guard);
+            });
+            const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.44), mat);
+            skirt.position.y = 0.64; grp.add(skirt);
+            this.mesh.add(grp); this.gearMeshes.pants = grp;
+        }
+
+        // ---- Bracers (wrist) on both forearms ----
+        if (g.wrist) {
+            const grp = new THREE.Group();
+            const mat = lambert(this._gearColor(g.wrist, 0x6b4a2a));
+            [-0.45, 0.45].forEach(x => {
+                const br = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.24), mat);
+                br.position.set(x, 0.78, 0); grp.add(br);
+            });
+            this.mesh.add(grp); this.gearMeshes.wrist = grp;
         }
 
         // ---- Boots (feet) ----

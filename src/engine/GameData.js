@@ -91,6 +91,14 @@ export const ITEMS = {
     'Speed Boots': { emoji: '🥾', type: 'armor', rarity: 'rare', desc: 'รองเท้าหนังเสือทอเหนียวทน เดินทางสะดวกเคลื่อนที่ว่องไว (DEF +5, HP +40)', price: 900, defBonus: 5, hpBonus: 40 },
     'Leather Cloak': { emoji: '🧥', type: 'armor', rarity: 'rare', desc: 'ผ้าคลุมไหล่หนังสุนัขป่า เก็บกักอุณภูมิผิวกายป้องกันบาดแผล (DEF +4, HP +60)', price: 650, defBonus: 4, hpBonus: 60 },
 
+    // ---- PANTS (ช่องกางเกง) & WRIST BRACERS (ช่องข้อมือ) ----
+    'Leather Pants': { emoji: '👖', type: 'armor', rarity: 'rare', desc: 'กางเกงหนังฟอกเนื้อเหนียว ป้องกันขาและเพิ่มความคล่องตัวในการเดินทาง (DEF +5, HP +60)', price: 550, defBonus: 5, hpBonus: 60 },
+    'Plate Legguards': { emoji: '👖', type: 'armor', rarity: 'epic', desc: 'สนับขาเหล็กกล้าแผ่นหนา ครอบต้นขาถึงหน้าแข้ง ทนแรงกระแทกหนักหน่วง (DEF +18, HP +220)', price: 4200, defBonus: 18, hpBonus: 220 },
+    'Dragon Greaves': { emoji: '👖', type: 'armor', rarity: 'legendary', desc: 'สนับขาเกล็ดมังกร แข็งแกร่งดั่งภูผา ก้าวเดินไม่หวั่นทุกสมรภูมิ (DEF +45, HP +700)', price: 20000, defBonus: 45, hpBonus: 700 },
+    'Leather Bracer': { emoji: '🧤', type: 'armor', rarity: 'rare', desc: 'สนับข้อมือหนังเย็บมือ กระชับข้อมือเสริมการโจมตีให้มั่นคง (DEF +3, HP +35)', price: 300, defBonus: 3, hpBonus: 35 },
+    'Steel Bracer': { emoji: '🧤', type: 'armor', rarity: 'epic', desc: 'สนับข้อมือเหล็กหุ้มหมุด ปัดป้องอาวุธและเสริมพลังแขนขณะปะทะ (DEF +12, HP +140)', price: 3200, defBonus: 12, hpBonus: 140 },
+    'Guardian Wristguard': { emoji: '🧤', type: 'armor', rarity: 'legendary', desc: 'สนับข้อมือผู้พิทักษ์ เรืองรัศมีศักดิ์สิทธิ์ ดูดซับดาเมจและเพิ่มพลังชีวิต (DEF +30, HP +500)', price: 16000, defBonus: 30, hpBonus: 500 },
+
     // ---- 18 EPIC ITEMS ----
     'Gilding Ingot': { emoji: '🧱', type: 'material', rarity: 'epic', desc: 'แท่งทองคำบริสุทธิ์ผ่านการหลอมสองรอบ ตราสัญลักษณ์ราชกรประทับตรางาม', price: 800 },
     'Wind Element Stone': { emoji: '🌀', type: 'material', rarity: 'epic', desc: 'ก้อนพลังงานธาตุลมสีเขียวครามระยิบ หมุนติ้วปะทะความเร็ววายุ', price: 1000 },
@@ -1276,10 +1284,7 @@ const ITEM_JOB = {
     // Priest
     'Holy Rod': 'priest',
     // 'Novice Cutter' and 'Fishing Rod' stay universal (starter / tool).
-    // --- Hats ---
-    'Wizard Hat': 'mage', 'Cowboy Hat': 'archer', 'Crown': 'priest',
-    // --- Glasses ---
-    'Classic Glasses': 'mage', 'Sunglasses': 'swordsman',
+    // Hats & glasses are cosmetic accessories — universal, anyone can wear them.
 };
 for (const [name, job] of Object.entries(ITEM_JOB)) {
     if (ITEMS[name]) ITEMS[name].job = job;
@@ -1332,6 +1337,8 @@ const ARMOR_ITEM_SLOT = {
     'Silver Ring': 'ring', 'Gorgon Ring': 'ring', 'Glow Ring': 'ring',
     'Speed Boots': 'feet',
     'Gold Earring': 'accessory',
+    'Leather Pants': 'pants', 'Plate Legguards': 'pants', 'Dragon Greaves': 'pants',
+    'Leather Bracer': 'wrist', 'Steel Bracer': 'wrist', 'Guardian Wristguard': 'wrist',
 };
 
 // The paper-doll slot id an item belongs to (weapon/shield/hat/glasses map by
@@ -1389,7 +1396,14 @@ export const SHOP_ITEMS = [
     { name: 'Tear Shield', price: 3600 },
     { name: 'Steel Plate Mail', price: 6000 },
     { name: 'Golden Shield', price: 18000 },
-    { name: 'Odin Garment', price: 22000 }
+    { name: 'Odin Garment', price: 22000 },
+    // ---- Pants (กางเกง) & wrist bracers (ข้อมือ) ----
+    { name: 'Leather Bracer', price: 300 },
+    { name: 'Leather Pants', price: 550 },
+    { name: 'Steel Bracer', price: 3200 },
+    { name: 'Plate Legguards', price: 4200 },
+    { name: 'Guardian Wristguard', price: 16000 },
+    { name: 'Dragon Greaves', price: 20000 }
 ];
 
 // ============ FORGE RECIPES ============
