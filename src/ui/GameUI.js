@@ -2039,16 +2039,27 @@ export class GameUI {
   }
 
   async _fetchAndShowPlayerProfile(player) {
+    // 1. Get live appearance from remotePlayersMap if available
+    let liveAppearance = null;
+    const remotePlayer = window.remotePlayersMap && window.remotePlayersMap.get(player.userId);
+    if (remotePlayer && remotePlayer.character) {
+      liveAppearance = remotePlayer.character.getAppearance();
+    }
+
+    // 2. Show modal immediately with live appearance (or null)
+    this.playerProfileModal.show(player, null, liveAppearance);
+
+    // 3. Fetch stats from DB and update
     try {
       const { fetchPublicCharacter } = await import('../network/GameSync.js');
-      const characterData = await fetchPublicCharacter(player.userId);
+      const dbData = await fetchPublicCharacter(player.userId);
       
-      // Show the beautiful profile modal
-      this.playerProfileModal.show(player, characterData);
+      // Update only if we are still looking at the same player (avoid race conditions)
+      if (this.playerProfileModal.currentPlayer && this.playerProfileModal.currentPlayer.userId === player.userId) {
+        this.playerProfileModal.show(player, dbData, liveAppearance);
+      }
     } catch (e) {
-      console.error('Failed to fetch player profile:', e);
-      // Fallback to basic info
-      this.playerProfileModal.show(player, null);
+      console.error('Failed to fetch player stats from DB:', e);
     }
   }
 

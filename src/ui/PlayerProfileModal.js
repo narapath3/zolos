@@ -2,6 +2,7 @@
 // Shows player stats, skills, and equipment with premium styling
 
 import { JobPreview } from '../engine/JobPreview.js';
+import { JOBS, ITEMS, EQUIP_SLOTS } from '../engine/GameData.js';
 
 export class PlayerProfileModal {
   constructor() {
@@ -31,13 +32,13 @@ export class PlayerProfileModal {
       }
 
       #player-profile-card {
-        width: min(800px, 96vw);
+        width: min(840px, 96vw);
         max-height: 92vh;
         display: flex;
         flex-direction: column;
-        border-radius: 18px;
-        background: linear-gradient(180deg, #151b30, #0d1120);
-        border: 1px solid rgba(240, 192, 64, 0.35);
+        border-radius: 20px;
+        background: linear-gradient(180deg, #1a223a, #0d1120);
+        border: 1px solid rgba(240, 192, 64, 0.4);
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         overflow: hidden;
       }
@@ -46,319 +47,295 @@ export class PlayerProfileModal {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 14px 18px;
-        border-bottom: 1px solid rgba(100, 150, 255, 0.2);
-        background: linear-gradient(90deg, rgba(240, 192, 64, 0.14), transparent);
+        padding: 14px 20px;
+        border-bottom: 1px solid rgba(240, 192, 64, 0.2);
+        background: linear-gradient(90deg, rgba(240, 192, 64, 0.1), transparent);
       }
 
       .profile-head h2 {
-        font-size: 17px;
+        font-size: 18px;
         color: #fff;
-        text-shadow: 0 0 14px rgba(240, 192, 64, 0.5);
+        text-shadow: 0 0 10px rgba(240, 192, 64, 0.3);
         margin: 0;
         font-weight: 800;
       }
 
-      .profile-head .sub {
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.5);
-        margin-top: 3px;
-      }
-
       .profile-x {
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(100, 150, 255, 0.2);
-        color: rgba(255, 255, 255, 0.5);
-        width: 36px;
-        height: 36px;
-        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
         cursor: pointer;
-        font-size: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
-        flex: 0 0 auto;
-        transition: all 0.2s;
+        transition: all 0.3s ease;
       }
 
       .profile-x:hover {
+        transform: rotate(90deg);
         background: rgba(255, 100, 100, 0.2);
-        border-color: rgba(255, 100, 100, 0.4);
         color: #ff6b6b;
+        border-color: rgba(255, 100, 100, 0.3);
       }
 
       .profile-main {
         display: flex;
-        gap: 16px;
-        padding: 16px 18px;
-        overflow-y: auto;
-        min-height: 0;
+        padding: 20px;
+        gap: 24px;
+        overflow: hidden;
       }
 
       .profile-left {
-        flex: 0 0 45%;
+        flex: 0 0 320px;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 16px;
       }
 
       #player-profile-canvas {
         width: 100%;
-        height: 280px;
-        border-radius: 14px;
-        border: 1px solid rgba(100, 150, 255, 0.2);
-        display: block;
-        background: radial-gradient(circle at 50% 32%, rgba(96, 130, 210, 0.28), rgba(10, 14, 28, 0.55) 70%);
+        height: 320px;
+        border-radius: 16px;
+        background: radial-gradient(circle at 50% 40%, #252d4a, #0d1120);
+        border: 1px solid rgba(255, 255, 255, 0.05);
       }
 
-      .profile-title {
+      .profile-info {
         text-align: center;
-        padding: 8px;
       }
 
-      .profile-title .n {
-        font-size: 18px;
+      .profile-name {
+        font-size: 20px;
         font-weight: 800;
         color: #fff;
+        margin-bottom: 4px;
       }
 
-      .profile-title .level-job {
-        font-size: 12px;
-        color: rgba(255, 255, 255, 0.6);
-        margin-top: 4px;
+      .profile-sub {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
       }
 
-      .profile-title .job-emoji {
-        font-size: 14px;
-        color: var(--primary, #f0c040);
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 8px;
       }
+
+      .status-online { background: rgba(81, 207, 102, 0.15); color: #51cf66; }
+      .status-offline { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.4); }
 
       .profile-right {
         flex: 1;
-        min-width: 0;
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: 20px;
         overflow-y: auto;
+        padding-right: 8px;
       }
 
-      .stat-section {
-        background: rgba(100, 150, 255, 0.08);
-        border: 1px solid rgba(100, 150, 255, 0.2);
-        border-radius: 12px;
-        padding: 12px;
-      }
+      /* Custom scrollbar */
+      .profile-right::-webkit-scrollbar { width: 4px; }
+      .profile-right::-webkit-scrollbar-track { background: transparent; }
+      .profile-right::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
 
-      .stat-section-title {
-        font-size: 9px;
-        letter-spacing: 0.5px;
-        color: var(--primary, #f0c040);
-        margin-bottom: 8px;
-        font-weight: 800;
+      .section-title {
+        font-size: 11px;
         text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #f0c040;
+        margin-bottom: 12px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .section-title::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, rgba(240, 192, 64, 0.2), transparent);
+      }
+
+      /* Basic Stats */
+      .basic-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
 
       .stat-row {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 8px;
+        gap: 12px;
       }
 
-      .stat-row:last-child {
-        margin-bottom: 0;
-      }
-
-      .stat-row .lbl {
-        width: 64px;
-        font-size: 11px;
+      .stat-label {
+        width: 40px;
+        font-size: 12px;
         font-weight: 800;
-        color: #fff;
+        color: rgba(255, 255, 255, 0.8);
       }
 
-      .stat-bar {
+      .stat-bar-bg {
         flex: 1;
-        height: 12px;
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.08);
+        height: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
         overflow: hidden;
       }
 
-      .stat-bar > i {
-        display: block;
+      .stat-bar-fill {
         height: 100%;
-        border-radius: 6px;
-        transition: width 0.3s;
+        border-radius: 4px;
+        width: 0;
+        transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
 
-      .stat-bar.str > i {
-        background: linear-gradient(90deg, #ff6b6b, #ff8787);
-      }
+      .stat-bar-fill.str { background: linear-gradient(90deg, #ff4b4b, #ff8787); }
+      .stat-bar-fill.agi { background: linear-gradient(90deg, #2ecc71, #51cf66); }
+      .stat-bar-fill.int { background: linear-gradient(90deg, #3498db, #748ffc); }
 
-      .stat-bar.agi > i {
-        background: linear-gradient(90deg, #51cf66, #69db7c);
-      }
-
-      .stat-bar.int > i {
-        background: linear-gradient(90deg, #4c6ef5, #748ffc);
-      }
-
-      .stat-row .val {
-        width: 28px;
-        text-align: right;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.7);
-        font-variant-numeric: tabular-nums;
-        font-weight: 600;
-      }
-
-      .stat-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      .stat-box {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 8px;
-        border-radius: 6px;
-        text-align: center;
-        border: 1px solid rgba(100, 150, 255, 0.1);
-      }
-
-      .stat-box .label {
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.5);
-        margin-bottom: 2px;
-      }
-
-      .stat-box .value {
-        font-size: 13px;
+      .stat-value {
+        width: 24px;
+        font-size: 12px;
         font-weight: 700;
         color: #fff;
+        text-align: right;
       }
 
-      .stat-box.hp .value { color: #ff6b6b; }
-      .stat-box.sp .value { color: #4c6ef5; }
-      .stat-box.atk .value { color: #ff8787; }
-      .stat-box.def .value { color: #51cf66; }
-      .stat-box.kills .value { color: #ffc107; }
-      .stat-box.gold .value { color: #ffd24a; }
-
-      .mod-pill {
-        display: inline-block;
-        font-size: 10px;
-        font-weight: 800;
-        border-radius: 16px;
-        padding: 3px 9px;
-        margin: 3px 4px 0 0;
-        border: 1px solid transparent;
-      }
-
-      .mod-up {
-        color: #57e08a;
-        background: rgba(64, 224, 128, 0.14);
-        border-color: rgba(64, 224, 128, 0.32);
-      }
-
-      .mod-dn {
-        color: #ff8098;
-        background: rgba(255, 96, 128, 0.14);
-        border-color: rgba(255, 96, 128, 0.32);
-      }
-
-      .skill-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        font-size: 11px;
-        color: #cfe6ff;
-        background: rgba(90, 140, 220, 0.14);
-        border: 1px solid rgba(120, 170, 230, 0.3);
-        border-radius: 20px;
-        padding: 3px 9px;
-        margin: 3px 4px 0 0;
-      }
-
-      .equip-grid {
+      /* Combat Stats */
+      .combat-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .combat-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 10px 14px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s ease;
+      }
+
+      .combat-box:hover {
+        transform: translateY(-2px);
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(240, 192, 64, 0.2);
+      }
+
+      .combat-label { font-size: 11px; color: rgba(255, 255, 255, 0.4); font-weight: 600; }
+      .combat-value { font-size: 14px; font-weight: 700; color: #fff; }
+
+      /* Skills */
+      .skills-flex {
+        display: flex;
+        flex-wrap: wrap;
         gap: 8px;
       }
 
-      .equip-slot {
+      .skill-badge {
+        background: rgba(52, 152, 219, 0.1);
+        border: 1px solid rgba(52, 152, 219, 0.2);
+        color: #74b9ff;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      /* Equipment */
+      .equip-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+      }
+
+      .equip-item {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         text-align: center;
-        padding: 8px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(100, 200, 255, 0.2);
-        transition: all 0.2s;
+        gap: 6px;
+        opacity: 0.5;
+        transition: all 0.2s ease;
       }
 
-      .equip-slot:hover {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(100, 200, 255, 0.4);
+      .equip-item.filled {
+        opacity: 1;
+        background: rgba(240, 192, 64, 0.05);
+        border-color: rgba(240, 192, 64, 0.3);
       }
 
-      .equip-slot .icon {
-        font-size: 18px;
-        margin-bottom: 4px;
-      }
-
-      .equip-slot .slot-name {
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.5);
-        margin-bottom: 2px;
-      }
-
-      .equip-slot .item-name {
+      .equip-emoji { font-size: 20px; }
+      .equip-slot-label { font-size: 9px; text-transform: uppercase; color: rgba(255, 255, 255, 0.3); font-weight: 800; }
+      .equip-name {
         font-size: 11px;
         font-weight: 600;
         color: #fff;
+        width: 100%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
-      .status-badge {
-        display: inline-block;
+      /* Badges */
+      .badges-section {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
+        margin-top: 8px;
+      }
+
+      .badge {
+        padding: 3px 8px;
+        border-radius: 4px;
         font-size: 10px;
         font-weight: 800;
-        border-radius: 16px;
-        padding: 4px 10px;
-        margin-top: 4px;
-        border: 1px solid transparent;
+        text-transform: uppercase;
       }
 
-      .status-online {
-        color: #57e08a;
-        background: rgba(64, 224, 128, 0.14);
-        border-color: rgba(64, 224, 128, 0.32);
-      }
+      .badge-title { background: #f0c040; color: #000; }
+      .badge-veteran { background: #9b59b6; color: #fff; }
+      .badge-wealthy { background: #2ecc71; color: #fff; }
 
-      .status-offline {
-        color: rgba(255, 255, 255, 0.5);
-        background: rgba(255, 255, 255, 0.04);
-        border-color: rgba(255, 255, 255, 0.1);
-      }
-
-      @media (max-width: 680px) {
+      @media (max-width: 720px) {
+        #player-profile-card {
+          width: 96vw;
+          max-height: 96vh;
+        }
         .profile-main {
           flex-direction: column;
+          overflow-y: auto;
         }
         .profile-left {
           flex: none;
+          width: 100%;
         }
-        #player-profile-canvas {
-          height: 240px;
-        }
-        #player-profile-card {
-          max-height: calc(100dvh - 116px);
-        }
-        #player-profile-modal {
-          align-items: flex-start;
-          padding: 8px 8px 108px;
+        .equip-grid {
+          grid-template-columns: repeat(3, 1fr);
         }
       }
     `;
@@ -371,20 +348,51 @@ export class PlayerProfileModal {
     modal.innerHTML = `<div id="player-profile-card"></div>`;
     document.body.appendChild(modal);
     this.modal = modal;
+    
+    // Global click listener to close if clicking outside the card
+    this.modal.addEventListener('click', (e) => {
+      if (e.target === this.modal) this.hide();
+    });
   }
 
-  show(player, characterData) {
+  show(player, dbData = null, liveAppearance = null) {
     this.currentPlayer = player;
     const card = document.getElementById('player-profile-card');
     
-    const jobEmoji = this._getJobEmoji(characterData?.job);
-    const jobName = this._getJobName(characterData?.job);
+    // Merge data: DB provides stats, liveAppearance provides current visuals
+    const job = dbData?.job || liveAppearance?.job || 'Novice';
+    const level = dbData?.level || player.level || 1;
+    
+    // STR/AGI/INT fallback logic
+    const defaultStats = JOBS[job]?.stats || { str: 1, agi: 1, int: 1 };
+    const stats = {
+      str: dbData?.str || defaultStats.str,
+      agi: dbData?.agi || defaultStats.agi,
+      int: dbData?.int || defaultStats.int
+    };
+
+    // Appearance merge
+    const appearance = {
+      gender: liveAppearance?.gender || dbData?.gender || 'male',
+      bodyColor: liveAppearance?.bodyColor || dbData?.body_color || 0x4060c0,
+      hairColor: liveAppearance?.hairColor || dbData?.hair_color || 0xc04040,
+      pantsColor: liveAppearance?.pantsColor || dbData?.pants_color || 0x3a3a5a,
+      hat: liveAppearance?.hat || dbData?.hat || 'None',
+      glasses: liveAppearance?.glasses || dbData?.glasses || 'None',
+      weapon: liveAppearance?.weapon || dbData?.weapon || 'None',
+      shield: liveAppearance?.shield || dbData?.shield || 'None',
+      gear: liveAppearance?.gear || { body: dbData?.armor },
+      job: job,
+      title: liveAppearance?.title || dbData?.title
+    };
+
+    const jobInfo = JOBS[job] || { name: 'Adventurer', emoji: '⚔️' };
+    const isOffline = player.isOffline || (player.userId.startsWith('guest_') && !remotePlayersMap.has(player.userId));
 
     card.innerHTML = `
       <div class="profile-head">
         <div>
-          <h2>🎖️ โปรไฟล์ผู้เล่น</h2>
-          <div class="sub">ดูข้อมูลสถิติและอุปกรณ์ของผู้เล่น</div>
+          <h2>PLAYER PROFILE</h2>
         </div>
         <button class="profile-x">✕</button>
       </div>
@@ -392,23 +400,86 @@ export class PlayerProfileModal {
       <div class="profile-main">
         <div class="profile-left">
           <canvas id="player-profile-canvas"></canvas>
-          <div class="profile-title">
-            <div class="n">${player.username}</div>
-            <div class="level-job">
-              Lv.${player.level} • <span class="job-emoji">${jobEmoji}</span> ${jobName}
+          <div class="profile-info">
+            <div class="profile-name">${dbData?.name || player.username}</div>
+            <div class="profile-sub">
+              Lv.${level} • ${jobInfo.emoji} ${jobInfo.name}
             </div>
-            <div class="status-badge ${player.isOffline ? 'status-offline' : 'status-online'}">
-              ${player.isOffline ? '⚫ ออฟไลน์' : '🟢 ออนไลน์'}
+            <div class="status-badge ${isOffline ? 'status-offline' : 'status-online'}">
+              ${isOffline ? '⚫ OFFLINE' : '🟢 ONLINE'}
+            </div>
+            <div class="badges-section">
+              ${this._renderBadges({ ...dbData, appearance, level })}
             </div>
           </div>
         </div>
 
         <div class="profile-right">
-          ${this._renderStats(characterData)}
-          ${this._renderCombatStats(characterData)}
-          ${this._renderModifiers(characterData)}
-          ${this._renderSkills(characterData)}
-          ${this._renderEquipment(characterData)}
+          <div>
+            <div class="section-title">Attributes</div>
+            <div class="basic-stats">
+              ${this._renderStatRow('STR', stats.str, 'str')}
+              ${this._renderStatRow('AGI', stats.agi, 'agi')}
+              ${this._renderStatRow('INT', stats.int, 'int')}
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Combat Stats</div>
+            <div class="combat-grid">
+              <div class="combat-box">
+                <span class="combat-label">HP</span>
+                <span class="combat-value">${dbData?.hp || '???'}/${dbData?.max_hp || '???'}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">SP</span>
+                <span class="combat-value">${dbData?.sp || '???'}/${dbData?.max_sp || '???'}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">ATK</span>
+                <span class="combat-value">+${dbData?.atk || 0}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">DEF</span>
+                <span class="combat-value">+${dbData?.def || 0}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">Kills</span>
+                <span class="combat-value">${dbData?.total_kills || 0}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">Zeny</span>
+                <span class="combat-value">${(dbData?.gold || 0).toLocaleString()}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">ZOL</span>
+                <span class="combat-value">${(dbData?.zol || 0).toLocaleString()}</span>
+              </div>
+              <div class="combat-box">
+                <span class="combat-label">Play Time</span>
+                <span class="combat-value">${this._formatPlayTime(dbData?.play_time || 0)}</span>
+              </div>
+            </div>
+            ${dbData?.last_map ? `
+              <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.3); text-align:right;">
+                Last seen: <span style="color:rgba(255,255,255,0.6)">${dbData.last_map.replace(/_/g, ' ')}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          <div>
+            <div class="section-title">Skills</div>
+            <div class="skills-flex">
+              ${this._renderSkills(job)}
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">Equipment</div>
+            <div class="equip-grid">
+              ${this._renderEquipment(appearance)}
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -417,7 +488,15 @@ export class PlayerProfileModal {
     card.querySelector('.profile-x').onclick = () => this.hide();
 
     // Initialize 3D character preview
-    this._init3DPreview(characterData);
+    this._init3DPreview(appearance);
+
+    // Animate bars after a short delay
+    setTimeout(() => {
+      card.querySelectorAll('.stat-bar-fill').forEach(bar => {
+        const val = parseInt(bar.getAttribute('data-val'));
+        bar.style.width = Math.min((val / 10) * 100, 100) + '%';
+      });
+    }, 50);
 
     this.modal.style.display = 'flex';
   }
@@ -431,173 +510,115 @@ export class PlayerProfileModal {
     }
   }
 
-  _init3DPreview(data) {
+  _init3DPreview(appearance) {
     const canvas = document.getElementById('player-profile-canvas');
     if (!canvas) return;
 
-    // Dispose old preview
     if (this.jobPreview) {
       this.jobPreview.dispose();
-      this.jobPreview = null;
     }
 
-    // Create new preview
     this.jobPreview = new JobPreview(canvas);
-    if (data && data.job) {
-      this.jobPreview.setJob(data.job);
+    
+    // Apply full appearance to the character
+    if (this.jobPreview.char) {
+      this.jobPreview.char.applyAppearance(appearance);
+      
+      // Update ring color based on job
+      const jobColor = JOBS[appearance.job]?.color || 0xf0c040;
+      if (this.jobPreview.ring) {
+        this.jobPreview.ring.material.color.setHex(jobColor);
+        this.jobPreview.ring.material.emissive.setHex(jobColor);
+      }
     }
+    
     this.jobPreview.start();
   }
 
-  _renderStats(data) {
-    if (!data) return '';
-
-    const stats = [
-      { label: 'STR', value: data.str || 0, max: 20, class: 'str' },
-      { label: 'AGI', value: data.agi || 0, max: 20, class: 'agi' },
-      { label: 'INT', value: data.int || 0, max: 20, class: 'int' }
-    ];
-
-    const statsHtml = stats.map(stat => {
-      const percent = Math.min((stat.value / stat.max) * 100, 100);
-      return `
-        <div class="stat-row">
-          <div class="lbl">${stat.label}</div>
-          <div class="stat-bar ${stat.class}">
-            <i style="width: ${percent}%"></i>
-          </div>
-          <div class="val">${stat.value}</div>
+  _renderStatRow(label, value, className) {
+    return `
+      <div class="stat-row">
+        <div class="stat-label">${label}</div>
+        <div class="stat-bar-bg">
+          <div class="stat-bar-fill ${className}" data-val="${value}"></div>
         </div>
-      `;
+        <div class="stat-value">${value}</div>
+      </div>
+    `;
+  }
+
+  _renderSkills(jobId) {
+    const skills = JOBS[jobId]?.skills || [];
+    if (skills.length === 0) return '<div style="font-size:11px; color:rgba(255,255,255,0.2)">No skills unlocked</div>';
+    
+    return skills.map(skillId => {
+      // Find skill name from JOBS data or fallback
+      const skillName = skillId.charAt(0).toUpperCase() + skillId.slice(1);
+      return `<div class="skill-badge">${skillName}</div>`;
     }).join('');
-
-    return `
-      <div class="stat-section">
-        <div class="stat-section-title">⚔️ พลังพื้นฐาน</div>
-        ${statsHtml}
-      </div>
-    `;
   }
 
-  _renderCombatStats(data) {
-    if (!data) return '';
-
-    return `
-      <div class="stat-section">
-        <div class="stat-section-title">📊 สถิติการต่อสู้</div>
-        <div class="stat-grid">
-          <div class="stat-box hp">
-            <div class="label">HP</div>
-            <div class="value">${data.hp || 0}/${data.max_hp || 0}</div>
-          </div>
-          <div class="stat-box sp">
-            <div class="label">SP</div>
-            <div class="value">${data.sp || 0}/${data.max_sp || 0}</div>
-          </div>
-          <div class="stat-box atk">
-            <div class="label">ATK</div>
-            <div class="value">+${data.atk || 0}</div>
-          </div>
-          <div class="stat-box def">
-            <div class="label">DEF</div>
-            <div class="value">+${data.def || 0}</div>
-          </div>
-          <div class="stat-box kills">
-            <div class="label">Kills</div>
-            <div class="value">${(data.total_kills || 0).toLocaleString()}</div>
-          </div>
-          <div class="stat-box gold">
-            <div class="label">Zeny</div>
-            <div class="value">${(data.gold || 0).toLocaleString()}</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  _renderModifiers(data) {
-    if (!data) return '';
-
-    const mods = [];
-    if (data.hp_mod) mods.push(`<span class="mod-pill ${data.hp_mod > 0 ? 'mod-up' : 'mod-dn'}">HP ${data.hp_mod > 0 ? '+' : ''}${data.hp_mod}%</span>`);
-    if (data.def_mod) mods.push(`<span class="mod-pill ${data.def_mod > 0 ? 'mod-up' : 'mod-dn'}">DEF ${data.def_mod > 0 ? '+' : ''}${data.def_mod}%</span>`);
-    if (data.atk_mod) mods.push(`<span class="mod-pill ${data.atk_mod > 0 ? 'mod-up' : 'mod-dn'}">ATK ${data.atk_mod > 0 ? '+' : ''}${data.atk_mod}%</span>`);
-    if (data.sp_mod) mods.push(`<span class="mod-pill ${data.sp_mod > 0 ? 'mod-up' : 'mod-dn'}">SP ${data.sp_mod > 0 ? '+' : ''}${data.sp_mod}%</span>`);
-
-    if (mods.length === 0) return '';
-
-    return `
-      <div class="stat-section">
-        <div class="stat-section-title">⚡ ค่าต่อสู้เทียบสายกลาง</div>
-        <div style="line-height: 1.8;">${mods.join('')}</div>
-      </div>
-    `;
-  }
-
-  _renderSkills(data) {
-    if (!data || !data.skills || data.skills.length === 0) return '';
-
-    const skillsHtml = data.skills.map(skill => 
-      `<span class="skill-pill">✨ ${skill.name}</span>`
-    ).join('');
-
-    return `
-      <div class="stat-section">
-        <div class="stat-section-title">✨ สกิลที่ติดตั้ง</div>
-        <div style="line-height: 1.8;">${skillsHtml}</div>
-      </div>
-    `;
-  }
-
-  _renderEquipment(data) {
-    if (!data) return '';
-
+  _renderEquipment(appearance) {
     const slots = [
-      { name: 'weapon', icon: '⚔️', label: 'Weapon' },
-      { name: 'hat', icon: '🎩', label: 'Hat' },
-      { name: 'shield', icon: '🛡️', label: 'Shield' },
-      { name: 'armor', icon: '🎽', label: 'Armor' },
-      { name: 'glasses', icon: '👓', label: 'Glasses' },
-      { name: 'ring', icon: '💍', label: 'Ring' }
+      { id: 'weapon', label: 'Weapon' },
+      { id: 'shield', label: 'Shield' },
+      { id: 'hat', label: 'Head' },
+      { id: 'glasses', label: 'Eyes' },
+      { id: 'body', label: 'Armor' },
+      { id: 'garment', label: 'Garment' },
+      { id: 'ring', label: 'Accessory' },
+      { id: 'feet', label: 'Shoes' }
     ];
 
-    const equipHtml = slots.map(slot => {
-      const item = data[slot.name];
-      const hasItem = item && item !== 'None';
+    return slots.map(slot => {
+      let itemName = 'None';
+      if (slot.id === 'weapon') itemName = appearance.weapon;
+      else if (slot.id === 'shield') itemName = appearance.shield;
+      else if (slot.id === 'hat') itemName = appearance.hat;
+      else if (slot.id === 'glasses') itemName = appearance.glasses;
+      else itemName = appearance.gear[slot.id] || 'None';
+
+      const isFilled = itemName && itemName !== 'None';
+      const itemData = isFilled ? ITEMS[itemName] : null;
+      const emoji = itemData?.emoji || '➖';
+      const displayName = isFilled ? itemName : 'Empty';
+
       return `
-        <div class="equip-slot">
-          <div class="icon">${slot.icon}</div>
-          <div class="slot-name">${slot.label}</div>
-          <div class="item-name">${hasItem ? item : '-'}</div>
+        <div class="equip-item ${isFilled ? 'filled' : ''}">
+          <div class="equip-emoji">${emoji}</div>
+          <div class="equip-slot-label">${slot.label}</div>
+          <div class="equip-name" title="${displayName}">${displayName}</div>
         </div>
       `;
     }).join('');
-
-    return `
-      <div class="stat-section">
-        <div class="stat-section-title">🎽 อุปกรณ์ที่สวมใส่</div>
-        <div class="equip-grid">${equipHtml}</div>
-      </div>
-    `;
   }
 
-  _getJobEmoji(job) {
-    const emojis = {
-      'swordsman': '⚔️',
-      'mage': '🔮',
-      'archer': '🏹',
-      'priest': '✨'
-    };
-    return emojis[job] || '🎮';
+  _renderBadges(data) {
+    const badges = [];
+    
+    // Title Badge
+    const title = data.appearance?.title || data.title;
+    if (title) {
+      badges.push(`<div class="badge badge-title">${title.replace(/_/g, ' ')}</div>`);
+    }
+    
+    // Veteran Badge
+    if (data.level >= 40) {
+      badges.push('<div class="badge badge-veteran">Veteran</div>');
+    }
+    
+    // Wealthy Badge
+    if (data.gold >= 1000000) {
+      badges.push('<div class="badge badge-wealthy">Wealthy</div>');
+    }
+    
+    return badges.join('');
   }
 
-  _getJobName(job) {
-    const jobs = {
-      'swordsman': '⚔️ นักดาบ',
-      'mage': '🔮 จอมเวทย์',
-      'archer': '🏹 นักธนู',
-      'priest': '✨ พระ'
-    };
-    return jobs[job] || job || 'ผู้เล่น';
+  _formatPlayTime(seconds) {
+    if (!seconds) return '0h 0m';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
   }
 }

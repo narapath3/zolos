@@ -90,7 +90,7 @@ export async function fetchPublicCharacter(userId) {
     try {
         const { data, error } = await supabase
             .from('characters')
-            .select('name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map')
+            .select('name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map, job, str, agi, int, body_color, hair_color, pants_color, shield, armor, title')
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
             .limit(1)
