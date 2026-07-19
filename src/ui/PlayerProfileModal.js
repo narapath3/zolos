@@ -2,7 +2,7 @@
 // Shows player stats, skills, and equipment with premium styling
 
 import { JobPreview } from '../engine/JobPreview.js';
-import { JOBS, ITEMS, EQUIP_SLOTS } from '../engine/GameData.js';
+import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS } from '../engine/GameData.js';
 
 export class PlayerProfileModal {
   constructor() {
@@ -387,7 +387,7 @@ export class PlayerProfileModal {
     };
 
     const jobInfo = JOBS[job] || { name: 'Adventurer', emoji: '⚔️' };
-    const isOffline = player.isOffline || (player.userId.startsWith('guest_') && !remotePlayersMap.has(player.userId));
+    const isOffline = player.isOffline || (player.userId.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(player.userId)));
 
     card.innerHTML = `
       <div class="profile-head">
@@ -524,11 +524,10 @@ export class PlayerProfileModal {
     if (this.jobPreview.char) {
       this.jobPreview.char.applyAppearance(appearance);
       
-      // Update ring color based on job
-      const jobColor = JOBS[appearance.job]?.color || 0xf0c040;
+      // Update ring color based on job (match JobPreview logic)
+      const ringColor = { swordsman: 0xff6a6a, mage: 0xb080ff, archer: 0x7be08a, priest: 0xffe98a }[appearance.job] || 0xffd24a;
       if (this.jobPreview.ring) {
-        this.jobPreview.ring.material.color.setHex(jobColor);
-        this.jobPreview.ring.material.emissive.setHex(jobColor);
+        this.jobPreview.ring.material.color.setHex(ringColor);
       }
     }
     
@@ -548,13 +547,14 @@ export class PlayerProfileModal {
   }
 
   _renderSkills(jobId) {
-    const skills = JOBS[jobId]?.skills || [];
-    if (skills.length === 0) return '<div style="font-size:11px; color:rgba(255,255,255,0.2)">No skills unlocked</div>';
+    const skillIds = JOBS[jobId]?.skills || [];
+    if (skillIds.length === 0) return '<div style="font-size:11px; color:rgba(255,255,255,0.2)">No skills unlocked</div>';
     
-    return skills.map(skillId => {
-      // Find skill name from JOBS data or fallback
-      const skillName = skillId.charAt(0).toUpperCase() + skillId.slice(1);
-      return `<div class="skill-badge">${skillName}</div>`;
+    return skillIds.map(id => {
+      const s = SKILLS[id];
+      const name = s ? s.name : (id.charAt(0).toUpperCase() + id.slice(1));
+      const emoji = s ? s.emoji : '🌀';
+      return `<div class="skill-badge">${emoji} ${name}</div>`;
     }).join('');
   }
 

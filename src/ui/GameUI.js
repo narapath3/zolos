@@ -1872,7 +1872,7 @@ export class GameUI {
       }
 
       return `
-        <div class="player-row" data-username="${p.username}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
+        <div class="player-row" data-username="${p.username}" data-user-id="${p.userId || ''}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
           <span class="online-dot" style="background-color:${dotColor}"></span>
           <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
           ${cityHtml}
@@ -1925,12 +1925,23 @@ export class GameUI {
         const row = e.target.closest('.player-row');
         if (!row) return;
 
-        // Skip if player is offline
-        if (row.getAttribute('data-offline') === 'true') {
+
+
+        const targetUsername = row.getAttribute('data-username');
+        const isOffline = row.getAttribute('data-offline') === 'true';
+        
+        if (isOffline) {
+          const userId = row.getAttribute('data-user-id');
+          // For offline friends, we might not have a full player object, but we can still try
+          this._showPlayerPopup({
+            username: targetUsername,
+            level: row.querySelector('.player-level-badge')?.textContent.replace('Lv.', '') || '?',
+            userId: userId || targetUsername,
+            isOffline: true
+          });
           return;
         }
 
-        const targetUsername = row.getAttribute('data-username');
         if (!this.onlinePlayers) return;
         const player = this.onlinePlayers.find(p => p.username === targetUsername);
         if (player) {
