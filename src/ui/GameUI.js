@@ -1209,26 +1209,23 @@ export class GameUI {
     });
   }
 
-  // Render the hero paper-doll: one frame per body-part slot, the equipped item
-  // shown in it, plus a centre portrait with the gear's combined stats.
-  _renderEquipDoll() {
-    this._ensureEquipDoll();
-    const doll = document.getElementById('equip-doll');
-    if (!doll) return;
-    doll.style.display = 'grid';
-    if (!this.character) { doll.innerHTML = ''; return; }
+  // The item currently worn in a paper-doll slot (or null).
+  _slotItemName(id) {
     const ch = this.character;
+    if (!ch) return null;
+    if (id === 'weapon') return ch.equippedWeapon || null;
+    if (id === 'shield') return ch.equippedShield || null;
+    if (id === 'hat') return (ch.equippedHat && ch.equippedHat !== 'None') ? ch.equippedHat : null;
+    if (id === 'glasses') return (ch.equippedGlasses && ch.equippedGlasses !== 'None') ? ch.equippedGlasses : null;
+    return (ch.equippedGear && ch.equippedGear[id]) || null;
+  }
 
-    const slotItemName = (id) => {
-      if (id === 'weapon') return ch.equippedWeapon || null;
-      if (id === 'shield') return ch.equippedShield || null;
-      if (id === 'hat') return (ch.equippedHat && ch.equippedHat !== 'None') ? ch.equippedHat : null;
-      if (id === 'glasses') return (ch.equippedGlasses && ch.equippedGlasses !== 'None') ? ch.equippedGlasses : null;
-      return (ch.equippedGear && ch.equippedGear[id]) || null;
-    };
-
+  // Shared markup for the paper-doll. `hint` lets each host (inventory vs
+  // profile) show its own instruction line.
+  _dollInnerHTML(hint) {
+    const ch = this.character;
     const cell = (slot) => {
-      const name = slotItemName(slot.id);
+      const name = this._slotItemName(slot.id);
       const it = name ? ITEMS[name] : null;
       const filled = !!name;
       const rarity = it && it.rarity ? it.rarity : '';
@@ -1236,23 +1233,20 @@ export class GameUI {
       const ic = filled && it ? (it.emoji || slot.icon) : slot.icon;
       return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
         data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
-        title="${filled ? name + ' — คลิกเพื่อถอด' : slot.label + ' (ว่าง) — คลิกเพื่อดูของที่ใส่ได้'}">
+        title="${filled ? name : slot.label + ' (ว่าง)'}">
         <div class="eq-slot-ic">${ic}</div>
         <div class="eq-slot-lb">${filled ? this._short(name) : slot.label}</div>
         ${filled ? '<div class="eq-slot-x">✕</div>' : ''}
       </div>`;
     };
-
     const bySlot = Object.fromEntries(EQUIP_SLOTS.map(s => [s.id, s]));
     const leftIds = ['hat', 'glasses', 'head', 'body', 'garment'];
     const rightIds = ['weapon', 'shield', 'ring', 'accessory'];
     const bottomIds = ['wrist', 'pants', 'feet'];
-
     const st = ch.stats;
     const faceEmoji = { swordsman: '⚔️', mage: '🔮', archer: '🏹', priest: '✨' }[st.job] || '🧑';
     const jobName = (JOBS[st.job] && JOBS[st.job].name) || 'Novice';
-
-    doll.innerHTML = `
+    return `
       <div class="equip-col">${leftIds.map(id => cell(bySlot[id])).join('')}</div>
       <div class="equip-hero">
         <div class="equip-hero-face">${faceEmoji}</div>
@@ -1267,8 +1261,121 @@ export class GameUI {
       </div>
       <div class="equip-col">${rightIds.map(id => cell(bySlot[id])).join('')}</div>
       <div class="equip-bottom">${bottomIds.map(id => cell(bySlot[id])).join('')}</div>
-      <div class="equip-doll-hint">แตะช่องที่ใส่ของอยู่เพื่อถอด · แตะช่องว่างเพื่อดูไอเทมที่สวมได้</div>
+      <div class="equip-doll-hint">${hint}</div>
     `;
+  }
+
+  // Render the hero paper-doll: one frame per body-part slot, the equipped item
+  // shown in it, plus a centre portrait with the gear's combined stats.
+  _renderEquipDoll() {
+    this._ensureEquipDoll();
+    const doll = document.getElementById('equip-doll');
+    if (!doll) return;
+    doll.style.display = 'grid';
+    if (!this.character) { doll.innerHTML = ''; return; }
+    doll.innerHTML = this._dollInnerHTML('แตะช่องที่ใส่ของอยู่เพื่อถอด · แตะช่องว่างเพื่อดูไอเทมที่สวมได้');
+  }
+
+  // Same paper-doll, embedded in the Settings & Profile panel (replaces the old
+  // weapon/hat/glasses dropdowns). Tapping any slot opens a picker of items that
+  // fit it; equip/unequip applies live.
+  _renderProfileEquipDoll() {
+    const host = document.getElementById('profile-equip-doll');
+    if (!host || !this.character) return;
+    this._ensureEquipDoll(); // guarantees the shared .equip-doll styles exist
+    host.className = 'equip-doll';
+    host.innerHTML = this._dollInnerHTML('แตะช่องเพื่อเลือก/เปลี่ยน/ถอดอุปกรณ์');
+    if (!host._wired) {
+      host._wired = true;
+      host.addEventListener('click', (e) => {
+        const c = e.target.closest('.eq-slot');
+        if (c) this._openSlotPicker(c.getAttribute('data-slot'));
+      });
+    }
+  }
+
+  // Owned items that fit a given doll slot (weapon slot also allows the rod).
+  _itemsForSlot(slotId) {
+    const inv = this.inventory || [];
+    return inv.filter(i => {
+      if (slotId === 'weapon') return i.item_type === 'weapon' || i.item_type === 'fishing_rod';
+      return getEquipSlot(i.item_name) === slotId;
+    });
+  }
+
+  // Popup list of the items that fit a slot (plus "remove"), for the profile
+  // doll. Selecting one equips it live; the doll + stats refresh instantly.
+  _openSlotPicker(slotId) {
+    const slot = EQUIP_SLOTS.find(s => s.id === slotId);
+    if (!slot) return;
+    const items = this._itemsForSlot(slotId);
+    const current = this._slotItemName(slotId);
+
+    let ov = document.getElementById('slot-picker-overlay');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'slot-picker-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(4,7,16,.62);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px;';
+
+    const rows = items.map(i => {
+      const equipped = i.item_name === current;
+      const locked = (i.item_type === 'weapon') && !canEquipItem(i.item_name, this.character.stats.job);
+      return `<div class="sp-row${equipped ? ' sp-eq' : ''}${locked ? ' sp-lock' : ''}" data-name="${i.item_name}">
+        <span class="sp-ic">${i.emoji || slot.icon}</span>
+        <span class="sp-nm">${i.item_name}</span>
+        <span class="sp-tag">${locked ? '🔒' : equipped ? '✅ ใส่อยู่' : ''}</span>
+      </div>`;
+    }).join('');
+
+    ov.innerHTML = `
+      <div class="sp-box" style="background:linear-gradient(160deg,#1b2340,#121627);border:1px solid rgba(130,160,230,.35);
+        border-radius:16px;max-width:340px;width:100%;max-height:70vh;overflow:auto;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-weight:800;color:#fff;font-size:15px;">${slot.icon} ${slot.label}</div>
+          <div id="sp-close" style="cursor:pointer;color:#9fb0e0;font-size:20px;line-height:1;padding:2px 6px;">✕</div>
+        </div>
+        <div class="sp-row sp-none" data-name="__none__" style="opacity:${current ? 1 : .5};">
+          <span class="sp-ic">🚫</span><span class="sp-nm">ถอดออก (ไม่ใส่)</span><span class="sp-tag"></span>
+        </div>
+        ${items.length ? rows : '<div style="color:#8b97ba;text-align:center;padding:16px 4px;font-size:13px;">ยังไม่มีไอเทมสำหรับช่องนี้ — หาซื้อได้ที่ร้านค้า</div>'}
+      </div>`;
+
+    if (!document.getElementById('slot-picker-styles')) {
+      const st = document.createElement('style');
+      st.id = 'slot-picker-styles';
+      st.textContent = `
+      .sp-row{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;cursor:pointer;
+        border:1px solid transparent;transition:background .12s,border-color .12s;}
+      .sp-row:hover{background:rgba(90,120,220,.18);border-color:rgba(150,180,255,.4);}
+      .sp-row .sp-ic{font-size:20px;width:26px;text-align:center;}
+      .sp-row .sp-nm{flex:1;color:#e6ecff;font-size:13.5px;}
+      .sp-row .sp-tag{font-size:11px;color:#8fe0a8;}
+      .sp-row.sp-eq{background:rgba(60,140,90,.18);border-color:rgba(120,220,150,.4);}
+      .sp-row.sp-lock{opacity:.55;}
+      .sp-none{margin-bottom:6px;background:rgba(200,70,70,.12);}
+      `;
+      document.head.appendChild(st);
+    }
+
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.querySelector('#sp-close').addEventListener('click', close);
+    ov.querySelectorAll('.sp-row').forEach(row => {
+      row.addEventListener('click', async () => {
+        const name = row.getAttribute('data-name');
+        if (name === '__none__') {
+          if (current) { const it = this.inventory.find(i => i.item_name === current); if (it) await this._toggleEquipItem(it); }
+        } else {
+          if (name === current) { close(); return; } // already worn
+          const it = this.inventory.find(i => i.item_name === name);
+          if (it) await this._toggleEquipItem(it); // equips (auto-swaps same slot)
+        }
+        close();
+        this._renderProfileEquipDoll();
+      });
+    });
   }
 
   // Trim a long item name so it fits a slot label.
@@ -3058,6 +3165,9 @@ export class GameUI {
         this._markLockedOptions(weaponSelect);
         this._markLockedOptions(hatSelect);
         this._markLockedOptions(glassesSelect);
+
+        // Paper-doll equipment picker (replaces the old dropdowns).
+        this._renderProfileEquipDoll();
       }
 
       modal.style.display = 'flex';
@@ -3092,9 +3202,11 @@ export class GameUI {
           shirtColor: strToHex(document.getElementById('profile-edit-shirt')?.value || '#4060c0'),
           pantsColor: strToHex(document.getElementById('profile-edit-pants')?.value || '#3a3a5a'),
           hairColor: strToHex(document.getElementById('profile-edit-hair')?.value || '#c04040'),
-          weapon: document.getElementById('profile-edit-weapon')?.value || 'Sword',
-          hat: document.getElementById('profile-edit-hat')?.value || 'None',
-          glasses: document.getElementById('profile-edit-glasses')?.value || 'None',
+          // Equipment is applied live via the paper-doll picker, so save just
+          // carries the hero's CURRENT gear through (never clobbers it).
+          weapon: this.character?.equippedWeapon || 'None',
+          hat: (this.character?.equippedHat && this.character.equippedHat !== 'None') ? this.character.equippedHat : 'None',
+          glasses: (this.character?.equippedGlasses && this.character.equippedGlasses !== 'None') ? this.character.equippedGlasses : 'None',
         };
 
         // Job lock: never apply a worn item this class can't use (guards against
@@ -3246,6 +3358,9 @@ export class GameUI {
     this._markLockedOptions(weaponSelect);
     this._markLockedOptions(hatSelect);
     this._markLockedOptions(glassesSelect);
+
+    // Keep the profile paper-doll in sync too.
+    this._renderProfileEquipDoll();
   }
 
   // ============ Auto Farm Button ============
