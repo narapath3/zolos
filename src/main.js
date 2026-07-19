@@ -48,6 +48,8 @@ import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { AdminUI } from './ui/AdminUI.js';
 import { announcementSystem } from './ui/AnnouncementSystem.js';
+import { TutorialSystem } from './ui/TutorialSystem.js';
+import { GlobalAnnouncements } from './ui/GlobalAnnouncements.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
@@ -68,6 +70,7 @@ import {
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
 let soundManager, combatSystem, inputManager;
+let globalAnnouncements = null;
 let isGameStarted = false;
 let lastTime = 0;
 let portalCooldown = 0;
@@ -391,6 +394,25 @@ async function initGame(charData) {
     // Initialize Announcement System
     announcementSystem.init();
     window.announcementSystem = announcementSystem;
+
+    // Initialize Global Announcements (server events feed)
+    globalAnnouncements = new GlobalAnnouncements();
+    window.globalAnnouncements = globalAnnouncements;
+    // Connect to socket for real-time events
+    import('./network/GameSync.js').then(({ getSocket }) => {
+        const socket = getSocket();
+        if (socket) {
+            globalAnnouncements.init(socket);
+        }
+    }).catch(e => console.warn('[GlobalAnnouncements] Socket init failed:', e));
+
+    // Initialize Tutorial System for new players
+    const tutorialSystem = new TutorialSystem(gameUI, character, sceneManager);
+    window.tutorialSystem = tutorialSystem;
+    await tutorialSystem.loadTutorialState(charData.user_id || 'guest');
+    if (tutorialSystem.shouldAutoStart()) {
+        setTimeout(() => tutorialSystem.initTutorialFlow(), 1200);
+    }
 
     // Set guest mode state
     gameUI.setGuestMode(charData.isGuest === true);

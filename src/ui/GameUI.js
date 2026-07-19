@@ -3969,13 +3969,13 @@ export class GameUI {
   // Dragon Heart on day 7 (the forge's rarest catalyst) so the streak feeds
   // the crafting loop. State: { streak, lastClaim: 'YYYY-MM-DD' }.
   static _STREAK_REWARDS = [
-    { day: 1, gold: 500, items: [] },
-    { day: 2, gold: 1000, items: [{ name: 'Red Herb', qty: 5 }] },
-    { day: 3, gold: 2000, items: [{ name: 'Iron Ore', qty: 5 }] },
-    { day: 4, gold: 3500, items: [{ name: 'Crystal Blue', qty: 2 }] },
-    { day: 5, gold: 5000, items: [{ name: 'Oridecon Stone', qty: 2 }] },
-    { day: 6, gold: 8000, items: [{ name: 'Fire Element Stone', qty: 1 }] },
-    { day: 7, gold: 15000, items: [{ name: 'Dragon Heart', qty: 1 }] },
+    { day: 1, gold: 500, items: [], cosmetic: null, title: '🌅 วันแรก', color: '#ffcf4a' },
+    { day: 2, gold: 1000, items: [{ name: 'Red Herb', qty: 5 }], cosmetic: null, title: '🌄 วันที่สอง', color: '#ff9a7a' },
+    { day: 3, gold: 2000, items: [{ name: 'Iron Ore', qty: 5 }], cosmetic: null, title: '🌇 วันที่สาม', color: '#ff7a7a' },
+    { day: 4, gold: 3500, items: [{ name: 'Crystal Blue', qty: 2 }], cosmetic: null, title: '🌆 วันที่สี่', color: '#7a9aff' },
+    { day: 5, gold: 5000, items: [{ name: 'Oridecon Stone', qty: 2 }], cosmetic: null, title: '🌃 วันที่ห้า', color: '#9a7aff' },
+    { day: 6, gold: 8000, items: [{ name: 'Fire Element Stone', qty: 1 }], cosmetic: null, title: '🌉 วันที่หก', color: '#ff7aaa' },
+    { day: 7, gold: 15000, items: [{ name: 'Dragon Heart', qty: 1 }], cosmetic: 'legendary-aura', title: '🌟 วันที่เจ็ด (ยิ่งใหญ่!)', color: '#ffaa4a' },
   ];
 
   _todayStr(offsetDays = 0) {
@@ -4050,8 +4050,10 @@ export class GameUI {
         @keyframes dailyPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
         @keyframes dailyGlow{0%,100%{box-shadow:0 0 10px rgba(255,207,74,.45);}50%{box-shadow:0 0 26px rgba(255,207,74,.95);}}
         @keyframes dailyShine{0%{background-position:-140% 0;}100%{background-position:240% 0;}}
+        @keyframes dailyIconBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
         .daily-slot-today{animation:dailyGlow 1.4s ease-in-out infinite;}
         .daily-claim-btn{position:relative;overflow:hidden;}
+        .daily-claim-btn:hover{transform:scale(1.02);box-shadow:0 0 30px rgba(255,207,74,.6) !important;}
         .daily-claim-btn::after{content:'';position:absolute;inset:0;
           background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);
           background-size:220% 100%;animation:dailyShine 2.2s linear infinite;}
@@ -4094,38 +4096,42 @@ export class GameUI {
       const isPast = r.day < todayIdx || (!canClaim && r.day === todayIdx);
       const isDay7 = r.day === 7;
       const bg = isToday && canClaim
-        ? 'linear-gradient(160deg,rgba(255,207,74,.25),rgba(255,122,46,.15))'
+        ? `linear-gradient(160deg,rgba(${parseInt(r.color.slice(1,3), 16)},${parseInt(r.color.slice(3,5), 16)},${parseInt(r.color.slice(5,7), 16)},.25),rgba(255,122,46,.15))`
         : isPast ? 'rgba(95,221,122,.08)' : 'rgba(255,255,255,.04)';
-      const border = isToday && canClaim ? '#ffcf4a' : isPast ? 'rgba(95,221,122,.4)' : 'rgba(255,255,255,.09)';
-      const label = isPast ? '✅' : (isToday && canClaim ? '⭐ วันนี้' : `วัน ${r.day}`);
+      const border = isToday && canClaim ? r.color : isPast ? 'rgba(95,221,122,.4)' : 'rgba(255,255,255,.09)';
+      const label = isPast ? '✅' : (isToday && canClaim ? '⭐ วันนี้' : r.title);
       return `
-        <div class="${isToday && canClaim ? 'daily-slot-today' : ''}" style="border-radius:12px;padding:8px 4px;text-align:center;
-          background:${bg};border:1.5px solid ${border};${isDay7 ? 'grid-column:span 2;' : ''}
-          ${isPast && !(isToday && canClaim) ? 'opacity:.55;filter:saturate(.6);' : ''}">
-          <div style="font-size:9px;font-weight:800;color:${isToday && canClaim ? '#ffcf4a' : '#9aa5c0'};margin-bottom:3px;">${label}</div>
-          <div style="font-size:${isDay7 ? '26px' : '20px'};">${isDay7 ? '🐉' : '💰'}</div>
-          <div style="font-size:10px;color:#ffd97a;font-weight:700;">${r.gold.toLocaleString()}g</div>
-          ${r.items.length ? `<div style="font-size:10px;color:#9fccff;">${itemLine(r)}</div>` : ''}
-          ${isDay7 ? `<div style="font-size:9px;color:#ff9a7a;font-weight:700;">Dragon Heart!</div>` : ''}
+        <div class="${isToday && canClaim ? 'daily-slot-today' : ''}" style="border-radius:12px;padding:12px 6px;text-align:center;
+          background:${bg};border:2px solid ${border};${isDay7 ? 'grid-column:span 2;' : ''}
+          ${isPast && !(isToday && canClaim) ? 'opacity:.55;filter:saturate(.6);' : ''}
+          transition: all 0.3s ease; cursor: ${isToday && canClaim ? 'pointer' : 'default'};">
+          <div style="font-size:9px;font-weight:800;color:${isToday && canClaim ? r.color : '#9aa5c0'};margin-bottom:4px;">${label}</div>
+          <div style="font-size:${isDay7 ? '32px' : '24px'};margin-bottom:4px;">${isDay7 ? '🐉' : '💰'}</div>
+          <div style="font-size:11px;color:${r.color};font-weight:700;">${r.gold.toLocaleString()}g</div>
+          ${r.items.length ? `<div style="font-size:10px;color:#9fccff;margin-top:3px;">${itemLine(r)}</div>` : ''}
+          ${isDay7 ? `<div style="font-size:9px;color:#ff9a7a;font-weight:700;margin-top:3px;">🌟 Dragon Heart!</div>` : ''}
+          ${r.cosmetic ? `<div style="font-size:8px;color:#aaffaa;margin-top:2px;">✨ ${r.cosmetic}</div>` : ''}
         </div>`;
     }).join('');
 
+    const todayReward = rewards[todayIdx - 1];
     const claimArea = canClaim
-      ? `<button id="daily-claim" class="daily-claim-btn" style="width:100%;border:none;border-radius:14px;padding:14px;cursor:pointer;
-          font-weight:900;font-size:16px;background:linear-gradient(135deg,#ffcf4a,#ff7a2e);color:#3a2000;">
-          🎁 รับรางวัลวัน ${todayIdx} — ${rewards[todayIdx - 1].gold.toLocaleString()} Gold${rewards[todayIdx - 1].items.length ? ' + ' + itemLine(rewards[todayIdx - 1]) : ''}</button>`
-      : `<div style="text-align:center;padding:12px;border-radius:12px;background:rgba(95,221,122,.1);border:1px solid rgba(95,221,122,.35);
+      ? `<button id="daily-claim" class="daily-claim-btn" style="width:100%;border:none;border-radius:14px;padding:16px;cursor:pointer;
+          font-weight:900;font-size:16px;background:linear-gradient(135deg,${todayReward.color},#ff7a2e);color:#fff;
+          box-shadow: 0 0 20px rgba(255,207,74,.4); transition: all 0.3s;">
+          🎁 รับรางวัลวัน ${todayIdx} — ${todayReward.gold.toLocaleString()} Gold${todayReward.items.length ? ' + ' + itemLine(todayReward) : ''}</button>`
+      : `<div style="text-align:center;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(95,221,122,.15),rgba(95,221,122,.05));border:2px solid rgba(95,221,122,.4);
           color:#7de89a;font-weight:800;font-size:13px;">✅ รับแล้ววันนี้ — กลับมาพรุ่งนี้เพื่อรักษาสตรีค! 🔥</div>`;
 
     card.innerHTML = `
-      <div style="padding:18px 20px 14px;background:linear-gradient(90deg,rgba(240,192,64,.12),transparent);border-bottom:1px solid var(--border);position:relative;">
+      <div style="padding:18px 20px 14px;background:linear-gradient(90deg,rgba(240,192,64,.15),rgba(255,122,46,.08));border-bottom:2px solid var(--gold-border);position:relative;">
         <button id="daily-close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:var(--text-dim);
-          width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
+          width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,207,74,.2)'" onmouseout="this.style.background='rgba(255,255,255,.08)'">✕</button>
         <div style="display:flex;align-items:center;gap:12px;">
-          <div style="font-size:34px;">🎁</div>
+          <div style="font-size:40px;animation:dailyIconBounce 2s ease-in-out infinite;">🎁</div>
           <div>
-            <div style="font-family:var(--font-main);color:#fff;font-size:19px;text-shadow:0 0 12px rgba(240,192,64,.5);">รางวัลเข้าเกมรายวัน</div>
-            <div style="font-size:12px;color:var(--text-dim);">สตรีคปัจจุบัน: <span style="color:var(--primary);font-weight:900;">🔥 ${streakShown} วัน</span>
+            <div style="font-family:var(--font-main);color:#fff;font-size:20px;text-shadow:0 0 12px rgba(240,192,64,.6);">🎉 รางวัลเข้าเกมรายวัน</div>
+            <div style="font-size:12px;color:var(--text-dim);">สตรีคปัจจุบัน: <span style="color:${todayReward.color};font-weight:900;font-size:13px;">🔥 ${streakShown} วัน</span>
             ${brokeStreak ? '<span style="color:#ff9a8a;"> (สตรีคขาด — เริ่มใหม่วัน 1)</span>' : ''}</div>
           </div>
         </div>
@@ -4133,8 +4139,10 @@ export class GameUI {
       <div class="daily-body" style="padding:16px 18px;">
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">${slots}</div>
         ${claimArea}
-        <div style="margin-top:10px;text-align:center;font-size:10px;color:var(--text-dim);opacity:.75;">เข้าเกมทุกวันเพื่อรางวัลใหญ่ขึ้นเรื่อยๆ — ขาดวันใดวันหนึ่ง สตรีคจะเริ่มนับใหม่</div>
-      </div>`;
+        <div style="margin-top:12px;padding:10px;border-radius:8px;background:rgba(255,207,74,.05);border:1px solid rgba(255,207,74,.15);text-align:center;font-size:11px;color:var(--text-dim);">
+          <span style="color:#ffcf4a;font-weight:700;">💡 เคล็ดลับ:</span> เข้าเกมทุกวันเพื่อรางวัลใหญ่ขึ้นเรื่อยๆ — ขาดวันใดวันหนึ่ง สตรีคจะเริ่มนับใหม่
+        </div>
+        </div>`;
 
     card.querySelector('#daily-close').onclick = () => {
       const m = document.getElementById('daily-modal'); if (m) m.style.display = 'none';
