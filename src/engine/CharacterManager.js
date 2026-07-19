@@ -68,8 +68,19 @@ export class CharacterManager {
         };
 
         this.equippedWeapon = null;
-        this.equippedArmor = null;
         this.equippedShield = null;
+
+        // Multi-slot armor: one item per body-part slot, all contributing stats.
+        // (head/body/garment/ring/wrist/pants/feet/accessory — see GameData.)
+        this.equippedGear = { head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
+        // Back-compat alias: legacy code reads/writes a single `equippedArmor`.
+        // Map it onto the body slot so old saves + call-sites keep working.
+        Object.defineProperty(this, 'equippedArmor', {
+            get: () => this.equippedGear.body,
+            set: (v) => { this.equippedGear.body = v || null; },
+            configurable: true,
+            enumerable: false,
+        });
 
         // Game settings (persisted to DB)
         this.gameSettings = {
@@ -157,19 +168,28 @@ export class CharacterManager {
         return ITEMS[weaponName].spBonus || 0;
     }
 
-    getArmorSpBonus(armorName) {
-        if (!armorName || !ITEMS[armorName]) return 0;
-        return ITEMS[armorName].spBonus || 0;
+    // Sum a bonus field (defBonus/hpBonus/spBonus) across every equipped gear
+    // piece — the whole paper-doll contributes, not just one armor.
+    _gearTotal(field) {
+        let sum = 0;
+        for (const name of Object.values(this.equippedGear)) {
+            if (name && ITEMS[name]) sum += ITEMS[name][field] || 0;
+        }
+        return sum;
     }
 
-    getArmorHpBonus(armorName) {
-        if (!armorName || !ITEMS[armorName]) return 0;
-        return ITEMS[armorName].hpBonus || 0;
+    // These now sum the whole gear set. The (ignored) argument is kept so any
+    // legacy caller passing `equippedArmor` still works.
+    getArmorSpBonus() {
+        return this._gearTotal('spBonus');
     }
 
-    getArmorDefBonus(armorName) {
-        if (!armorName || !ITEMS[armorName]) return 0;
-        return ITEMS[armorName].defBonus || 0;
+    getArmorHpBonus() {
+        return this._gearTotal('hpBonus');
+    }
+
+    getArmorDefBonus() {
+        return this._gearTotal('defBonus');
     }
 
     getShieldDefBonus(shieldName) {

@@ -1298,6 +1298,55 @@ export function canEquipItem(itemName, jobId) {
     return jobId === locked;         // must be that exact job
 }
 
+// ============ EQUIPMENT SLOTS (paper-doll) ============
+// The hero can wear one item per body-part slot at once. Weapons/shields/hats/
+// glasses keep their own dedicated engine slots; everything of type `armor` is
+// split into semantic slots below so a helm, body, cloak, ring and boots can all
+// be worn together (each contributes its DEF/HP/SP). Slots with no items yet
+// (pants, wrist) still appear on the doll, ready for future gear.
+export const EQUIP_SLOTS = [
+    { id: 'hat', label: 'หมวก', icon: '🎩', kind: 'hat' },
+    { id: 'head', label: 'ศีรษะ', icon: '🪖', kind: 'armor' },
+    { id: 'glasses', label: 'แว่นตา', icon: '👓', kind: 'glasses' },
+    { id: 'body', label: 'เสื้อเกราะ', icon: '👕', kind: 'armor' },
+    { id: 'garment', label: 'ผ้าคลุม', icon: '🧥', kind: 'armor' },
+    { id: 'weapon', label: 'อาวุธ', icon: '⚔️', kind: 'weapon' },
+    { id: 'shield', label: 'โล่', icon: '🛡️', kind: 'shield' },
+    { id: 'ring', label: 'แหวน', icon: '💍', kind: 'armor' },
+    { id: 'wrist', label: 'ข้อมือ', icon: '⌚', kind: 'armor' },
+    { id: 'pants', label: 'กางเกง', icon: '👖', kind: 'armor' },
+    { id: 'feet', label: 'รองเท้า', icon: '🥾', kind: 'armor' },
+    { id: 'accessory', label: 'เครื่องประดับ', icon: '💎', kind: 'armor' },
+];
+
+// The armor sub-slots the hero tracks as a gear map (see CharacterManager).
+export const ARMOR_SLOTS = ['head', 'body', 'garment', 'ring', 'wrist', 'pants', 'feet', 'accessory'];
+
+// Which body-part slot each type:'armor' item occupies. Anything not listed
+// falls back to the body slot so new armor is always wearable.
+const ARMOR_ITEM_SLOT = {
+    'Iron Helm': 'head', 'Ranger Hood': 'head',
+    'Cotton Shirt': 'body', 'Adventurer Suit': 'body', 'Steel Plate Mail': 'body',
+    'Valkyrie Armor': 'body', 'Dragon Scale Mail': 'body',
+    'Leather Cloak': 'garment', 'Shadow Garment': 'garment', 'Odin Garment': 'garment',
+    'Silver Ring': 'ring', 'Gorgon Ring': 'ring', 'Glow Ring': 'ring',
+    'Speed Boots': 'feet',
+    'Gold Earring': 'accessory',
+};
+
+// The paper-doll slot id an item belongs to (weapon/shield/hat/glasses map by
+// their item type; armor items map by ARMOR_ITEM_SLOT, default 'body').
+export function getEquipSlot(itemName) {
+    const it = ITEMS[itemName];
+    if (!it) return null;
+    if (it.type === 'weapon') return 'weapon';
+    if (it.type === 'shield') return 'shield';
+    if (it.type === 'hat') return 'hat';
+    if (it.type === 'glasses') return 'glasses';
+    if (it.type === 'armor') return ARMOR_ITEM_SLOT[itemName] || 'body';
+    return null;
+}
+
 // Celestial mining pickaxe ladder, cheapest → rarest. The Heaven Merchant sells
 // these and mining uses the best one the player owns (ITEMS[name].mineYield).
 export const PICKAXES = ['Stone Pickaxe', 'Mythril Pickaxe', 'Celestial Pickaxe', 'Divine Pickaxe'];
