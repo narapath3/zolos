@@ -218,6 +218,35 @@ async function initGame(charData) {
     window.particles = particles; // exposed for the forge's craft-success burst
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
+    // Aggro: when a monster reaches the player it swings back for real damage.
+    monsters.onMonsterAttackPlayer = (mon) => {
+        if (!character || !character.isAlive || !character.isAlive()) return;
+        if (window.bossEngaged || duelState) return; // boss/duel own their own combat
+        const atk = (mon.data && mon.data.atk) || 10;
+        const def = character.stats.def || 0;
+        const dmg = Math.max(1, atk - Math.floor(def * 0.3) + Math.floor(Math.random() * 3));
+        const actual = character.takeDamage(dmg);
+        if (particles) {
+            const sp = worldToScreen(character.getPosition(), 1.6);
+            particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
+            particles.spawnHitEffect(character.getPosition(), false);
+        }
+        if (gameUI) {
+            gameUI.addCombatLog(`🩸 ${mon.data.name} จู่โจมคุณ -${actual}`, 'warning');
+            gameUI.updateHUD(character.stats);
+        }
+        if (!character.isAlive()) {
+            if (combatSystem) { combatSystem.autoFarm = false; combatSystem.currentTarget = null; }
+            character.targetMonster = null;
+            if (gameUI) { gameUI.addCombatLog('💀 คุณถูกมอนสเตอร์ปราบ! กำลังเกิดใหม่ใน 3 วินาที...', 'death'); gameUI.setAutoFarmState(false); }
+            setTimeout(() => {
+                if (character && !character.isAlive()) {
+                    character.respawn();
+                    if (gameUI) { gameUI.addCombatLog('💚 คุณเกิดใหม่แล้ว!', 'system'); gameUI.updateHUD(character.stats); }
+                }
+            }, 3000);
+        }
+    };
 
     // Initialize Combat System
     combatSystem = new CombatSystem(character, monsters, (event) => {
@@ -2118,7 +2147,7 @@ function stepWorld(dt) {
     // World boss: keep the mesh in sync and swing when in range
     if (window.worldBossManager) window.worldBossManager.reconcileMesh();
     updateBossCombat(dt);
-    monsters.update(dt, sceneManager.camera, character.stats.level);
+    monsters.update(dt, sceneManager.camera, character);
     sceneManager.updateAnimations(dt);
     if (particles) particles.update(dt);
     if (combatSystem) combatSystem.update(dt);

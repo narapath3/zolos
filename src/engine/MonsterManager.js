@@ -42,6 +42,21 @@ class Monster {
         this.isWaterMonster = !!this.data.waterOnly;
 
         this._createModel(position);
+
+        // Bigger, more imposing monsters — the tougher, the larger. Scales the
+        // whole group uniformly (feet stay grounded); positions/centres are
+        // unchanged so movement and hit-ranges keep working.
+        let ms = 1.5;
+        const hp0 = this.data.hp || 0;
+        if (hp0 >= 800) ms = 1.7;
+        if (hp0 >= 2500) ms = 1.85;
+        if (hp0 >= 6000) ms = 2.05;
+        this._scale = ms;
+        this.mesh.scale.setScalar(ms);
+
+        // Aggro state (chase + attack the player when provoked or approached).
+        this._aggroUntil = 0;
+        this._atkCd = 0;
     }
 
     _createModel(position) {
@@ -812,6 +827,8 @@ class Monster {
     takeDamage(amount, isCritical = false) {
         const actualDmg = Math.max(1, amount - Math.floor(this.data.def * 0.3));
         this.hp = Math.max(0, this.hp - actualDmg);
+        // Getting hit provokes it — chase the attacker for a while.
+        this._aggroUntil = (this.animTimer || 0) + 8;
         // Step 6: Enhanced monster impact flash durations
         this.hitFlash = isCritical ? 0.35 : 0.18;
         this.isCriticalHit = isCritical;
@@ -836,7 +853,7 @@ class Monster {
         return this.mesh.position.distanceTo(pos);
     }
 
-    update(dt, camera, sceneManager) {
+    update(dt, camera, sceneManager, player, onAttackPlayer) {
         if (!this.alive) return;
 
         this.animTimer += dt;
@@ -853,6 +870,44 @@ class Monster {
         this.bodyMesh.scale.y = 1 + bounce * 0.5;
         this.bodyMesh.scale.x = 1 - bounce * 0.15;
         this.bodyMesh.scale.z = 1 - bounce * 0.15;
+
+        // ===== Aggro: chase & attack the player when provoked or approached =====
+        let aggroActive = false;
+        if (player && player.mesh && this.alive && !this.isWaterMonster) {
+            const adx = player.mesh.position.x - this.mesh.position.x;
+            const adz = player.mesh.position.z - this.mesh.position.z;
+            const pdist = Math.hypot(adx, adz) || 0.001;
+            const t = this.animTimer;
+            // Wandering within 4.5 units provokes it; a hit provokes it for longer.
+            if (pdist < 4.5) this._aggroUntil = Math.max(this._aggroUntil, t + 4);
+            aggroActive = t < this._aggroUntil && pdist < 20;
+            if (aggroActive) {
+                const reach = 1.0 + this.data.size * (this._scale || 1) * 0.6;
+                if (pdist > reach) {
+                    const spd = (this.data.speed + 1.4) * 1.5 * dt;
+                    const nx = this.mesh.position.x + (adx / pdist) * spd;
+                    const nz = this.mesh.position.z + (adz / pdist) * spd;
+                    let ok = true;
+                    if (sceneManager) {
+                        if (sceneManager.isInArena && sceneManager.isInArena(nx, nz)) ok = false;
+                        else if (sceneManager.getEnvironmentAt(new THREE.Vector3(nx, 0, nz)) !== (this.data.environment || 'ground')) ok = false;
+                    }
+                    if (ok) { this.mesh.position.x = nx; this.mesh.position.z = nz; }
+                    this.mesh.rotation.y = Math.atan2(adx, adz);
+                    this.isMoving = true;
+                } else {
+                    // In range — strike on a cooldown.
+                    this.isMoving = false;
+                    this.mesh.rotation.y = Math.atan2(adx, adz);
+                    this._atkCd -= dt;
+                    if (this._atkCd <= 0) {
+                        this._atkCd = 1.3;
+                        if (onAttackPlayer) onAttackPlayer(this);
+                    }
+                }
+                this.wanderTarget = null; // hunting overrides wandering
+            }
+        }
 
         // Recursive hit flash for all bodyMesh children
         const isFlashing = this.hitFlash > 0;
@@ -899,10 +954,10 @@ class Monster {
             });
         }
 
-        // Wander AI
-        this.wanderTimer -= dt;
-        if (this.wanderTimer <= 0) {
-            this.wanderTimer = 2 + Math.random() * 4;
+        // Wander AI (idle roaming when not hunting the player)
+        if (!aggroActive) this.wanderTimer -= dt;
+        if (!aggroActive && this.wanderTimer <= 0) {
+            this.wanderTimer = 1.2 + Math.random() * 2.5;
             const angle = Math.random() * Math.PI * 2;
             const dist = 1 + Math.random() * 2;
             const newX = this.mesh.position.x + Math.cos(angle) * dist;
@@ -942,12 +997,12 @@ class Monster {
             }
         }
 
-        if (this.wanderTarget) {
+        if (!aggroActive && this.wanderTarget) {
             const dx = this.wanderTarget.x - this.mesh.position.x;
             const dz = this.wanderTarget.z - this.mesh.position.z;
             const dist = Math.sqrt(dx * dx + dz * dz);
             if (dist > 0.2) {
-                const speed = this.data.speed * dt;
+                const speed = Math.max(0.7, this.data.speed) * dt * 1.25;
                 const nextX = this.mesh.position.x + (dx / dist) * speed;
                 const nextZ = this.mesh.position.z + (dz / dist) * speed;
 
@@ -976,7 +1031,7 @@ class Monster {
             } else {
                 this.isMoving = false;
             }
-        } else {
+        } else if (!aggroActive) {
             this.isMoving = false;
         }
 
@@ -1150,15 +1205,15 @@ export class MonsterManager {
         return monster;
     }
 
-    update(dt, camera, playerLevel) {
+    update(dt, camera, player) {
         // Update alive land monsters
         for (const m of this.monsters) {
-            m.update(dt, camera, this.sceneManager);
+            m.update(dt, camera, this.sceneManager, player, this.onMonsterAttackPlayer);
         }
 
         // Update alive water monsters
         for (const m of this.waterMonsters) {
-            m.update(dt, camera, this.sceneManager);
+            m.update(dt, camera, this.sceneManager, player, this.onMonsterAttackPlayer);
         }
 
         // Handle respawns
