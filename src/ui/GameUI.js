@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 
@@ -613,11 +613,16 @@ export class GameUI {
         this.character.equipWeapon(null);
       }
 
-      const equippedArmor = this.inventory.find(i => i.item_type === 'armor' && i.stats && i.stats.equipped === true);
-      if (equippedArmor && this.character) {
-        this.character.equippedArmor = equippedArmor.item_name;
-      } else if (this.character) {
-        this.character.equippedArmor = null;
+      // Restore every equipped armor piece into its own body-part slot. If two
+      // saved items claim the same slot (shouldn't happen), the last one wins.
+      if (this.character) {
+        for (const s of ARMOR_SLOTS) this.character.equippedGear[s] = null;
+        for (const it of this.inventory) {
+          if (it.item_type === 'armor' && it.stats && it.stats.equipped === true) {
+            const slot = getEquipSlot(it.item_name) || 'body';
+            this.character.equippedGear[slot] = it.item_name;
+          }
+        }
       }
 
       const equippedShield = this.inventory.find(i => i.item_type === 'shield' && i.stats && i.stats.equipped === true);
@@ -1066,12 +1071,25 @@ export class GameUI {
     const grid = document.getElementById('inventory-grid');
     grid.innerHTML = '';
 
+    // Paper-doll equipment screen shows only on the Equip tab.
+    const doll = document.getElementById('equip-doll');
+    if (this.currentTab === 'equip') {
+      this._renderEquipDoll();
+    } else if (doll) {
+      doll.style.display = 'none';
+      this.equipSlotFilter = null;
+    }
+
     // Filter based on tab
     let filtered = this.inventory;
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
     } else if (this.currentTab === 'equip') {
       filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(i.item_type));
+      // Clicking an empty doll slot narrows the list to gear that fits it.
+      if (this.equipSlotFilter) {
+        filtered = filtered.filter(i => getEquipSlot(i.item_name) === this.equipSlotFilter);
+      }
     } else if (this.currentTab === 'etc') {
       filtered = this.inventory.filter(i => i.item_type === 'material' || i.item_type === 'tool');
     } else if (this.currentTab === 'fish') {
@@ -1115,6 +1133,138 @@ export class GameUI {
     }
 
     this._updateDetailBox();
+  }
+
+  // Lazily create the paper-doll container (above the inventory grid) and its
+  // one-time styles.
+  _ensureEquipDoll() {
+    if (document.getElementById('equip-doll')) return;
+    const grid = document.getElementById('inventory-grid');
+    if (!grid || !grid.parentNode) return;
+
+    if (!document.getElementById('equip-doll-styles')) {
+      const st = document.createElement('style');
+      st.id = 'equip-doll-styles';
+      st.textContent = `
+      .equip-doll{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px;margin:8px 0 12px;padding:12px;
+        background:linear-gradient(160deg,rgba(30,38,64,.85),rgba(18,22,38,.9));border:1px solid rgba(120,150,220,.28);
+        border-radius:14px;box-shadow:inset 0 0 24px rgba(80,110,200,.12);}
+      .equip-col{display:flex;flex-direction:column;gap:8px;}
+      .equip-bottom{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:2px;}
+      .eq-slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        min-height:58px;padding:6px 4px;border-radius:10px;cursor:pointer;user-select:none;
+        background:rgba(12,16,30,.6);border:1.5px solid rgba(120,140,200,.22);transition:transform .1s,border-color .15s,box-shadow .15s;}
+      .eq-slot:hover{transform:translateY(-2px);border-color:rgba(150,180,255,.6);box-shadow:0 4px 14px rgba(60,90,190,.35);}
+      .eq-slot.filled{background:rgba(30,40,72,.75);border-color:rgba(255,210,90,.55);}
+      .eq-slot.active-filter{border-color:#7fe0ff;box-shadow:0 0 12px rgba(127,224,255,.55);}
+      .eq-slot-ic{font-size:24px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));}
+      .eq-slot.empty .eq-slot-ic{opacity:.32;filter:grayscale(1);}
+      .eq-slot-lb{font-size:10px;color:#aeb8d6;letter-spacing:.3px;text-align:center;}
+      .eq-slot.filled .eq-slot-lb{color:#ffe6a2;}
+      .eq-slot-x{position:absolute;top:2px;right:4px;font-size:10px;color:#ff8f8f;opacity:.75;}
+      .eq-slot.rarity-rare{border-color:rgba(90,170,255,.6);} .eq-slot.rarity-epic{border-color:rgba(190,120,255,.65);}
+      .eq-slot.rarity-legendary{border-color:rgba(255,190,70,.75);} .eq-slot.rarity-mythic{border-color:rgba(255,90,140,.8);}
+      .equip-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;
+        border-radius:12px;background:radial-gradient(circle at 50% 35%,rgba(90,120,220,.28),rgba(10,14,28,.2));}
+      .equip-hero-face{font-size:46px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5));}
+      .equip-hero-name{font-size:12px;font-weight:700;color:#fff;text-align:center;}
+      .equip-hero-job{font-size:10px;color:#9fb0e0;}
+      .equip-hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:10.5px;margin-top:2px;}
+      .equip-hero-stats span b{color:#ffd98a;}
+      .equip-doll-hint{grid-column:1/-1;font-size:10.5px;color:#8b97ba;text-align:center;margin-top:-2px;}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const doll = document.createElement('div');
+    doll.id = 'equip-doll';
+    doll.className = 'equip-doll';
+    doll.style.display = 'none';
+    grid.parentNode.insertBefore(doll, grid);
+
+    // Delegated click: unequip a filled slot, or filter the list by an empty one.
+    doll.addEventListener('click', (e) => {
+      const cell = e.target.closest('.eq-slot');
+      if (!cell) return;
+      const slotId = cell.getAttribute('data-slot');
+      const itemName = cell.getAttribute('data-item') || null;
+      if (itemName) {
+        const invItem = this.inventory.find(i => i.item_name === itemName);
+        if (invItem) this._toggleEquipItem(invItem);
+      } else {
+        // Toggle a filter so the grid shows only gear that fits this slot.
+        this.equipSlotFilter = (this.equipSlotFilter === slotId) ? null : slotId;
+        this._renderInventory();
+      }
+    });
+  }
+
+  // Render the hero paper-doll: one frame per body-part slot, the equipped item
+  // shown in it, plus a centre portrait with the gear's combined stats.
+  _renderEquipDoll() {
+    this._ensureEquipDoll();
+    const doll = document.getElementById('equip-doll');
+    if (!doll) return;
+    doll.style.display = 'grid';
+    if (!this.character) { doll.innerHTML = ''; return; }
+    const ch = this.character;
+
+    const slotItemName = (id) => {
+      if (id === 'weapon') return ch.equippedWeapon || null;
+      if (id === 'shield') return ch.equippedShield || null;
+      if (id === 'hat') return (ch.equippedHat && ch.equippedHat !== 'None') ? ch.equippedHat : null;
+      if (id === 'glasses') return (ch.equippedGlasses && ch.equippedGlasses !== 'None') ? ch.equippedGlasses : null;
+      return (ch.equippedGear && ch.equippedGear[id]) || null;
+    };
+
+    const cell = (slot) => {
+      const name = slotItemName(slot.id);
+      const it = name ? ITEMS[name] : null;
+      const filled = !!name;
+      const rarity = it && it.rarity ? it.rarity : '';
+      const filterCls = this.equipSlotFilter === slot.id ? ' active-filter' : '';
+      const ic = filled && it ? (it.emoji || slot.icon) : slot.icon;
+      return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
+        data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
+        title="${filled ? name + ' — คลิกเพื่อถอด' : slot.label + ' (ว่าง) — คลิกเพื่อดูของที่ใส่ได้'}">
+        <div class="eq-slot-ic">${ic}</div>
+        <div class="eq-slot-lb">${filled ? this._short(name) : slot.label}</div>
+        ${filled ? '<div class="eq-slot-x">✕</div>' : ''}
+      </div>`;
+    };
+
+    const bySlot = Object.fromEntries(EQUIP_SLOTS.map(s => [s.id, s]));
+    const leftIds = ['hat', 'glasses', 'head', 'body', 'garment'];
+    const rightIds = ['weapon', 'shield', 'ring', 'accessory'];
+    const bottomIds = ['wrist', 'pants', 'feet'];
+
+    const st = ch.stats;
+    const faceEmoji = { swordsman: '⚔️', mage: '🔮', archer: '🏹', priest: '✨' }[st.job] || '🧑';
+    const jobName = (JOBS[st.job] && JOBS[st.job].name) || 'Novice';
+
+    doll.innerHTML = `
+      <div class="equip-col">${leftIds.map(id => cell(bySlot[id])).join('')}</div>
+      <div class="equip-hero">
+        <div class="equip-hero-face">${faceEmoji}</div>
+        <div class="equip-hero-name">${st.name || 'Hero'}</div>
+        <div class="equip-hero-job">Lv.${st.level} · ${jobName}</div>
+        <div class="equip-hero-stats">
+          <span>⚔️ ATK <b>${st.atk}</b></span>
+          <span>🛡️ DEF <b>${st.def}</b></span>
+          <span>❤️ HP <b>${st.max_hp}</b></span>
+          <span>💧 SP <b>${st.max_sp}</b></span>
+        </div>
+      </div>
+      <div class="equip-col">${rightIds.map(id => cell(bySlot[id])).join('')}</div>
+      <div class="equip-bottom">${bottomIds.map(id => cell(bySlot[id])).join('')}</div>
+      <div class="equip-doll-hint">แตะช่องที่ใส่ของอยู่เพื่อถอด · แตะช่องว่างเพื่อดูไอเทมที่สวมได้</div>
+    `;
+  }
+
+  // Trim a long item name so it fits a slot label.
+  _short(name) {
+    if (!name) return '';
+    return name.length > 11 ? name.slice(0, 10) + '…' : name;
   }
 
   _updateDetailBox() {
@@ -1264,7 +1414,8 @@ export class GameUI {
           this.setFishingButtonVisible(false);
         }
       } else if (item.item_type === 'armor') {
-        this.character.equippedArmor = null;
+        const slot = getEquipSlot(item.item_name) || 'body';
+        this.character.equippedGear[slot] = null;
       } else if (item.item_type === 'shield') {
         this.character.equippedShield = null;
       } else if (item.item_type === 'hat') {
@@ -1293,11 +1444,16 @@ export class GameUI {
         return;
       }
 
-      // Un-equip any currently equipped item of the SAME slot type
+      // Un-equip any currently equipped item of the SAME slot. Weapons and the
+      // fishing rod share the weapon slot; armor pieces compare by body-part
+      // slot so a helm and boots (both 'armor') don't fight over one slot.
+      const mySlot = getEquipSlot(item.item_name);
       for (const otherItem of this.inventory) {
         let isSameSlot = false;
         if ((item.item_type === 'weapon' || item.item_type === 'fishing_rod') && (otherItem.item_type === 'weapon' || otherItem.item_type === 'fishing_rod')) {
           isSameSlot = true;
+        } else if (item.item_type === 'armor' && otherItem.item_type === 'armor') {
+          isSameSlot = getEquipSlot(otherItem.item_name) === mySlot;
         } else if (item.item_type === otherItem.item_type) {
           isSameSlot = true;
         }
@@ -1321,7 +1477,7 @@ export class GameUI {
           this.setFishingButtonVisible(false);
         }
       } else if (item.item_type === 'armor') {
-        this.character.equippedArmor = item.item_name;
+        this.character.equippedGear[getEquipSlot(item.item_name) || 'body'] = item.item_name;
       } else if (item.item_type === 'shield') {
         this.character.equippedShield = item.item_name;
       } else if (item.item_type === 'hat') {
