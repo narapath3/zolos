@@ -2092,10 +2092,18 @@ export class GameUI {
     box.innerHTML = '<div style="opacity:.6;font-size:12px;padding:6px 0;">กำลังโหลดข้อมูล...</div>';
 
     // Immediate equipped gear from the live remote avatar (works for guests too).
+    // The remote CharacterManager carries the full loadout (armor/shield/…) via
+    // the appearance broadcast, so we can show every worn piece — not just 3.
     let liveGear = null;
     const rp = window.remotePlayersMap && window.remotePlayersMap.get(player.userId);
     if (rp && rp.character) {
-      liveGear = { weapon: rp.character.equippedWeapon, hat: rp.character.equippedHat, glasses: rp.character.equippedGlasses };
+      liveGear = {
+        weapon: rp.character.equippedWeapon,
+        hat: rp.character.equippedHat,
+        glasses: rp.character.equippedGlasses,
+        shield: rp.character.equippedShield,
+        gear: { ...(rp.character.equippedGear || {}) },
+      };
     }
 
     // Full stats from the DB (real accounts only).
@@ -2122,16 +2130,37 @@ export class GameUI {
       if (!name || name === 'None') return null;
       return { emoji: (ITEMS[name] || {}).emoji || '📦', name };
     };
-    const weapon = gear((ch && ch.weapon) || (liveGear && liveGear.weapon));
-    const hat = gear((ch && ch.hat) || (liveGear && liveGear.hat));
-    const glasses = gear((ch && ch.glasses) || (liveGear && liveGear.glasses));
+    const gearMap = (liveGear && liveGear.gear) || {};
+    // Resolve the item worn in each doll slot: prefer the live avatar, fall back
+    // to the DB columns we have (weapon/hat/glasses/armor/shield).
+    const resolveSlot = (id) => {
+      if (id === 'weapon') return (liveGear && liveGear.weapon) || (ch && ch.weapon) || null;
+      if (id === 'hat') return (liveGear && liveGear.hat) || (ch && ch.hat) || null;
+      if (id === 'glasses') return (liveGear && liveGear.glasses) || (ch && ch.glasses) || null;
+      if (id === 'shield') return (liveGear && liveGear.shield) || (ch && ch.shield) || null;
+      if (id === 'body') return gearMap.body || (ch && ch.armor) || null;
+      return gearMap[id] || null;
+    };
 
     const stat = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:6px;"><span style="color:var(--text-dim);font-size:11px;">${label}</span><span style="font-weight:800;font-size:12px;color:#fff;">${val}</span></div>`;
-    const slot = (label, item) => `<div style="flex:1;text-align:center;padding:8px 4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;">
-        <div style="font-size:22px;">${item ? item.emoji : '➖'}</div>
-        <div style="font-size:9px;color:var(--text-dim);margin-top:2px;">${label}</div>
-        <div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item ? item.name : '-'}</div>
+
+    // One compact cell per body-part slot (filled highlighted, empty dimmed).
+    const rarityColor = { rare: 'rgba(90,170,255,.6)', epic: 'rgba(190,120,255,.65)', legendary: 'rgba(255,190,70,.75)', mythic: 'rgba(255,90,140,.8)' };
+    const cell = (s) => {
+      const name = resolveSlot(s.id);
+      const item = gear(name);
+      const it = name ? ITEMS[name] : null;
+      const bc = (it && rarityColor[it.rarity]) || 'var(--border)';
+      return `<div style="text-align:center;padding:7px 3px;border-radius:8px;background:rgba(255,255,255,${item ? '.06' : '.02'});border:1px solid ${item ? bc : 'var(--border)'};${item ? '' : 'opacity:.5;'}">
+        <div style="font-size:20px;line-height:1;">${item ? item.emoji : s.icon}</div>
+        <div style="font-size:8.5px;color:var(--text-dim);margin-top:3px;">${s.label}</div>
+        <div style="font-size:9.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item ? item.name : '-'}</div>
       </div>`;
+    };
+    // Order: worn slots first for quick scanning, then empties.
+    const ordered = ['weapon', 'shield', 'hat', 'glasses', 'head', 'body', 'garment', 'ring', 'wrist', 'pants', 'feet', 'accessory']
+      .map(id => EQUIP_SLOTS.find(s => s.id === id)).filter(Boolean);
+    const wornCount = ordered.filter(s => resolveSlot(s.id)).length;
 
     let statsHtml = '';
     if (ch) {
@@ -2146,11 +2175,9 @@ export class GameUI {
     }
 
     box.innerHTML = `${statsHtml}
-      <div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;text-align:left;">🎽 อุปกรณ์ที่สวมใส่</div>
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        ${slot('อาวุธ', weapon)}
-        ${slot('หมวก', hat)}
-        ${slot('แว่นตา', glasses)}
+      <div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;text-align:left;">🎽 อุปกรณ์ที่สวมใส่ (${wornCount}/${ordered.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px;">
+        ${ordered.map(cell).join('')}
       </div>`;
   }
 
