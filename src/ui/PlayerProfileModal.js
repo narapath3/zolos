@@ -1,9 +1,12 @@
-// Player Profile Modal — Beautiful profile display matching Job Selection UX/UI
+// Player Profile Modal — Beautiful profile display with real-time 3D avatar
 // Shows player stats, skills, and equipment with premium styling
+
+import { JobPreview } from '../engine/JobPreview.js';
 
 export class PlayerProfileModal {
   constructor() {
     this.currentPlayer = null;
+    this.jobPreview = null;
     this._createModal();
     this._injectStyles();
   }
@@ -28,7 +31,7 @@ export class PlayerProfileModal {
       }
 
       #player-profile-card {
-        width: min(780px, 96vw);
+        width: min(800px, 96vw);
         max-height: 92vh;
         display: flex;
         flex-direction: column;
@@ -93,7 +96,7 @@ export class PlayerProfileModal {
       }
 
       .profile-left {
-        flex: 0 0 44%;
+        flex: 0 0 45%;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -101,7 +104,7 @@ export class PlayerProfileModal {
 
       #player-profile-canvas {
         width: 100%;
-        height: 236px;
+        height: 280px;
         border-radius: 14px;
         border: 1px solid rgba(100, 150, 255, 0.2);
         display: block;
@@ -110,26 +113,24 @@ export class PlayerProfileModal {
 
       .profile-title {
         text-align: center;
+        padding: 8px;
       }
 
       .profile-title .n {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 800;
         color: #fff;
       }
 
-      .profile-title .job {
+      .profile-title .level-job {
         font-size: 12px;
-        color: rgba(255, 255, 255, 0.5);
-        font-weight: 600;
-        margin-left: 4px;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 4px;
       }
 
-      .profile-title .desc {
-        font-size: 11px;
+      .profile-title .job-emoji {
+        font-size: 14px;
         color: var(--primary, #f0c040);
-        margin-top: 2px;
-        font-weight: 700;
       }
 
       .profile-right {
@@ -203,12 +204,47 @@ export class PlayerProfileModal {
       }
 
       .stat-row .val {
-        width: 22px;
+        width: 28px;
         text-align: right;
         font-size: 11px;
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 255, 255, 0.7);
         font-variant-numeric: tabular-nums;
+        font-weight: 600;
       }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .stat-box {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 8px;
+        border-radius: 6px;
+        text-align: center;
+        border: 1px solid rgba(100, 150, 255, 0.1);
+      }
+
+      .stat-box .label {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.5);
+        margin-bottom: 2px;
+      }
+
+      .stat-box .value {
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+      }
+
+      .stat-box.hp .value { color: #ff6b6b; }
+      .stat-box.sp .value { color: #4c6ef5; }
+      .stat-box.atk .value { color: #ff8787; }
+      .stat-box.def .value { color: #51cf66; }
+      .stat-box.kills .value { color: #ffc107; }
+      .stat-box.gold .value { color: #ffd24a; }
 
       .mod-pill {
         display: inline-block;
@@ -285,6 +321,28 @@ export class PlayerProfileModal {
         text-overflow: ellipsis;
       }
 
+      .status-badge {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 800;
+        border-radius: 16px;
+        padding: 4px 10px;
+        margin-top: 4px;
+        border: 1px solid transparent;
+      }
+
+      .status-online {
+        color: #57e08a;
+        background: rgba(64, 224, 128, 0.14);
+        border-color: rgba(64, 224, 128, 0.32);
+      }
+
+      .status-offline {
+        color: rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+
       @media (max-width: 680px) {
         .profile-main {
           flex-direction: column;
@@ -293,7 +351,7 @@ export class PlayerProfileModal {
           flex: none;
         }
         #player-profile-canvas {
-          height: 210px;
+          height: 240px;
         }
         #player-profile-card {
           max-height: calc(100dvh - 116px);
@@ -336,15 +394,18 @@ export class PlayerProfileModal {
           <canvas id="player-profile-canvas"></canvas>
           <div class="profile-title">
             <div class="n">${player.username}</div>
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.6); margin-top: 4px;">
-              Lv.${player.level}
+            <div class="level-job">
+              Lv.${player.level} • <span class="job-emoji">${jobEmoji}</span> ${jobName}
             </div>
-            <div class="job" style="color: rgba(255, 255, 255, 0.7);">${jobEmoji} ${jobName}</div>
+            <div class="status-badge ${player.isOffline ? 'status-offline' : 'status-online'}">
+              ${player.isOffline ? '⚫ ออฟไลน์' : '🟢 ออนไลน์'}
+            </div>
           </div>
         </div>
 
         <div class="profile-right">
           ${this._renderStats(characterData)}
+          ${this._renderCombatStats(characterData)}
           ${this._renderModifiers(characterData)}
           ${this._renderSkills(characterData)}
           ${this._renderEquipment(characterData)}
@@ -355,14 +416,37 @@ export class PlayerProfileModal {
     // Close button handler
     card.querySelector('.profile-x').onclick = () => this.hide();
 
-    // Draw 3D character placeholder
-    this._drawCharacter(characterData);
+    // Initialize 3D character preview
+    this._init3DPreview(characterData);
 
     this.modal.style.display = 'flex';
   }
 
   hide() {
     this.modal.style.display = 'none';
+    if (this.jobPreview) {
+      this.jobPreview.stop();
+      this.jobPreview.dispose();
+      this.jobPreview = null;
+    }
+  }
+
+  _init3DPreview(data) {
+    const canvas = document.getElementById('player-profile-canvas');
+    if (!canvas) return;
+
+    // Dispose old preview
+    if (this.jobPreview) {
+      this.jobPreview.dispose();
+      this.jobPreview = null;
+    }
+
+    // Create new preview
+    this.jobPreview = new JobPreview(canvas);
+    if (data && data.job) {
+      this.jobPreview.setJob(data.job);
+    }
+    this.jobPreview.start();
   }
 
   _renderStats(data) {
@@ -387,32 +471,46 @@ export class PlayerProfileModal {
       `;
     }).join('');
 
-    const combatStats = `
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
-        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5); margin-bottom: 2px;">HP</div>
-          <div style="font-size: 13px; font-weight: 700; color: #ff6b6b;">${data.hp || 0}/${data.max_hp || 0}</div>
-        </div>
-        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5); margin-bottom: 2px;">SP</div>
-          <div style="font-size: 13px; font-weight: 700; color: #4c6ef5;">${data.sp || 0}/${data.max_sp || 0}</div>
-        </div>
-        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5); margin-bottom: 2px;">ATK</div>
-          <div style="font-size: 13px; font-weight: 700; color: #ff8787;">+${data.atk || 0}</div>
-        </div>
-        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 6px; text-align: center;">
-          <div style="font-size: 10px; color: rgba(255, 255, 255, 0.5); margin-bottom: 2px;">DEF</div>
-          <div style="font-size: 13px; font-weight: 700; color: #51cf66;">+${data.def || 0}</div>
-        </div>
-      </div>
-    `;
-
     return `
       <div class="stat-section">
         <div class="stat-section-title">⚔️ พลังพื้นฐาน</div>
         ${statsHtml}
-        ${combatStats}
+      </div>
+    `;
+  }
+
+  _renderCombatStats(data) {
+    if (!data) return '';
+
+    return `
+      <div class="stat-section">
+        <div class="stat-section-title">📊 สถิติการต่อสู้</div>
+        <div class="stat-grid">
+          <div class="stat-box hp">
+            <div class="label">HP</div>
+            <div class="value">${data.hp || 0}/${data.max_hp || 0}</div>
+          </div>
+          <div class="stat-box sp">
+            <div class="label">SP</div>
+            <div class="value">${data.sp || 0}/${data.max_sp || 0}</div>
+          </div>
+          <div class="stat-box atk">
+            <div class="label">ATK</div>
+            <div class="value">+${data.atk || 0}</div>
+          </div>
+          <div class="stat-box def">
+            <div class="label">DEF</div>
+            <div class="value">+${data.def || 0}</div>
+          </div>
+          <div class="stat-box kills">
+            <div class="label">Kills</div>
+            <div class="value">${(data.total_kills || 0).toLocaleString()}</div>
+          </div>
+          <div class="stat-box gold">
+            <div class="label">Zeny</div>
+            <div class="value">${(data.gold || 0).toLocaleString()}</div>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -481,33 +579,6 @@ export class PlayerProfileModal {
         <div class="equip-grid">${equipHtml}</div>
       </div>
     `;
-  }
-
-  _drawCharacter(data) {
-    const canvas = document.getElementById('player-profile-canvas');
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw job emoji
-    const jobEmoji = this._getJobEmoji(data?.job);
-    ctx.font = 'bold 80px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(jobEmoji, canvas.width / 2, canvas.height / 2 - 20);
-
-    // Draw level badge
-    ctx.fillStyle = 'rgba(255, 193, 7, 0.3)';
-    ctx.beginPath();
-    ctx.arc(canvas.width - 30, 30, 25, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffc107';
-    ctx.font = 'bold 16px Arial';
-    ctx.fillText(`Lv.${data?.level || 1}`, canvas.width - 30, 35);
   }
 
   _getJobEmoji(job) {
