@@ -646,6 +646,9 @@ export class GameUI {
         this.character.setGlasses(null);
       }
 
+      // Show the loaded armor/shield pieces on the hero model.
+      if (this.character && this.character.updateGearVisuals) this.character.updateGearVisuals();
+
       // Migrate pickaxes saved before durability existed: a missing `durability`
       // means "bought under the old rules", so give it a full bar rather than
       // letting it read as broken.
@@ -1510,6 +1513,9 @@ export class GameUI {
     if (this.soundManager) {
       this.soundManager.playUseItemSound();
     }
+
+    // Reflect the change on the 3D hero (helmet / armor / cape / boots / shield).
+    if (this.character.updateGearVisuals) this.character.updateGearVisuals();
 
     this._renderInventory();
     this.updateHUD(this.character.stats);
