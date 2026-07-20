@@ -6077,28 +6077,27 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
-/* HUD Currency & Presence — Centered at the very top for best visibility and zero overlap. */
+/* HUD Currency & Presence — Positioned below the EXP bar for all screens. */
 #hud-currency-widget {
   position: fixed;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 104px; /* Fixed position below the bars container */
+  left: 16px;
   display: flex;
   align-items: center;
   gap: 0;
   min-height: 32px;
-  max-width: 90vw;
+  max-width: calc(100vw - 32px);
   font-size: 11px;
   font-weight: 700;
   color: #f5f7ff;
   pointer-events: none;
-  background: linear-gradient(135deg, rgba(12, 18, 34, 0.92), rgba(7, 10, 20, 0.85));
-  backdrop-filter: blur(12px);
+  background: linear-gradient(135deg, rgba(12, 18, 34, 0.88), rgba(7, 10, 20, 0.78));
+  backdrop-filter: blur(10px);
   padding: 2px 4px;
-  border-radius: 12px;
-  border: 1px solid rgba(126, 174, 255, 0.35);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px rgba(255, 255, 255, 0.08);
-  z-index: 2000; /* Ensure it stays above everything else */
+  border-radius: 11px;
+  border: 1px solid rgba(126, 174, 255, 0.28);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 255, 255, 0.06);
+  z-index: 101;
   font-variant-numeric: tabular-nums;
 }
 #hud-currency-widget > span {
@@ -6117,13 +6116,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 1024px) {
   #hud-currency-widget {
-    top: 104px; /* Positioned below EXP bar (40px top + ~60px HUD height) */
+    top: 104px;
     left: 16px;
-    transform: none;
     min-height: 28px;
     font-size: 10px;
-    background: rgba(0, 0, 0, 0.6); /* Slightly more transparent for smaller screens */
-    border-radius: 8px;
   }
   #hud-currency-widget > span { padding: 0 6px; }
 }
@@ -6134,7 +6130,6 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     left: 10px;
     min-height: 24px;
     font-size: 9px;
-    padding: 1px 3px;
   }
   #hud-currency-widget > span {
     gap: 3px;
@@ -6147,7 +6142,6 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     top: 96px;
     left: 8px;
     font-size: 8px;
-    border-radius: 6px;
   }
   #hud-currency-widget > span { padding: 0 3px; }
 }
