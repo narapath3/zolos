@@ -544,6 +544,33 @@ async function initGame(charData) {
     window.adminUI = new AdminUI();
     window.adminUI.checkAdmin(charData.user_id);
 
+    // Global Kill Streak Handler (Self & Others)
+    window.onKillStreakReceived = (payload) => {
+        if (!payload || !sceneManager) return;
+        
+        // Only show if on the same map
+        if (payload.mapId && payload.mapId !== sceneManager.currentMap) return;
+
+        if (payload.userId === userId) {
+            // Self
+            if (character) character.showKillStreakEffect(payload.count);
+        } else {
+            // Others
+            const rp = remotePlayersMap.get(payload.userId);
+            if (rp && rp.character) {
+                rp.character.showKillStreakEffect(payload.count);
+            }
+        }
+
+        // Add to combat log for extra flair
+        if (gameUI) {
+            const isMe = payload.userId === userId;
+            const color = payload.count >= 50 ? 'levelup' : 'loot';
+            const prefix = isMe ? '🔥 คุณ' : `🔥 [${payload.username}]`;
+            gameUI.addCombatLog(`${prefix} ทำ Kill Streak ได้ถึง ${payload.count} ตัวแล้ว!`, color);
+        }
+    };
+
     // Fix C: Wire profileSaveCallback in main.js
     if (gameUI) {
         gameUI.setupProfileSaveCallback(async (data) => {

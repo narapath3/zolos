@@ -949,6 +949,12 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
 
+            socket.on('kill_streak', (payload) => {
+                if (payload && typeof window.onKillStreakReceived === 'function') {
+                    window.onKillStreakReceived(payload);
+                }
+            });
+
             // Server dropped a message (too fast / duplicate) — gentle heads-up
             socket.on('chat_blocked', (payload) => {
                 if (window.gameUI && typeof window.gameUI.addCombatLog === 'function') {
@@ -1076,6 +1082,20 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
         if (atkSeq) { payload.aseq = atkSeq; payload.wsc = weaponSoundClass || 'sword'; }
         socket.emit('pos', payload);
         return;
+    }
+}
+
+export function broadcastKillStreak(userId, username, count, currentMapId = 'prontera') {
+    if (isOfflineMode) {
+        if (typeof window.onKillStreakReceived === 'function') {
+            window.onKillStreakReceived({ userId, username, count, mapId: currentMapId });
+        }
+        return;
+    }
+
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('kill_streak', { userId, username, count, mapId: currentMapId });
     }
 }
 

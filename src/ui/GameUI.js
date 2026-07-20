@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 
@@ -6363,21 +6363,12 @@ export class GameUI {
 
   handleMonsterKill(monsterName) {
     this.killStreak++;
-    const streaks = [5, 10, 20, 50];
+    const streaks = [10, 20, 50, 100, 200, 500];
     if (streaks.includes(this.killStreak)) {
-      this.showKillStreakBanner(this.killStreak);
+      // Broadcast to others via socket
+      const currentMap = window.sceneManager ? window.sceneManager.currentMap : 'prontera';
+      broadcastKillStreak(window.userId, window.username, this.killStreak, currentMap);
     }
-  }
-
-  showKillStreakBanner(count) {
-    let msg = count + ' Kill Streak!';
-    let sub = 'ยอดเยี่ยม!';
-    if (count === 10) { msg = '10 Kill Streak! RAMPAGE!'; sub = 'คุณกำลังคลั่ง!'; }
-    if (count === 20) { msg = '20 Kill Streak! UNSTOPPABLE!'; sub = 'ไม่มีใครหยุดคุณได้!'; }
-    if (count === 50) { msg = '50 Kill Streak! GODLIKE!'; sub = 'คุณคือตำนาน!'; }
-    this._showDuelOverlay('duel-win streak-overlay',
-      '<div class="duel-title">' + msg + '</div><div class="duel-sub">' + sub + '</div>',
-      3000);
   }
 
   updateMinimap(playerPos, monsters, portals, npc, remotePlayersMap, currentMap) {

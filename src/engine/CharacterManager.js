@@ -1375,6 +1375,95 @@ export class CharacterManager {
         this.mesh.add(this.nameSprite);
     }
 
+    showKillStreakEffect(count) {
+        if (this.streakSprite) {
+            this.mesh.remove(this.streakSprite);
+            if (this.streakTimeout) clearTimeout(this.streakTimeout);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        // Styles based on streak count
+        let msg = count + ' KILL STREAK!';
+        let color1 = '#ffaa00';
+        let color2 = '#ff4400';
+        let fontSize = 'bold 48px Arial';
+        let glowColor = 'rgba(255, 100, 0, 0.8)';
+
+        if (count >= 10) {
+            msg = '🔥 RAMPAGE (' + count + ') 🔥';
+            color1 = '#ff3300'; color2 = '#ff0000';
+            fontSize = 'bold 54px Arial';
+            glowColor = 'rgba(255, 0, 0, 0.9)';
+        }
+        if (count >= 20) {
+            msg = '⚡ UNSTOPPABLE (' + count + ') ⚡';
+            color1 = '#00ccff'; color2 = '#0066ff';
+            fontSize = 'bold 58px Arial';
+            glowColor = 'rgba(0, 150, 255, 1.0)';
+        }
+        if (count >= 50) {
+            msg = '👑 GODLIKE (' + count + ') 👑';
+            color1 = '#ffd700'; color2 = '#ff8800';
+            fontSize = 'bold 64px Arial';
+            glowColor = 'rgba(255, 215, 0, 1.0)';
+        }
+
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 15;
+        ctx.font = fontSize;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Draw text with gradient
+        const grad = ctx.createLinearGradient(0, 40, 0, 90);
+        grad.addColorStop(0, color1);
+        grad.addColorStop(1, color2);
+        ctx.fillStyle = grad;
+        
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 6;
+        ctx.strokeText(msg, 256, 64);
+        ctx.fillText(msg, 256, 64);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        this.streakSprite = new THREE.Sprite(spriteMat);
+        
+        // Position it higher than name and chat
+        this.streakSprite.position.y = 3.5;
+        this.streakSprite.scale.set(4.5, 1.12, 1);
+        this.mesh.add(this.streakSprite);
+
+        // Animate up slightly
+        let startTime = Date.now();
+        const animate = () => {
+            if (!this.streakSprite) return;
+            let elapsed = Date.now() - startTime;
+            if (elapsed < 3000) {
+                this.streakSprite.position.y = 3.5 + (elapsed / 3000) * 0.5;
+                this.streakSprite.material.opacity = 1 - (elapsed / 3000) * 0.2;
+                requestAnimationFrame(animate);
+            } else {
+                if (this.streakSprite) {
+                    this.mesh.remove(this.streakSprite);
+                    this.streakSprite = null;
+                }
+            }
+        };
+        animate();
+
+        this.streakTimeout = setTimeout(() => {
+            if (this.streakSprite) {
+                this.mesh.remove(this.streakSprite);
+                this.streakSprite = null;
+            }
+        }, 4000);
+    }
+
     showChatBubble(text) {
         if (!text) return;
 
