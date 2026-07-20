@@ -201,17 +201,22 @@ export class CharacterManager {
         if (this.isRanged()) return 10.0;
         const weapon = this.equippedWeapon;
         if (weapon === 'Gun') return 7.0;
+        // Mage is now a ranged class
+        if (this.stats.job === 'mage') return 9.0;
         return 1.8; // Default range
     }
 
     isRanged() {
         const weapon = this.equippedWeapon;
-        return weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow' || weapon === 'Rudra Bow' || weapon === 'Stormcaller Bow';
+        const isWeaponRanged = weapon === 'Bow' || weapon === 'Crossbow' || weapon === 'Great Bow' || weapon === 'Rudra Bow' || weapon === 'Stormcaller Bow';
+        // Mage is now a ranged class
+        return isWeaponRanged || (this.stats.job === 'mage');
     }
 
-    // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet)
+    // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet), 'magic' (lightning)
     getWeaponClass() {
         const w = this.equippedWeapon;
+        if (this.stats.job === 'mage') return 'magic';
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
         return 'melee';
@@ -222,6 +227,7 @@ export class CharacterManager {
     // attack VISUALS as melee/bow/gun — so tuning sounds never changes visuals.
     getWeaponSoundClass() {
         const w = this.equippedWeapon;
+        if (this.stats.job === 'mage') return 'lightning';
         if (!w || w === 'None') return 'unarmed';
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';

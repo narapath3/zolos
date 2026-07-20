@@ -270,6 +270,8 @@ async function initGame(charData) {
                     };
                     if (wc === 'gun') {
                         particles.spawnBullet(event.startPos, event.target, resolveHit);
+                    } else if (wc === 'magic') {
+                        particles.spawnLightningBolt(event.startPos, event.target, resolveHit);
                     } else {
                         particles.spawnArrow(event.startPos, event.target, resolveHit);
                     }
@@ -773,7 +775,27 @@ async function initGame(charData) {
                     const dz = (p.z ?? me.z) - me.z;
                     const dist = Math.sqrt(dx * dx + dz * dz);
                     const vol = Math.max(0, 1 - dist / 34); // fades out past ~34 units
-                    if (vol > 0.02) soundManager.playWeaponAttack(p.wsc || 'sword', { volume: vol * 0.9 });
+                    if (vol > 0.02) {
+                        soundManager.playWeaponAttack(p.wsc || 'sword', { volume: vol * 0.9 });
+                        
+                        // Visual replication for special weapon classes (Mage lightning)
+                        if (p.wsc === 'lightning' && particles) {
+                            // For remote players, we don't necessarily have their target ID replicated,
+                            // but we can spawn a cosmetic bolt at their approximate facing direction or target
+                            // If they have a targetMonster assigned in their CharacterManager, use it.
+                            const target = rp.character.targetMonster;
+                            if (target && target.alive) {
+                                particles.spawnLightningBolt(rp.character.getPosition(), target);
+                            } else {
+                                // Fallback: strike slightly in front of them if no target
+                                const forward = new THREE.Vector3(0, 0, 5).applyQuaternion(rp.character.mesh.quaternion);
+                                const strikePos = rp.character.getPosition().add(forward);
+                                // Dummy target-like object for the particle system
+                                const dummyTarget = { getPosition: () => strikePos, alive: true };
+                                particles.spawnLightningBolt(rp.character.getPosition(), dummyTarget);
+                            }
+                        }
+                    }
                 }
             }
         },

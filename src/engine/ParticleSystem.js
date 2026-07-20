@@ -675,6 +675,58 @@ export class ParticleSystem {
         });
     }
 
+    // ============ Lightning Bolt (Mage) ============
+    spawnLightningBolt(startPos, targetMonster, onHit) {
+        const targetPos = targetMonster.getPosition();
+        const distance = startPos.distanceTo(targetPos);
+        
+        // A vertical beam that strikes from the sky onto the target
+        const group = new THREE.Group();
+        
+        // Main core beam
+        const coreGeo = new THREE.CylinderGeometry(0.05, 0.15, 12, 6);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        group.add(core);
+        
+        // Outer glow
+        const glowGeo = new THREE.CylinderGeometry(0.2, 0.4, 12, 6);
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.4 });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        group.add(glow);
+        
+        // Position at target, but strike from above
+        group.position.copy(targetPos);
+        group.position.y += 6; // Half height of 12
+        this.scene.add(group);
+        
+        // Strike flash at impact point
+        const flash = new THREE.Mesh(
+            new THREE.SphereGeometry(0.6, 8, 6),
+            new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 0.8 })
+        );
+        flash.position.copy(targetPos);
+        flash.position.y += 0.5;
+        this.scene.add(flash);
+        
+        // Add to hit effects for automatic fade and removal
+        this.hitEffects.push({ mesh: group, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.15 });
+        this.hitEffects.push({ mesh: flash, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2 });
+        
+        // Ground ripple
+        const rippleGeo = new THREE.RingGeometry(0.1, 1.2, 16);
+        const rippleMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+        const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+        ripple.rotation.x = -Math.PI / 2;
+        ripple.position.copy(targetPos);
+        ripple.position.y = 0.05;
+        this.scene.add(ripple);
+        this.shockwaves.push({ mesh: ripple, type: 'ripple', life: 0.4, maxLife: 0.4 });
+
+        // Resolve damage immediately
+        if (onHit) onHit();
+    }
+
     // ============ Bullet Projectile (Gun) ============
     spawnBullet(startPos, targetMonster, onHit) {
         const group = new THREE.Group();

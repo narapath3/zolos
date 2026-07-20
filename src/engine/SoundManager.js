@@ -85,6 +85,7 @@ export class SoundManager {
             case 'blunt': return this._sfxBlunt(vol);
             case 'staff': return this._sfxStaff(vol);
             case 'unarmed': return this._sfxPunch(vol);
+            case 'lightning': return this._sfxLightning(vol);
             case 'sword':
             case 'melee':
             default: return this._sfxSword(vol);
@@ -162,6 +163,35 @@ export class SoundManager {
         osc.connect(gain).connect(ctx.destination);
         osc.start(t); osc.stop(t + 0.22);
         this._playNoiseBurst(ctx, t, 0.06, m * 0.3, 200, 900);
+    }
+
+    // Lightning bolt — a sharp crack followed by an electric sizzle.
+    _sfxLightning(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+
+        // Sharp crack (high-pass noise)
+        this._playNoiseBurst(ctx, t, 0.05, m * 0.8, 2000, 8000);
+
+        // Electric sizzle (sawtooth osc)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+        
+        gain.gain.setValueAtTime(m * 0.4, t);
+        gain.gain.linearRampToValueAtTime(m * 0.6, t + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(4000, t);
+        filter.frequency.exponentialRampToValueAtTime(500, t + 0.3);
+
+        osc.connect(filter).connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.35);
     }
 
     // Magic staff — a soft rising bell shimmer.
