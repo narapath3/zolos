@@ -3,6 +3,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ITEMS } from './GameData.js';
+import { MAP_TRACKS } from './MapMusicConfig.js';
+import { youtubeBGM } from './YouTubeBGM.js';
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
@@ -353,6 +355,12 @@ export class SceneManager {
         // Update UI
         if (window.gameUI) {
             window.gameUI.setMapName(this.getCurrentMapName(), mapId);
+        }
+
+        // Switch BGM for the new map
+        const trackId = MAP_TRACKS[mapId] || MAP_TRACKS['prontera'];
+        if (youtubeBGM) {
+            youtubeBGM.switchTrack(trackId);
         }
     }
 

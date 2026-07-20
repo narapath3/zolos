@@ -86,6 +86,8 @@ export class SoundManager {
             case 'staff': return this._sfxStaff(vol);
             case 'unarmed': return this._sfxPunch(vol);
             case 'lightning': return this._sfxLightning(vol);
+            case 'shadowslash': return this._sfxShadowSlash(vol);
+            case 'holyorb': return this._sfxHolyOrb(vol);
             case 'sword':
             case 'melee':
             default: return this._sfxSword(vol);
@@ -192,6 +194,45 @@ export class SoundManager {
 
         osc.connect(filter).connect(gain).connect(ctx.destination);
         osc.start(t); osc.stop(t + 0.35);
+    }
+
+    // Shadow slash — a fast, deep slicing sound.
+    _sfxShadowSlash(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        this._playNoiseBurst(ctx, t, 0.12, m * 0.6, 100, 2000);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+        gain.gain.setValueAtTime(m * 0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.18);
+    }
+
+    // Holy orb — a magical "shimmering" projectile sound.
+    _sfxHolyOrb(vol = 1) {
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * vol;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.exponentialRampToValueAtTime(440, t + 0.2);
+        gain.gain.setValueAtTime(m * 0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        const lfo = ctx.createOscillator();
+        const lfoGain = ctx.createGain();
+        lfo.frequency.setValueAtTime(15, t);
+        lfoGain.gain.setValueAtTime(100, t);
+        lfo.connect(lfoGain).connect(osc.frequency);
+        lfo.start(t); lfo.stop(t + 0.25);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t); osc.stop(t + 0.25);
     }
 
     // Magic staff — a soft rising bell shimmer.

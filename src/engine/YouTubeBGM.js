@@ -107,6 +107,20 @@ export class YouTubeBGM {
         if (this.ready && this.player?.playVideo) this.player.playVideo();
     }
 
+    switchTrack(videoId) {
+        if (this.videoId === videoId) return;
+        this.videoId = videoId;
+        if (this.ready && this.player && this.player.loadVideoById) {
+            this.player.loadVideoById({
+                videoId: this.videoId,
+                startSeconds: 0,
+                suggestedQuality: 'small'
+            });
+            this.player.setVolume(this.volume);
+            if (!this.enabled) this.pause();
+        }
+    }
+
     pause() {
         if (this.ready && this.player?.pauseVideo) this.player.pauseVideo();
     }

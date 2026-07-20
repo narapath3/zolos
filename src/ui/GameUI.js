@@ -1630,6 +1630,7 @@ export class GameUI {
       if (this.characterId) {
         // Send the full stats object (not {}) so a tool's durability survives.
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
+        this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
       this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
       this._equipToast(`ถอด ${item.item_name}`, true);
@@ -1694,6 +1695,7 @@ export class GameUI {
       if (this.characterId) {
         // Send the full stats object so a tool's durability isn't wiped.
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
+        this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
       this.addCombatLog(`⚔️ สวมใส่ ${item.emoji} ${item.item_name} เพิ่มความแข็งแกร่ง!`, 'system');
       this._equipToast(`สวมใส่ ${item.item_name}`, true);

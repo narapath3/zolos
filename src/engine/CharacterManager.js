@@ -213,10 +213,12 @@ export class CharacterManager {
         return isWeaponRanged || (this.stats.job === 'mage');
     }
 
-    // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet), 'magic' (lightning)
+    // Attack visual class: 'melee' (sword slash), 'bow' (arrow), 'gun' (bullet), 'magic' (lightning), 'thief' (shadow slash), 'acolyte' (holy orb)
     getWeaponClass() {
         const w = this.equippedWeapon;
         if (this.stats.job === 'mage') return 'magic';
+        if (this.stats.job === 'thief') return 'thief';
+        if (this.stats.job === 'acolyte') return 'acolyte';
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
         return 'melee';
@@ -228,6 +230,8 @@ export class CharacterManager {
     getWeaponSoundClass() {
         const w = this.equippedWeapon;
         if (this.stats.job === 'mage') return 'lightning';
+        if (this.stats.job === 'thief') return 'shadowslash';
+        if (this.stats.job === 'acolyte') return 'holyorb';
         if (!w || w === 'None') return 'unarmed';
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
@@ -1770,6 +1774,8 @@ export class CharacterManager {
                 weapon: this.equippedWeapon,
                 hat: this.equippedHat,
                 glasses: this.equippedGlasses,
+                shield: this.equippedShield,
+                armor: this.equippedGear?.body || null,
                 // DB columns body_color/hair_color/pants_color are INTEGER — persist
                 // the raw numeric color (e.g. 0x4060c0). Saving a hex string here made
                 // the whole UPDATE fail (invalid integer), so nothing persisted.

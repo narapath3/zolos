@@ -746,6 +746,27 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- PLAYER DEATH ANNOUNCEMENT ---
+    socket.on('player_dead', (payload) => {
+        const player = onlinePlayers.get(socket.id);
+        if (!player || !payload || !payload.monsterName) return;
+        
+        // Only announce if player was above level 5
+        if (player.level > 5) {
+            const mapId = player.mapId || 'prontera_field';
+            const message = `ผู้เล่น [${player.username}] ถูก [${payload.monsterName}] สังหาร!`;
+            
+            io.to(`map:${mapId}`).emit('chat', {
+                userId: 'system',
+                username: '📢 แจ้งเตือน',
+                level: 99,
+                message: message,
+                color: 'red',
+                mapId: mapId
+            });
+        }
+    });
+
     // --- DISCONNECT ---
     socket.on('disconnect', async (reason) => {
         // Clear all recurring announcement intervals for this socket
@@ -922,7 +943,7 @@ async function saveCharacterToSupabase(saveData) {
             const allowedFields = [
                 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
                 'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
-                'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
+                'weapon', 'hat', 'glasses', 'shield', 'armor', 'body_color', 'hair_color', 'pants_color', 'gender',
                 'sound_enabled', 'graphics_quality', 'fps_enabled'
             ];
             const filtered = {};

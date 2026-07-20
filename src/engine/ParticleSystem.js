@@ -727,6 +727,65 @@ export class ParticleSystem {
         if (onHit) onHit();
     }
 
+    // ============ Shadow Slash (Thief) ============
+    spawnShadowSlash(startPos, targetMonster, onHit) {
+        const targetPos = targetMonster.getPosition();
+        
+        // A fast purple shadow arc at the target's position
+        const arcGeo = new THREE.TorusGeometry(0.8, 0.05, 8, 24, Math.PI * 0.8);
+        const arcMat = new THREE.MeshBasicMaterial({ color: 0x8800ff, transparent: true, opacity: 0.9 });
+        const arc = new THREE.Mesh(arcGeo, arcMat);
+        
+        arc.position.copy(targetPos);
+        arc.position.y += 0.8;
+        arc.rotation.y = Math.random() * Math.PI * 2;
+        arc.rotation.x = Math.random() * Math.PI * 0.5;
+        this.scene.add(arc);
+        
+        // Shadow particles
+        this._fxBurst(targetPos, 0x440088, 12, 4, { life: 0.4, yOff: 0.8 });
+        
+        // Add to hit effects for automatic fade and removal
+        this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2 });
+        
+        if (onHit) onHit();
+    }
+
+    // ============ Holy Orb (Acolyte) ============
+    spawnHolyOrb(startPos, targetMonster, onHit) {
+        const group = new THREE.Group();
+        
+        // Golden orb
+        const orb = new THREE.Mesh(
+            new THREE.SphereGeometry(0.2, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0xffffaa })
+        );
+        group.add(orb);
+        
+        // Holy glow
+        const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.4, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, opacity: 0.4 })
+        );
+        group.add(glow);
+        
+        group.position.copy(startPos);
+        group.position.y += 1.2;
+        this.scene.add(group);
+        
+        this.projectiles.push({
+            mesh: group,
+            target: targetMonster,
+            speed: 18,
+            onHit: () => {
+                this._fxBurst(targetMonster.getPosition(), 0xffff88, 15, 5, { life: 0.5, yOff: 0.8 });
+                this._fxRing(targetMonster.getPosition(), 0xfff0a0, 0.4, 0.06, 0.1, 0.8);
+                if (onHit) onHit();
+            },
+            life: 2.0
+        });
+    }
+
     // ============ Bullet Projectile (Gun) ============
     spawnBullet(startPos, targetMonster, onHit) {
         const group = new THREE.Group();

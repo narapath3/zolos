@@ -272,6 +272,8 @@ async function initGame(charData) {
                         particles.spawnBullet(event.startPos, event.target, resolveHit);
                     } else if (wc === 'magic') {
                         particles.spawnLightningBolt(event.startPos, event.target, resolveHit);
+                    } else if (wc === 'acolyte') {
+                        particles.spawnHolyOrb(event.startPos, event.target, resolveHit);
                     } else {
                         particles.spawnArrow(event.startPos, event.target, resolveHit);
                     }
@@ -285,6 +287,8 @@ async function initGame(charData) {
                     // Sword slash arc for melee; plain hit spark for ranged impacts
                     if (event.weaponClass === 'melee') {
                         particles.spawnSlash(event.targetPos, event.critical);
+                    } else if (event.weaponClass === 'thief') {
+                        particles.spawnShadowSlash(character.getPosition(), { getPosition: () => event.targetPos });
                     }
                     particles.spawnHitEffect(event.targetPos, event.critical);
                     spawnForgeBurst(event.targetPos, event.critical); // forged-weapon element burst
@@ -343,6 +347,14 @@ async function initGame(charData) {
                     if (gameUI) gameUI.killStreak = 0;
                     const respawnBtn = document.getElementById('btn-respawn-now');
                     if (respawnBtn) respawnBtn.style.display = 'block';
+
+                    // Broadcast death to others via socket
+                    import('./network/SocketClient.js').then(({ getSocket, isSocketConnected }) => {
+                        const socket = getSocket();
+                        if (socket && isSocketConnected()) {
+                            socket.emit('player_dead', { monsterName: killer });
+                        }
+                    });
                 }
                 break;
             case 'playerRespawn':
@@ -778,21 +790,23 @@ async function initGame(charData) {
                     if (vol > 0.02) {
                         soundManager.playWeaponAttack(p.wsc || 'sword', { volume: vol * 0.9 });
                         
-                        // Visual replication for special weapon classes (Mage lightning)
-                        if (p.wsc === 'lightning' && particles) {
-                            // For remote players, we don't necessarily have their target ID replicated,
-                            // but we can spawn a cosmetic bolt at their approximate facing direction or target
-                            // If they have a targetMonster assigned in their CharacterManager, use it.
+                        // Visual replication for special weapon classes (Mage lightning, Thief shadow slash, Acolyte holy orb)
+                        if (particles) {
                             const target = rp.character.targetMonster;
-                            if (target && target.alive) {
-                                particles.spawnLightningBolt(rp.character.getPosition(), target);
-                            } else {
-                                // Fallback: strike slightly in front of them if no target
+                            let dummyTarget = null;
+                            if (!target || !target.alive) {
                                 const forward = new THREE.Vector3(0, 0, 5).applyQuaternion(rp.character.mesh.quaternion);
                                 const strikePos = rp.character.getPosition().add(forward);
-                                // Dummy target-like object for the particle system
-                                const dummyTarget = { getPosition: () => strikePos, alive: true };
-                                particles.spawnLightningBolt(rp.character.getPosition(), dummyTarget);
+                                dummyTarget = { getPosition: () => strikePos, alive: true };
+                            }
+                            const finalTarget = target && target.alive ? target : dummyTarget;
+
+                            if (p.wsc === 'lightning') {
+                                particles.spawnLightningBolt(rp.character.getPosition(), finalTarget);
+                            } else if (p.wsc === 'shadowslash') {
+                                particles.spawnShadowSlash(rp.character.getPosition(), finalTarget);
+                            } else if (p.wsc === 'holyorb') {
+                                particles.spawnHolyOrb(rp.character.getPosition(), finalTarget);
                             }
                         }
                     }
@@ -856,6 +870,14 @@ async function initGame(charData) {
             // Local bubble is now handled by the echo in broadcastChat callback
         });
     }
+
+    // Persistence fix: Add beforeunload event listener to flush inventory to DB before page closes
+    window.addEventListener('beforeunload', () => {
+        if (isGameStarted && gameUI && typeof gameUI._flushInventoryToDB === 'function') {
+            // best-effort async flush (browsers may kill it, but better than nothing)
+            gameUI._flushInventoryToDB();
+        }
+    });
 
     // Setup Logout Button
     gameUI.setupLogoutButton(async () => {

@@ -278,14 +278,17 @@ export class CombatSystem {
             ? this.character.getWeaponClass()
             : (this.character.isRanged() ? 'bow' : 'melee');
 
-        if (weaponClass === 'bow' || weaponClass === 'gun') {
-            // Ranged: spawn projectile; damage resolves on hit (see main.js)
+        if (weaponClass === 'bow' || weaponClass === 'gun' || weaponClass === 'acolyte' || weaponClass === 'magic') {
+            // Ranged/Projectile: spawn projectile or vertical effect; damage resolves on hit (see main.js)
             this.onEvent({
                 type: 'playerRangedAttack',
                 weaponClass,
                 target: monster,
                 startPos: this.character.getPosition()
             });
+        } else if (weaponClass === 'thief') {
+            // Thief: fast shadow slash (resolves immediately like melee but with special visual)
+            this._resolveDamage(monster, 'thief');
         } else {
             // Melee: immediate damage + sword slash
             this._resolveDamage(monster, 'melee');

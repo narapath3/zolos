@@ -784,12 +784,18 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
     }
 
     // Check if item already exists
-    const { data: existing } = await supabase
+    // Use .maybeSingle() instead of .single() to avoid throwing an error if the item is not found.
+    const { data: existing, error: fetchError } = await supabase
         .from('inventory')
         .select('*')
         .eq('character_id', characterId)
         .eq('item_name', itemName)
-        .single();
+        .maybeSingle();
+
+    if (fetchError) {
+        console.error(`[Zolos] ❌ Error checking inventory item ${itemName}:`, fetchError.message);
+        return;
+    }
 
     if (existing) {
         const newQty = existing.quantity + quantity;
