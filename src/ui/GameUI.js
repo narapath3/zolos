@@ -2132,23 +2132,19 @@ export class GameUI {
       liveAppearance = remotePlayer.character.getAppearance();
     }
 
-    // 2. Show modal immediately with live appearance (or null)
-    this.playerProfileModal.show(player, null, liveAppearance);
-
-    // 3. Fetch stats from DB and update
+    // 2. Fetch DB stats in parallel — do NOT show modal yet (avoids double render)
+    let dbData = null;
     try {
       const { fetchPublicCharacter } = await import('../network/GameSync.js');
       console.log(`[Profile] Fetching DB stats for ${player.username} (${player.userId})...`);
-      const dbData = await fetchPublicCharacter(player.userId);
+      dbData = await fetchPublicCharacter(player.userId);
       console.log(`[Profile] DB Data for ${player.username}:`, dbData);
-      
-      // Update only if we are still looking at the same player (avoid race conditions)
-      if (this.playerProfileModal.currentPlayer && this.playerProfileModal.currentPlayer.userId === player.userId) {
-        this.playerProfileModal.show(player, dbData, liveAppearance);
-      }
     } catch (e) {
       console.error('Failed to fetch player stats from DB:', e);
     }
+
+    // 3. Show modal ONCE with all available data (DB + live appearance)
+    this.playerProfileModal.show(player, dbData, liveAppearance);
   }
 
   // Populate the profile popup with the target's stats + equipped gear.

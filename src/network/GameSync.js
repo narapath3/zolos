@@ -88,33 +88,27 @@ export async function loadCharacter(userId) {
 export async function fetchPublicCharacter(userId) {
     if (!supabase || isOfflineMode || !userId || userId.startsWith('guest_') || userId.startsWith('local_')) return null;
     try {
-        // Try fetching all fields first. If it fails (likely due to missing columns in DB), 
-        // fallback to a safer set of core fields.
-        const allFields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map, job, str, agi, int, body_color, hair_color, pants_color, shield, armor, title';
+        // Only select columns that actually exist in the DB schema.
+        // Including non-existent columns (str, agi, int, title) caused
+        // the first query to ALWAYS fail with PGRST204, forcing a second
+        // network round-trip on every profile load — the main cause of
+        // the slow profile popup.
+        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color';
         const { data, error } = await supabase
             .from('characters')
-            .select(allFields)
+            .select(fields)
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
         
         if (error) {
-            console.warn('[Zolos] Failed to fetch full character data, retrying with core fields:', error.message);
-            const coreFields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color';
-            const { data: coreData, error: coreError } = await supabase
-                .from('characters')
-                .select(coreFields)
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-            
-            if (coreError) return null;
-            return coreData;
+            console.warn('[Zolos] Failed to fetch character data:', error.message);
+            return null;
         }
         return data;
     } catch (e) {
+        console.error('[Zolos] fetchPublicCharacter error:', e);
         return null;
     }
 }

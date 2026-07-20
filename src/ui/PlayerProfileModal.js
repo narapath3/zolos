@@ -477,7 +477,9 @@ export class PlayerProfileModal {
     const isFriend = window.gameUI && window.gameUI.friends && window.gameUI.friends.includes(player.username);
     const isSelf = window.userId === player.userId;
 
-    card.innerHTML = `
+    // Build the full HTML — preserve the canvas DOM element reference
+    // so that the WebGL renderer survives between show() calls.
+    const cardHTML = `
       <div class="profile-head">
         <div>
           <h2>PLAYER PROFILE</h2>
@@ -573,6 +575,19 @@ export class PlayerProfileModal {
         </div>
       </div>
     `;
+
+    // If the modal was already showing a DIFFERENT player (switched mid-fly),
+    // we must rebuild the full DOM. But if it's the same player, skip the
+    // innerHTML assignment to preserve the WebGL canvas.
+    const isSamePlayer = this._lastShownPlayerId === player.userId;
+    this._lastShownPlayerId = player.userId;
+
+    if (!isSamePlayer) {
+      card.innerHTML = cardHTML;
+    } else {
+      // Same player — update only the text content without destroying the canvas
+      this._updateProfileText(card, { dbData, player, level, jobInfo, isOffline, stats, isSelf, isFriend, appearance });
+    }
 
     // Close button handler
     card.querySelector('.profile-x').onclick = () => this.hide();
@@ -696,10 +711,10 @@ export class PlayerProfileModal {
   hide() {
     this.modal.style.display = 'none';
     this._stopStatusPolling();
+    // Stop the render loop but keep the WebGL renderer alive.
+    // The next show() will reuse it (no rebuild needed).
     if (this.jobPreview) {
       this.jobPreview.stop();
-      this.jobPreview.dispose();
-      this.jobPreview = null;
     }
   }
 
@@ -707,6 +722,25 @@ export class PlayerProfileModal {
     const canvas = document.getElementById('player-profile-canvas');
     if (!canvas) return;
 
+    // Reuse existing JobPreview if the canvas is the same — avoids
+    // destroying and recreating the entire WebGL renderer, scene, and
+    // CharacterManager on every profile open (the main cause of slow
+    // profile popup rendering).
+    const existingCanvas = this.jobPreview?.canvas;
+    if (this.jobPreview && existingCanvas === canvas) {
+      // Just update the appearance — no need to rebuild the renderer
+      if (this.jobPreview.char) {
+        this.jobPreview.char.applyAppearance(appearance);
+        const ringColor = { swordsman: 0xff6a6a, mage: 0xb080ff, archer: 0x7be08a, priest: 0xffe98a }[appearance.job] || 0xffd24a;
+        if (this.jobPreview.ring) {
+          this.jobPreview.ring.material.color.setHex(ringColor);
+        }
+      }
+      this.jobPreview.start();
+      return;
+    }
+
+    // Canvas changed (first open or canvas was replaced) — create new preview
     if (this.jobPreview) {
       this.jobPreview.dispose();
     }
@@ -725,6 +759,58 @@ export class PlayerProfileModal {
     }
     
     this.jobPreview.start();
+  }
+
+  // Update profile text content without destroying the canvas DOM element.
+  // This is called when show() is invoked for the SAME player (e.g. the DB
+  // fetch completes after the initial render). Preserving the canvas keeps
+  // the WebGL renderer alive and avoids the expensive re-creation cost.
+  _updateProfileText(card, { dbData, player, level, jobInfo, isOffline, stats, isSelf, isFriend, appearance }) {
+    // Update name
+    const nameEl = card.querySelector('.profile-name');
+    if (nameEl) nameEl.textContent = dbData?.name || player.username;
+
+    // Update level/job subtitle
+    const subEl = card.querySelector('.profile-sub');
+    if (subEl) subEl.textContent = `Lv.${level} \u2022 ${jobInfo.emoji} ${jobInfo.name}`;
+
+    // Update status badge
+    const badgeEl = card.querySelector('.status-badge');
+    if (badgeEl) {
+      badgeEl.className = `status-badge ${isOffline ? 'status-offline' : 'status-online'}`;
+      badgeEl.innerHTML = isOffline ? '\u26ab OFFLINE' : '\ud83d\udfe2 ONLINE';
+    }
+
+    // Update badges
+    const badgesEl = card.querySelector('.badges-section');
+    if (badgesEl) badgesEl.innerHTML = this._renderBadges({ ...dbData, appearance, level });
+
+    // Update stats bars
+    card.querySelectorAll('.stat-bar-fill').forEach(bar => {
+      const val = parseInt(bar.getAttribute('data-val'));
+      bar.style.width = Math.min((val / 10) * 100, 100) + '%';
+    });
+
+    // Update combat stat values
+    const boxes = card.querySelectorAll('.combat-box');
+    const values = [
+      `${dbData?.hp || '???'}/${dbData?.max_hp || '???'}`,
+      `${dbData?.sp || '???'}/${dbData?.max_sp || '???'}`,
+      `+${dbData?.atk || 0}`,
+      `+${dbData?.def || 0}`,
+      `${dbData?.total_kills || 0}`,
+      `${(dbData?.gold || 0).toLocaleString()}`,
+      `${(dbData?.zol || 0).toLocaleString()}`,
+      `${this._formatPlayTime(dbData?.play_time)}`,
+    ];
+    boxes.forEach((box, i) => {
+      const valEl = box.querySelector('.combat-value');
+      if (valEl && values[i]) valEl.textContent = values[i];
+    });
+
+    // Update equipment grid
+    const equipGrid = card.querySelector('.equip-grid');
+    if (equipGrid) equipGrid.innerHTML = this._renderEquipment(appearance);
   }
 
   _renderStatRow(label, value, className) {
