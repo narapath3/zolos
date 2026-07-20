@@ -1525,12 +1525,10 @@ function updateDuelCombat(dt) {
 
 // ============ World Boss ============
 // A giant server-scheduled boss everyone fights together. The server owns the
-// shared HP and per-player damage; this client renders the boss, deals damage
-// (relayed via sendBossHit), shows the countdown/HP bar, and applies the reward
+// shared HP and per-player damage; this client renders the boss in its assigned
+// outlying map, deals damage (relayed via sendBossHit), and applies the reward
 // the server assigns to *this* player when the boss dies.
-let bossState = null;           // { active, name, hp, maxHp, x, z }
-let bossCountdownTarget = 0;     // epoch ms of next spawn (for the countdown pill)
-let bossFleeTarget = 0;          // epoch ms the active boss flees
+let bossState = null;           // { active, name, hp, maxHp, mapId, mapName, x, z }
 let bossAtkTimer = 0;            // boss AoE counter-attack cadence
 let bossSwingCd = 0;             // our attack cooldown vs the boss
 let bossRewardClaimed = false;   // guard so a reward is applied once per kill
@@ -1540,23 +1538,12 @@ const BOSS_ITEM_META = {
     'Mythril Shard': { emoji: '💠', type: 'material', rarity: 'rare', price: 6000, desc: 'เศษมิธริลจากบอสโลก' },
 };
 
-function fmtCountdown(ms) {
-    const s = Math.max(0, Math.floor(ms / 1000));
-    const m = Math.floor(s / 60);
-    return `${m}:${(s % 60).toString().padStart(2, '0')}`;
-}
-
-// Build the boss HUD (countdown pill, HP bar, spawn toast, summary board) once.
+// Build the boss HUD (HP bar, spawn toast, summary board) once.
 function initBossUI() {
     if (document.getElementById('boss-ui-style')) return;
     const style = document.createElement('style');
     style.id = 'boss-ui-style';
     style.textContent = `
-    #boss-countdown{position:fixed;top:96px;left:50%;transform:translateX(-50%);z-index:60;
-      background:linear-gradient(135deg,rgba(60,20,20,.92),rgba(30,10,30,.92));
-      border:1px solid #b4462e;border-radius:20px;padding:5px 14px;color:#ffd9a0;
-      font-weight:700;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.5);display:none;
-      backdrop-filter:blur(4px);white-space:nowrap;cursor:default;user-select:none;}
     #boss-hpbar{position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:61;
       width:min(560px,86vw);display:none;text-align:center;}
     #boss-hpbar .bh-name{color:#ffcf6a;font-weight:800;font-size:15px;
@@ -1567,9 +1554,7 @@ function initBossUI() {
       background:linear-gradient(90deg,#ff3b30,#ff7a2e,#ffb038);transition:width .18s ease;}
     #boss-hpbar .bh-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
       color:#fff;font-weight:700;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.9);}
-    #boss-hpbar .bh-flee{color:#ffb0a0;font-size:11px;margin-top:2px;text-shadow:0 1px 3px rgba(0,0,0,.8);}
     @media(max-width:768px){
-      #boss-countdown{top:82px;font-size:11px;padding:4px 10px;}
       #boss-hpbar{top:78px;}
       #boss-hpbar .bh-name{font-size:13px;}
       #boss-hpbar .bh-track{height:16px;}
@@ -1607,15 +1592,10 @@ function initBossUI() {
     `;
     document.head.appendChild(style);
 
-    const cd = document.createElement('div');
-    cd.id = 'boss-countdown';
-    document.body.appendChild(cd);
-
     const bar = document.createElement('div');
     bar.id = 'boss-hpbar';
     bar.innerHTML = `<div class="bh-name"></div>
-      <div class="bh-track"><div class="bh-fill"></div><div class="bh-text"></div></div>
-      <div class="bh-flee"></div>`;
+      <div class="bh-track"><div class="bh-fill"></div><div class="bh-text"></div></div>`;
     document.body.appendChild(bar);
 
     const toast = document.createElement('div');
@@ -1634,13 +1614,20 @@ window.worldBossManager = {
     onState(p) {
         if (!p) return;
         if (p.active) {
-            bossState = { active: true, name: p.name, hp: p.hp, maxHp: p.maxHp, x: p.x || 0, z: p.z || 0 };
-            bossFleeTarget = Date.now() + (p.msUntilFlee || 0);
+            bossState = {
+                active: true,
+                name: p.name,
+                hp: p.hp,
+                maxHp: p.maxHp,
+                mapId: p.mapId || null,
+                mapName: p.mapName || p.mapId || 'ดินแดนรอบนอก',
+                x: p.x || 0,
+                z: p.z || 0,
+            };
             bossRewardClaimed = false;
             this._showBar();
         } else {
             bossState = null;
-            bossCountdownTarget = Date.now() + (p.msUntilSpawn || 0);
             this._hideBar();
         }
         this.reconcileMesh();
@@ -1648,13 +1635,22 @@ window.worldBossManager = {
 
     onSpawn(p) {
         if (!p) return;
-        bossState = { active: true, name: p.name, hp: p.hp, maxHp: p.maxHp, x: p.x || 0, z: p.z || 0 };
-        bossFleeTarget = Date.now() + (p.msUntilFlee || 0);
+        const mapName = p.mapName || p.mapId || 'ดินแดนรอบนอก';
+        bossState = {
+            active: true,
+            name: p.name,
+            hp: p.hp,
+            maxHp: p.maxHp,
+            mapId: p.mapId || null,
+            mapName,
+            x: p.x || 0,
+            z: p.z || 0,
+        };
         bossRewardClaimed = false;
         this._showBar();
         this.reconcileMesh();
-        if (gameUI) gameUI.addCombatLog(`👹 บอสโลก [${p.name}] ปรากฏตัวกลางทุ่ง Prontera! รีบไปช่วยกันตี!`, 'levelup');
-        this._toast(`👹 ${p.name}`, 'บอสโลกปรากฏตัว! ไปที่ทุ่งหญ้า Prontera เพื่อร่วมรบ');
+        if (gameUI) gameUI.addCombatLog(`👹 บอสโลก [${p.name}] ปรากฏตัวที่ ${mapName}! รีบไปช่วยกันตี!`, 'levelup');
+        this._toast(`👹 ${p.name}`, `บอสโลกปรากฏตัวที่ ${mapName}!`);
         if (soundManager) soundManager.playLevelUpSound();
     },
 
@@ -1668,7 +1664,6 @@ window.worldBossManager = {
     onDead(p) {
         if (!p) return;
         bossState = null;
-        bossCountdownTarget = Date.now() + (p.msUntilSpawn || 0);
         this._hideBar();
         // Death flourish, then remove the mesh
         if (sceneManager && sceneManager._worldBoss && sceneManager.getWorldBossInfo) {
@@ -1689,17 +1684,16 @@ window.worldBossManager = {
 
     onFlee(p) {
         bossState = null;
-        bossCountdownTarget = Date.now() + ((p && p.msUntilSpawn) || 0);
         this._hideBar();
         if (sceneManager) sceneManager.removeWorldBoss();
         if (gameUI) gameUI.addCombatLog(`🌫️ ${(p && p.name) || 'บอส'} หนีหายเข้าไปในหมอก... ไม่มีใครปราบได้ทัน`, 'warning');
     },
 
-    // Mesh exists iff there's an active boss and we're on the home field.
+    // The mesh only exists on the outlying map selected by the server.
     reconcileMesh() {
         if (!sceneManager) return;
-        const onField = sceneManager.currentMap === 'prontera';
-        if (bossState && bossState.active && onField) {
+        const onBossMap = bossState && sceneManager.currentMap === bossState.mapId;
+        if (bossState && bossState.active && onBossMap) {
             if (!sceneManager._worldBoss) sceneManager.spawnWorldBoss(bossState.name, bossState.x, bossState.z);
         } else if (sceneManager._worldBoss) {
             sceneManager.removeWorldBoss();
@@ -1727,9 +1721,7 @@ window.worldBossManager = {
     },
 
     _showBar() {
-        const cd = document.getElementById('boss-countdown');
         const bar = document.getElementById('boss-hpbar');
-        if (cd) cd.style.display = 'none';
         if (bar) { bar.style.display = 'block'; bar.querySelector('.bh-name').textContent = `👹 ${bossState.name}`; }
         this._updateBar();
     },
@@ -1788,25 +1780,6 @@ function escapeHtml(s) {
     ));
 }
 
-// Update the boss countdown pill / HP-bar flee timer (called on the HUD throttle).
-function updateBossHud() {
-    const cd = document.getElementById('boss-countdown');
-    if (bossState && bossState.active) {
-        if (cd) cd.style.display = 'none';
-        const flee = document.querySelector('#boss-hpbar .bh-flee');
-        if (flee) {
-            const onField = sceneManager && sceneManager.currentMap === 'prontera';
-            const rem = fmtCountdown(bossFleeTarget - Date.now());
-            flee.textContent = onField ? `⏳ หนีใน ${rem}` : `⏳ หนีใน ${rem} — ไปทุ่ง Prontera เพื่อร่วมรบ!`;
-        }
-    } else if (bossCountdownTarget) {
-        if (cd) {
-            cd.style.display = 'block';
-            cd.textContent = `👹 บอสโลกเกิดในอีก ${fmtCountdown(bossCountdownTarget - Date.now())}`;
-        }
-    }
-}
-
 // Per-frame: rush the boss, keep swinging with big visible effects, and take
 // the counter-slams. While "engaged" we set window.bossEngaged so CombatSystem
 // stands down (no idle-reset / no wandering off to farm nearby monsters), which
@@ -1815,7 +1788,7 @@ function updateBossCombat(dt) {
     // Not engageable → release the takeover so normal combat resumes.
     if (duelState || !bossState || !bossState.active || !character || !character.isAlive()
         || (combatSystem && combatSystem.isFishing)
-        || !sceneManager || sceneManager.currentMap !== 'prontera' || !sceneManager._worldBoss) {
+        || !sceneManager || sceneManager.currentMap !== bossState.mapId || !sceneManager._worldBoss) {
         window.bossEngaged = false;
         return;
     }
@@ -2306,7 +2279,6 @@ function gameLoop(time) {
 
         const now = performance.now();
         if (now - lastHUDTime > 100) {
-            updateBossHud();
             if (gameUI) {
                 gameUI.updateHUD(character.stats);
                 // Also update stats panel if visible (throttled)

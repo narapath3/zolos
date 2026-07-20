@@ -126,11 +126,11 @@ const CHAT_WINDOW_MS = 6000;
 const CHAT_DUP_MS = 3000;
 
 // ============ World Boss (server-authoritative) ============
-// A giant boss spawns on the main field on a fixed schedule. Everyone shares
-// one HP pool; each hit is relayed to the server which tracks per-player
-// damage. When the boss dies the server ranks contributors and broadcasts
-// rewards (applied client-side, then persisted via normal auto-save). If it
-// isn't killed within BOSS_FIGHT_MS it flees and reschedules.
+// A giant boss spawns on a rotating set of outlying maps, never in the main
+// city. Everyone shares one HP pool; each hit is relayed to the server which
+// tracks per-player damage. When the boss dies the server ranks contributors
+// and broadcasts rewards (applied client-side, then persisted via normal
+// auto-save). If it isn't killed within BOSS_FIGHT_MS it flees and reschedules.
 const BOSS_INTERVAL_MS = parseInt(process.env.BOSS_INTERVAL_MS) || 12 * 60 * 1000; // spawn every 12 min
 const BOSS_FIGHT_MS = parseInt(process.env.BOSS_FIGHT_MS) || 6 * 60 * 1000;        // 6 min to kill
 const BOSS_NAMES = [
@@ -141,11 +141,21 @@ const BOSS_NAMES = [
     'Kaltharu อสูรน้ำแข็ง',
     'Zul\'garoth เทพสังหาร',
 ];
+// Keep world bosses away from Prontera, the main hub. Each selected centre is
+// clear of portals and major map landmarks so the oversized boss has room.
+const BOSS_SPAWN_LOCATIONS = [
+    { mapId: 'payon', mapName: 'Payon Forest', x: 0, z: 0 },
+    { mapId: 'glast_heim', mapName: 'Glast Heim', x: 0, z: 0 },
+    { mapId: 'mjolnir', mapName: 'Mjolnir Mountains', x: 0, z: 0 },
+    { mapId: 'abyss_lake', mapName: 'Abyss Lake', x: 0, z: 0 },
+];
 const worldBoss = {
     active: false,
     name: '',
     hp: 0,
     maxHp: 0,
+    mapId: null,
+    mapName: '',
     x: 0,
     z: 0,
     spawnAt: Date.now() + BOSS_INTERVAL_MS, // next spawn (epoch ms)
@@ -155,29 +165,31 @@ const worldBoss = {
 };
 
 function bossPublicState() {
-    const now = Date.now();
     return {
         active: worldBoss.active,
         name: worldBoss.name,
         hp: worldBoss.hp,
         maxHp: worldBoss.maxHp,
+        mapId: worldBoss.mapId,
+        mapName: worldBoss.mapName,
         x: worldBoss.x,
         z: worldBoss.z,
-        msUntilSpawn: worldBoss.active ? 0 : Math.max(0, worldBoss.spawnAt - now),
-        msUntilFlee: worldBoss.active ? Math.max(0, worldBoss.endsAt - now) : 0,
     };
 }
 
 function spawnWorldBoss() {
     const online = onlinePlayers.size;
+    const location = BOSS_SPAWN_LOCATIONS[Math.floor(Math.random() * BOSS_SPAWN_LOCATIONS.length)];
     // HP scales with population so it's always a few minutes of teamwork.
     const maxHp = Math.min(45000, 7000 + online * 3500);
     worldBoss.active = true;
     worldBoss.name = BOSS_NAMES[Math.floor(Math.random() * BOSS_NAMES.length)];
     worldBoss.maxHp = maxHp;
     worldBoss.hp = maxHp;
-    worldBoss.x = 0;
-    worldBoss.z = 0;
+    worldBoss.mapId = location.mapId;
+    worldBoss.mapName = location.mapName;
+    worldBoss.x = location.x;
+    worldBoss.z = location.z;
     worldBoss.endsAt = Date.now() + BOSS_FIGHT_MS;
     worldBoss.damage = new Map();
     worldBoss._lastHpBcast = 0;
@@ -185,11 +197,12 @@ function spawnWorldBoss() {
         name: worldBoss.name,
         hp: worldBoss.hp,
         maxHp: worldBoss.maxHp,
+        mapId: worldBoss.mapId,
+        mapName: worldBoss.mapName,
         x: worldBoss.x,
         z: worldBoss.z,
-        msUntilFlee: BOSS_FIGHT_MS,
     });
-    console.log(`[Server] 👹 World Boss spawned: ${worldBoss.name} (${maxHp} HP, ${online} online)`);
+    console.log(`[Server] 👹 World Boss spawned: ${worldBoss.name} at ${worldBoss.mapName} (${maxHp} HP, ${online} online)`);
 }
 
 function computeBossRanking() {
@@ -220,9 +233,10 @@ function endWorldBoss(killerName) {
     worldBoss.damage = new Map();
     io.emit('boss_dead', {
         name,
+        mapId: worldBoss.mapId,
+        mapName: worldBoss.mapName,
         killerName: killerName || (ranking[0] && ranking[0].name) || 'นักผจญภัย',
         ranking,
-        msUntilSpawn: BOSS_INTERVAL_MS,
     });
     console.log(`[Server] 💀 World Boss defeated: ${name} — ${ranking.length} contributors (killer: ${killerName})`);
 }
@@ -233,7 +247,7 @@ function fleeWorldBoss() {
     worldBoss.hp = 0;
     worldBoss.spawnAt = Date.now() + BOSS_INTERVAL_MS;
     worldBoss.damage = new Map();
-    io.emit('boss_flee', { name, msUntilSpawn: BOSS_INTERVAL_MS });
+    io.emit('boss_flee', { name, mapId: worldBoss.mapId, mapName: worldBoss.mapName });
     console.log(`[Server] 🌫️ World Boss fled (survived): ${name}`);
 }
 
@@ -247,7 +261,7 @@ setInterval(() => {
     }
 }, 1000);
 
-// Periodic resync so countdowns stay aligned for everyone (incl. clock drift).
+// Periodic resync so boss state stays aligned for everyone after reconnects.
 setInterval(() => {
     io.emit('boss_state', bossPublicState());
 }, 30000);
@@ -657,9 +671,8 @@ io.on('connection', (socket) => {
     // per-player damage tally. Per-hit damage is clamped as light anti-cheat.
     socket.on('boss_hit', (payload) => {
         if (!worldBoss.active || worldBoss.hp <= 0 || !payload) return;
-        const player = onlinePlayers.get(socket.id);
-        if (!player) return;
-
+                const player = onlinePlayers.get(socket.id);
+        if (!player || player.mapId !== worldBoss.mapId) return;
         const dmg = Math.max(0, Math.min(5000, Number(payload.damage) || 0));
         if (dmg <= 0) return;
 
