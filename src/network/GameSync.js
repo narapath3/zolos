@@ -759,7 +759,25 @@ export async function loadInventory(characterId) {
     return data || [];
 }
 
+/**
+ * Save (or adjust quantity of) an inventory item in Supabase.
+ *
+ * Required Supabase RLS policy for the inventory table:
+ *
+ * CREATE POLICY "Users can manage their own inventory"
+ * ON inventory FOR ALL
+ * USING (
+ *   character_id IN (
+ *     SELECT id FROM characters WHERE user_id = auth.uid()
+ *   )
+ * );
+ *
+ * The policy ensures that only authenticated users can INSERT/UPDATE/DELETE
+ * inventory rows whose character_id belongs to a character they own.
+ */
 export async function saveInventoryItem(characterId, itemName, itemType, quantity, stats = {}) {
+    console.log(`[Zolos] 📦 saveInventoryItem called: characterId=${characterId}, itemName=${itemName}, quantity=${quantity}`);
+
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         const inv = localDb.get(`inventory_${characterId}`) || [];
         const existing = inv.find(i => i.item_name === itemName);
@@ -780,44 +798,66 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
             });
         }
         localDb.set(`inventory_${characterId}`, inv);
+        console.log(`[Zolos] 📦 [offline] saveInventoryItem completed for ${itemName}`);
         return;
     }
 
-    // Check if item already exists
-    // Use .maybeSingle() instead of .single() to avoid throwing an error if the item is not found.
-    const { data: existing, error: fetchError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('character_id', characterId)
-        .eq('item_name', itemName)
-        .maybeSingle();
-
-    if (fetchError) {
-        console.error(`[Zolos] ❌ Error checking inventory item ${itemName}:`, fetchError.message);
-        return;
-    }
-
-    if (existing) {
-        const newQty = existing.quantity + quantity;
-        if (newQty <= 0) {
-            await supabase
-                .from('inventory')
-                .delete()
-                .eq('id', existing.id);
-        } else {
-            await supabase
-                .from('inventory')
-                .update({ quantity: newQty })
-                .eq('id', existing.id);
-        }
-    } else if (quantity > 0) {
-        await supabase
+    try {
+        // Check if item already exists
+        // Use .maybeSingle() instead of .single() to avoid throwing an error if the item is not found.
+        const { data: existing, error: fetchError } = await supabase
             .from('inventory')
-            .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity, stats });
+            .select('*')
+            .eq('character_id', characterId)
+            .eq('item_name', itemName)
+            .maybeSingle();
+
+        if (fetchError) {
+            console.error(`[Zolos] ❌ Error checking inventory item ${itemName} for characterId ${characterId}:`, fetchError.message);
+            throw fetchError;
+        }
+
+        if (existing) {
+            const newQty = existing.quantity + quantity;
+            if (newQty <= 0) {
+                const { error: deleteError } = await supabase
+                    .from('inventory')
+                    .delete()
+                    .eq('id', existing.id);
+                if (deleteError) {
+                    console.error(`[Zolos] ❌ Error deleting inventory item ${itemName} for characterId ${characterId}:`, deleteError.message);
+                    throw deleteError;
+                }
+                console.log(`[Zolos] 📦 saveInventoryItem deleted ${itemName} (qty=0) for characterId ${characterId}`);
+            } else {
+                const { error: updateError } = await supabase
+                    .from('inventory')
+                    .update({ quantity: newQty })
+                    .eq('id', existing.id);
+                if (updateError) {
+                    console.error(`[Zolos] ❌ Error updating inventory item ${itemName} for characterId ${characterId}:`, updateError.message);
+                    throw updateError;
+                }
+                console.log(`[Zolos] 📦 saveInventoryItem updated ${itemName} qty=${newQty} for characterId ${characterId}`);
+            }
+        } else if (quantity > 0) {
+            const { error: insertError } = await supabase
+                .from('inventory')
+                .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity, stats });
+            if (insertError) {
+                console.error(`[Zolos] ❌ Error inserting inventory item ${itemName} for characterId ${characterId}:`, insertError.message);
+                throw insertError;
+            }
+            console.log(`[Zolos] 📦 saveInventoryItem inserted ${itemName} qty=${quantity} for characterId ${characterId}`);
+        }
+    } catch (e) {
+        console.error(`[Zolos] ❌ saveInventoryItem FAILED for characterId=${characterId}, itemName=${itemName}:`, e.message);
     }
 }
 
 export async function updateInventoryItemStats(characterId, itemName, stats) {
+    console.log(`[Zolos] 🔄 updateInventoryItemStats called: characterId=${characterId}, itemName=${itemName}, stats=${JSON.stringify(stats)}`);
+
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         const inv = localDb.get(`inventory_${characterId}`) || [];
         const existing = inv.find(i => i.item_name === itemName);
@@ -825,14 +865,25 @@ export async function updateInventoryItemStats(characterId, itemName, stats) {
             existing.stats = stats;
             localDb.set(`inventory_${characterId}`, inv);
         }
+        console.log(`[Zolos] 🔄 [offline] updateInventoryItemStats completed for ${itemName}`);
         return;
     }
 
-    await supabase
-        .from('inventory')
-        .update({ stats })
-        .eq('character_id', characterId)
-        .eq('item_name', itemName);
+    try {
+        const { error } = await supabase
+            .from('inventory')
+            .update({ stats })
+            .eq('character_id', characterId)
+            .eq('item_name', itemName);
+
+        if (error) {
+            console.error(`[Zolos] ❌ updateInventoryItemStats FAILED for characterId=${characterId}, itemName=${itemName}:`, error.message);
+            throw error;
+        }
+        console.log(`[Zolos] 🔄 updateInventoryItemStats succeeded for ${itemName} on characterId ${characterId}`);
+    } catch (e) {
+        console.error(`[Zolos] ❌ updateInventoryItemStats threw for characterId=${characterId}, itemName=${itemName}:`, e.message);
+    }
 }
 
 // ============ Leaderboard ============

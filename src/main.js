@@ -836,10 +836,13 @@ async function initGame(charData) {
     // Start auto-save
     startAutoSave(() => {
         const saveData = character.getSaveData();
-        // Auto-save daily quests and friends in the background
+        // Auto-save daily quests, friends, AND inventory in the background
         if (gameUI) {
             gameUI._saveDailyQuestsToDB().catch(() => { });
             gameUI._saveFriendsListToDB().catch(() => { });
+            // Flush inventory to DB on every auto-save tick (every 15s) so
+            // equipped state / newly bought items are always persisted.
+            gameUI._flushInventoryToDB().catch(() => { });
         }
         return {
             characterId: charData.id,

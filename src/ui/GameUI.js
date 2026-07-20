@@ -805,19 +805,29 @@ export class GameUI {
   }
 
   /**
-   * Flush all inventory item stats to database (Safety net for logout/exit)
+   * Flush all inventory item stats to database (Safety net for logout/exit).
+   * This ensures every item in the local inventory exists in Supabase with
+   * the correct quantity AND stats, so nothing is lost on reload.
    */
   async _flushInventoryToDB() {
     if (!this.characterId || !this.inventory) return;
-    const { updateInventoryItemStats } = await import('../network/GameSync.js');
-    
-    // Only flush items that have stats (equipped state, durability, etc.)
-    const itemsToSave = this.inventory.filter(item => item.stats && Object.keys(item.stats).length > 0);
-    
-    // Run in parallel for speed
-    await Promise.all(itemsToSave.map(item => 
-      updateInventoryItemStats(this.characterId, item.item_name, item.stats)
-    ));
+    const { saveInventoryItem, updateInventoryItemStats } = await import('../network/GameSync.js');
+
+    // Flush ALL items (not just equipped ones) so that items bought but never
+    // equipped still have a confirmed DB row with the right quantity.
+    for (const item of this.inventory) {
+      try {
+        // First ensure the item exists in DB with correct quantity
+        await saveInventoryItem(this.characterId, item.item_name, item.item_type, item.quantity, item.stats || {});
+        // Then update the stats (equipped state, durability, etc.)
+        if (item.stats && Object.keys(item.stats).length > 0) {
+          await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
+        }
+      } catch (e) {
+        console.error(`[Zolos] ❌ _flushInventoryToDB failed for ${item.item_name}:`, e.message);
+      }
+    }
+    console.log(`[Zolos] 💾 _flushInventoryToDB completed for ${this.inventory.length} items, characterId=${this.characterId}`);
   }
 
   // ============ Fishing Almanac ============
@@ -1628,6 +1638,8 @@ export class GameUI {
         this.stopMining();
       }
       if (this.characterId) {
+        // Ensure the item row exists in DB with correct quantity before updating stats.
+        await saveInventoryItem(this.characterId, item.item_name, item.item_type, item.quantity || 1, {});
         // Send the full stats object (not {}) so a tool's durability survives.
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
@@ -1664,6 +1676,8 @@ export class GameUI {
         if (isSameSlot && otherItem.stats && otherItem.stats.equipped === true) {
           otherItem.stats.equipped = false;
           if (this.characterId) {
+            // Ensure DB row exists with correct quantity before updating stats
+            await saveInventoryItem(this.characterId, otherItem.item_name, otherItem.item_type, otherItem.quantity || 1, {});
             await updateInventoryItemStats(this.characterId, otherItem.item_name, otherItem.stats);
           }
         }
@@ -1693,6 +1707,10 @@ export class GameUI {
       }
 
       if (this.characterId) {
+        // Ensure the item row exists in DB with correct quantity before updating stats.
+        // This handles the case where a player bought an item but the save was
+        // interrupted before the DB row was created.
+        await saveInventoryItem(this.characterId, item.item_name, item.item_type, item.quantity || 1, {});
         // Send the full stats object so a tool's durability isn't wiped.
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
@@ -3573,8 +3591,8 @@ export class GameUI {
     // Buy button
     const buyBtn = document.getElementById('btn-buy-npc-item');
     if (buyBtn) {
-      buyBtn.addEventListener('click', () => {
-        this._performShopAction();
+      buyBtn.addEventListener('click', async () => {
+        await this._performShopAction();
       });
     }
 
