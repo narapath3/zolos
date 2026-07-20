@@ -390,6 +390,15 @@ async function initGame(charData) {
     window.sceneManager = sceneManager;
     gameUI.particles = particles;
 
+    // Expose globals for _doWarp and other external systems
+    window.monsters = monsters;
+    window.combatSystem = combatSystem;
+    window.character = character;
+    window.userId = userId;
+    window.username = username;
+    window.updatePresence = updatePresence;
+    window.broadcastPosition = broadcastPosition;
+
     // Build the World Boss HUD (countdown, HP bar, summary board)
     initBossUI();
 
