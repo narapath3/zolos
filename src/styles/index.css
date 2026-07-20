@@ -6168,6 +6168,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   background: rgba(0, 0, 0, 0.2) !important;
   backdrop-filter: blur(2px) !important;
   border-color: rgba(255, 255, 255, 0.05) !important;
+  pointer-events: none !important; /* Allows clicking through to the joystick/canvas when not active */
+}
+
+.chat-panel.preview-mode * {
+  pointer-events: none !important; /* Ensure all children also pass through clicks */
 }
 
 .chat-panel.preview-mode:hover {
