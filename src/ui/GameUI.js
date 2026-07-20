@@ -48,9 +48,6 @@ export class GameUI {
     this._setupFriendSystem();
     this._setupChat();
     this._setupMinimap();
-    
-    // Initial check for chat panel visibility
-    this._updateChatVisibility();
     this._setupProfileEditor();
     this.playerProfileModal = new PlayerProfileModal();
     this._setupLeaderboardTabs();
@@ -2477,7 +2474,6 @@ export class GameUI {
         } else {
           this._closeChatToPreview();
         }
-        this._updateChatVisibility();
       });
     }
 
@@ -2667,8 +2663,6 @@ export class GameUI {
     if (chatInputRow) chatInputRow.style.display = 'none';
     if (chatInput) chatInput.blur();
     
-    this._updateChatVisibility();
-
     // Auto scroll to bottom
     const chatMessages = document.getElementById('chat-messages');
     if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -2865,8 +2859,6 @@ export class GameUI {
         chatMessages.appendChild(row);
     while (chatMessages.children.length > 80) chatMessages.removeChild(chatMessages.firstChild);
 
-    this._updateChatVisibility();
-
     setTimeout(() => {
       chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
     }, 50);
@@ -2875,22 +2867,6 @@ export class GameUI {
     if (mentionedMe && username !== myName) {
       if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
       this.addCombatLog(`💬 ${username} แท็กหาคุณในแชท!`, 'levelup');
-    }
-  }
-
-  _updateChatVisibility() {
-    const chatPanel = document.getElementById('chat-panel');
-    const chatMessages = document.getElementById('chat-messages');
-    if (!chatPanel || !chatMessages) return;
-
-    // Show if there are messages or if it's not in preview mode (being typed in)
-    const hasMessages = chatMessages.children.length > 0;
-    const isInteracting = !chatPanel.classList.contains('preview-mode');
-
-    if (hasMessages || isInteracting) {
-      chatPanel.classList.remove('empty');
-    } else {
-      chatPanel.classList.add('empty');
     }
   }
 
