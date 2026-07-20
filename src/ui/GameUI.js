@@ -5724,7 +5724,8 @@ export class GameUI {
         target.closest('#fps-counter') || target.closest('#kill-counter') ||
         target.closest('#chat-panel') || target.closest('#tutorial-tooltip') ||
         target.closest('.tutorial-tooltip') || target.closest('.tutorial-close') ||
-        target.closest('.tutorial-btn-primary') || target.closest('.tutorial-btn-secondary')) return;
+        target.closest('.tutorial-btn-primary') || target.closest('.tutorial-btn-secondary') ||
+        target.closest('#warp-modal') || target.closest('.warp-tile') || target.closest('.tile-warp-btn')) return;
 
       // Never spawn the joystick / tap over the chat UI. The chat panel is
       // click-through in preview mode, so a touch there can fall past it to the
@@ -7367,6 +7368,7 @@ export class GameUI {
           border: 1px solid rgba(240, 192, 64, 0.35);
           box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
           overflow: hidden;
+          pointer-events: auto;
         }
         .warp-head {
           display: flex; align-items: center; justify-content: space-between;
@@ -7577,8 +7579,8 @@ export class GameUI {
     return m ? `${m.emoji} ${m.name}` : this.currentMapId;
   }
 
-  // Execute the warp — delegate to the existing loadMapAndSpawn helper in main.js
-  async _doWarp(targetMap) {
+  // Execute the warp — uses window globals directly (avoids circular import with main.js)
+  _doWarp(targetMap) {
     if (!window.sceneManager || !window.character) return;
 
     // Already on this map?
@@ -7605,65 +7607,58 @@ export class GameUI {
     const spawnZ = (Math.random() - 0.5) * 8;
     const spawn = { x: spawnX, y: 1.2, z: spawnZ };
 
-    // Import and call the shared helper
-    const { loadMapAndSpawn } = await import('../main.js');
-    if (typeof loadMapAndSpawn === 'function') {
-      loadMapAndSpawn(targetMap, spawn);
-    } else {
-      // Fallback: call sceneManager.loadMap directly (same map switch logic)
-      // This mirrors loadMapAndSpawn from main.js for cases where the import fails
-      if (typeof window.portalCooldown !== 'undefined') window.portalCooldown = 2.0;
-      if (typeof window.autoPath !== 'undefined') window.autoPath = null;
-      if (window.character) {
-        window.character.targetMonster = null;
-        window.character.state = 'idle';
-      }
-      if (window.combatSystem) {
-        window.combatSystem.currentTarget = null;
-        window.combatSystem.autoFarm = false;
-        window.combatSystem.isFishing = false;
-      }
-      if (this && typeof this.clearTarget === 'function') this.clearTarget();
-
-      window.character.baseY = spawn.y;
-      window.character.mesh.position.set(spawn.x, spawn.y, spawn.z);
-      window.sceneManager.loadMap(targetMap);
-      if (window.monsters) {
-        window.monsters.clearAll();
-        window.monsters.mapId = targetMap;
-        window.monsters.spawnInitial(window.character.stats.level);
-      }
-
-      // Update multiplayer presence and broadcast new position
-      if (typeof window.updatePresence === 'function') {
-        window.updatePresence(window.character.stats.level, window.username, targetMap);
-      }
-      if (typeof window.broadcastPosition === 'function') {
-        window.broadcastPosition(
-          window.userId, window.username, window.character.stats.level,
-          window.character.getPosition(), window.character.mesh.rotation.y,
-          window.character.state, window.character.getAppearance(), targetMap
-        );
-      }
-
-      // Clear remote players from old map
-      if (window.remotePlayersMap) {
-        for (const [, rp] of window.remotePlayersMap.entries()) {
-          if (rp.mesh) window.sceneManager.scene.remove(rp.mesh);
-        }
-        window.remotePlayersMap.clear();
-      }
-
-      // Refresh market stalls on arrival
-      if (window.stallManager) window.stallManager.refresh();
-
-      // Sparkle on arrival
-      if (window.particles && typeof window.particles.spawnHitEffect === 'function') {
-        window.particles.spawnHitEffect(window.character.getPosition(), true);
-      }
-
-      this.addCombatLog(`✨ วาร์ปไป ${targetMap} สำเร็จ!`, 'levelup');
+    // Execute warp directly (mirrors loadMapAndSpawn from main.js to avoid circular import)
+    if (typeof window.portalCooldown !== 'undefined') window.portalCooldown = 2.0;
+    if (typeof window.autoPath !== 'undefined') window.autoPath = null;
+    if (window.character) {
+      window.character.targetMonster = null;
+      window.character.state = 'idle';
     }
+    if (window.combatSystem) {
+      window.combatSystem.currentTarget = null;
+      window.combatSystem.autoFarm = false;
+      window.combatSystem.isFishing = false;
+    }
+    if (this && typeof this.clearTarget === 'function') this.clearTarget();
+
+    window.character.baseY = spawn.y;
+    window.character.mesh.position.set(spawn.x, spawn.y, spawn.z);
+    window.sceneManager.loadMap(targetMap);
+    if (window.monsters) {
+      window.monsters.clearAll();
+      window.monsters.mapId = targetMap;
+      window.monsters.spawnInitial(window.character.stats.level);
+    }
+
+    // Update multiplayer presence and broadcast new position
+    if (typeof window.updatePresence === 'function') {
+      window.updatePresence(window.character.stats.level, window.username, targetMap);
+    }
+    if (typeof window.broadcastPosition === 'function') {
+      window.broadcastPosition(
+        window.userId, window.username, window.character.stats.level,
+        window.character.getPosition(), window.character.mesh.rotation.y,
+        window.character.state, window.character.getAppearance(), targetMap
+      );
+    }
+
+    // Clear remote players from old map
+    if (window.remotePlayersMap) {
+      for (const [, rp] of window.remotePlayersMap.entries()) {
+        if (rp.mesh) window.sceneManager.scene.remove(rp.mesh);
+      }
+      window.remotePlayersMap.clear();
+    }
+
+    // Refresh market stalls on arrival
+    if (window.stallManager) window.stallManager.refresh();
+
+    // Sparkle on arrival
+    if (window.particles && typeof window.particles.spawnHitEffect === 'function') {
+      window.particles.spawnHitEffect(window.character.getPosition(), true);
+    }
+
+    this.addCombatLog(`✨ วาร์ปไป ${targetMap} สำเร็จ!`, 'levelup');
   }
 }
 
