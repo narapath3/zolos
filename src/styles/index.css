@@ -4401,9 +4401,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     right: 90px;
   }
 
-  /* Combat log above bottom bar */
+  /* Combat log above bottom bar and chat panel */
   #combat-log {
-    bottom: calc(198px + env(safe-area-inset-bottom));
+    bottom: calc(205px + env(safe-area-inset-bottom));
     top: auto;
     left: 10px;
     right: auto;
