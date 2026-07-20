@@ -4401,9 +4401,9 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     right: 90px;
   }
 
-  /* Combat log above bottom bar and chat panel */
+  /* Combat log above bottom bar, chat panel, and currency widget */
   #combat-log {
-    bottom: calc(205px + env(safe-area-inset-bottom));
+    bottom: calc(230px + env(safe-area-inset-bottom));
     top: auto;
     left: 10px;
     right: auto;
@@ -6080,22 +6080,20 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* HUD Currency Widget */
 #hud-currency-widget {
   position: fixed;
-  top: 155px; /* Below minimap */
-  right: 10px;
+  bottom: 125px; /* Above chat panel on desktop */
+  left: 16px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 12px;
   font-size: 11px;
   font-weight: 600;
   color: #fff;
   pointer-events: none;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
-  padding: 6px 10px;
-  border-radius: 10px;
+  padding: 4px 10px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 900;
-  min-width: 100px;
 }
 
 #hud-currency-widget span {
@@ -6106,11 +6104,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 768px) {
   #hud-currency-widget {
-    top: 115px; /* Adjusted for smaller minimap */
-    right: 8px;
-    padding: 4px 8px;
+    bottom: calc(200px + env(safe-area-inset-bottom)); /* Above compact chat and log on mobile */
+    left: 10px;
+    padding: 3px 8px;
     font-size: 10px;
-    min-width: 90px;
+    gap: 8px;
   }
 }
 
