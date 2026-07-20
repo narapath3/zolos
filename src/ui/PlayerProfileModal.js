@@ -442,6 +442,10 @@ export class PlayerProfileModal {
   show(player, dbData = null, liveAppearance = null) {
     this.currentPlayer = player;
     const card = document.getElementById('player-profile-card');
+    if (!card) {
+      console.error('[Profile] #player-profile-card not found in DOM');
+      return;
+    }
     
     // Merge data: DB provides stats, liveAppearance provides current visuals
     const job = liveAppearance?.job || dbData?.job || 'Novice';
@@ -471,7 +475,8 @@ export class PlayerProfileModal {
     };
 
     const jobInfo = JOBS[job] || { name: 'Adventurer', emoji: '⚔️' };
-    const isOffline = player.isOffline || (player.userId.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(player.userId)));
+    const uid = player.userId || '';
+    const isOffline = player.isOffline || (uid.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(player.userId)));
 
     // Friend status check
     const isFriend = window.gameUI && window.gameUI.friends && window.gameUI.friends.includes(player.username);
@@ -590,7 +595,8 @@ export class PlayerProfileModal {
     }
 
     // Close button handler
-    card.querySelector('.profile-x').onclick = () => this.hide();
+    const closeBtn = card.querySelector('.profile-x');
+    if (closeBtn) closeBtn.onclick = () => this.hide();
 
     // Action button handlers
     if (!isSelf) {

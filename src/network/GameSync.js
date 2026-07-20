@@ -85,6 +85,36 @@ export async function loadCharacter(userId) {
 // Read-only fetch of another player's character for the profile popup. Unlike
 // loadCharacter this never creates a row. characters is publicly readable
 // (RLS SELECT USING true), so any player's stats + equipped gear are viewable.
+// Read-only fetch of another player's character by username (fallback when
+// the userId from the socket roster doesn't match the characters.user_id
+// column — e.g. the server sent a socket id instead of the Supabase UUID).
+// characters is publicly readable (RLS SELECT USING true).
+export async function fetchCharacterByUsername(username) {
+    if (!supabase || isOfflineMode || !username) return null;
+    try {
+        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color';
+        const { data, error } = await supabase
+            .from('characters')
+            .select(fields)
+            .eq('name', username)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        
+        if (error) {
+            console.error('[Zolos] fetchCharacterByUsername error:', error.message);
+            return null;
+        }
+        if (data) {
+            console.error(`[Zolos] fetchCharacterByUsername matched: ${data.name} (user_id=${data.user_id})`);
+        }
+        return data;
+    } catch (e) {
+        console.error('[Zolos] fetchCharacterByUsername error:', e);
+        return null;
+    }
+}
+
 export async function fetchPublicCharacter(userId) {
     if (!supabase || isOfflineMode || !userId || userId.startsWith('guest_') || userId.startsWith('local_')) return null;
     try {
@@ -103,8 +133,11 @@ export async function fetchPublicCharacter(userId) {
             .maybeSingle();
         
         if (error) {
-            console.warn('[Zolos] Failed to fetch character data:', error.message);
+            console.error('[Zolos] fetchPublicCharacter error:', error.message);
             return null;
+        }
+        if (!data) {
+            console.error(`[Zolos] fetchPublicCharacter: no row found for user_id=${userId}`);
         }
         return data;
     } catch (e) {

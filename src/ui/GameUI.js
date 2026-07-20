@@ -2125,6 +2125,13 @@ export class GameUI {
   }
 
   async _fetchAndShowPlayerProfile(player) {
+    // Safety: guard against missing/undefined userId which would crash
+    // show() with a TypeError on .startsWith()
+    if (!player || !player.userId) {
+      console.error('[Profile] No userId for player:', player);
+      return;
+    }
+
     // 1. Get live appearance from remotePlayersMap if available
     let liveAppearance = null;
     const remotePlayer = window.remotePlayersMap && window.remotePlayersMap.get(player.userId);
@@ -2132,19 +2139,35 @@ export class GameUI {
       liveAppearance = remotePlayer.character.getAppearance();
     }
 
-    // 2. Fetch DB stats in parallel — do NOT show modal yet (avoids double render)
+    // 2. Show modal IMMEDIATELY with whatever we have so far (avoids the
+    // user seeing nothing while the DB query is in flight).
+    this.playerProfileModal.show(player, null, liveAppearance);
+
+    // 3. Fetch DB stats in background — update the modal once data arrives.
     let dbData = null;
     try {
       const { fetchPublicCharacter } = await import('../network/GameSync.js');
-      console.log(`[Profile] Fetching DB stats for ${player.username} (${player.userId})...`);
+      console.error(`[Profile] Fetching DB stats for ${player.username} (userId=${player.userId})...`);
       dbData = await fetchPublicCharacter(player.userId);
-      console.log(`[Profile] DB Data for ${player.username}:`, dbData);
+      if (!dbData) {
+        // Fallback: try querying by username in case the userId doesn't
+        // match the characters.user_id column (e.g. server sent a socket
+        // id instead of the Supabase UUID).
+        const { fetchCharacterByUsername } = await import('../network/GameSync.js');
+        if (typeof fetchCharacterByUsername === 'function') {
+          console.error(`[Profile] userId query returned null, trying username fallback for "${player.username}"...`);
+          dbData = await fetchCharacterByUsername(player.username);
+        }
+      }
+      console.error(`[Profile] DB Data for ${player.username}:`, dbData);
     } catch (e) {
       console.error('Failed to fetch player stats from DB:', e);
     }
 
-    // 3. Show modal ONCE with all available data (DB + live appearance)
-    this.playerProfileModal.show(player, dbData, liveAppearance);
+    // 4. If DB data arrived, re-render the modal with full stats
+    if (dbData) {
+      this.playerProfileModal.show(player, dbData, liveAppearance);
+    }
   }
 
   // Populate the profile popup with the target's stats + equipped gear.
