@@ -410,7 +410,9 @@ async function initGame(charData) {
     const tutorialSystem = new TutorialSystem(gameUI, character, sceneManager);
     window.tutorialSystem = tutorialSystem;
     await tutorialSystem.loadTutorialState(charData.user_id || 'guest');
-    if (tutorialSystem.shouldAutoStart()) {
+    // Only auto-start if character has a job already (e.g. returning player)
+    // New players will start tutorial after they pick their job in GameUI.js
+    if (tutorialSystem.shouldAutoStart() && charData.job) {
         setTimeout(() => tutorialSystem.initTutorialFlow(), 1200);
     }
 

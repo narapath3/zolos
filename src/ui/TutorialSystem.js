@@ -198,10 +198,14 @@ export class TutorialSystem {
     document.body.appendChild(this.stepTooltip);
 
     // Attach button listeners
-    document.getElementById('tutorial-skip').addEventListener('click', () => this._skipTutorial());
-    document.getElementById('tutorial-next').addEventListener('click', () => this._advanceStep());
-    if (this.currentStep > 0) {
-      document.getElementById('tutorial-prev').addEventListener('click', () => this._previousStep());
+    const skipBtn = document.getElementById('tutorial-skip');
+    const nextBtn = document.getElementById('tutorial-next');
+    const prevBtn = document.getElementById('tutorial-prev');
+
+    if (skipBtn) skipBtn.onclick = (e) => { e.stopPropagation(); this._skipTutorial(); };
+    if (nextBtn) nextBtn.onclick = (e) => { e.stopPropagation(); this._advanceStep(); };
+    if (prevBtn && this.currentStep > 0) {
+      prevBtn.onclick = (e) => { e.stopPropagation(); this._previousStep(); };
     }
 
     // Highlight target element if specified
