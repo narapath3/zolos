@@ -339,6 +339,8 @@ async function initGame(charData) {
                     gameUI.setAutoFarmState(false);
                     if (gameUI.showDeathBanner) gameUI.showDeathBanner(killer);
                     if (gameUI) gameUI.killStreak = 0;
+                    const respawnBtn = document.getElementById('btn-respawn-now');
+                    if (respawnBtn) respawnBtn.style.display = 'block';
                 }
                 break;
             case 'playerRespawn':

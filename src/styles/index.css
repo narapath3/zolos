@@ -6179,11 +6179,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* Respawn Button */
 .btn-respawn-now {
   position: fixed;
-  top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: 200px;
+  transform: translateX(-50%);
   padding: 16px 32px;
-  background: linear-gradient(135deg, #ff4060, #a01020);
+  background: linear-gradient(135deg, #e74c3c, #f1c40f);
   color: white;
   border: 2px solid #fff;
   border-radius: 50px;
@@ -6191,14 +6191,14 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   font-size: 24px;
   font-weight: bold;
   cursor: pointer;
-  z-index: 2500;
-  box-shadow: 0 0 20px rgba(255, 64, 96, 0.6);
+  z-index: 2100;
+  box-shadow: 0 0 20px rgba(231, 76, 60, 0.6);
   animation: respawnPulse 1.5s infinite;
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 
 @keyframes respawnPulse {
-  0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px rgba(255, 64, 96, 0.6); }
-  50% { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 0 40px rgba(255, 64, 96, 0.9); }
-  100% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px rgba(255, 64, 96, 0.6); }
+  0% { transform: translateX(-50%) scale(1); box-shadow: 0 0 20px rgba(231, 76, 60, 0.6); }
+  50% { transform: translateX(-50%) scale(1.1); box-shadow: 0 0 40px rgba(231, 76, 60, 0.9); }
+  100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 20px rgba(231, 76, 60, 0.6); }
 }

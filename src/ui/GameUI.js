@@ -58,8 +58,23 @@ export class GameUI {
     this._setupMobileControls();
     this._setupDailyQuests();
     this._setupNetworkStatus();
+    this._setupRespawnShortcut();
     this.layoutManager = new LayoutManager(this);
     window.gameUI = this;
+  }
+
+  _setupRespawnShortcut() {
+    const btn = document.getElementById('btn-respawn-now');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (this.character && !this.character.isAlive()) {
+        this.character.respawn();
+        this.killStreak = 0;
+        this.addCombatLog('💚 คุณเกิดใหม่แล้ว!', 'system');
+        this.updateHUD(this.character.stats);
+        btn.style.display = 'none';
+      }
+    });
   }
 
   _setupNetworkStatus() {
