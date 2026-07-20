@@ -6117,16 +6117,21 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 1024px) {
   #hud-currency-widget {
-    top: 6px;
+    top: 104px; /* Positioned below EXP bar (40px top + ~60px HUD height) */
+    left: 16px;
+    transform: none;
     min-height: 28px;
     font-size: 10px;
+    background: rgba(0, 0, 0, 0.6); /* Slightly more transparent for smaller screens */
+    border-radius: 8px;
   }
   #hud-currency-widget > span { padding: 0 6px; }
 }
 
 @media (max-width: 768px) {
   #hud-currency-widget {
-    top: 5px;
+    top: 100px;
+    left: 10px;
     min-height: 24px;
     font-size: 9px;
     padding: 1px 3px;
@@ -6139,9 +6144,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 480px) {
   #hud-currency-widget {
-    top: 4px;
+    top: 96px;
+    left: 8px;
     font-size: 8px;
-    border-radius: 8px;
+    border-radius: 6px;
   }
   #hud-currency-widget > span { padding: 0 3px; }
 }
