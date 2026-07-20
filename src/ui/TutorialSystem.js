@@ -393,15 +393,16 @@ export class TutorialSystem {
     style.textContent = `
       #tutorial-tooltip {
         position: fixed;
-        bottom: 20px;
+        bottom: 120px; /* Moved up to avoid blocking main bottom controls */
         right: 20px;
-        width: min(420px, 90vw);
+        width: min(380px, 90vw);
         background: linear-gradient(135deg, #1a1a2e, #16213e);
         border: 2px solid #ffcf4a;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 207, 74, 0.4);
-        z-index: 1400;
+        z-index: 10000; /* Extremely high z-index to stay above other UI */
         animation: tutorialSlideIn 0.4s ease-out;
+        pointer-events: auto; /* Ensure it's clickable */
       }
 
       @keyframes tutorialSlideIn {
@@ -436,20 +437,25 @@ export class TutorialSystem {
       }
 
       .tutorial-close {
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 207, 74, 0.3);
-        color: #ffcf4a;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
+        background: rgba(231, 76, 60, 0.2);
+        border: 1px solid rgba(231, 76, 60, 0.5);
+        color: #ff7675;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         transition: all 0.2s;
+        z-index: 10001;
       }
-
+      
       .tutorial-close:hover {
-        background: rgba(255, 207, 74, 0.2);
-        border-color: #ffcf4a;
+        background: rgba(231, 76, 60, 0.4);
+        border-color: #ff7675;
+        transform: rotate(90deg);
       }
 
       .tutorial-body {
@@ -533,7 +539,7 @@ export class TutorialSystem {
 
       @media (max-width: 768px) {
         #tutorial-tooltip {
-          bottom: 80px;
+          bottom: 160px; /* Even higher on mobile to clear mobile controls */
           right: 10px;
           left: 10px;
           width: auto;
