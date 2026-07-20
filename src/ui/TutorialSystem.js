@@ -13,6 +13,7 @@ export class TutorialSystem {
     this.stepHandlers = {};
     this.stepOverlay = null;
     this.stepTooltip = null;
+    this.stepBackdrop = null;
   }
 
   // Load tutorial state from localStorage
@@ -49,6 +50,8 @@ export class TutorialSystem {
     this.isActive = true;
     this.currentStep = this.tutorialState?.lastStep || 0;
     this._injectTutorialStyles();
+    // Add panels-open class so mobile controls are hidden beneath the tutorial
+    document.body.classList.add('panels-open');
     this._showStep(this.currentStep);
   }
 
@@ -157,6 +160,9 @@ export class TutorialSystem {
     const step = steps[stepIndex];
     this.currentStep = stepIndex;
 
+    // Render the semi-transparent backdrop (captures stray clicks, keeps tooltip on top)
+    this._renderBackdrop();
+
     // Create or update overlay and tooltip
     this._renderStepTooltip(step);
 
@@ -165,6 +171,15 @@ export class TutorialSystem {
 
     // Log progress
     console.log(`[Tutorial] Step ${stepIndex + 1}/${steps.length}: ${step.id}`);
+  }
+
+  // Render a semi-transparent backdrop so the tooltip floats above a dimmed game screen
+  _renderBackdrop() {
+    if (!this.stepBackdrop) {
+      this.stepBackdrop = document.createElement('div');
+      this.stepBackdrop.id = 'tutorial-backdrop';
+      document.body.appendChild(this.stepBackdrop);
+    }
   }
 
   // Render step tooltip UI
@@ -327,7 +342,7 @@ export class TutorialSystem {
       border-radius: 8px;
       box-shadow: 0 0 20px rgba(255, 207, 74, 0.6), inset 0 0 20px rgba(255, 207, 74, 0.2);
       pointer-events: none;
-      z-index: 1399;
+      z-index: 20000;
       animation: tutorialPulse 1.5s ease-in-out infinite;
     `;
   }
@@ -370,6 +385,8 @@ export class TutorialSystem {
 
   // Skip tutorial
   _skipTutorial() {
+    // Remove panels-open class immediately
+    document.body.classList.remove('panels-open');
     if (confirm('คุณต้องการข้ามบทเรียนหรือไม่? คุณสามารถกลับมาเรียนได้ในเมนู')) {
       this._completeTutorial();
     }
@@ -383,8 +400,11 @@ export class TutorialSystem {
 
     if (this.stepTooltip) this.stepTooltip.remove();
     if (this.stepOverlay) this.stepOverlay.remove();
+    if (this.stepBackdrop) { this.stepBackdrop.remove(); this.stepBackdrop = null; }
 
     this.isActive = false;
+    // Restore mobile controls via the standard visibility system
+    this.gameUI?.updateMobileControlsVisibility?.();
     this.gameUI?.addCombatLog('🎉 ยินดีด้วย! คุณจบบทเรียนแล้ว! ตอนนี้คุณพร้อมที่จะเริ่มการผจญภัยของคุณ', 'levelup');
   }
 
@@ -395,6 +415,15 @@ export class TutorialSystem {
     const style = document.createElement('style');
     style.id = 'tutorial-styles';
     style.textContent = `
+      #tutorial-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(2px);
+        z-index: 19999;
+        pointer-events: none;
+      }
+
       #tutorial-tooltip {
         position: fixed;
         bottom: 120px; /* Moved up to avoid blocking main bottom controls */
@@ -404,7 +433,7 @@ export class TutorialSystem {
         border: 2px solid #ffcf4a;
         border-radius: 12px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 207, 74, 0.4);
-        z-index: 10000; /* Extremely high z-index to stay above other UI */
+        z-index: 20000; /* Above mobile controls (1500) and game panels (300) */
         animation: tutorialSlideIn 0.4s ease-out;
         pointer-events: auto; /* Ensure it's clickable */
       }
@@ -444,16 +473,18 @@ export class TutorialSystem {
         background: rgba(231, 76, 60, 0.2);
         border: 1px solid rgba(231, 76, 60, 0.5);
         color: #ff7675;
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         cursor: pointer;
-        font-size: 16px;
+        font-size: 18px;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.2s;
-        z-index: 10001;
+        z-index: 20001;
+        flex-shrink: 0;
+        -webkit-tap-highlight-color: transparent;
       }
       
       .tutorial-close:hover {
@@ -493,13 +524,16 @@ export class TutorialSystem {
 
       .tutorial-btn-primary,
       .tutorial-btn-secondary {
-        padding: 6px 12px;
+        padding: 10px 18px;
         border: none;
-        border-radius: 6px;
-        font-size: 12px;
+        border-radius: 8px;
+        font-size: 14px;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.2s;
+        -webkit-tap-highlight-color: transparent;
+        min-height: 38px;
+        touch-action: manipulation;
       }
 
       .tutorial-btn-primary {
@@ -547,6 +581,10 @@ export class TutorialSystem {
           right: 10px;
           left: 10px;
           width: auto;
+        }
+
+        #tutorial-backdrop {
+          z-index: 19999;
         }
       }
     `;

@@ -5708,7 +5708,9 @@ export class GameUI {
         target.closest('.modal-popup') || target.closest('#hud-top') ||
         target.closest('#minimap-container') || target.closest('#target-indicator') ||
         target.closest('#fps-counter') || target.closest('#kill-counter') ||
-        target.closest('#chat-panel')) return;
+        target.closest('#chat-panel') || target.closest('#tutorial-tooltip') ||
+        target.closest('.tutorial-tooltip') || target.closest('.tutorial-close') ||
+        target.closest('.tutorial-btn-primary') || target.closest('.tutorial-btn-secondary')) return;
 
       // Never spawn the joystick / tap over the chat UI. The chat panel is
       // click-through in preview mode, so a touch there can fall past it to the
