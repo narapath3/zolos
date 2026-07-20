@@ -329,12 +329,16 @@ async function initGame(charData) {
                 if (gameUI) gameUI.addCombatLog(`🎁 Dropped: ${event.item.name}`, 'loot');
                 if (gameUI) gameUI.addItem(event.item);
                 break;
+            case 'monsterKilled':
+                if (gameUI) gameUI.handleMonsterKill(event.monsterName);
+                break;
             case 'playerDeath':
                 if (gameUI) {
                     const killer = event.monsterName || 'มอนสเตอร์';
                     gameUI.addCombatLog(`💀 คุณถูก ${killer} ปราบ! กำลังเกิดใหม่ใน 3 วินาที...`, 'death');
                     gameUI.setAutoFarmState(false);
                     if (gameUI.showDeathBanner) gameUI.showDeathBanner(killer);
+                    if (gameUI) gameUI.killStreak = 0;
                 }
                 break;
             case 'playerRespawn':

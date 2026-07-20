@@ -122,6 +122,11 @@
       </div>
     </div>
 
+    <!-- Respawn Shortcut Button -->
+    <button id="btn-respawn-now" class="btn-respawn-now" style="display: none;">
+      ⚡ Respawn Now
+    </button>
+
 
     <!-- Top HUD -->
     <div id="hud-top">
@@ -158,6 +163,22 @@
         <div class="minimap-direction east">E</div>
         <div class="minimap-direction south">S</div>
         <div class="minimap-direction west">W</div>
+      </div>
+    </div>
+
+    <!-- HUD Currency & Online Count -->
+    <div id="hud-currency">
+      <div class="currency-item" title="Zeny">
+        <span class="currency-icon">🪙</span>
+        <span id="hud-gold-amount">0</span>
+      </div>
+      <div class="currency-item" title="ZOL Crystals">
+        <span class="currency-icon">💎</span>
+        <span id="hud-zol-amount">0</span>
+      </div>
+      <div class="currency-item" title="Online Players">
+        <span class="online-dot"></span>
+        <span id="hud-online-count">0</span>
       </div>
     </div>
 
@@ -617,10 +638,11 @@
       <div id="emoji-picker" class="emoji-picker" style="display:none;"></div>
       <div class="chat-input-row">
         <button id="btn-emoji" title="อีโมจิ / @แท็ก">😊</button>
-        <input type="text" id="chat-input" maxlength="200" placeholder="กด Enter เพื่อพิมพ์... (@ แท็กเพื่อน)"
+        <input type="text" id="chat-input" maxlength="100" placeholder="กด Enter เพื่อพิมพ์... (@ แท็กเพื่อน)"
           autocomplete="off">
         <button id="btn-send-chat" title="ส่ง">➤</button>
       </div>
+      <div id="chat-char-counter">0 / 100</div>
     </div>
 
     <!-- Player Status Popup Modal -->
