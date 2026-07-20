@@ -1,6 +1,7 @@
 // ============ ZOLOS TUTORIAL SYSTEM ============
 // Guides new players through essential mechanics with interactive steps.
-// Replaces the generic "Start Game" button with a structured onboarding flow.
+// Tutorial completion is persisted server-side (characters.tutorial_completed)
+// so returning users never see the tutorial again, even across devices.
 
 export class TutorialSystem {
   constructor(gameUI, character, sceneManager) {
@@ -9,46 +10,112 @@ export class TutorialSystem {
     this.sceneManager = sceneManager;
     this.currentStep = 0;
     this.isActive = false;
-    this.tutorialState = null;
+    this.tutorialCompleted = false;  // Server-side flag from DB
     this.stepHandlers = {};
     this.stepOverlay = null;
     this.stepTooltip = null;
     this.stepBackdrop = null;
   }
 
-  // Load tutorial state from localStorage
-  async loadTutorialState(characterId) {
+  // Load tutorial state from the database (characters.tutorial_completed)
+  async loadTutorialState(characterData) {
     try {
-      const key = `zolos_tutorial_${characterId}`;
-      const stored = localStorage.getItem(key);
-      this.tutorialState = stored ? JSON.parse(stored) : { completed: false, lastStep: 0 };
-      return this.tutorialState;
+      // If charData already has tutorial_completed (loaded from DB), use it directly
+      if (characterData && characterData.tutorial_completed !== undefined && characterData.tutorial_completed !== null) {
+        this.tutorialCompleted = !!characterData.tutorial_completed;
+      } else {
+        this.tutorialCompleted = false;
+      }
+      return this.tutorialCompleted;
     } catch (e) {
       console.error('[Tutorial] Failed to load state:', e);
-      this.tutorialState = { completed: false, lastStep: 0 };
-      return this.tutorialState;
+      this.tutorialCompleted = false;
+      return this.tutorialCompleted;
     }
   }
 
-  // Save tutorial progress
-  async saveTutorialState(characterId) {
+  // Save tutorial completion to database
+  async saveTutorialCompleted() {
+    this.tutorialCompleted = true;
+
     try {
-      const key = `zolos_tutorial_${characterId}`;
-      localStorage.setItem(key, JSON.stringify(this.tutorialState));
+      // Import supabase client
+      const { supabase, isOfflineMode } = await import('../network/SupabaseClient.js');
+
+      if (isOfflineMode || !supabase) {
+        // Fallback to localStorage for offline mode
+        console.warn('[Tutorial] Offline mode: saving tutorial_completed to localStorage');
+        try {
+          const key = `zolos_tutorial_completed_${this.character?.userId || 'guest'}`;
+          localStorage.setItem(key, 'true');
+        } catch (e) { /* localStorage unavailable */ }
+        return;
+      }
+
+      // Update the character row in Supabase
+      const userId = this.character?.userId;
+      const characterId = this.character?.characterId;
+
+      if (userId && !userId.startsWith('guest_') && !userId.startsWith('local_')) {
+        // Save by user_id
+        const { error } = await supabase
+          .from('characters')
+          .update({ tutorial_completed: true, updated_at: new Date().toISOString() })
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error('[Tutorial] Failed to save tutorial_completed by user_id:', error.message);
+          // Fallback to localStorage
+          try {
+            const key = `zolos_tutorial_completed_${userId}`;
+            localStorage.setItem(key, 'true');
+          } catch (e) { /* localStorage unavailable */ }
+        } else {
+          console.log('[Tutorial] ✅ tutorial_completed saved to database for user:', userId);
+        }
+      } else if (characterId) {
+        // Save by character_id (guest / local)
+        const { error } = await supabase
+          .from('characters')
+          .update({ tutorial_completed: true, updated_at: new Date().toISOString() })
+          .eq('id', characterId);
+
+        if (error) {
+          console.error('[Tutorial] Failed to save tutorial_completed by character_id:', error.message);
+          try {
+            const key = `zolos_tutorial_completed_${characterId}`;
+            localStorage.setItem(key, 'true');
+          } catch (e) { /* localStorage unavailable */ }
+        } else {
+          console.log('[Tutorial] ✅ tutorial_completed saved to database for character:', characterId);
+        }
+      } else {
+        // Fallback to localStorage
+        try {
+          const key = `zolos_tutorial_completed_guest`;
+          localStorage.setItem(key, 'true');
+        } catch (e) { /* localStorage unavailable */ }
+      }
     } catch (e) {
-      console.error('[Tutorial] Failed to save state:', e);
+      console.error('[Tutorial] Failed to save tutorial_completed:', e);
+      // Last resort fallback
+      try {
+        const key = `zolos_tutorial_completed_${this.character?.userId || 'guest'}`;
+        localStorage.setItem(key, 'true');
+      } catch (e2) { /* localStorage unavailable */ }
     }
   }
 
   // Check if tutorial should auto-start
+  // Returns false if already completed on the server (returning user)
   shouldAutoStart() {
-    return this.tutorialState && !this.tutorialState.completed;
+    return !this.tutorialCompleted;
   }
 
   // Initialize tutorial flow
   initTutorialFlow() {
     this.isActive = true;
-    this.currentStep = this.tutorialState?.lastStep || 0;
+    this.currentStep = 0;
     this._injectTutorialStyles();
     // Add panels-open class so mobile controls are hidden beneath the tutorial
     document.body.classList.add('panels-open');
@@ -233,9 +300,9 @@ export class TutorialSystem {
   _registerStepHandler(step) {
     const steps = this._getSteps();
     const nextStep = () => {
-      this.tutorialState.lastStep = this.currentStep + 1;
-      this.saveTutorialState(this.character?.userId || 'guest');
-      this._showStep(this.currentStep + 1);
+      this.currentStep + 1 >= steps.length
+        ? this._completeTutorial()
+        : this._showStep(this.currentStep + 1);
     };
 
     switch (step.action) {
@@ -262,7 +329,6 @@ export class TutorialSystem {
 
       case 'defeat-monster':
         // Track monster kills
-        const origIncrementQuest = this.gameUI?.incrementQuestProgress;
         const monsterCheckHandler = (monsterName) => {
           if (monsterName === step.monsterName) {
             this.gameUI?.addCombatLog(`✅ ดีเลย! คุณชนะ ${step.monsterName}!`, 'system');
@@ -275,7 +341,6 @@ export class TutorialSystem {
 
       case 'open-panel':
         // Track panel opening
-        const origTogglePanel = this.gameUI?._togglePanel;
         const panelCheckHandler = (panelId) => {
           if (panelId === step.panelId) {
             this.gameUI?.addCombatLog(`✅ เยี่ยม! คุณเปิด ${step.panelId} ได้สำเร็จ`, 'system');
@@ -288,7 +353,6 @@ export class TutorialSystem {
 
       case 'equip-item':
         // Track equipment
-        const origEquip = this.gameUI?.equipItem;
         const equipCheckHandler = (itemType) => {
           if (itemType === step.itemType) {
             this.gameUI?.addCombatLog(`✅ ยอดเยี่ยม! คุณติดตั้ง ${step.itemType} ได้แล้ว`, 'system');
@@ -301,7 +365,6 @@ export class TutorialSystem {
 
       case 'enable-autofarm':
         // Track auto farm toggle
-        const origAutoFarm = this.gameUI?.setAutoFarmState;
         const autoFarmCheckHandler = (isActive) => {
           if (isActive) {
             this.gameUI?.addCombatLog(`✅ ยอดเยี่ยม! Auto Farm เปิดแล้ว`, 'system');
@@ -313,7 +376,7 @@ export class TutorialSystem {
         break;
 
       case 'complete':
-        // Tutorial complete
+        // Tutorial complete — mark as completed
         this._grantReward(step.reward);
         this._completeTutorial();
         break;
@@ -369,34 +432,27 @@ export class TutorialSystem {
 
   // Advance to next step
   _advanceStep() {
-    this.tutorialState.lastStep = this.currentStep + 1;
-    this.saveTutorialState(this.character?.userId || 'guest');
     this._showStep(this.currentStep + 1);
   }
 
   // Go back to previous step
   _previousStep() {
     if (this.currentStep > 0) {
-      this.tutorialState.lastStep = this.currentStep - 1;
-      this.saveTutorialState(this.character?.userId || 'guest');
       this._showStep(this.currentStep - 1);
     }
   }
 
   // Skip tutorial
   _skipTutorial() {
-    // Remove panels-open class immediately
-    document.body.classList.remove('panels-open');
     if (confirm('คุณต้องการข้ามบทเรียนหรือไม่? คุณสามารถกลับมาเรียนได้ในเมนู')) {
       this._completeTutorial();
     }
   }
 
-  // Complete tutorial
+  // Complete tutorial — save to server so it never shows again
   _completeTutorial() {
-    this.tutorialState.completed = true;
-    this.tutorialState.completedAt = new Date().toISOString();
-    this.saveTutorialState(this.character?.userId || 'guest');
+    // Save completion status to database (server-side persistent)
+    this.saveTutorialCompleted();
 
     if (this.stepTooltip) this.stepTooltip.remove();
     if (this.stepOverlay) this.stepOverlay.remove();
@@ -406,6 +462,12 @@ export class TutorialSystem {
     // Restore mobile controls via the standard visibility system
     this.gameUI?.updateMobileControlsVisibility?.();
     this.gameUI?.addCombatLog('🎉 ยินดีด้วย! คุณจบบทเรียนแล้ว! ตอนนี้คุณพร้อมที่จะเริ่มการผจญภัยของคุณ', 'levelup');
+  }
+
+  // Allow returning tutorial from menu (resets completed flag locally)
+  async restartTutorial() {
+    this.tutorialCompleted = false;
+    this.initTutorialFlow();
   }
 
   // Inject tutorial styles
