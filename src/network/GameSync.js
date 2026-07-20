@@ -101,7 +101,7 @@ export async function fetchPublicCharacter(userId) {
         
         if (error) {
             console.warn('[Zolos] Failed to fetch full character data, retrying with core fields:', error.message);
-            const coreFields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map, job, body_color, hair_color, pants_color';
+            const coreFields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color';
             const { data: coreData, error: coreError } = await supabase
                 .from('characters')
                 .select(coreFields)
@@ -176,6 +176,12 @@ export async function createCharacter(userId) {
         total_kills: 0,
         play_time: 0,
         last_map: 'prontera_field',
+        weapon: 'Sword',
+        hat: 'None',
+        glasses: 'None',
+        shield: 'None',
+        armor: null,
+        job: null,
         // Game settings defaults
         sound_enabled: true,
         graphics_quality: 'medium',
@@ -257,7 +263,8 @@ export async function saveCharacter(characterId, updates) {
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
         'job',
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
+        'weapon', 'hat', 'glasses', 'shield', 'armor',
+        'body_color', 'hair_color', 'pants_color', 'gender',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
 
@@ -364,7 +371,8 @@ export async function saveCharacterByUserId(userId, updates) {
         'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
         'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
         'job',
-        'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender',
+        'weapon', 'hat', 'glasses', 'shield', 'armor',
+        'body_color', 'hair_color', 'pants_color', 'gender',
         'sound_enabled', 'graphics_quality', 'fps_enabled'
     ];
 
@@ -803,21 +811,39 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
     }
 
     try {
-        // Check if item already exists
-        // Use .maybeSingle() instead of .single() to avoid throwing an error if the item is not found.
-        const { data: existing, error: fetchError } = await supabase
+        // Check if item already exists.
+        // Use .select() + .limit(1) instead of .maybeSingle() because the
+        // inventory table may have duplicate (character_id, item_name) rows
+        // from a missing UNIQUE constraint. .maybeSingle() returns null when
+        // it finds multiple rows, causing a new INSERT on every save and
+        // creating even more duplicates. With .limit(1) we always get one
+        // row to update (or null if none exists).
+        const { data: rows, error: fetchError } = await supabase
             .from('inventory')
             .select('*')
             .eq('character_id', characterId)
             .eq('item_name', itemName)
-            .maybeSingle();
+            .limit(1)
+            .single();
 
-        if (fetchError) {
+        if (fetchError && fetchError.code === 'PGRST116') {
+            // No rows found — item doesn't exist yet
+            if (quantity > 0) {
+                const { error: insertError } = await supabase
+                    .from('inventory')
+                    .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity, stats });
+                if (insertError) {
+                    console.error(`[Zolos] ❌ Error inserting inventory item ${itemName} for characterId ${characterId}:`, insertError.message);
+                    throw insertError;
+                }
+                console.log(`[Zolos] 📦 saveInventoryItem inserted ${itemName} qty=${quantity} for characterId ${characterId}`);
+            }
+        } else if (fetchError) {
             console.error(`[Zolos] ❌ Error checking inventory item ${itemName} for characterId ${characterId}:`, fetchError.message);
             throw fetchError;
-        }
-
-        if (existing) {
+        } else {
+            // Row exists — update its quantity
+            const existing = rows;
             const newQty = existing.quantity + quantity;
             if (newQty <= 0) {
                 const { error: deleteError } = await supabase
@@ -840,15 +866,6 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
                 }
                 console.log(`[Zolos] 📦 saveInventoryItem updated ${itemName} qty=${newQty} for characterId ${characterId}`);
             }
-        } else if (quantity > 0) {
-            const { error: insertError } = await supabase
-                .from('inventory')
-                .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity, stats });
-            if (insertError) {
-                console.error(`[Zolos] ❌ Error inserting inventory item ${itemName} for characterId ${characterId}:`, insertError.message);
-                throw insertError;
-            }
-            console.log(`[Zolos] 📦 saveInventoryItem inserted ${itemName} qty=${quantity} for characterId ${characterId}`);
         }
     } catch (e) {
         console.error(`[Zolos] ❌ saveInventoryItem FAILED for characterId=${characterId}, itemName=${itemName}:`, e.message);
