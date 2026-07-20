@@ -1926,10 +1926,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== COMBAT LOG ========== */
 #combat-log {
   position: fixed;
-  bottom: 188px; /* sits directly ABOVE the chat box (which is anchored bottom) */
+  bottom: 140px; /* Adjusted for compact chat */
   left: 16px;
   z-index: 100;
-  width: 320px;
+  width: 360px; /* Matched with chat-panel */
   max-height: 126px;
   overflow: hidden;
   pointer-events: none;
@@ -4408,7 +4408,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
     left: 10px;
     right: auto;
     transform: none;
-    width: min(240px, 58vw);
+    width: 260px; /* Matched with mobile chat-panel */
     max-height: 66px;
     z-index: 90;
   }
@@ -6127,6 +6127,13 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   pointer-events: auto !important;
   display: flex !important;
   flex-direction: column !important;
+  transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+.chat-panel.empty {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(10px) !important;
 }
 
 .chat-messages-container {
