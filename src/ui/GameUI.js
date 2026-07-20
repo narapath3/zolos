@@ -4182,6 +4182,23 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this._updateDailyRewardBadge();
+
+    // Fade out and close the modal after a short delay to show the "claimed" state
+    setTimeout(() => {
+      const modal = document.getElementById('daily-modal');
+      if (modal && modal.style.display !== 'none') {
+        modal.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+        modal.style.opacity = '0';
+        modal.style.transform = 'scale(0.95)';
+        
+        setTimeout(() => {
+          modal.style.display = 'none';
+          modal.style.opacity = '1';
+          modal.style.transform = 'scale(1)';
+          this.updateMobileControlsVisibility();
+        }, 800);
+      }
+    }, 1500);
   }
 
   // ============ Vending Stalls (player shops) ============
