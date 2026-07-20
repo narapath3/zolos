@@ -526,10 +526,53 @@ export class PlayerProfileModal {
     }, 50);
 
     this.modal.style.display = 'flex';
+
+    // Start live status polling while modal is open
+    this._startStatusPolling();
+  }
+
+  _startStatusPolling() {
+    this._stopStatusPolling();
+    this._statusPollTimer = setInterval(() => {
+      if (this.modal.style.display === 'none') {
+        this._stopStatusPolling();
+        return;
+      }
+      this._updateLiveStatus();
+    }, 2000);
+  }
+
+  _stopStatusPolling() {
+    if (this._statusPollTimer) {
+      clearInterval(this._statusPollTimer);
+      this._statusPollTimer = null;
+    }
+  }
+
+  _updateLiveStatus() {
+    if (!this.currentPlayer) return;
+    const badge = this.modal.querySelector('.status-badge');
+    if (!badge) return;
+
+    const userId = this.currentPlayer.userId;
+    // Local player is always online
+    const isLocal = window.userId === userId;
+    // Remote player is online if in the map
+    const isRemoteOnline = window.remotePlayersMap && window.remotePlayersMap.has(userId);
+    const isOnline = isLocal || isRemoteOnline;
+
+    if (isOnline) {
+      badge.className = 'status-badge status-online';
+      badge.innerHTML = '🟢 ONLINE';
+    } else {
+      badge.className = 'status-badge status-offline';
+      badge.innerHTML = '⚫ OFFLINE';
+    }
   }
 
   hide() {
     this.modal.style.display = 'none';
+    this._stopStatusPolling();
     if (this.jobPreview) {
       this.jobPreview.stop();
       this.jobPreview.dispose();
