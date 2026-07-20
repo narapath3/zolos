@@ -322,6 +322,63 @@ export class PlayerProfileModal {
       .badge-veteran { background: #9b59b6; color: #fff; }
       .badge-wealthy { background: #2ecc71; color: #fff; }
 
+      /* Action Buttons */
+      .profile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 16px;
+        width: 100%;
+      }
+
+      .profile-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 1px solid rgba(240, 192, 64, 0.3);
+        background: rgba(240, 192, 64, 0.05);
+        color: #f0c040;
+      }
+
+      .profile-btn:hover:not(:disabled) {
+        background: rgba(240, 192, 64, 0.15);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(240, 192, 64, 0.2);
+      }
+
+      .profile-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        filter: grayscale(1);
+      }
+
+      .profile-btn.primary {
+        background: #f0c040;
+        color: #000;
+        border: none;
+      }
+
+      .profile-btn.primary:hover:not(:disabled) {
+        background: #ffcf50;
+      }
+      
+      .profile-btn.danger {
+        border-color: rgba(255, 100, 100, 0.3);
+        background: rgba(255, 100, 100, 0.05);
+        color: #ff6b6b;
+      }
+      
+      .profile-btn.danger:hover:not(:disabled) {
+        background: rgba(255, 100, 100, 0.15);
+      }
+
       @media (max-width: 720px) {
         #player-profile-card {
           width: 96vw;
@@ -416,6 +473,10 @@ export class PlayerProfileModal {
     const jobInfo = JOBS[job] || { name: 'Adventurer', emoji: '⚔️' };
     const isOffline = player.isOffline || (player.userId.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(player.userId)));
 
+    // Friend status check
+    const isFriend = window.gameUI && window.gameUI.friends && window.gameUI.friends.includes(player.username);
+    const isSelf = window.userId === player.userId;
+
     card.innerHTML = `
       <div class="profile-head">
         <div>
@@ -438,6 +499,20 @@ export class PlayerProfileModal {
             <div class="badges-section">
               ${this._renderBadges({ ...dbData, appearance, level })}
             </div>
+
+            ${!isSelf ? `
+            <div class="profile-actions">
+              <button id="prof-btn-friend" class="profile-btn ${isFriend ? 'danger' : 'primary'}">
+                ${isFriend ? '💔 Remove Friend' : '➕ Add Friend (เพิ่มเพื่อน)'}
+              </button>
+              <button id="prof-btn-warp" class="profile-btn" ${isOffline ? 'disabled' : ''}>
+                🌀 Warp To Player (วาปไปหา)
+              </button>
+              <button id="prof-btn-duel" class="profile-btn" ${isOffline ? 'disabled' : ''}>
+                ⚔️ PVP Duel (ท้าดวล PVP)
+              </button>
+            </div>
+            ` : ''}
           </div>
         </div>
 
@@ -483,21 +558,9 @@ export class PlayerProfileModal {
                 <span class="combat-value">${(dbData?.zol || 0).toLocaleString()}</span>
               </div>
               <div class="combat-box">
-                <span class="combat-label">Play Time</span>
-                <span class="combat-value">${this._formatPlayTime(dbData?.play_time || 0)}</span>
+                <span class="combat-label">Playtime</span>
+                <span class="combat-value">${this._formatPlayTime(dbData?.play_time)}</span>
               </div>
-            </div>
-            ${dbData?.last_map ? `
-              <div style="margin-top:10px; font-size:11px; color:rgba(255,255,255,0.3); text-align:right;">
-                Last seen: <span style="color:rgba(255,255,255,0.6)">${dbData.last_map.replace(/_/g, ' ')}</span>
-              </div>
-            ` : ''}
-          </div>
-
-          <div>
-            <div class="section-title">Skills</div>
-            <div class="skills-flex">
-              ${this._renderSkills(job)}
             </div>
           </div>
 
@@ -513,6 +576,66 @@ export class PlayerProfileModal {
 
     // Close button handler
     card.querySelector('.profile-x').onclick = () => this.hide();
+
+    // Action button handlers
+    if (!isSelf) {
+      const btnFriend = card.querySelector('#prof-btn-friend');
+      const btnWarp = card.querySelector('#prof-btn-warp');
+      const btnDuel = card.querySelector('#prof-btn-duel');
+
+      if (btnFriend) {
+        btnFriend.onclick = () => {
+          if (window.gameUI) {
+            window.gameUI._toggleFriend(player);
+            // Update button state immediately if it was an add action (pending state)
+            if (!isFriend) {
+              btnFriend.innerHTML = '⌛ Pending...';
+              btnFriend.style.opacity = '0.6';
+              btnFriend.style.pointerEvents = 'none';
+            } else {
+              // If removing, it's instant, so we can hide the modal or let GameUI refresh it
+              this.hide();
+            }
+          }
+        };
+      }
+
+      if (btnWarp) {
+        btnWarp.onclick = async () => {
+          if (window.gameUI) {
+            const { sendWarpRequest } = await import('../network/GameSync.js');
+            const res = sendWarpRequest(player.userId);
+            if (res && res.success) {
+              if (window.warpManager) window.warpManager.pending = { targetName: player.username };
+              window.gameUI.addCombatLog(`🌀 กำลังวาปไปหา ${player.username}...`, 'system');
+              this.hide();
+            } else {
+              window.gameUI.addCombatLog('❌ วาปไม่ได้ (เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
+            }
+          }
+        };
+      }
+
+      if (btnDuel) {
+        btnDuel.onclick = async () => {
+          if (window.gameUI) {
+            const { sendDuelRequest } = await import('../network/GameSync.js');
+            const res = sendDuelRequest(
+              player.userId,
+              player.username,
+              window.gameUI.character?.stats?.name || 'Adventurer',
+              window.gameUI.character?.stats?.level || 1
+            );
+            if (res.success) {
+              window.gameUI.addCombatLog(`⚔️ ส่งคำท้าดวลไปยัง ${player.username} แล้ว รอการตอบรับ...`, 'system');
+              this.hide();
+            } else {
+              window.gameUI.addCombatLog('❌ ท้าดวลไม่ได้ (ออฟไลน์/เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
+            }
+          }
+        };
+      }
+    }
 
     // Initialize 3D character preview
     this._init3DPreview(appearance);
