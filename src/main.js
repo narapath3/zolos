@@ -1647,7 +1647,15 @@ window.worldBossManager = {
             z: p.z || 0,
         };
         bossRewardClaimed = false;
-        this._showBar();
+        
+        // Only show bar if the player is actually on the boss map.
+        const onBossMap = sceneManager && sceneManager.currentMap === bossState.mapId;
+        if (onBossMap) {
+            this._showBar();
+        } else {
+            this._hideBar();
+        }
+
         this.reconcileMesh();
         if (gameUI) gameUI.addCombatLog(`👹 บอสโลก [${p.name}] ปรากฏตัวที่ ${mapName}! รีบไปช่วยกันตี!`, 'levelup');
         this._toast(`👹 ${p.name}`, `บอสโลกปรากฏตัวที่ ${mapName}!`);
@@ -1658,7 +1666,14 @@ window.worldBossManager = {
         if (!p || !bossState) return;
         bossState.hp = p.hp;
         bossState.maxHp = p.maxHp;
-        this._updateBar();
+        
+        const onBossMap = sceneManager && sceneManager.currentMap === bossState.mapId;
+        if (onBossMap) {
+            this._showBar(); // Show if they just entered the map
+            this._updateBar();
+        } else {
+            this._hideBar(); // Hide if they are elsewhere
+        }
     },
 
     onDead(p) {
