@@ -216,18 +216,32 @@ export class AuthUI {
         const container = document.getElementById('auth-particles');
         if (!container) return;
         container.innerHTML = '';
-        for (let i = 0; i < 50; i++) {
+        // Mix of gold, blue, and white particles for magical atmosphere
+        const colors = [
+            'rgba(240, 192, 64, 0.7)',    // gold
+            'rgba(96, 160, 255, 0.5)',     // blue
+            'rgba(255, 255, 255, 0.4)',    // white
+            'rgba(120, 40, 160, 0.5)',     // purple
+            'rgba(240, 192, 64, 0.4)',     // gold (dim)
+        ];
+        for (let i = 0; i < 60; i++) {
             const p = document.createElement('div');
             p.className = 'particle';
             p.style.left = Math.random() * 100 + '%';
-            const duration = 10 + Math.random() * 20;
-            const delay = Math.random() * 20;
+            p.style.bottom = '0';
+            const duration = 12 + Math.random() * 25;
+            const delay = Math.random() * 25;
             p.style.setProperty('--duration', `${duration}s`);
             p.style.animationDelay = `${-delay}s`;
-            p.style.opacity = Math.random();
-            const size = 2 + Math.random() * 4;
+            const peakOpacity = 0.4 + Math.random() * 0.6;
+            p.style.setProperty('--peak-opacity', peakOpacity);
+            const drift = (Math.random() - 0.5) * 80;
+            p.style.setProperty('--drift', `${drift}px`);
+            const size = 1.5 + Math.random() * 5;
             p.style.width = `${size}px`;
             p.style.height = `${size}px`;
+            p.style.background = colors[Math.floor(Math.random() * colors.length)];
+            p.style.filter = `blur(${size > 3.5 ? 1.5 : 0}px)`;
             container.appendChild(p);
         }
     }
