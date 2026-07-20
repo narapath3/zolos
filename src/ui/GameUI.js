@@ -465,9 +465,10 @@ export class GameUI {
     document.getElementById('kill-count').textContent = stats.total_kills;
 
     // Gold
-    document.getElementById('gold-amount').textContent = stats.gold.toLocaleString();
-    const zolEl = document.getElementById('zol-amount');
-    if (zolEl) zolEl.textContent = (Number(stats.zol) || 0).toLocaleString();
+    const hudGold = document.getElementById('hud-gold-amount');
+    if (hudGold) hudGold.textContent = stats.gold.toLocaleString();
+    const hudZol = document.getElementById('hud-zol-amount');
+    if (hudZol) hudZol.textContent = (Number(stats.zol) || 0).toLocaleString();
   }
 
   updateStats(stats) {
@@ -1793,6 +1794,9 @@ export class GameUI {
     // Update auth screen count
     const authCount = document.getElementById('online-players-auth');
     if (authCount) authCount.textContent = this.onlinePlayers.length;
+
+    const hudCount = document.getElementById('hud-online-count');
+    if (hudCount) hudCount.textContent = this.onlinePlayers.length;
 
     this._renderOnlinePlayers();
   }
