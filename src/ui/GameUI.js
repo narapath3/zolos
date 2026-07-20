@@ -2842,7 +2842,9 @@ export class GameUI {
     row.innerHTML = `<span class="chat-msg-username">[${esc(username)}]:</span> <span class="chat-msg-text">${body}</span>`;
     chatMessages.appendChild(row);
     while (chatMessages.children.length > 80) chatMessages.removeChild(chatMessages.firstChild);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    setTimeout(() => {
+      chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+    }, 50);
 
     // Ping when someone tags you (not your own message)
     if (mentionedMe && username !== myName) {
