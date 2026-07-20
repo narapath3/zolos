@@ -318,6 +318,7 @@ async function initGame(charData) {
                 break;
             case 'levelUp':
                 if (soundManager) soundManager.playLevelUpSound();
+                if (particles) particles.spawnLevelUpEffect(character.getPosition());
                 if (gameUI) gameUI.addCombatLog(`🎉 LEVEL UP! You are now level ${event.level}!`, 'levelup');
                 // Hitting the unlock level opens the job picker (once per session).
                 if (gameUI && gameUI.maybePromptJobSelect) {

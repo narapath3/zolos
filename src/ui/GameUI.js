@@ -7662,7 +7662,7 @@ export class GameUI {
     if (typeof window.broadcastPosition === 'function') window.broadcastPosition(window.userId, window.username, window.character.stats.level, window.character.getPosition(), window.character.mesh.rotation.y, window.character.state, window.character.getAppearance(), targetMap);
     if (window.remotePlayersMap) { for (const [, rp] of window.remotePlayersMap.entries()) { if (rp.mesh) window.sceneManager.scene.remove(rp.mesh); } window.remotePlayersMap.clear(); }
     if (window.stallManager) window.stallManager.refresh();
-    if (window.particles && typeof window.particles.spawnHitEffect === 'function') window.particles.spawnHitEffect(window.character.getPosition(), true);
+    if (window.particles && typeof window.particles.spawnWarpEffect === 'function') window.particles.spawnWarpEffect(window.character.getPosition());
     this.addCombatLog('วาร์ปไป ' + targetMap + ' สำเร็จ!', 'levelup');
   }
 }

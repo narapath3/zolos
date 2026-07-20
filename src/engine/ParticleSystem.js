@@ -211,13 +211,130 @@ export class ParticleSystem {
         }
     }
 
+    // ============ Spectacular RO-Style Effects ============
+    
+    // Iconic RO Level Up: Glowing ring expands while green sparkles rise in a pillar
+    spawnLevelUpEffect(position) {
+        if (!this.effectsEnabled) return;
+        
+        // 1. Multiple expanding rings (The "Halo")
+        for (let i = 0; i < 3; i++) {
+            setTimeout(() => {
+                const mesh = new THREE.Mesh(
+                    new THREE.RingGeometry(0.5, 0.7, 32),
+                    new THREE.MeshBasicMaterial({ color: 0xffff44, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
+                );
+                mesh.position.set(position.x, position.y + 0.1, position.z);
+                mesh.rotation.x = -Math.PI / 2;
+                this.scene.add(mesh);
+                this.shockwaves.push({ mesh, life: 0.8, maxLife: 0.8, type: 'level-ring' });
+            }, i * 200);
+        }
+
+        // 2. Rising Sparkle Pillar
+        const sparkCount = 40;
+        const seg = this.perfMonitor.getGeometrySegments();
+        for (let i = 0; i < sparkCount; i++) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.08, seg, seg),
+                new THREE.MeshBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 1.0 })
+            );
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 0.4 + Math.random() * 0.4;
+            mesh.position.set(
+                position.x + Math.cos(angle) * radius,
+                position.y + Math.random() * 0.5,
+                position.z + Math.sin(angle) * radius
+            );
+            const velocity = new THREE.Vector3(0, 3 + Math.random() * 3, 0);
+            this.scene.add(mesh);
+            this.hitEffects.push({
+                mesh,
+                velocity,
+                life: 1.2 + Math.random() * 0.6,
+                gravity: -1.0, // Rising gravity
+            });
+        }
+
+        // 3. Central light pillar
+        const pillar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.8, 1.2, 6, 16, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+        );
+        pillar.position.set(position.x, position.y + 3, position.z);
+        this.scene.add(pillar);
+        this.shockwaves.push({ mesh: pillar, life: 1.0, maxLife: 1.0, type: 'pillar' });
+    }
+
+    // Spectacular Warp Effect: Blue light pillar + swirling particles
+    spawnWarpEffect(position) {
+        if (!this.effectsEnabled) return;
+
+        // 1. Blue Pillar
+        const pillar = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.0, 1.0, 8, 16, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+        );
+        pillar.position.set(position.x, position.y + 4, position.z);
+        this.scene.add(pillar);
+        this.shockwaves.push({ mesh: pillar, life: 0.8, maxLife: 0.8, type: 'pillar' });
+
+        // 2. Swirling Particles
+        const count = 30;
+        for (let i = 0; i < count; i++) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1, 4, 4),
+                new THREE.MeshBasicMaterial({ color: 0x88ccff, transparent: true, opacity: 1.0 })
+            );
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 1.2;
+            mesh.position.set(
+                position.x + Math.cos(angle) * radius,
+                position.y + Math.random() * 2,
+                position.z + Math.sin(angle) * radius
+            );
+            // Spiral upward velocity
+            const velocity = new THREE.Vector3(
+                -Math.sin(angle) * 2,
+                4 + Math.random() * 4,
+                Math.cos(angle) * 2
+            );
+            this.scene.add(mesh);
+            this.hitEffects.push({
+                mesh,
+                velocity,
+                life: 0.8,
+                gravity: -2.0,
+            });
+        }
+    }
+
+    // Enhanced Critical Hit: Screen shake + big red flash + radial sparks
+    spawnEnhancedCritical(position) {
+        if (!this.effectsEnabled) return;
+        
+        // 1. Big Flash Ring
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.1, 2.5, 32),
+            new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+        );
+        ring.position.copy(position);
+        ring.position.y += 0.8;
+        if (this.camera) ring.lookAt(this.camera.position);
+        this.scene.add(ring);
+        this.shockwaves.push({ mesh: ring, life: 0.3, maxLife: 0.3, type: 'flash' });
+
+        // 2. High-speed radial sparks
+        this.spawnHitEffect(position, true);
+    }
+
     // ============ Compatibility Methods ============
     createHitBurst(position) {
         this.spawnHitEffect(position, false);
     }
 
     createCriticalBurst(position) {
-        this.spawnHitEffect(position, true);
+        this.spawnEnhancedCritical(position);
     }
 
     createExplosion(position, color) {
@@ -697,6 +814,15 @@ export class ParticleSystem {
                 wave.mesh.material.opacity = 0.5 * (1 - progress);
             } else if (wave.type === 'dot') {
                 wave.mesh.material.opacity = 1.0 * (1 - progress);
+            } else if (wave.type === 'level-ring') {
+                wave.mesh.scale.set(1 + progress * 4, 1 + progress * 4, 1);
+                wave.mesh.material.opacity = 0.8 * (1 - progress);
+            } else if (wave.type === 'pillar') {
+                wave.mesh.scale.set(1 - progress * 0.5, 1, 1 - progress * 0.5);
+                wave.mesh.material.opacity = 0.4 * (1 - progress);
+            } else if (wave.type === 'flash') {
+                wave.mesh.scale.set(0.1 + progress * 2, 0.1 + progress * 2, 1);
+                wave.mesh.material.opacity = 0.6 * (1 - progress);
             } else {
                 // Generic shockwave behavior
                 wave.mesh.scale.set(1 + progress * 2, 1, 1 + progress * 2);
