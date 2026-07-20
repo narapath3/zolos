@@ -6077,26 +6077,27 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
-/* HUD Currency & Presence — Overlaid within the status bar area on PC. */
+/* HUD Currency & Presence — Positioned clearly below the EXP bar with no overlap. */
 #hud-currency-widget {
   position: fixed;
-  top: 10px; /* Overlaid at the top within the black status bar background on PC */
-  left: 210px; /* Shifted right to sit beside the player name/level info on PC */
+  top: 108px; /* Fixed distance below the top bars (40px top + ~64px bars height + margin) */
+  left: 16px;
   display: flex;
   align-items: center;
   gap: 0;
-  min-height: 24px;
-  max-width: calc(100vw - 250px);
+  min-height: 32px;
+  max-width: calc(100vw - 32px);
   font-size: 11px;
   font-weight: 700;
   color: #f5f7ff;
   pointer-events: none;
-  background: rgba(0, 0, 0, 0.3); /* Lighter overlay since it's already on a dark bar */
-  backdrop-filter: blur(4px);
-  padding: 1px 4px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 1000; /* High z-index to stay on top of the bars */
+  background: linear-gradient(135deg, rgba(12, 18, 34, 0.9), rgba(7, 10, 20, 0.8));
+  backdrop-filter: blur(10px);
+  padding: 2px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(126, 174, 255, 0.25);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  z-index: 101;
   font-variant-numeric: tabular-nums;
 }
 #hud-currency-widget > span {
@@ -6115,7 +6116,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 1024px) {
   #hud-currency-widget {
-    top: 104px;
+    top: 106px; /* Slightly adjusted to ensure no overlap with the EXP bar on tablets */
     left: 16px;
     min-height: 28px;
     font-size: 10px;
@@ -6125,7 +6126,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 768px) {
   #hud-currency-widget {
-    top: 100px;
+    top: 102px; /* Clear distance below the bars on mobile */
     left: 10px;
     min-height: 24px;
     font-size: 9px;
@@ -6138,7 +6139,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 480px) {
   #hud-currency-widget {
-    top: 96px;
+    top: 98px; /* Final clearance for very small screens */
     left: 8px;
     font-size: 8px;
   }
