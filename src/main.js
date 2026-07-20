@@ -74,6 +74,7 @@ let globalAnnouncements = null;
 let isGameStarted = false;
 let lastTime = 0;
 let portalCooldown = 0;
+window.portalCooldown = portalCooldown;
 let userId = null;
 let username = 'Adventurer';
 
@@ -96,6 +97,7 @@ let lastMinimapTime = 0;
 
 // Input state
 let autoPath = null;
+window.autoPath = autoPath;
 let isShiftPressed = false;
 
 // Reusable vector for per-frame rod tip queries (avoids per-frame allocation)
@@ -1341,7 +1343,9 @@ window.duelManager = {
 // multiplayer presence and clears remote players carried over from the old map.
 function loadMapAndSpawn(targetMap, spawn) {
     portalCooldown = 2.0;
+    window.portalCooldown = 2.0;
     autoPath = null;
+    window.autoPath = null;
 
     // Clear stale combat state before loading the new map
     if (character) {
@@ -2059,7 +2063,10 @@ function stepWorld(dt) {
         return;
     }
 
-    if (portalCooldown > 0) portalCooldown -= dt;
+    if (portalCooldown > 0) {
+        portalCooldown -= dt;
+        window.portalCooldown = portalCooldown;
+    }
 
     // 1. Movement
     const isFishingActive = combatSystem && combatSystem.isFishing;

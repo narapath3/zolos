@@ -274,7 +274,12 @@ export class GameUI {
 
     const btnWarp = document.getElementById('btn-warp');
     if (btnWarp) {
-      btnWarp.addEventListener('click', () => this.openWarpMap());
+      btnWarp.addEventListener('click', (e) => {
+        console.log('[GameUI] btn-warp clicked');
+        this.openWarpMap();
+      });
+    } else {
+      console.warn('[GameUI] btn-warp not found in DOM');
     }
 
     // Close buttons
@@ -7349,13 +7354,14 @@ export class GameUI {
   ];
 
   openWarpMap() {
+    console.log('[GameUI] openWarpMap called');
     // Inject styles once
     if (!document.getElementById('warp-style')) {
       const st = document.createElement('style');
       st.id = 'warp-style';
       st.textContent = `
         #warp-modal {
-          position: fixed; inset: 0; z-index: 1500;
+          position: fixed; inset: 0; z-index: 1800;
           display: none; align-items: center; justify-content: center;
           background: rgba(4, 8, 18, 0.85); backdrop-filter: blur(6px);
           padding: 12px; box-sizing: border-box;
@@ -7581,7 +7587,11 @@ export class GameUI {
 
   // Execute the warp — uses window globals directly (avoids circular import with main.js)
   _doWarp(targetMap) {
-    if (!window.sceneManager || !window.character) return;
+    console.log('[GameUI] _doWarp called with', targetMap);
+    if (!window.sceneManager || !window.character) {
+      console.warn('[GameUI] _doWarp: missing sceneManager or character', !!window.sceneManager, !!window.character);
+      return;
+    }
 
     // Already on this map?
     if (targetMap === window.sceneManager.currentMap) {
