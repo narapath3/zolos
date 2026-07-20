@@ -7350,7 +7350,8 @@ export class GameUI {
       bgGradient: 'linear-gradient(135deg, #0a3a6a 0%, #1a6a9a 40%, #3a9ac0 100%)',
       desc: 'เมืองหลวงศูนย์กลางของทวีป — จุดเริ่มต้นของการผจญภัย',
       level: 'Lv.1+',
-      difficulty: '🟢 Easy',
+      difficulty: 'Easy',
+      difficultyClass: 'easy',
       monsters: ['Poring', 'Lunatic', 'Fabre', 'Pupa'],
     },
     {
@@ -7362,7 +7363,8 @@ export class GameUI {
       bgGradient: 'linear-gradient(135deg, #1a3a1a 0%, #2a5a2a 40%, #4a8a4a 100%)',
       desc: 'ป่าเขียวขจีแห่งนักรบ — เต็มไปด้วยมอนสเตอร์ระดับกลาง',
       level: 'Lv.5+',
-      difficulty: '🟡 Medium',
+      difficulty: 'Medium',
+      difficultyClass: 'medium',
       monsters: ['Horn', 'Bee', 'Coco', 'Wolf'],
     },
     {
@@ -7374,7 +7376,8 @@ export class GameUI {
       bgGradient: 'linear-gradient(135deg, #1a0a3a 0%, #3a1a5a 40%, #5a3a8a 100%)',
       desc: 'ซากปรักหักพังแห่งความมืด — ที่หลบซ่อนของสัตว์ประหลาด',
       level: 'Lv.10+',
-      difficulty: '🟠 Hard',
+      difficulty: 'Hard',
+      difficultyClass: 'hard',
       monsters: ['Skeleton', 'Zombie', 'Ghoul', 'Mummy'],
     },
     {
@@ -7386,7 +7389,8 @@ export class GameUI {
       bgGradient: 'linear-gradient(135deg, #2a3a4a 0%, #4a6a7a 40%, #6a8aaa 100%)',
       desc: 'เทือกเขาสูงชัน — ที่พำนักของยักษ์และโกเล็ม',
       level: 'Lv.15+',
-      difficulty: '🟠 Hard',
+      difficulty: 'Hard',
+      difficultyClass: 'hard',
       monsters: ['Golem', 'Ogre', 'Giant Spider'],
     },
     {
@@ -7398,7 +7402,8 @@ export class GameUI {
       bgGradient: 'linear-gradient(135deg, #0a1a2a 0%, #1a3a5a 40%, #2a5a8a 100%)',
       desc: 'ทะเลสาบลึกลับใต้น้ำ — บ้านของมังกรและสัตว์ทะเล',
       level: 'Lv.20+',
-      difficulty: '🔴 Very Hard',
+      difficulty: 'Very Hard',
+      difficultyClass: 'very-hard',
       monsters: ['Dragon Egg', 'Triton', 'Sea Serpent'],
     },
     {
@@ -7408,9 +7413,10 @@ export class GameUI {
       emoji: '✨',
       color: '#ffd700',
       bgGradient: 'linear-gradient(135deg, #e8d0a0 0%, #f5e8c0 40%, #fff8e0 100%)',
-      desc: 'เมืองเหมืองแร่บนสรวงสวรรค์ — ไม่มีมอนสเตอร์ ปลอดภัย 100%',
+      desc: 'ดินแดนแห่งความสงบ — สถานที่พักผ่อนของเหล่านักรบ',
       level: 'All Levels',
-      difficulty: '🟢 Safe Zone',
+      difficulty: 'Safe Zone',
+      difficultyClass: 'safe',
       monsters: [],
     },
   ];
@@ -7588,11 +7594,11 @@ export class GameUI {
                style="background: radial-gradient(ellipse at 30% 20%, ${m.color}40 0%, transparent 70%);
                       opacity: ${glowOpacity}; animation: warpPulse ${isCurrent ? '2s' : '3s'} ease-in-out infinite;">
           </div>
-          ${isCurrent ? '<div class="tile-current-badge">📍 ปัจจุบัน</div>' : ''}
+          ${isCurrent ? '<div class="tile-current-badge">📍 YOU ARE HERE</div>' : ''}
           <div class="tile-content">
             <div class="tile-top">
               <span class="tile-emoji">${m.emoji}</span>
-              <span class="tile-badge">${m.difficulty}</span>
+              <span class="tile-badge ${m.difficultyClass}">${m.difficulty}</span>
             </div>
             <div class="tile-name">${m.name}</div>
             <div class="tile-name-th">${m.nameTh}</div>

@@ -6162,6 +6162,14 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .warp-tile .tile-badge.hard { background: #e67e22 !important; }
 .warp-tile .tile-badge.very-hard { background: #e74c3c !important; }
 
+.warp-main {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.warp-tile .tile-badge.medium { background: #f1c40f !important; color: #000 !important; }
+.warp-tile .tile-badge.hard { background: #e67e22 !important; }
+.warp-tile .tile-badge.very-hard { background: #e74c3c !important; }
+
 .warp-tile.current {
   border: 2px solid var(--primary) !important;
   box-shadow: 0 0 15px var(--primary-glow) !important;
