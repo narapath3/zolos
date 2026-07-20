@@ -272,6 +272,11 @@ export class GameUI {
       btnVendingStall.addEventListener('click', () => this._openVendingStallSetup());
     }
 
+    const btnWarp = document.getElementById('btn-warp');
+    if (btnWarp) {
+      btnWarp.addEventListener('click', () => this.openWarpMap());
+    }
+
     // Close buttons
     document.querySelectorAll('.panel-close').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -397,6 +402,15 @@ export class GameUI {
     const jobModal = document.getElementById('job-modal');
     if (jobModal) {
       const display = jobModal.style.display || window.getComputedStyle(jobModal).display;
+      if (display !== 'none') {
+        anyPanelOpen = true;
+      }
+    }
+
+    // Check the Warp Map overlay
+    const warpModal = document.getElementById('warp-modal');
+    if (warpModal) {
+      const display = warpModal.style.display || window.getComputedStyle(warpModal).display;
       if (display !== 'none') {
         anyPanelOpen = true;
       }
@@ -7250,6 +7264,405 @@ export class GameUI {
       if (panel && panel.style.display !== 'none') {
         this._renderDailyQuests();
       }
+    }
+  }
+
+  // ============ WARP MAP MODAL ============
+  // Opens a beautiful map selection UI so the player can teleport to any map.
+
+  // All available maps with their metadata for the warp UI.
+  // These match MAP_CONFIGS in SceneManager.js and the portal graph.
+  static _WARP_MAPS = [
+    {
+      id: 'prontera',
+      name: 'Prontera Field',
+      nameTh: 'เมืองประเทอร์รา',
+      emoji: '🏰',
+      color: '#40c0ff',
+      bgGradient: 'linear-gradient(135deg, #0a3a6a 0%, #1a6a9a 40%, #3a9ac0 100%)',
+      desc: 'เมืองหลวงศูนย์กลางของทวีป — จุดเริ่มต้นของการผจญภัย',
+      level: 'Lv.1+',
+      difficulty: '🟢 Easy',
+      monsters: ['Poring', 'Lunatic', 'Fabre', 'Pupa'],
+    },
+    {
+      id: 'payon',
+      name: 'Payon Forest',
+      nameTh: 'ป่าเปยอง',
+      emoji: '🌲',
+      color: '#60ff80',
+      bgGradient: 'linear-gradient(135deg, #1a3a1a 0%, #2a5a2a 40%, #4a8a4a 100%)',
+      desc: 'ป่าเขียวขจีแห่งนักรบ — เต็มไปด้วยมอนสเตอร์ระดับกลาง',
+      level: 'Lv.5+',
+      difficulty: '🟡 Medium',
+      monsters: ['Horn', 'Bee', 'Coco', 'Wolf'],
+    },
+    {
+      id: 'glast_heim',
+      name: 'Glast Heim',
+      nameTh: 'ปราสาทกลาสท์ไฮม์',
+      emoji: '🏚️',
+      color: '#c040ff',
+      bgGradient: 'linear-gradient(135deg, #1a0a3a 0%, #3a1a5a 40%, #5a3a8a 100%)',
+      desc: 'ซากปรักหักพังแห่งความมืด — ที่หลบซ่อนของสัตว์ประหลาด',
+      level: 'Lv.10+',
+      difficulty: '🟠 Hard',
+      monsters: ['Skeleton', 'Zombie', 'Ghoul', 'Mummy'],
+    },
+    {
+      id: 'mjolnir',
+      name: 'Mjolnir Mountains',
+      nameTh: 'เทือกเขาหมิโอลนีร์',
+      emoji: '⛰️',
+      color: '#80a0d0',
+      bgGradient: 'linear-gradient(135deg, #2a3a4a 0%, #4a6a7a 40%, #6a8aaa 100%)',
+      desc: 'เทือกเขาสูงชัน — ที่พำนักของยักษ์และโกเล็ม',
+      level: 'Lv.15+',
+      difficulty: '🟠 Hard',
+      monsters: ['Golem', 'Ogre', 'Giant Spider'],
+    },
+    {
+      id: 'abyss_lake',
+      name: 'Abyss Lake',
+      nameTh: 'ทะเลสาบห้วงลึก',
+      emoji: '🌊',
+      color: '#2060a0',
+      bgGradient: 'linear-gradient(135deg, #0a1a2a 0%, #1a3a5a 40%, #2a5a8a 100%)',
+      desc: 'ทะเลสาบลึกลับใต้น้ำ — บ้านของมังกรและสัตว์ทะเล',
+      level: 'Lv.20+',
+      difficulty: '🔴 Very Hard',
+      monsters: ['Dragon Egg', 'Triton', 'Sea Serpent'],
+    },
+    {
+      id: 'svarrga',
+      name: 'Svarrga',
+      nameTh: 'สรวงสวรรค์',
+      emoji: '✨',
+      color: '#ffd700',
+      bgGradient: 'linear-gradient(135deg, #e8d0a0 0%, #f5e8c0 40%, #fff8e0 100%)',
+      desc: 'เมืองเหมืองแร่บนสรวงสวรรค์ — ไม่มีมอนสเตอร์ ปลอดภัย 100%',
+      level: 'All Levels',
+      difficulty: '🟢 Safe Zone',
+      monsters: [],
+    },
+  ];
+
+  openWarpMap() {
+    // Inject styles once
+    if (!document.getElementById('warp-style')) {
+      const st = document.createElement('style');
+      st.id = 'warp-style';
+      st.textContent = `
+        #warp-modal {
+          position: fixed; inset: 0; z-index: 1500;
+          display: none; align-items: center; justify-content: center;
+          background: rgba(4, 8, 18, 0.85); backdrop-filter: blur(6px);
+          padding: 12px; box-sizing: border-box;
+        }
+        #warp-card {
+          width: min(820px, 96vw); max-height: 92vh;
+          display: flex; flex-direction: column;
+          border-radius: 18px;
+          background: linear-gradient(180deg, #151b30, #0d1120);
+          border: 1px solid rgba(240, 192, 64, 0.35);
+          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+          overflow: hidden;
+        }
+        .warp-head {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 18px;
+          border-bottom: 1px solid rgba(240, 192, 64, 0.15);
+          background: linear-gradient(90deg, rgba(240, 192, 64, 0.14), transparent);
+        }
+        .warp-head h2 {
+          font-family: var(--font-main, inherit);
+          font-size: 17px; color: #fff;
+          text-shadow: 0 0 14px rgba(240, 192, 64, 0.5); margin: 0;
+        }
+        .warp-head .sub { font-size: 11px; color: #9aa5c0; margin-top: 3px; }
+        .warp-x {
+          background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);
+          color: #9aa5c0; width: 36px; height: 36px; border-radius: 9px;
+          cursor: pointer; font-size: 16px;
+          display: flex; align-items: center; justify-content: center;
+          flex: 0 0 auto; transition: all 0.2s;
+        }
+        .warp-x:hover { background: rgba(231, 76, 60, 0.2); color: #ff7675; border-color: rgba(231, 76, 60, 0.4); }
+        .warp-main {
+          flex: 1 1 auto; min-height: 0; overflow-y: auto;
+          -webkit-overflow-scrolling: touch; padding: 12px;
+        }
+        .warp-grid {
+          display: grid; grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        @media (max-width: 680px) {
+          .warp-grid { grid-template-columns: 1fr; }
+          #warp-modal { align-items: flex-start; padding: 8px 8px 108px; }
+          #warp-card { max-height: calc(100dvh - 116px); }
+        }
+        .warp-tile {
+          position: relative; border-radius: 14px; overflow: hidden;
+          cursor: pointer; transition: all 0.25s;
+          border: 2px solid rgba(255, 255, 255, 0.08);
+          background-size: cover; background-position: center;
+        }
+        .warp-tile:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+          border-color: rgba(240, 192, 64, 0.5);
+        }
+        .warp-tile.current {
+          border-color: rgba(240, 192, 64, 0.8);
+          box-shadow: 0 0 20px rgba(240, 192, 64, 0.3);
+        }
+        .warp-tile .tile-bg {
+          position: absolute; inset: 0; z-index: 0;
+        }
+        .warp-tile .tile-content {
+          position: relative; z-index: 1;
+          padding: 14px; display: flex; flex-direction: column; gap: 6px;
+          min-height: 140px;
+        }
+        .warp-tile .tile-top {
+          display: flex; align-items: center; justify-content: space-between;
+        }
+        .warp-tile .tile-emoji { font-size: 32px; }
+        .warp-tile .tile-badge {
+          font-size: 10px; font-weight: 800; padding: 2px 8px;
+          border-radius: 10px; background: rgba(0, 0, 0, 0.5);
+          color: #fff; backdrop-filter: blur(4px);
+        }
+        .warp-tile .tile-name {
+          font-size: 16px; font-weight: 800; color: #fff;
+          text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+        }
+        .warp-tile .tile-name-th {
+          font-size: 12px; color: rgba(255, 255, 255, 0.75); font-weight: 600;
+        }
+        .warp-tile .tile-desc {
+          font-size: 11px; color: rgba(255, 255, 255, 0.65);
+          line-height: 1.4; margin-top: auto;
+        }
+        .warp-tile .tile-footer {
+          display: flex; align-items: center; justify-content: space-between;
+          margin-top: 4px; padding-top: 6px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .warp-tile .tile-level {
+          font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.6);
+        }
+        .warp-tile .tile-warp-btn {
+          font-size: 11px; font-weight: 800; padding: 4px 12px;
+          border-radius: 8px; border: none; cursor: pointer;
+          background: linear-gradient(135deg, #ffe89a, #f0c040);
+          color: #2a1c00; transition: all 0.2s;
+        }
+        .warp-tile .tile-warp-btn:hover {
+          transform: scale(1.05);
+          box-shadow: 0 0 16px rgba(240, 192, 64, 0.5);
+        }
+        .warp-tile .tile-current-badge {
+          position: absolute; top: 8px; right: 8px; z-index: 2;
+          font-size: 9px; font-weight: 800; padding: 3px 10px;
+          border-radius: 10px; background: rgba(240, 192, 64, 0.9);
+          color: #2a1c00; letter-spacing: 0.5px;
+        }
+        .warp-tile .tile-glow {
+          position: absolute; inset: 0; z-index: 0;
+          opacity: 0.35;
+        }
+        @keyframes warpPulse {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.6; }
+        }
+      `;
+      document.head.appendChild(st);
+    }
+
+    // Create modal
+    let modal = document.getElementById('warp-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'warp-modal';
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { modal.style.display = 'none'; this.updateMobileControlsVisibility(); }
+      });
+      modal.innerHTML = `<div id="warp-card"></div>`;
+      document.body.appendChild(modal);
+    }
+
+    // Close side panels
+    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+
+    this._renderWarpMap();
+    modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+  }
+
+  _renderWarpMap() {
+    const card = document.getElementById('warp-card');
+    if (!card) return;
+
+    const currentMapId = this.currentMapId || 'prontera';
+    const maps = GameUI._WARP_MAPS;
+    const playerLevel = Number(this.character?.stats?.level) || 1;
+
+    const tiles = maps.map(m => {
+      const isCurrent = m.id === currentMapId;
+      const glowOpacity = isCurrent ? '0.5' : '0.2';
+      return `
+        <div class="warp-tile ${isCurrent ? 'current' : ''}" data-map="${m.id}"
+             style="background: ${m.bgGradient};">
+          <div class="tile-glow"
+               style="background: radial-gradient(ellipse at 30% 20%, ${m.color}40 0%, transparent 70%);
+                      opacity: ${glowOpacity}; animation: warpPulse ${isCurrent ? '2s' : '3s'} ease-in-out infinite;">
+          </div>
+          ${isCurrent ? '<div class="tile-current-badge">📍 ปัจจุบัน</div>' : ''}
+          <div class="tile-content">
+            <div class="tile-top">
+              <span class="tile-emoji">${m.emoji}</span>
+              <span class="tile-badge">${m.difficulty}</span>
+            </div>
+            <div class="tile-name">${m.name}</div>
+            <div class="tile-name-th">${m.nameTh}</div>
+            <div class="tile-desc">${m.desc}</div>
+            <div class="tile-footer">
+              <span class="tile-level">${m.level}</span>
+              ${isCurrent
+                ? '<span style="font-size:10px;color:#9aa5c0;font-weight:600;">คุณอยู่ที่นี่</span>'
+                : `<button class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">🌀 วาร์ป</button>`
+              }
+            </div>
+            ${m.monsters.length > 0 ? `
+              <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">
+                👾 ${m.monsters.slice(0, 3).join(' · ')}${m.monsters.length > 3 ? ' · …' : ''}
+              </div>
+            ` : '<div style="font-size:10px;color:#57e08a;margin-top:2px;">✅ ไม่มีมอนสเตอร์ — พื้นที่ปลอดภัย</div>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="warp-head">
+        <div>
+          <h2>🌀 วาร์ปไปยังแผนที่</h2>
+          <div class="sub">เลือกจุดหมายแล้วกดปุ่ม "วาร์ป" — ตำแหน่งปัจจุบัน: <b style="color:var(--primary)">${this._currentMapLabel()}</b></div>
+        </div>
+        <button class="warp-x" id="warp-close">✕</button>
+      </div>
+      <div class="warp-main">
+        <div class="warp-grid">${tiles}</div>
+      </div>
+    `;
+
+    card.querySelector('#warp-close').onclick = () => {
+      const m = document.getElementById('warp-modal');
+      if (m) m.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    };
+
+    // Wire warp buttons
+    card.querySelectorAll('[data-warp]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetMap = btn.dataset.warp;
+        this._doWarp(targetMap);
+      });
+    });
+  }
+
+  _currentMapLabel() {
+    const m = GameUI._WARP_MAPS.find(x => x.id === this.currentMapId);
+    return m ? `${m.emoji} ${m.name}` : this.currentMapId;
+  }
+
+  // Execute the warp — delegate to the existing loadMapAndSpawn helper in main.js
+  async _doWarp(targetMap) {
+    if (!window.sceneManager || !window.character) return;
+
+    // Already on this map?
+    if (targetMap === window.sceneManager.currentMap) {
+      this.addCombatLog(`🌀 คุณอยู่ที่ ${targetMap} แล้ว`, 'system');
+      return;
+    }
+
+    // Play a sound if available
+    if (this.soundManager && this.soundManager.playTeleportSound) {
+      this.soundManager.playTeleportSound();
+    }
+
+    // Close the modal
+    const modal = document.getElementById('warp-modal');
+    if (modal) modal.style.display = 'none';
+    this.updateMobileControlsVisibility();
+
+    this.addCombatLog(`🌀 กำลังวาร์ปไป ${targetMap}...`, 'system');
+
+    // Use the canonical loadMapAndSpawn helper from main.js
+    // Random spawn point within the map center area
+    const spawnX = (Math.random() - 0.5) * 8;
+    const spawnZ = (Math.random() - 0.5) * 8;
+    const spawn = { x: spawnX, y: 1.2, z: spawnZ };
+
+    // Import and call the shared helper
+    const { loadMapAndSpawn } = await import('../main.js');
+    if (typeof loadMapAndSpawn === 'function') {
+      loadMapAndSpawn(targetMap, spawn);
+    } else {
+      // Fallback: call sceneManager.loadMap directly (same map switch logic)
+      // This mirrors loadMapAndSpawn from main.js for cases where the import fails
+      if (typeof window.portalCooldown !== 'undefined') window.portalCooldown = 2.0;
+      if (typeof window.autoPath !== 'undefined') window.autoPath = null;
+      if (window.character) {
+        window.character.targetMonster = null;
+        window.character.state = 'idle';
+      }
+      if (window.combatSystem) {
+        window.combatSystem.currentTarget = null;
+        window.combatSystem.autoFarm = false;
+        window.combatSystem.isFishing = false;
+      }
+      if (this && typeof this.clearTarget === 'function') this.clearTarget();
+
+      window.character.baseY = spawn.y;
+      window.character.mesh.position.set(spawn.x, spawn.y, spawn.z);
+      window.sceneManager.loadMap(targetMap);
+      if (window.monsters) {
+        window.monsters.clearAll();
+        window.monsters.mapId = targetMap;
+        window.monsters.spawnInitial(window.character.stats.level);
+      }
+
+      // Update multiplayer presence and broadcast new position
+      if (typeof window.updatePresence === 'function') {
+        window.updatePresence(window.character.stats.level, window.username, targetMap);
+      }
+      if (typeof window.broadcastPosition === 'function') {
+        window.broadcastPosition(
+          window.userId, window.username, window.character.stats.level,
+          window.character.getPosition(), window.character.mesh.rotation.y,
+          window.character.state, window.character.getAppearance(), targetMap
+        );
+      }
+
+      // Clear remote players from old map
+      if (window.remotePlayersMap) {
+        for (const [, rp] of window.remotePlayersMap.entries()) {
+          if (rp.mesh) window.sceneManager.scene.remove(rp.mesh);
+        }
+        window.remotePlayersMap.clear();
+      }
+
+      // Refresh market stalls on arrival
+      if (window.stallManager) window.stallManager.refresh();
+
+      // Sparkle on arrival
+      if (window.particles && typeof window.particles.spawnHitEffect === 'function') {
+        window.particles.spawnHitEffect(window.character.getPosition(), true);
+      }
+
+      this.addCombatLog(`✨ วาร์ปไป ${targetMap} สำเร็จ!`, 'levelup');
     }
   }
 }

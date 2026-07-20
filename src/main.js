@@ -1339,7 +1339,7 @@ window.duelManager = {
 // ============ Map Warp (shared by portals + warp-to-friend) ============
 // Loads a new map, moves the player to `spawn`, respawns monsters, refreshes
 // multiplayer presence and clears remote players carried over from the old map.
-function loadMapAndSpawn(targetMap, spawn) {
+export function loadMapAndSpawn(targetMap, spawn) {
     portalCooldown = 2.0;
     autoPath = null;
 
