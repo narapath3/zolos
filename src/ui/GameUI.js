@@ -61,6 +61,7 @@ export class GameUI {
     this._setupRespawnShortcut();
     this.layoutManager = new LayoutManager(this);
     window.gameUI = this;
+    this.killStreak = 0;
   }
 
   _setupRespawnShortcut() {
@@ -6357,6 +6358,25 @@ export class GameUI {
     if (this.minimapCanvas) {
       this.minimapCtx = this.minimapCanvas.getContext('2d');
     }
+  }
+
+  handleMonsterKill(monsterName) {
+    this.killStreak++;
+    const streaks = [5, 10, 20, 50];
+    if (streaks.includes(this.killStreak)) {
+      this.showKillStreakBanner(this.killStreak);
+    }
+  }
+
+  showKillStreakBanner(count) {
+    let msg = count + ' Kill Streak!';
+    let sub = 'ยอดเยี่ยม!';
+    if (count === 10) { msg = '10 Kill Streak! RAMPAGE!'; sub = 'คุณกำลังคลั่ง!'; }
+    if (count === 20) { msg = '20 Kill Streak! UNSTOPPABLE!'; sub = 'ไม่มีใครหยุดคุณได้!'; }
+    if (count === 50) { msg = '50 Kill Streak! GODLIKE!'; sub = 'คุณคือตำนาน!'; }
+    this._showDuelOverlay('duel-win streak-overlay',
+      '<div class="duel-title">' + msg + '</div><div class="duel-sub">' + sub + '</div>',
+      3000);
   }
 
   updateMinimap(playerPos, monsters, portals, npc, remotePlayersMap, currentMap) {
