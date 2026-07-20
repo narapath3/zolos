@@ -6080,8 +6080,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* HUD Currency & Presence — compactly placed beside the desktop minimap. */
 #hud-currency-widget {
   position: fixed;
-  top: 12px;
-  right: 154px; /* 16px gutter + 122px minimap + 16px breathing room */
+  top: 108px; /* Adjusted down to clear the player info card (approx 40px top + 60px card height) */
+  left: 16px; /* Moved to left side below player info to match the visual request */
   display: flex;
   align-items: center;
   gap: 0;
