@@ -66,16 +66,19 @@ export class AuthUI {
 
         if (this._startBtn) {
             this._startBtn.addEventListener('click', () => {
-                // With an active session we know who the player is — START enters
-                // the game directly (matches the redesigned welcome splash). With
-                // no session it opens the login form as before.
                 if (this._sessionData) {
                     this._enterGameWithSession();
                     return;
                 }
-                this._splashEl.style.display = 'none';
-                this._formWrapperEl.style.display = 'block';
-                this._formWrapperEl.classList.add('fade-in');
+                this._splashEl.style.opacity = '0';
+                this._splashEl.style.transform = 'translateY(-20px)';
+                this._splashEl.style.transition = 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+                
+                setTimeout(() => {
+                    this._splashEl.style.display = 'none';
+                    this._formWrapperEl.style.display = 'block';
+                    this._formWrapperEl.classList.add('fade-in');
+                }, 400);
             });
         }
 

@@ -166,10 +166,28 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .auth-logo {
-  margin-bottom: clamp(8px, 2vw, 16px);
+  margin-bottom: clamp(12px, 3vw, 24px);
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+}
+
+.logo-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(240, 192, 64, 0.3) 0%, transparent 70%);
+  z-index: -1;
+  animation: logoPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes logoPulse {
+  from { opacity: 0.4; transform: translate(-50%, -50%) scale(0.8); }
+  to { opacity: 0.8; transform: translate(-50%, -50%) scale(1.2); }
 }
 
 .auth-icon-img {
@@ -319,17 +337,20 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .btn-primary {
   background: linear-gradient(135deg, #40e080, #1a8040);
-  box-shadow: 0 8px 20px rgba(64, 224, 128, 0.3), inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(64, 224, 128, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(64, 224, 128, 0.4);
 }
 
 .btn-secondary {
   background: linear-gradient(135deg, #60a0ff, #2050a0);
-  box-shadow: 0 8px 20px rgba(96, 160, 255, 0.3), inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(96, 160, 255, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(96, 160, 255, 0.4);
 }
 
 .btn-guest {
   background: linear-gradient(135deg, #ff6080, #a02040);
-  box-shadow: 0 8px 20px rgba(255, 96, 128, 0.3), inset 0 -4px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(255, 96, 128, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 96, 128, 0.4);
 }
 
 .btn-primary:hover, .btn-secondary:hover, .btn-guest:hover {
@@ -345,35 +366,36 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 
 .btn-start-game {
-  background: linear-gradient(180deg, var(--primary), var(--primary-deep));
+  background: linear-gradient(180deg, #ffe89a, var(--primary) 45%, var(--primary-deep));
   font-family: var(--font-main);
   color: white;
   font-weight: 900;
   text-transform: uppercase;
-  font-size: clamp(18px, 5vw, 28px);
-  padding: clamp(12px, 3vw, 20px) clamp(24px, 8vw, 48px);
+  font-size: clamp(20px, 6vw, 32px);
+  padding: clamp(16px, 4vw, 24px) clamp(32px, 10vw, 64px);
   border-radius: 50px;
   border: none;
-  border-bottom: clamp(5px, 1.5vw, 10px) solid #b08010;
-  box-shadow: 0 15px 30px rgba(240,192,64,0.5), inset 0 2px 5px rgba(255,255,255,0.4);
-  -webkit-text-stroke: clamp(1px, 0.3vw, 2px) #804000;
-  margin: clamp(12px, 3vw, 20px) 0;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 20px 40px rgba(240, 192, 64, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  -webkit-text-stroke: clamp(1px, 0.3vw, 1.5px) #7a3d00;
+  text-shadow: 0 2px 0 rgba(122, 61, 0, 0.4);
+  margin: clamp(16px, 4vw, 28px) 0;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
   width: 100%;
   box-sizing: border-box;
-  max-width: 360px;
+  max-width: 400px;
   word-break: break-word;
+  letter-spacing: 4px;
 }
 
 .btn-start-game:hover {
-  transform: translateY(4px);
-  border-bottom-width: 6px;
+  transform: scale(1.05);
+  box-shadow: 0 25px 50px rgba(240, 192, 64, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.8);
 }
 
 .btn-start-game:active {
-  transform: translateY(10px);
-  border-bottom-width: 0;
+  transform: scale(0.95);
+  box-shadow: 0 10px 20px rgba(240, 192, 64, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.4);
 }
 
 .auth-divider {
@@ -6024,4 +6046,14 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   margin-left: auto;
   border: 1px solid transparent;
   text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+}
+
+/* Fade-in Utility */
+.fade-in {
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
