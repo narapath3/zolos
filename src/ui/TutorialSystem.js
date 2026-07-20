@@ -109,7 +109,9 @@ export class TutorialSystem {
   // Check if tutorial should auto-start
   // Returns false if already completed on the server (returning user)
   shouldAutoStart() {
-    return !this.tutorialCompleted;
+    // Tutorial disabled as per user request
+    return false;
+    // return !this.tutorialCompleted;
   }
 
   // Initialize tutorial flow

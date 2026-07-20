@@ -5587,11 +5587,13 @@ export class GameUI {
     this.updateStats(s);
     this._renderProfileJob();
 
+    /*
     // If this is a new player (just picked their first job), start the tutorial
     if (window.tutorialSystem && window.tutorialSystem.shouldAutoStart() && !window.tutorialSystem.isActive) {
       console.log('[GameUI] Starting tutorial after job selection...');
       setTimeout(() => window.tutorialSystem.initTutorialFlow(), 1000);
     }
+    */
   }
 
   // Fill the Job row in the Profile tab and wire its change button.
