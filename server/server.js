@@ -1008,6 +1008,23 @@ async function saveCharacterToSupabase(saveData) {
                 console.error('[Server] ❌ Save friends list error:', e.message);
             }
         }
+
+        // 4. Save full inventory (Safety backup)
+        if (inventory && Array.isArray(inventory)) {
+            try {
+                // Batch update inventory items that have stats
+                const itemsWithStats = inventory.filter(i => i.stats && Object.keys(i.stats).length > 0);
+                for (const item of itemsWithStats) {
+                    await supabase
+                        .from('inventory')
+                        .update({ stats: item.stats })
+                        .eq('character_id', characterId)
+                        .eq('item_name', item.item_name);
+                }
+            } catch (e) {
+                console.error('[Server] ❌ Save inventory backup error:', e.message);
+            }
+        }
     } catch (err) {
         console.error('[Server] ❌ saveCharacterToSupabase failed:', err.message);
     }

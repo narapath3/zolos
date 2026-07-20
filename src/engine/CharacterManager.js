@@ -1735,9 +1735,11 @@ export class CharacterManager {
 
     // Get save data
     getSaveData() {
+        const inventory = window.gameUI ? window.gameUI.inventory : null;
         return {
             characterId: this.characterId,
             userId: this.userId,
+            inventory: inventory, // Include inventory for server-side backup
             updates: {
                 id: this.characterId, // Include ID in updates for fallback identification
                 name: this.stats.name,

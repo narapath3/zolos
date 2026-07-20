@@ -830,6 +830,7 @@ async function initGame(charData) {
         return {
             characterId: charData.id,
             userId: charData.user_id,
+            inventory: saveData.inventory,
             updates: saveData.updates
         };
     }, 15000);
@@ -873,6 +874,8 @@ async function initGame(charData) {
                     await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
                 }
                 await saveFriendsList(charData.id, gameUI.friends);
+                // Flush inventory to DB before logout to ensure all equipped state is saved
+                await gameUI._flushInventoryToDB();
                 gameUI.addCombatLog('✅ บันทึกข้อมูลสำเร็จ', 'system');
             } catch (e) {
                 console.error('Final state save error:', e);

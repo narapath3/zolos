@@ -804,6 +804,22 @@ export class GameUI {
     }
   }
 
+  /**
+   * Flush all inventory item stats to database (Safety net for logout/exit)
+   */
+  async _flushInventoryToDB() {
+    if (!this.characterId || !this.inventory) return;
+    const { updateInventoryItemStats } = await import('../network/GameSync.js');
+    
+    // Only flush items that have stats (equipped state, durability, etc.)
+    const itemsToSave = this.inventory.filter(item => item.stats && Object.keys(item.stats).length > 0);
+    
+    // Run in parallel for speed
+    await Promise.all(itemsToSave.map(item => 
+      updateInventoryItemStats(this.characterId, item.item_name, item.stats)
+    ));
+  }
+
   // ============ Fishing Almanac ============
   // A collection log of every fish species. Each new species caught grants a
   // small discovery bonus; completing a whole rarity tier (or the entire book)
@@ -3364,7 +3380,8 @@ export class GameUI {
       if (slotTypes.includes(invItem.item_type) && invItem.stats && invItem.stats.equipped === true) {
         invItem.stats.equipped = false;
         if (this.characterId) {
-          await updateInventoryItemStats(this.characterId, invItem.item_name, {});
+          // Persistence Fix: Pass the whole stats object, don't wipe it with {}
+          await updateInventoryItemStats(this.characterId, invItem.item_name, invItem.stats);
         }
       }
     }
@@ -3376,7 +3393,8 @@ export class GameUI {
         if (!targetItem.stats) targetItem.stats = {};
         targetItem.stats.equipped = true;
         if (this.characterId) {
-          await updateInventoryItemStats(this.characterId, targetItem.item_name, { equipped: true });
+          // Persistence Fix: Pass the whole stats object, don't wipe it with {equipped:true}
+          await updateInventoryItemStats(this.characterId, targetItem.item_name, targetItem.stats);
         }
       }
     }
