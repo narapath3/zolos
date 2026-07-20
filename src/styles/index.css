@@ -6079,20 +6079,17 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 /* HUD Currency Widget */
 #hud-currency-widget {
-  position: fixed;
-  top: 10px;
-  right: 130px; /* To the left of network/fps */
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  padding: 4px 10px;
-  border-radius: 8px;
   display: flex;
   gap: 12px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 11px;
   font-weight: 600;
   color: #fff;
-  z-index: 1000;
   pointer-events: none;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: 6px;
+  width: fit-content;
 }
 
 #hud-currency-widget span {
@@ -6103,12 +6100,10 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 768px) {
   #hud-currency-widget {
-    top: auto;
-    bottom: 85px;
-    right: 10px;
-    font-size: 11px;
-    padding: 3px 8px;
     gap: 8px;
+    font-size: 10px;
+    padding: 2px 6px;
+    margin-top: 4px;
   }
 }
 
