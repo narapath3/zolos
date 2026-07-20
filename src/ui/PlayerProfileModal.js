@@ -360,8 +360,8 @@ export class PlayerProfileModal {
     const card = document.getElementById('player-profile-card');
     
     // Merge data: DB provides stats, liveAppearance provides current visuals
-    const job = dbData?.job || liveAppearance?.job || 'Novice';
-    const level = dbData?.level || player.level || 1;
+    const job = liveAppearance?.job || dbData?.job || 'Novice';
+    const level = dbData?.level || liveAppearance?.level || player.level || 1;
     
     // STR/AGI/INT fallback logic
     const defaultStats = JOBS[job]?.stats || { str: 1, agi: 1, int: 1 };
@@ -576,7 +576,8 @@ export class PlayerProfileModal {
       else if (slot.id === 'shield') itemName = appearance.shield;
       else if (slot.id === 'hat') itemName = appearance.hat;
       else if (slot.id === 'glasses') itemName = appearance.glasses;
-      else itemName = appearance.gear[slot.id] || 'None';
+      else if (slot.id === 'body') itemName = appearance.gear?.body || appearance.gear?.armor || 'None';
+      else itemName = appearance.gear?.[slot.id] || 'None';
 
       const isFilled = itemName && itemName !== 'None';
       const itemData = isFilled ? ITEMS[itemName] : null;

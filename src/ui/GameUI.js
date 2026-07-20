@@ -2063,7 +2063,9 @@ export class GameUI {
     // 3. Fetch stats from DB and update
     try {
       const { fetchPublicCharacter } = await import('../network/GameSync.js');
+      console.log(`[Profile] Fetching DB stats for ${player.username} (${player.userId})...`);
       const dbData = await fetchPublicCharacter(player.userId);
+      console.log(`[Profile] DB Data for ${player.username}:`, dbData);
       
       // Update only if we are still looking at the same player (avoid race conditions)
       if (this.playerProfileModal.currentPlayer && this.playerProfileModal.currentPlayer.userId === player.userId) {

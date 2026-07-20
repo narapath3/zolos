@@ -88,14 +88,31 @@ export async function loadCharacter(userId) {
 export async function fetchPublicCharacter(userId) {
     if (!supabase || isOfflineMode || !userId || userId.startsWith('guest_') || userId.startsWith('local_')) return null;
     try {
+        // Try fetching all fields first. If it fails (likely due to missing columns in DB), 
+        // fallback to a safer set of core fields.
+        const allFields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map, job, str, agi, int, body_color, hair_color, pants_color, shield, armor, title';
         const { data, error } = await supabase
             .from('characters')
-            .select('name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map, job, str, agi, int, body_color, hair_color, pants_color, shield, armor, title')
+            .select(allFields)
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-        if (error) return null;
+        
+        if (error) {
+            console.warn('[Zolos] Failed to fetch full character data, retrying with core fields:', error.message);
+            const coreFields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, gender, last_map, job, body_color, hair_color, pants_color';
+            const { data: coreData, error: coreError } = await supabase
+                .from('characters')
+                .select(coreFields)
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            
+            if (coreError) return null;
+            return coreData;
+        }
         return data;
     } catch (e) {
         return null;
