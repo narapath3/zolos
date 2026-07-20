@@ -41,6 +41,7 @@ export class PlayerProfileModal {
         border: 1px solid rgba(240, 192, 64, 0.4);
         box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         overflow: hidden;
+        pointer-events: auto;
       }
 
       .profile-head {
@@ -324,19 +325,45 @@ export class PlayerProfileModal {
       @media (max-width: 720px) {
         #player-profile-card {
           width: 96vw;
-          max-height: 96vh;
+          max-height: calc(100dvh - 120px);
+          border-radius: 16px;
         }
+        .profile-head { padding: 10px 16px; }
+        .profile-head h2 { font-size: 15px; }
         .profile-main {
           flex-direction: column;
           overflow-y: auto;
+          padding: 12px;
+          gap: 16px;
+          -webkit-overflow-scrolling: touch;
         }
         .profile-left {
           flex: none;
           width: 100%;
+          gap: 12px;
         }
+        #player-profile-canvas {
+          height: 240px;
+        }
+        .profile-name { font-size: 18px; }
+        .profile-right {
+          padding-right: 0;
+          overflow-y: visible;
+          gap: 16px;
+        }
+        .combat-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px;
+        }
+        .combat-box { padding: 8px 12px; }
         .equip-grid {
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
+          gap: 8px;
         }
+        .equip-item { padding: 8px 4px; }
+        .equip-emoji { font-size: 18px; }
+        .equip-name { font-size: 10px; }
+        .section-title { margin-bottom: 8px; }
       }
     `;
     document.head.appendChild(st);
