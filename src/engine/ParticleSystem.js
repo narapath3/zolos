@@ -710,8 +710,8 @@ export class ParticleSystem {
         this.scene.add(flash);
         
         // Add to hit effects for automatic fade and removal
-        this.hitEffects.push({ mesh: group, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.15 });
-        this.hitEffects.push({ mesh: flash, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2 });
+        this.hitEffects.push({ mesh: group, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.15, maxLife: 0.15 });
+        this.hitEffects.push({ mesh: flash, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2, maxLife: 0.2 });
         
         // Ground ripple
         const rippleGeo = new THREE.RingGeometry(0.1, 1.2, 16);
@@ -746,7 +746,7 @@ export class ParticleSystem {
         this._fxBurst(targetPos, 0x440088, 12, 4, { life: 0.4, yOff: 0.8 });
         
         // Add to hit effects for automatic fade and removal
-        this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2 });
+        this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2, maxLife: 0.2 });
         
         if (onHit) onHit();
     }
@@ -957,7 +957,18 @@ export class ParticleSystem {
             effect.mesh.position.y += effect.velocity.y * deltaTime;
             effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.life -= deltaTime;
-            effect.mesh.material.opacity = Math.max(0, effect.life / 0.8);
+            
+            // Fix: Group objects don't have a direct material property
+            if (effect.mesh.material) {
+                effect.mesh.material.opacity = Math.max(0, effect.life / (effect.maxLife || 0.8));
+            } else {
+                // If it's a group, traverse and update children's opacity
+                effect.mesh.traverse(child => {
+                    if (child.material) {
+                        child.material.opacity = Math.max(0, effect.life / (effect.maxLife || 0.8));
+                    }
+                });
+            }
 
             if (effect.life <= 0) {
                 this.scene.remove(effect.mesh);
@@ -974,7 +985,16 @@ export class ParticleSystem {
             effect.mesh.position.y += effect.velocity.y * deltaTime;
             effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.life -= deltaTime;
-            effect.mesh.material.opacity = Math.max(0, effect.life / 1.5);
+            
+            if (effect.mesh.material) {
+                effect.mesh.material.opacity = Math.max(0, effect.life / (effect.maxLife || 1.5));
+            } else {
+                effect.mesh.traverse(child => {
+                    if (child.material) {
+                        child.material.opacity = Math.max(0, effect.life / (effect.maxLife || 1.5));
+                    }
+                });
+            }
 
             if (effect.life <= 0) {
                 this.scene.remove(effect.mesh);
