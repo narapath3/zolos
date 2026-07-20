@@ -243,7 +243,11 @@ async function initGame(charData) {
         if (!character.isAlive()) {
             if (combatSystem) { combatSystem.autoFarm = false; combatSystem.currentTarget = null; }
             character.targetMonster = null;
-            if (gameUI) { gameUI.addCombatLog('💀 คุณถูกมอนสเตอร์ปราบ! กำลังเกิดใหม่ใน 3 วินาที...', 'death'); gameUI.setAutoFarmState(false); }
+            if (gameUI) {
+                gameUI.addCombatLog(`💀 คุณถูก ${mon.data.name} ปราบ! กำลังเกิดใหม่ใน 3 วินาที...`, 'death');
+                gameUI.setAutoFarmState(false);
+                if (gameUI.showDeathBanner) gameUI.showDeathBanner(mon.data.name);
+            }
             setTimeout(() => {
                 if (character && !character.isAlive()) {
                     character.respawn();
@@ -326,8 +330,10 @@ async function initGame(charData) {
                 break;
             case 'playerDeath':
                 if (gameUI) {
-                    gameUI.addCombatLog('💀 You have been defeated! Respawning in 3s...', 'death');
+                    const killer = event.monsterName || 'มอนสเตอร์';
+                    gameUI.addCombatLog(`💀 คุณถูก ${killer} ปราบ! กำลังเกิดใหม่ใน 3 วินาที...`, 'death');
                     gameUI.setAutoFarmState(false);
+                    if (gameUI.showDeathBanner) gameUI.showDeathBanner(killer);
                 }
                 break;
             case 'playerRespawn':

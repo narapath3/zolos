@@ -2315,6 +2315,45 @@ export class GameUI {
     }
   }
 
+  showDeathBanner(killerName) {
+    this._ensureDuelStyles();
+    // Inject extra death-specific styles if missing
+    if (!document.getElementById('death-fx-styles')) {
+      const s = document.createElement('style');
+      s.id = 'death-fx-styles';
+      s.textContent = `
+        .death-overlay .duel-title {
+          color: #ff4444;
+          text-shadow: 0 0 30px rgba(255, 0, 0, 0.8), 0 4px 20px rgba(0, 0, 0, 0.9);
+          font-family: 'Press Start 2P', cursive;
+          letter-spacing: -2px;
+        }
+        .death-overlay .killer-name {
+          color: #fff;
+          font-size: clamp(18px, 4vw, 32px);
+          margin-top: 20px;
+          font-weight: 800;
+          text-transform: uppercase;
+          background: linear-gradient(90deg, transparent, rgba(255,0,0,0.3), transparent);
+          padding: 10px 40px;
+          animation: deathSlideIn 0.8s ease-out both;
+        }
+        @keyframes deathSlideIn {
+          from { opacity: 0; transform: scaleX(0); }
+          to { opacity: 1; transform: scaleX(1); }
+        }
+      `;
+      document.head.appendChild(s);
+    }
+
+    this._showDuelOverlay('duel-lose death-overlay',
+      `<div class="duel-title">YOU DIED</div>
+       <div class="duel-sub">คุณถูกกำจัดโดย</div>
+       <div class="killer-name">💀 ${killerName} 💀</div>
+       <div class="duel-sub" style="font-size: 12px; margin-top: 30px; opacity: 0.7;">กำลังรอการเกิดใหม่...</div>`,
+      2800);
+  }
+
   receiveFriendRequest(payload) {
     if (!payload) return;
     this.activeIncomingFriendRequest = payload;

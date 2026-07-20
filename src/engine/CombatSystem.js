@@ -340,7 +340,7 @@ export class CombatSystem {
 
         // Player died?
         if (!this.character.isAlive()) {
-            this.onEvent({ type: 'playerDeath' });
+            this.onEvent({ type: 'playerDeath', monsterName: monster.data.name });
 
             // Step 7: Store autoFarm state to resume after respawn
             const wasAutoFarming = this.autoFarm;
