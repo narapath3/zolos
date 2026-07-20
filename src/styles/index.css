@@ -6080,7 +6080,7 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* HUD Currency & Presence — Positioned clearly below the EXP bar with no overlap. */
 #hud-currency-widget {
   position: fixed;
-  top: 108px; /* Fixed distance below the top bars (40px top + ~64px bars height + margin) */
+  top: 122px; /* Adjusted down by ~14px (2-3mm) to ensure no overlap with EXP bar on PC */
   left: 16px;
   display: flex;
   align-items: center;
