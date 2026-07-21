@@ -52,6 +52,31 @@ export class JobPreview {
         this.ring.material.color.setHex(ringColor);
     }
 
+    // Apply a full appearance (colours + job + weapon + hat + glasses + armor/
+    // shield gear) so the preview mirrors a real hero — used by the player
+    // profile popup to show that player's actual look, spinning on the pedestal.
+    setAppearance(app) {
+        if (!this.char || !app) return;
+        const c = this.char;
+        if (app.gender && c.setGender) c.setGender(app.gender);
+        if (app.bodyColor != null && c.setBodyColor) c.setBodyColor(app.bodyColor);
+        if (app.hairColor != null && c.setHairColor) c.setHairColor(app.hairColor);
+        if (app.pantsColor != null && c.setPantsColor) c.setPantsColor(app.pantsColor);
+        c.stats.job = app.job || null;
+        c._applyJobAppearance();
+        c.equipWeapon(app.weapon && app.weapon !== 'None' ? app.weapon : null);
+        c.setHat(app.hat && app.hat !== 'None' ? app.hat : null);
+        c.setGlasses(app.glasses && app.glasses !== 'None' ? app.glasses : null);
+        if (app.gear && c.equippedGear) {
+            for (const k of Object.keys(c.equippedGear)) c.equippedGear[k] = app.gear[k] || null;
+        }
+        c.equippedShield = app.shield || null;
+        if (c.updateGearVisuals) c.updateGearVisuals();
+        if (c.nameSprite) c.nameSprite.visible = false;
+        const ringColor = { swordsman: 0xff6a6a, mage: 0xb080ff, archer: 0x7be08a, priest: 0xffe98a }[app.job] || 0xffd24a;
+        this.ring.material.color.setHex(ringColor);
+    }
+
     resize() {
         const w = this.canvas.clientWidth || 260;
         const h = this.canvas.clientHeight || 300;

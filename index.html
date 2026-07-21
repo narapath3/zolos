@@ -624,7 +624,10 @@
           <button class="popup-close" id="btn-close-player-popup">✕</button>
         </div>
         <div class="popup-body">
-          <div class="player-avatar">👤</div>
+          <div class="player-hero-stage" id="player-popup-hero-wrap">
+            <canvas id="player-popup-hero"></canvas>
+            <div class="player-avatar player-hero-fallback">👤</div>
+          </div>
           <div class="player-detail-name" id="player-popup-name">Adventurer</div>
           <div class="player-detail-level" id="player-popup-level">Lv.1</div>
           <div class="player-detail-status" id="player-popup-status">Status: Online</div>

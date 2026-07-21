@@ -1904,6 +1904,7 @@ export class GameUI {
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
         if (popup) popup.style.display = 'none';
+        this._stopPopupHero();
         this.updateMobileControlsVisibility();
       });
     }
@@ -1912,6 +1913,7 @@ export class GameUI {
     if (overlay) {
       overlay.addEventListener('click', () => {
         if (popup) popup.style.display = 'none';
+        this._stopPopupHero();
         this.updateMobileControlsVisibility();
       });
     }
@@ -2029,6 +2031,33 @@ export class GameUI {
     }
   }
 
+  // Lazily create a rotating 3D hero on the popup canvas and apply `app`.
+  _renderPopupHero(app) {
+    const canvas = document.getElementById('player-popup-hero');
+    const wrap = document.getElementById('player-popup-hero-wrap');
+    if (!canvas) return;
+    const fallback = wrap && wrap.querySelector('.player-hero-fallback');
+    const boot = ({ JobPreview }) => {
+      try {
+        if (!this._popupHero) this._popupHero = new JobPreview(canvas);
+        this._popupHero.setAppearance(app || {});
+        this._popupHero.resize();
+        this._popupHero.start();
+        if (fallback) fallback.style.display = 'none';
+        if (wrap) wrap.classList.add('has-3d');
+      } catch (e) {
+        // WebGL unavailable → keep the emoji fallback.
+        if (fallback) fallback.style.display = '';
+      }
+    };
+    if (this._popupHero) { boot({ JobPreview: this._popupHero.constructor }); return; }
+    import('../engine/JobPreview.js').then(boot).catch(() => {});
+  }
+
+  _stopPopupHero() {
+    if (this._popupHero && this._popupHero.stop) this._popupHero.stop();
+  }
+
   _showPlayerPopup(player) {
     this.selectedProfilePlayer = player;
     const popup = document.getElementById('player-popup');
@@ -2126,6 +2155,20 @@ export class GameUI {
       return;
     }
 
+    // Spin up the 3D hero preview mirroring this player's look.
+    const heroApp = (rp && rp.character && rp.character.getAppearance)
+      ? rp.character.getAppearance()
+      : {
+          job: ch && ch.job || null,
+          weapon: ch && ch.weapon, hat: ch && ch.hat, glasses: ch && ch.glasses,
+          shield: ch && ch.shield, gear: { body: ch && ch.armor },
+          bodyColor: ch && (ch.body_color ?? ch.bodyColor),
+          hairColor: ch && (ch.hair_color ?? ch.hairColor),
+          pantsColor: ch && (ch.pants_color ?? ch.pantsColor),
+          gender: ch && ch.gender,
+        };
+    this._renderPopupHero(heroApp);
+
     const gear = (name) => {
       if (!name || name === 'None') return null;
       return { emoji: (ITEMS[name] || {}).emoji || '📦', name };
@@ -2144,17 +2187,23 @@ export class GameUI {
 
     const stat = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 8px;background:rgba(255,255,255,.04);border-radius:6px;"><span style="color:var(--text-dim);font-size:11px;">${label}</span><span style="font-weight:800;font-size:12px;color:#fff;">${val}</span></div>`;
 
-    // One compact cell per body-part slot (filled highlighted, empty dimmed).
-    const rarityColor = { rare: 'rgba(90,170,255,.6)', epic: 'rgba(190,120,255,.65)', legendary: 'rgba(255,190,70,.75)', mythic: 'rgba(255,90,140,.8)' };
+    // One cell per body-part slot (filled highlighted with a rarity glow, empty dimmed).
+    const rarityColor = { common: 'rgba(180,190,210,.5)', rare: 'rgba(90,170,255,.7)', epic: 'rgba(190,120,255,.75)', legendary: 'rgba(255,190,70,.85)', mythic: 'rgba(255,90,140,.9)' };
     const cell = (s) => {
       const name = resolveSlot(s.id);
       const item = gear(name);
       const it = name ? ITEMS[name] : null;
       const bc = (it && rarityColor[it.rarity]) || 'var(--border)';
-      return `<div style="text-align:center;padding:7px 3px;border-radius:8px;background:rgba(255,255,255,${item ? '.06' : '.02'});border:1px solid ${item ? bc : 'var(--border)'};${item ? '' : 'opacity:.5;'}">
-        <div style="font-size:20px;line-height:1;">${item ? item.emoji : s.icon}</div>
-        <div style="font-size:8.5px;color:var(--text-dim);margin-top:3px;">${s.label}</div>
-        <div style="font-size:9.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item ? item.name : '-'}</div>
+      const glow = item && it && ['epic', 'legendary', 'mythic'].includes(it.rarity)
+        ? `box-shadow:0 0 10px -2px ${bc},inset 0 0 16px -8px ${bc};` : '';
+      const bg = item
+        ? `linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.02))`
+        : `rgba(255,255,255,.02)`;
+      return `<div style="position:relative;text-align:center;padding:9px 4px 8px;border-radius:11px;background:${bg};
+        border:1px solid ${item ? bc : 'var(--border)'};${glow}${item ? '' : 'opacity:.45;'}">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:.3px;">${s.icon} ${s.label}</div>
+        <div style="font-size:23px;line-height:1.15;margin:2px 0;">${item ? item.emoji : '➖'}</div>
+        <div style="font-size:10px;font-weight:700;color:${item ? '#fff' : 'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item ? item.name : '—'}</div>
       </div>`;
     };
     // Order: worn slots first for quick scanning, then empties.
@@ -2176,7 +2225,7 @@ export class GameUI {
 
     box.innerHTML = `${statsHtml}
       <div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;text-align:left;">🎽 อุปกรณ์ที่สวมใส่ (${wornCount}/${ordered.length})</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
         ${ordered.map(cell).join('')}
       </div>`;
   }

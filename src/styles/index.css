@@ -3843,6 +3843,49 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   margin-bottom: 10px;
 }
 
+/* Rotating 3D hero stage in the player profile popup */
+.player-hero-stage {
+  position: relative;
+  width: 100%;
+  height: 210px;
+  margin: 2px 0 8px;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 50% 15%, rgba(90, 120, 220, 0.22), rgba(10, 14, 28, 0) 60%),
+    linear-gradient(180deg, rgba(24, 30, 52, 0.55), rgba(12, 16, 28, 0.35));
+  border: 1px solid rgba(120, 150, 220, 0.22);
+  overflow: hidden;
+}
+.player-hero-stage::after {
+  /* soft floor glow under the hero */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: 130px;
+  height: 26px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(120, 150, 255, 0.28), rgba(0, 0, 0, 0) 70%);
+  pointer-events: none;
+}
+.player-hero-stage canvas {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.player-hero-stage .player-hero-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  z-index: 0;
+}
+.player-hero-stage.has-3d .player-hero-fallback { display: none; }
+
 .player-detail-name {
   font-family: var(--font-pixel);
   font-size: 12px;
