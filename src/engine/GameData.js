@@ -1257,6 +1257,15 @@ export function getJobMods(jobId) {
     return (job && job.mods) ? job.mods : { hp: 1, sp: 1, atk: 1, def: 1 };
 }
 
+// STR/AGI/INT attributes for a class, grown with level along the job's focus.
+// Novice (no job) gets a balanced spread. Shown on the profile screens.
+export function getJobStats(jobId, level = 1) {
+    const base = (JOBS[jobId] && JOBS[jobId].stats) || { str: 4, agi: 4, int: 4 };
+    const lvl = Math.max(1, Math.floor(level) || 1);
+    const grow = (b) => b + Math.floor((lvl - 1) * b * 0.12);
+    return { str: grow(base.str), agi: grow(base.agi), int: grow(base.int) };
+}
+
 // The weapon each job is handed free the moment it's chosen, so every class
 // starts with an iconic, usable weapon (Priest had none in the game before).
 JOBS.swordsman.signatureWeapon = 'Sword';

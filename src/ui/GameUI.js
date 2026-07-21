@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
@@ -1358,6 +1358,29 @@ export class GameUI {
     }
   }
 
+  // STR/AGI/INT card on the Settings & Profile page (own hero).
+  _renderProfileAttributes() {
+    const host = document.getElementById('profile-attributes');
+    if (!host || !this.character) return;
+    const st = this.character.stats || {};
+    const js = getJobStats(st.job || null, st.level || 1);
+    const attr = {
+      str: st.str != null ? st.str : js.str,
+      agi: st.agi != null ? st.agi : js.agi,
+      int: st.int != null ? st.int : js.int,
+    };
+    const chip = (label, val, color, hint) => `<div style="flex:1;text-align:center;padding:10px 4px;border-radius:11px;
+        background:linear-gradient(160deg,${color}22,${color}08);border:1px solid ${color}66;">
+        <div style="font-size:11px;color:${color};font-weight:800;letter-spacing:.6px;">${label}</div>
+        <div style="font-size:22px;font-weight:800;color:#fff;line-height:1.2;">${val}</div>
+        <div style="font-size:9px;color:var(--text-dim);">${hint}</div></div>`;
+    host.style.cssText = 'display:flex;gap:8px;';
+    host.innerHTML =
+      chip('STR', attr.str, '#ff6b6b', 'พลังโจมตี') +
+      chip('AGI', attr.agi, '#51cf66', 'ความว่องไว') +
+      chip('INT', attr.int, '#748ffc', 'พลังเวท');
+  }
+
   // Owned items that fit a given doll slot (weapon slot also allows the rod).
   _itemsForSlot(slotId) {
     const inv = this.inventory || [];
@@ -2311,7 +2334,26 @@ export class GameUI {
         </div>`;
     }
 
-    box.innerHTML = `${statsHtml}
+    // STR / AGI / INT — from the DB if stored, else derived from job + level.
+    const jobForAttr = (ch && ch.job) || (heroApp && heroApp.job) || null;
+    const lvlForAttr = (ch && ch.level) || player.level || 1;
+    const js = getJobStats(jobForAttr, lvlForAttr);
+    const attr = {
+      str: (ch && ch.str != null) ? ch.str : js.str,
+      agi: (ch && ch.agi != null) ? ch.agi : js.agi,
+      int: (ch && ch.int != null) ? ch.int : js.int,
+    };
+    const attrChip = (label, val, color) => `<div style="flex:1;text-align:center;padding:7px 4px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid ${color}55;">
+        <div style="font-size:10px;color:${color};font-weight:800;letter-spacing:.6px;">${label}</div>
+        <div style="font-size:16px;font-weight:800;color:#fff;">${val}</div></div>`;
+    const attrHtml = `<div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;text-align:left;">📊 พลังพื้นฐาน (Attributes)</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        ${attrChip('STR', attr.str, '#ff6b6b')}
+        ${attrChip('AGI', attr.agi, '#51cf66')}
+        ${attrChip('INT', attr.int, '#748ffc')}
+      </div>`;
+
+    box.innerHTML = `${statsHtml}${attrHtml}
       <div style="font-size:11px;color:var(--text-dim);margin:2px 0 6px;text-align:left;">🎽 อุปกรณ์ที่สวมใส่ (${wornCount}/${ordered.length})</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;">
         ${ordered.map(cell).join('')}
@@ -3374,6 +3416,7 @@ export class GameUI {
 
         // Paper-doll equipment picker (replaces the old dropdowns).
         this._renderProfileEquipDoll();
+        this._renderProfileAttributes();
       }
 
       modal.style.display = 'flex';
@@ -3567,8 +3610,9 @@ export class GameUI {
     this._markLockedOptions(hatSelect);
     this._markLockedOptions(glassesSelect);
 
-    // Keep the profile paper-doll in sync too.
+    // Keep the profile paper-doll + attributes in sync too.
     this._renderProfileEquipDoll();
+    this._renderProfileAttributes();
   }
 
   // ============ Auto Farm Button ============
