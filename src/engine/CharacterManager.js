@@ -752,12 +752,61 @@ export class CharacterManager {
         shadow.position.y = 0.02;
         this.mesh.add(shadow);
 
+        // Glowing aura ring at the feet (a slowly-spinning magic circle).
+        this._createAuraRing();
+
         // Safe spawn point: Prontera field (0, 1.2, 10)
         this.mesh.position.set(0, 1.2, 10);
         this.scene.add(this.mesh);
 
         this._applyJobAppearance();
         this.updateNameTag();
+    }
+
+    // Aura colour by class (falls back to a cyan-white for Novice).
+    _auraColor() {
+        const job = this.stats && this.stats.job;
+        return { swordsman: 0xff5a5a, mage: 0xb060ff, archer: 0x66e07a, priest: 0xffe27a }[job] || 0x7fd0ff;
+    }
+
+    // A lightweight persistent aura: two concentric glowing rings + a few
+    // radiating spokes, laid flat at the feet. Animated by rotation only (no
+    // per-frame spawning), so it's cheap even with many players on screen.
+    _createAuraRing() {
+        if (this.auraRing) { this.mesh.remove(this.auraRing); this.auraRing = null; }
+        const col = this._auraColor();
+        const glow = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+        const grp = new THREE.Group();
+        // Soft radiant floor pool (kept low-opacity so overdraw stays cheap).
+        const pool = new THREE.Mesh(new THREE.CircleGeometry(0.9, 28), glow(col, 0.16));
+        pool.userData.noSpin = true;
+        grp.add(pool);
+        grp.add(new THREE.Mesh(new THREE.RingGeometry(0.72, 0.9, 40), glow(col, 0.7)));    // outer ring
+        const whiteRing = new THREE.Mesh(new THREE.RingGeometry(0.44, 0.52, 32), glow(0xffffff, 0.5)); // inner ring
+        whiteRing.userData.keepWhite = true;
+        grp.add(whiteRing);
+        const spokeGeo = new THREE.PlaneGeometry(0.07, 0.26);
+        const spokeMat = glow(col, 0.5);
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            const spoke = new THREE.Mesh(spokeGeo, spokeMat);
+            spoke.position.set(Math.cos(a) * 0.62, Math.sin(a) * 0.62, 0);
+            spoke.rotation.z = a;
+            grp.add(spoke);
+        }
+        grp.rotation.x = -Math.PI / 2;
+        grp.position.y = 0.05;
+        this.mesh.add(grp);
+        this.auraRing = grp;
+    }
+
+    // Recolour the aura (called when the class changes).
+    refreshAura() {
+        if (!this.auraRing) return;
+        const col = this._auraColor();
+        this.auraRing.children.forEach((m) => {
+            if (m.material && !m.userData.keepWhite) m.material.color.setHex(col);
+        });
     }
 
     // Adds class-specific silhouette pieces (pauldrons, robe, hat, quiver, halo)
@@ -776,6 +825,7 @@ export class CharacterManager {
         }
         this._jobDecor = [];
         const job = this.stats && this.stats.job;
+        this.refreshAura(); // aura colour tracks the class
         if (!job) return;
 
         const add = (obj) => { this.mesh.add(obj); this._jobDecor.push(obj); };
@@ -1790,6 +1840,13 @@ export class CharacterManager {
     update(dt) {
         this.animTimer += dt;
         this.attackTimer += dt;
+
+        // Spin the aura ring + gentle breathing pulse (rotation only — cheap).
+        if (this.auraRing) {
+            this.auraRing.rotation.z += dt * 0.7;
+            const s = 1 + Math.sin(this.animTimer * 2.2) * 0.05;
+            this.auraRing.scale.set(s, s, 1);
+        }
 
         // Achievement title pulse — the glowing badge gently breathes
         if (this.title && this.nameSprite && this.nameSprite.material) {
