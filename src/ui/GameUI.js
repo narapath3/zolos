@@ -2637,6 +2637,31 @@ export class GameUI {
       });
     }
 
+    // Mobile: tapping the chat preview focuses the (always-visible) input,
+    // which pops the keyboard natively — focus() here runs inside the tap
+    // gesture so iOS/Android honour it.
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) {
+      chatMessages.addEventListener('click', () => {
+        if (chatPanel.classList.contains('preview-mode') && chatInput) {
+          try { chatInput.focus(); } catch (e) { /* ignore */ }
+        }
+      });
+    }
+
+    // Focusing the input (tap on mobile, or click on desktop) expands the panel
+    // out of preview. Done here — not by re-focusing — to avoid a focus loop.
+    if (chatInput) {
+      chatInput.addEventListener('focus', () => {
+        if (chatPanel.classList.contains('preview-mode')) {
+          chatPanel.classList.remove('preview-mode');
+          chatPanel.classList.remove('empty');
+          const cm = document.getElementById('chat-messages');
+          if (cm) cm.scrollTop = cm.scrollHeight;
+        }
+      });
+    }
+
     if (btnClose) {
       btnClose.addEventListener('click', () => {
         this._closeChatToPreview();
@@ -2801,11 +2826,14 @@ export class GameUI {
     chatPanel.classList.remove('preview-mode');
     chatPanel.classList.remove('empty');
     if (chatInputRow) chatInputRow.style.display = 'flex';
-    
+
     if (chatInput) {
+      // Focus SYNCHRONOUSLY so mobile browsers open the keyboard — a deferred
+      // focus() (setTimeout) is ignored on iOS/Android because it's no longer
+      // inside the user's tap gesture. The timeout is only a desktop fallback.
+      try { chatInput.focus(); } catch (e) { /* ignore */ }
       setTimeout(() => {
-        chatInput.focus();
-        chatInput.select();
+        try { chatInput.focus(); chatInput.select(); } catch (e) { /* ignore */ }
       }, 50);
     }
     
@@ -2820,7 +2848,9 @@ export class GameUI {
     const chatInputRow = chatPanel.querySelector('.chat-input-row');
 
     chatPanel.classList.add('preview-mode');
-    if (chatInputRow) chatInputRow.style.display = 'none';
+    // Keep the input row VISIBLE (dimmed via CSS) as a "tap to type" bar so
+    // mobile users have something to tap; hiding it left no way to open it.
+    if (chatInputRow) chatInputRow.style.display = 'flex';
     if (chatInput) chatInput.blur();
     
     // Auto scroll to bottom
@@ -5963,20 +5993,16 @@ export class GameUI {
         target.closest('.warp-tile') ||
         target.closest('.tile-warp-btn')) return;
 
-      // Never spawn the joystick / tap over the chat UI. The chat panel is
-      // click-through in preview mode, so a touch there can fall past it to the
-      // canvas. Guard by geometry: always block the input bar; while the chat is
-      // open (typing), block the whole panel.
+      // Never spawn the joystick over the chat UI — block the WHOLE panel
+      // (messages + input) so a tap on the chat bar opens the input/keyboard
+      // instead of moving the hero. Returning early (no preventDefault) lets the
+      // tap fall through to the chat's own click/focus handlers.
       const chatPanel = document.getElementById('chat-panel');
       if (chatPanel && window.getComputedStyle(chatPanel).display !== 'none') {
-        const chatOpen = !chatPanel.classList.contains('preview-mode');
-        const guardEl = chatOpen ? chatPanel : chatPanel.querySelector('.chat-input-row');
-        if (guardEl) {
-          const r = guardEl.getBoundingClientRect();
-          if (r.width > 0 && r.height > 0 &&
-            touch.clientX >= r.left && touch.clientX <= r.right &&
-            touch.clientY >= r.top && touch.clientY <= r.bottom) return;
-        }
+        const r = chatPanel.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 &&
+          touch.clientX >= r.left && touch.clientX <= r.right &&
+          touch.clientY >= r.top && touch.clientY <= r.bottom) return;
       }
 
       e.preventDefault();
