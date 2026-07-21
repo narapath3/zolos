@@ -14,7 +14,7 @@ class ParticlePerformanceMonitor {
         const cores = navigator.hardwareConcurrency || 1;
         const memory = navigator.deviceMemory || 4;
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
+
         return isMobile && (cores <= 2 || memory <= 2);
     }
 
@@ -54,9 +54,85 @@ export class ParticleSystem {
         this.projectiles = [];
         this.slashes = [];
         this.splashCooldown = 0;
-        
+
         // Performance monitoring
         this.perfMonitor = new ParticlePerformanceMonitor();
+
+        // Setup procedural textures
+        this.textures = this._initProceduralTextures();
+    }
+
+    _initProceduralTextures() {
+        const textures = {};
+
+        // 1. Glow Spark (radial gradient)
+        const c1 = document.createElement('canvas');
+        c1.width = c1.height = 32;
+        const ctx1 = c1.getContext('2d');
+        const grad1 = ctx1.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad1.addColorStop(0, 'rgba(255,255,255,1)');
+        grad1.addColorStop(0.3, 'rgba(255,255,255,0.8)');
+        grad1.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx1.fillStyle = grad1;
+        ctx1.fillRect(0, 0, 32, 32);
+        textures.glowSpark = new THREE.CanvasTexture(c1);
+
+        // 2. Magic Circle (geometric runes)
+        const c2 = document.createElement('canvas');
+        c2.width = c2.height = 256;
+        const ctx2 = c2.getContext('2d');
+        ctx2.strokeStyle = 'white';
+        ctx2.lineWidth = 4;
+        ctx2.shadowColor = 'white';
+        ctx2.shadowBlur = 10;
+
+        // Outer rings
+        ctx2.beginPath(); ctx2.arc(128, 128, 110, 0, Math.PI * 2); ctx2.stroke();
+        ctx2.beginPath(); ctx2.arc(128, 128, 95, 0, Math.PI * 2); ctx2.stroke();
+
+        // Inner triangle / star
+        ctx2.lineWidth = 2;
+        ctx2.beginPath();
+        for (let i = 0; i < 3; i++) {
+            const angle = (i * Math.PI * 2 / 3) - Math.PI / 2;
+            const x = 128 + Math.cos(angle) * 90;
+            const y = 128 + Math.sin(angle) * 90;
+            if (i === 0) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
+        }
+        ctx2.closePath(); ctx2.stroke();
+
+        // Inner circles
+        ctx2.beginPath(); ctx2.arc(128, 128, 30, 0, Math.PI * 2); ctx2.stroke();
+        textures.magicCircle = new THREE.CanvasTexture(c2);
+
+        // 3. Melee Slash Blade (curved blade swoosh)
+        const c3 = document.createElement('canvas');
+        c3.width = 120; c3.height = 120;
+        const ctx3 = c3.getContext('2d');
+        const grad3 = ctx3.createRadialGradient(60, 60, 20, 60, 60, 50);
+        grad3.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+        grad3.addColorStop(0.5, 'rgba(255, 255, 255, 0.4)');
+        grad3.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx3.fillStyle = grad3;
+        ctx3.beginPath();
+        ctx3.arc(60, 60, 45, -Math.PI / 6, Math.PI / 6);
+        ctx3.lineWidth = 12;
+        ctx3.strokeStyle = grad3;
+        ctx3.stroke();
+        textures.slashBlade = new THREE.CanvasTexture(c3);
+
+        return textures;
+    }
+
+    _createGlowMaterial(colorVal, textureType, size = 0.5) {
+        return new THREE.PointsMaterial({
+            size: size,
+            color: colorVal,
+            map: this.textures[textureType] || this.textures.glowSpark,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            depthWrite: false
+        });
     }
 
     // ============ Water Splash Effect ============
@@ -136,7 +212,7 @@ export class ParticleSystem {
         const colors = isCritical
             ? [0xff4040, 0xff8020, 0xffff40, 0xffaa00]
             : [0xffdd44, 0xffaa00, 0xff8800, 0xffffff];
-        
+
         const segments = this.perfMonitor.getGeometrySegments();
 
         for (let i = 0; i < sparkCount; i++) {
@@ -212,11 +288,11 @@ export class ParticleSystem {
     }
 
     // ============ Spectacular RO-Style Effects ============
-    
+
     // Iconic RO Level Up: Glowing ring expands while green sparkles rise in a pillar
     spawnLevelUpEffect(position) {
         if (!this.effectsEnabled) return;
-        
+
         // 1. Multiple expanding rings (The "Halo")
         for (let i = 0; i < 3; i++) {
             setTimeout(() => {
@@ -312,7 +388,7 @@ export class ParticleSystem {
     // Enhanced Critical Hit: Screen shake + big red flash + radial sparks
     spawnEnhancedCritical(position) {
         if (!this.effectsEnabled) return;
-        
+
         // 1. Big Flash Ring
         const ring = new THREE.Mesh(
             new THREE.RingGeometry(0.1, 2.5, 32),
@@ -426,9 +502,25 @@ export class ParticleSystem {
         const size = opts.size || 0.12;
         const yOff = opts.yOff != null ? opts.yOff : 0.5;
         for (let i = 0; i < n; i++) {
-            const mesh = new THREE.Mesh(
-                new THREE.SphereGeometry(size, seg, seg),
-                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+            let mesh;
+            if (opts.useGlow) {
+                const geo = new THREE.PlaneGeometry(size * 2, size * 2);
+                const mat = new THREE.MeshBasicMaterial({
+                    color,
+                    map: this.textures.glowSpark,
+                    transparent: true,
+                    opacity: 1,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                mesh = new THREE.Mesh(geo, mat);
+                if (this.camera) mesh.lookAt(this.camera.position);
+            } else {
+                mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(size, seg, seg),
+                    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+            }
             mesh.position.set(pos.x, pos.y + yOff, pos.z);
             const a = Math.random() * Math.PI * 2, up = Math.random() * Math.PI;
             const s = speed * (0.4 + Math.random() * 0.8);
@@ -497,68 +589,298 @@ export class ParticleSystem {
         const at = targetPos || origin;
         switch (skillId) {
             // --- Novice / shared ---
-            case 'bash':
-                this._fxBurst(at, 0xff7a30, 22, 6, { life: 0.6 });
-                this._fxRing(at, 0xffb060, 0.4, 0.06, 0.2, 0.9);
+            case 'bash': {
+                // Crescent blade trail
+                const trailGeo = new THREE.RingGeometry(0.3, 1.0, 18, 1, 0, Math.PI * 0.9);
+                const trailMat = new THREE.MeshBasicMaterial({
+                    color: 0xffaa40,
+                    map: this.textures.slashBlade,
+                    transparent: true,
+                    opacity: 0.95,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+                const mesh = new THREE.Mesh(trailGeo, trailMat);
+                mesh.position.copy(at);
+                mesh.position.y += 0.8;
+                mesh.rotation.y = Math.random() * Math.PI * 2;
+                mesh.rotation.x = (Math.random() - 0.5) * 0.4;
+                this.scene.add(mesh);
+                this.slashes.push({ mesh, life: 0.25, maxLife: 0.25 });
+
+                // Additive sparks
+                this._fxBurst(at, 0xff7a30, 25, 7, { life: 0.7, size: 0.15, useGlow: true });
                 break;
-            case 'heal':
-                this._fxBurst(origin, 0x66ff88, 22, 2, { rise: 3, gravity: -1, life: 1.1, size: 0.08 });
-                this._fxRing(origin, 0x8effa0, 0.7, 0.06, 0.2, 1.1);
-                this._fxPillar(origin, 0x66ff88, 0.7, 2.6, 0.7);
+            }
+            case 'heal': {
+                // Ground magic circle
+                const cGeo = new THREE.PlaneGeometry(1.6, 1.6);
+                const cMat = new THREE.MeshBasicMaterial({
+                    color: 0x40ff60,
+                    map: this.textures.magicCircle,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+                const circle = new THREE.Mesh(cGeo, cMat);
+                circle.position.copy(origin);
+                circle.position.y = 0.05;
+                circle.rotation.x = -Math.PI / 2;
+                this.scene.add(circle);
+                this.shockwaves.push({ mesh: circle, life: 1.2, maxLife: 1.2, type: 'magic-ring' });
+
+                // Swirling particles
+                const count = Math.floor(30 * this.perfMonitor.getParticleCount());
+                for (let i = 0; i < count; i++) {
+                    const progress = i / count;
+                    const angle = progress * Math.PI * 8;
+                    const r = 0.6;
+                    const p = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.08, 4, 4),
+                        new THREE.MeshBasicMaterial({ color: 0x66ff88, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })
+                    );
+                    p.position.set(
+                        origin.x + Math.cos(angle) * r,
+                        origin.y + 0.1 + progress * 2.0,
+                        origin.z + Math.sin(angle) * r
+                    );
+                    this.scene.add(p);
+                    this.hitEffects.push({
+                        mesh: p,
+                        velocity: new THREE.Vector3(-Math.sin(angle) * 0.5, 1.4, Math.cos(angle) * 0.5),
+                        life: 1.2,
+                        gravity: -0.4
+                    });
+                }
+
+                // Rising pillar
+                this._fxPillar(origin, 0x66ff88, 1.0, 3.0, 0.8);
                 break;
-            case 'magnumBreak':
-                this._fxBurst(origin, 0xff4010, 40, 9, { rise: 2, life: 0.9 });
-                this._fxRing(origin, 0xff6020, 0.7, 0.06, 0.4, 5.5);
-                this._fxPillar(origin, 0xff5020, 0.6, 3.6, 1.3);
+            }
+            case 'magnumBreak': {
+                // Expanding fire magic circle
+                const cGeo = new THREE.PlaneGeometry(2.5, 2.5);
+                const cMat = new THREE.MeshBasicMaterial({
+                    color: 0xff5010,
+                    map: this.textures.magicCircle,
+                    transparent: true,
+                    opacity: 0.95,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+                const circle = new THREE.Mesh(cGeo, cMat);
+                circle.position.copy(origin);
+                circle.position.y = 0.05;
+                circle.rotation.x = -Math.PI / 2;
+                this.scene.add(circle);
+                this.shockwaves.push({ mesh: circle, life: 1.5, maxLife: 1.5, type: 'magic-ring-expand' });
+
+                // Massive radial spark explosion
+                this._fxBurst(origin, 0xff3b00, 50, 11, { rise: 3, life: 1.0, size: 0.22, useGlow: true });
+                this._fxRing(origin, 0xffaa00, 0.8, 0.06, 0.5, 6.0);
+                this._fxPillar(origin, 0xff3a00, 1.2, 4.0, 1.5);
                 break;
+            }
             // --- Swordsman ---
-            case 'endure':
-                this._fxDome(origin, 0xbcd0ff, 0.95, 0.3, 0.7);
-                this._fxRing(origin, 0xcfe0ff, 0.7, 0.06, 0.3, 1.3);
-                this._fxBurst(origin, 0xdfe8ff, 14, 3, { rise: 2, gravity: -1, life: 0.9, size: 0.08 });
+            case 'endure': {
+                // Custom wireframe shield dome
+                const domeGeo = new THREE.SphereGeometry(1.0, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+                const domeMat = new THREE.MeshBasicMaterial({
+                    color: 0x80c0ff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.45,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide
+                });
+                const dome = new THREE.Mesh(domeGeo, domeMat);
+                dome.position.copy(origin);
+                dome.position.y += 0.1;
+                this.scene.add(dome);
+                this.shockwaves.push({ mesh: dome, life: 1.5, maxLife: 1.5, type: 'endure-dome' });
+
+                // Ring and sparkles
+                this._fxRing(origin, 0xb0e0ff, 1.0, 0.06, 0.5, 1.8);
+                this._fxBurst(origin, 0xd0f0ff, 20, 4, { rise: 2, gravity: -0.6, life: 1.2, size: 0.12, useGlow: true });
                 break;
+            }
             // --- Mage ---
-            case 'fireBolt':
-                this._fxBurst(at, 0xff6020, 30, 7, { life: 0.8, rise: 1 });
-                this._fxRing(at, 0xffa040, 0.5, 0.5, 0.2, 1.2);
-                this._fxPillar(at, 0xff7020, 0.5, 2.2, 0.5);
+            case 'fireBolt': {
+                // Explosive burst using glowing plane sparks
+                this._fxBurst(at, 0xff4f00, 45, 9, { life: 1.0, rise: 2, size: 0.25, useGlow: true });
+                this._fxRing(at, 0xffaa00, 0.8, 0.06, 0.4, 2.5);
+                this._fxPillar(at, 0xff5511, 1.0, 3.5, 0.8);
                 break;
-            case 'frostNova':
-                this._fxBurst(origin, 0x9fe8ff, 36, 8, { rise: 1, life: 0.9, size: 0.14 });
-                this._fxRing(origin, 0x66d0ff, 0.8, 0.06, 0.4, 6);
-                this._fxRing(origin, 0xffffff, 0.6, 0.06, 0.3, 4);
+            }
+            case 'frostNova': {
+                // Ground frost circle
+                this._fxRing(origin, 0x4aa0ff, 1.0, 0.05, 0.5, 5.0);
+                this._fxRing(origin, 0xaaddff, 0.8, 0.05, 0.3, 3.5);
+
+                // Exploding crystal shards
+                const count = Math.floor(25 * this.perfMonitor.getParticleCount());
+                for (let i = 0; i < count; i++) {
+                    const size = 0.08 + Math.random() * 0.12;
+                    const geo = new THREE.OctahedronGeometry(size); // diamond geometry
+                    const mat = new THREE.MeshBasicMaterial({
+                        color: 0x88ccff,
+                        transparent: true,
+                        opacity: 0.9,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.copy(origin);
+                    mesh.position.y += 0.5;
+
+                    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+                    const speed = 4 + Math.random() * 5;
+                    const velocity = new THREE.Vector3(Math.cos(angle) * speed, 0.5, Math.sin(angle) * speed);
+                    this.scene.add(mesh);
+                    this.hitEffects.push({ mesh, velocity, life: 0.9, gravity: 0.5 });
+                }
                 break;
-            case 'energyCoat':
-                this._fxDome(origin, 0xa070ff, 0.95, 0.3, 0.7);
-                this._fxBurst(origin, 0xb890ff, 20, 3, { rise: 2.5, gravity: -1.2, life: 1.1, size: 0.09 });
-                this._fxRing(origin, 0x9060ff, 0.7, 0.06, 0.3, 1.3);
+            }
+            case 'energyCoat': {
+                // Purple force shield
+                const geom = new THREE.SphereGeometry(1.0, 16, 16);
+                const mate = new THREE.MeshBasicMaterial({
+                    color: 0xa040ff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.35,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide
+                });
+                const dome = new THREE.Mesh(geom, mate);
+                dome.position.copy(origin);
+                dome.position.y += 1.0;
+                this.scene.add(dome);
+                this.shockwaves.push({ mesh: dome, life: 1.5, maxLife: 1.5, type: 'endure-dome' });
+
+                // Orbiting sparks
+                const count = Math.floor(18 * this.perfMonitor.getParticleCount());
+                for (let i = 0; i < count; i++) {
+                    const p = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.08, 4, 4),
+                        new THREE.MeshBasicMaterial({ color: 0xd066ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })
+                    );
+                    const angle = Math.random() * Math.PI * 2;
+                    p.position.set(origin.x + Math.cos(angle) * 1.0, origin.y + 1.0 + (Math.random() - 0.5) * 0.8, origin.z + Math.sin(angle) * 1.0);
+                    this.scene.add(p);
+                    this.hitEffects.push({
+                        mesh: p,
+                        velocity: new THREE.Vector3(-Math.sin(angle) * 1.5, 0, Math.cos(angle) * 1.5),
+                        life: 1.2,
+                        gravity: 0
+                    });
+                }
                 break;
+            }
             // --- Archer ---
-            case 'doubleStrafe':
-                this._fxBurst(at, 0x9dff70, 16, 6, { life: 0.5 });
-                this._fxBurst(at, 0xd8ffb0, 16, 7, { life: 0.5, yOff: 0.8 });
-                this._fxRing(at, 0xa0ff60, 0.4, 0.5, 0.2, 0.8);
+            case 'doubleStrafe': {
+                this._fxBurst(at, 0xbfff40, 20, 8, { life: 0.6, size: 0.16, useGlow: true });
+                this._fxBurst(at, 0xe0ff70, 20, 9, { life: 0.6, yOff: 0.9, size: 0.14, useGlow: true });
+                this._fxRing(at, 0x88ff30, 0.5, 0.4, 0.2, 1.2);
                 break;
-            case 'arrowShower':
-                this._fxRain(origin, 0xc8ff90, 40, 5.5);
-                this._fxRing(origin, 0xa0ff60, 0.8, 0.06, 0.4, 5.5);
+            }
+            case 'arrowShower': {
+                // Highlighting target circle on ground
+                this._fxRing(origin, 0x76ff60, 1.5, 0.05, 0.3, 5.0);
+
+                // Rain arrows vertical cylinders
+                const count = Math.floor(40 * this.perfMonitor.getParticleCount());
+                for (let i = 0; i < count; i++) {
+                    const arrow = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.015, 0.015, 0.6, 4),
+                        new THREE.MeshBasicMaterial({ color: 0xaaff50, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+                    );
+                    const aAngle = Math.random() * Math.PI * 2;
+                    const rDist = Math.random() * 4.5;
+                    arrow.position.set(origin.x + Math.cos(aAngle) * rDist, origin.y + 6.0 + Math.random() * 3.5, origin.z + Math.sin(aAngle) * rDist);
+                    arrow.rotation.x = Math.PI; // point down
+                    this.scene.add(arrow);
+                    this.hitEffects.push({
+                        mesh: arrow,
+                        velocity: new THREE.Vector3(0, -(12 + Math.random() * 6), 0),
+                        life: 0.8,
+                        gravity: -4
+                    });
+                }
                 break;
-            case 'concentration':
-                this._fxRing(origin, 0xffd24a, 0.8, 0.06, 1.6, 0.2); // ring converging inward look
-                this._fxBurst(origin, 0xffe27a, 22, 3, { rise: 2.5, gravity: -1.2, life: 1.0, size: 0.09 });
-                this._fxPillar(origin, 0xffd24a, 0.7, 2.8, 0.7);
+            }
+            case 'concentration': {
+                // Converging ring at character
+                this._fxRing(origin, 0xffd24a, 0.8, 0.05, 2.0, 0.4);
+
+                // Imploding/converging sparks
+                const count = Math.floor(25 * this.perfMonitor.getParticleCount());
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = 2.2;
+                    const p = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.08, 4, 4),
+                        new THREE.MeshBasicMaterial({ color: 0xffcc33, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })
+                    );
+                    p.position.set(origin.x + Math.cos(angle) * r, origin.y + 0.1 + Math.random() * 1.8, origin.z + Math.sin(angle) * r);
+                    this.scene.add(p);
+
+                    // Directing velocity towards character center
+                    this.hitEffects.push({
+                        mesh: p,
+                        velocity: new THREE.Vector3(-Math.cos(angle) * 2.2, 0.2, -Math.sin(angle) * 2.2),
+                        life: 1.0,
+                        gravity: 0
+                    });
+                }
+
+                this._fxPillar(origin, 0xffd24a, 1.0, 3.2, 0.8);
                 break;
+            }
             // --- Priest ---
-            case 'holyLight':
-                this._fxPillar(at, 0xfff2a0, 0.8, 4.5, 1.0);
-                this._fxBurst(at, 0xffffc0, 30, 6, { rise: 2, gravity: 1, life: 0.9, size: 0.1 });
-                this._fxRing(at, 0xfff0a0, 0.6, 0.06, 0.3, 1.6);
+            case 'holyLight': {
+                // Sacred sky light strike
+                const rayGeo = new THREE.CylinderGeometry(0.1, 0.6, 15, 8, 1, true);
+                const rayMat = new THREE.MeshBasicMaterial({
+                    color: 0xfffca0,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+                const ray = new THREE.Mesh(rayGeo, rayMat);
+                ray.position.copy(at);
+                ray.position.y += 7.5;
+                this.scene.add(ray);
+                this.shockwaves.push({ mesh: ray, life: 0.6, maxLife: 0.6, type: 'pillar' });
+
+                // Holy ground flash
+                this._fxRing(at, 0xfff0aa, 0.6, 0.05, 0.4, 3.0);
+                this._fxBurst(at, 0xffffff, 30, 6, { rise: 2, gravity: 0.5, life: 0.9, size: 0.15, useGlow: true });
                 break;
-            case 'blessing':
-                this._fxBurst(origin, 0xfff0a0, 26, 3, { rise: 3, gravity: -1.2, life: 1.2, size: 0.09 });
-                this._fxRing(origin, 0xffe98a, 0.8, 0.06, 0.3, 1.4);
-                this._fxPillar(origin, 0xfff2b0, 0.7, 3.2, 0.7);
+            }
+            case 'blessing': {
+                // Glowing golden cross
+                const group = new THREE.Group();
+                const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.2, 0.2), new THREE.MeshBasicMaterial({ color: 0xffdf60, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending }));
+                const hBar = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0xffdf60, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending }));
+                hBar.position.y = 0.2;
+                group.add(vBar); group.add(hBar);
+                group.position.copy(origin);
+                group.position.y += 1.0;
+                this.scene.add(group);
+                this.hitEffects.push({ mesh: group, velocity: new THREE.Vector3(0, 1.2, 0), gravity: -0.2, life: 1.4, maxLife: 1.4 });
+
+                // Holy halos
+                this._fxRing(origin, 0xffea70, 0.9, 0.05, 0.3, 1.6);
+                this._fxPillar(origin, 0xfff590, 1.2, 4.0, 1.0);
                 break;
+            }
             default:
                 this._fxBurst(at, 0xffffff, 20, 6, { life: 0.7 });
         }
@@ -580,9 +902,9 @@ export class ParticleSystem {
         ripple.position.y = 0.05;
         ripple.rotation.x = -Math.PI / 2;
         this.scene.add(ripple);
-        this.shockwaves.push({ 
-            mesh: ripple, 
-            life: 0.4, 
+        this.shockwaves.push({
+            mesh: ripple,
+            life: 0.4,
             maxLife: 0.4,
             type: 'ripple'
         });
@@ -599,9 +921,9 @@ export class ParticleSystem {
         column.position.copy(position);
         column.position.y = 0.25;
         this.scene.add(column);
-        this.shockwaves.push({ 
-            mesh: column, 
-            life: 0.6, 
+        this.shockwaves.push({
+            mesh: column,
+            life: 0.6,
             maxLife: 0.6,
             type: 'column'
         });
@@ -619,9 +941,9 @@ export class ParticleSystem {
         dot.position.y = 0.06;
         dot.rotation.x = -Math.PI / 2;
         this.scene.add(dot);
-        this.shockwaves.push({ 
-            mesh: dot, 
-            life: 0.8, 
+        this.shockwaves.push({
+            mesh: dot,
+            life: 0.8,
             maxLife: 0.8,
             type: 'dot'
         });
@@ -631,14 +953,14 @@ export class ParticleSystem {
     spawnArrow(startPos, targetMonster, onHit) {
         // Create arrow mesh
         const arrowGroup = new THREE.Group();
-        
+
         // Arrow shaft
         const shaftGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.6, 5);
         const shaftMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
         const shaft = new THREE.Mesh(shaftGeo, shaftMat);
         shaft.rotation.x = Math.PI / 2;
         arrowGroup.add(shaft);
-        
+
         // Arrow head
         const headGeo = new THREE.ConeGeometry(0.04, 0.12, 5);
         const headMat = new THREE.MeshLambertMaterial({ color: 0xaaaaaa });
@@ -646,16 +968,16 @@ export class ParticleSystem {
         head.position.z = 0.3;
         head.rotation.x = Math.PI / 2;
         arrowGroup.add(head);
-        
+
         // Fletching (feathers)
         const featherGeo = new THREE.PlaneGeometry(0.1, 0.15);
         const featherMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
-        
+
         const f1 = new THREE.Mesh(featherGeo, featherMat);
         f1.position.z = -0.25;
         f1.position.y = 0.05;
         arrowGroup.add(f1);
-        
+
         const f2 = f1.clone();
         f2.rotation.z = Math.PI / 2;
         f2.position.y = 0;
@@ -679,27 +1001,27 @@ export class ParticleSystem {
     spawnLightningBolt(startPos, targetMonster, onHit) {
         const targetPos = targetMonster.getPosition();
         const distance = startPos.distanceTo(targetPos);
-        
+
         // A vertical beam that strikes from the sky onto the target
         const group = new THREE.Group();
-        
+
         // Main core beam
         const coreGeo = new THREE.CylinderGeometry(0.05, 0.15, 12, 6);
         const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
         const core = new THREE.Mesh(coreGeo, coreMat);
         group.add(core);
-        
+
         // Outer glow
         const glowGeo = new THREE.CylinderGeometry(0.2, 0.4, 12, 6);
         const glowMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.4 });
         const glow = new THREE.Mesh(glowGeo, glowMat);
         group.add(glow);
-        
+
         // Position at target, but strike from above
         group.position.copy(targetPos);
         group.position.y += 6; // Half height of 12
         this.scene.add(group);
-        
+
         // Strike flash at impact point
         const flash = new THREE.Mesh(
             new THREE.SphereGeometry(0.6, 8, 6),
@@ -708,11 +1030,11 @@ export class ParticleSystem {
         flash.position.copy(targetPos);
         flash.position.y += 0.5;
         this.scene.add(flash);
-        
+
         // Add to hit effects for automatic fade and removal
-        this.hitEffects.push({ mesh: group, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.15, maxLife: 0.15 });
-        this.hitEffects.push({ mesh: flash, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2, maxLife: 0.2 });
-        
+        this.hitEffects.push({ mesh: group, velocity: new THREE.Vector3(0, 0, 0), gravity: 0, life: 0.15, maxLife: 0.15 });
+        this.hitEffects.push({ mesh: flash, velocity: new THREE.Vector3(0, 0, 0), gravity: 0, life: 0.2, maxLife: 0.2 });
+
         // Ground ripple
         const rippleGeo = new THREE.RingGeometry(0.1, 1.2, 16);
         const rippleMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
@@ -730,49 +1052,49 @@ export class ParticleSystem {
     // ============ Shadow Slash (Thief) ============
     spawnShadowSlash(startPos, targetMonster, onHit) {
         const targetPos = targetMonster.getPosition();
-        
+
         // A fast purple shadow arc at the target's position
         const arcGeo = new THREE.TorusGeometry(0.8, 0.05, 8, 24, Math.PI * 0.8);
         const arcMat = new THREE.MeshBasicMaterial({ color: 0x8800ff, transparent: true, opacity: 0.9 });
         const arc = new THREE.Mesh(arcGeo, arcMat);
-        
+
         arc.position.copy(targetPos);
         arc.position.y += 0.8;
         arc.rotation.y = Math.random() * Math.PI * 2;
         arc.rotation.x = Math.random() * Math.PI * 0.5;
         this.scene.add(arc);
-        
+
         // Shadow particles
         this._fxBurst(targetPos, 0x440088, 12, 4, { life: 0.4, yOff: 0.8 });
-        
+
         // Add to hit effects for automatic fade and removal
-        this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(0,0,0), gravity: 0, life: 0.2, maxLife: 0.2 });
-        
+        this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(0, 0, 0), gravity: 0, life: 0.2, maxLife: 0.2 });
+
         if (onHit) onHit();
     }
 
     // ============ Holy Orb (Acolyte) ============
     spawnHolyOrb(startPos, targetMonster, onHit) {
         const group = new THREE.Group();
-        
+
         // Golden orb
         const orb = new THREE.Mesh(
             new THREE.SphereGeometry(0.2, 8, 8),
             new THREE.MeshBasicMaterial({ color: 0xffffaa })
         );
         group.add(orb);
-        
+
         // Holy glow
         const glow = new THREE.Mesh(
             new THREE.SphereGeometry(0.4, 8, 8),
             new THREE.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, opacity: 0.4 })
         );
         group.add(glow);
-        
+
         group.position.copy(startPos);
         group.position.y += 1.2;
         this.scene.add(group);
-        
+
         this.projectiles.push({
             mesh: group,
             target: targetMonster,
@@ -879,7 +1201,7 @@ export class ParticleSystem {
 
             const targetPos = p.target.getPosition();
             targetPos.y += 0.8; // Aim for center of monster
-            
+
             const direction = new THREE.Vector3().subVectors(targetPos, p.mesh.position).normalize();
             const distance = p.mesh.position.distanceTo(targetPos);
             const moveStep = p.speed * deltaTime;
@@ -916,7 +1238,7 @@ export class ParticleSystem {
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
             const wave = this.shockwaves[i];
             const progress = 1 - wave.life / wave.maxLife;
-            
+
             if (wave.type === 'ripple') {
                 wave.mesh.scale.set(1 + progress * 3, 1, 1 + progress * 3);
                 wave.mesh.material.opacity = 0.8 * (1 - progress);
@@ -934,12 +1256,25 @@ export class ParticleSystem {
             } else if (wave.type === 'flash') {
                 wave.mesh.scale.set(0.1 + progress * 2, 0.1 + progress * 2, 1);
                 wave.mesh.material.opacity = 0.6 * (1 - progress);
+            } else if (wave.type === 'endure-dome') {
+                // Bubble remains same size, rotates and fades out
+                wave.mesh.rotation.y += deltaTime * 2.0;
+                wave.mesh.material.opacity = 0.45 * (1 - progress);
+            } else if (wave.type === 'magic-ring') {
+                // Rotates the plane circle
+                wave.mesh.rotation.z += deltaTime * 1.5;
+                wave.mesh.material.opacity = 0.9 * (1 - progress);
+            } else if (wave.type === 'magic-ring-expand') {
+                // Rotates and scales up
+                wave.mesh.rotation.z -= deltaTime * 1.0;
+                wave.mesh.scale.set(1 + progress * 2, 1 + progress * 2, 1);
+                wave.mesh.material.opacity = 0.9 * (1 - progress);
             } else {
                 // Generic shockwave behavior
                 wave.mesh.scale.set(1 + progress * 2, 1, 1 + progress * 2);
                 wave.mesh.material.opacity = 0.6 * (1 - progress);
             }
-            
+
             wave.life -= deltaTime;
 
             if (wave.life <= 0) {
@@ -957,7 +1292,7 @@ export class ParticleSystem {
             effect.mesh.position.y += effect.velocity.y * deltaTime;
             effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.life -= deltaTime;
-            
+
             // Fix: Group objects don't have a direct material property
             if (effect.mesh.material) {
                 effect.mesh.material.opacity = Math.max(0, effect.life / (effect.maxLife || 0.8));
@@ -985,7 +1320,7 @@ export class ParticleSystem {
             effect.mesh.position.y += effect.velocity.y * deltaTime;
             effect.mesh.position.z += effect.velocity.z * deltaTime;
             effect.life -= deltaTime;
-            
+
             if (effect.mesh.material) {
                 effect.mesh.material.opacity = Math.max(0, effect.life / (effect.maxLife || 1.5));
             } else {
