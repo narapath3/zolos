@@ -1,6 +1,7 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
 import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods } from './GameData.js';
+import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
 // Walkable half-extent. The ground is a 70x70 plane centred at the origin
@@ -23,8 +24,10 @@ export class CharacterManager {
         this.pantsColor = 0x3a3a5a;
         this.equippedHat = 'None';
         this.equippedGlasses = 'None';
+        this.equippedPet = null;   // companion pet model key (see PetModels)
         this.hatMesh = null;
         this.glassesMesh = null;
+        this.petMesh = null;
         this.title = null; // achievement title over the name (e.g. 'master_angler')
 
         // State
@@ -1227,6 +1230,30 @@ export class CharacterManager {
         this.mesh.add(this.glassesMesh);
     }
 
+    // Companion pet that trots beside the hero. The model is a child of the
+    // character mesh (so it moves + rotates with the hero for free — works for
+    // remote players too), positioned to the hero's right and animated with a
+    // gentle hop in update(). Cheap: one small static voxel group, no particles.
+    setPet(petKey) {
+        const key = (petKey && petKey !== 'None') ? petKey : null;
+        this.equippedPet = key;
+        if (this.petMesh) {
+            this.mesh.remove(this.petMesh);
+            this.petMesh.traverse(c => {
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) Array.isArray(c.material) ? c.material.forEach(m => m.dispose()) : c.material.dispose();
+            });
+            this.petMesh = null;
+        }
+        if (!key) return;
+        const pet = buildPet(key);
+        if (!pet) return;
+        pet.position.set(0.95, 0, -0.15); // beside + slightly behind the hero
+        pet.rotation.y = -0.35;           // angle it to face roughly where the hero looks
+        this.mesh.add(pet);
+        this.petMesh = pet;
+    }
+
     // ===== Worn gear visuals (helmet / body armor / cape / boots / shield) =====
     // Armor items only gave stats before; now each equipped piece shows on the
     // hero. Colours are chosen per item so a steel plate, a gold set and a dark
@@ -1848,6 +1875,19 @@ export class CharacterManager {
             this.auraRing.scale.set(s, s, 1);
         }
 
+        // Pet idle animation: ground pets hop; floating pets bob + sway.
+        if (this.petMesh) {
+            const floats = this.petMesh.userData.float;
+            const t = this.animTimer;
+            if (floats) {
+                this.petMesh.position.y = 0.35 + Math.sin(t * 2.4) * 0.09;
+                this.petMesh.rotation.y = -0.35 + Math.sin(t * 1.3) * 0.15;
+            } else {
+                this.petMesh.position.y = Math.max(0, Math.abs(Math.sin(t * 3.2)) * 0.12);
+                this.petMesh.rotation.y = -0.35 + Math.sin(t * 2.0) * 0.08;
+            }
+        }
+
         // Achievement title pulse — the glowing badge gently breathes
         if (this.title && this.nameSprite && this.nameSprite.material) {
             this.nameSprite.material.opacity = 0.86 + Math.sin(this.animTimer * 2.6) * 0.14;
@@ -2249,6 +2289,7 @@ export class CharacterManager {
             weapon: this.equippedWeapon,
             shield: this.equippedShield || null,
             gear: { ...(this.equippedGear || {}) }, // helmet/body/cape/boots so others see them
+            pet: this.equippedPet || null,          // companion so others see it too
             job: this.stats ? (this.stats.job || null) : null,
             title: this.title
         };
@@ -2269,6 +2310,7 @@ export class CharacterManager {
         }
         if (app.shield !== undefined) this.equippedShield = app.shield || null;
         if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
+        if (app.pet !== undefined && app.pet !== this.equippedPet) this.setPet(app.pet);
         // Sync class so other players see this hero's job-specific look.
         if (app.job !== undefined) {
             if (!this.stats) this.stats = {};
