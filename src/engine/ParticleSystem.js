@@ -139,6 +139,9 @@ export class ParticleSystem {
         
         const segments = this.perfMonitor.getGeometrySegments();
 
+        // A bright additive flash at the impact point sells the hit.
+        this._fxFlash(position, isCritical ? 0xffd060 : 0xffe0a0, { r: isCritical ? 0.45 : 0.3, grow: isCritical ? 3 : 2, life: isCritical ? 0.22 : 0.16, y: 0.8 });
+
         for (let i = 0; i < sparkCount; i++) {
             const geo = new THREE.SphereGeometry(isCritical ? 0.07 : 0.05, segments, segments);
             const color = colors[Math.floor(Math.random() * colors.length)];
@@ -146,6 +149,8 @@ export class ParticleSystem {
                 color,
                 transparent: true,
                 opacity: 1,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
             });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.copy(position);
@@ -419,6 +424,12 @@ export class ParticleSystem {
     // ============ Skill FX primitives ============
     // Small composable pieces that reuse the existing hitEffects / shockwaves
     // update pools, so per-skill effects can be built dramatically but cheaply.
+    // Additive, glow-friendly material used by the premium FX below — makes
+    // overlapping particles bloom bright for that "spectacular" look.
+    _glowMat(color, opacity = 0.9) {
+        return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+    }
+
     _fxBurst(pos, color, count, speed, opts = {}) {
         if (!this.effectsEnabled) return;
         const n = Math.max(1, Math.floor(count * this.perfMonitor.getParticleCount()));
@@ -428,7 +439,7 @@ export class ParticleSystem {
         for (let i = 0; i < n; i++) {
             const mesh = new THREE.Mesh(
                 new THREE.SphereGeometry(size, seg, seg),
-                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+                opts.glow ? this._glowMat(color, 1) : new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
             mesh.position.set(pos.x, pos.y + yOff, pos.z);
             const a = Math.random() * Math.PI * 2, up = Math.random() * Math.PI;
             const s = speed * (0.4 + Math.random() * 0.8);
@@ -490,6 +501,63 @@ export class ParticleSystem {
         }
     }
 
+    // ===== Premium glow FX primitives (additive, scaled by perf) =====
+
+    // Fast-expanding glowing ground ring (shockwave).
+    _fxGlowRing(pos, color, { grow = 6, life = 0.5, r0 = 0.25, r1 = 0.55, y = 0.08, op0 = 0.9, spin = 0 } = {}) {
+        if (!this.effectsEnabled) return;
+        const mesh = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 48), this._glowMat(color, op0));
+        mesh.position.set(pos.x, pos.y + y, pos.z);
+        mesh.rotation.x = -Math.PI / 2;
+        this.scene.add(mesh);
+        this.shockwaves.push({ mesh, life, maxLife: life, fx: { grow, mode: 'xz', op0, spin } });
+    }
+
+    // Bright flash sphere at an impact point (scales up + fades fast).
+    _fxFlash(pos, color, { r = 0.5, grow = 4, life = 0.28, y = 1.0, op0 = 0.95 } = {}) {
+        if (!this.effectsEnabled) return;
+        const seg = Math.max(8, this.perfMonitor.getGeometrySegments() * 2);
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, seg, seg), this._glowMat(color, op0));
+        mesh.position.set(pos.x, pos.y + y, pos.z);
+        this.scene.add(mesh);
+        this.shockwaves.push({ mesh, life, maxLife: life, fx: { grow, mode: 'all', op0, s0: 0.3 } });
+    }
+
+    // A vertical light beam that shoots up from a point (widens slightly, fades).
+    _fxBeam(pos, color, { h = 6, r = 0.45, life = 0.5, op0 = 0.85, y = 0 } = {}) {
+        if (!this.effectsEnabled) return;
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.5, r, h, 20, 1, true), this._glowMat(color, op0));
+        mesh.position.set(pos.x, pos.y + y + h / 2, pos.z);
+        this.scene.add(mesh);
+        this.shockwaves.push({ mesh, life, maxLife: life, fx: { grow: 0.7, mode: 'xz', op0 } });
+    }
+
+    // A flat magic-circle rune on the ground that spins as it fades.
+    _fxRune(pos, color, { r0 = 0.9, r1 = 1.5, life = 0.9, op0 = 0.7, spin = 3, y = 0.05 } = {}) {
+        if (!this.effectsEnabled) return;
+        const g = new THREE.Group();
+        g.add(new THREE.Mesh(new THREE.RingGeometry(r0, r1, 40), this._glowMat(color, op0)));
+        g.add(new THREE.Mesh(new THREE.RingGeometry(r0 * 0.45, r0 * 0.6, 3), this._glowMat(color, op0 * 0.9)));
+        g.position.set(pos.x, pos.y + y, pos.z);
+        g.rotation.x = -Math.PI / 2;
+        this.scene.add(g);
+        this.shockwaves.push({ mesh: g, life, maxLife: life, fx: { grow: 0.5, mode: 'xz', op0, spin, group: true } });
+    }
+
+    // Particles spiralling upward — swirling energy gathering / releasing.
+    _fxSpiral(pos, color, count, { radius = 1.1, rise = 3.6, life = 1.0, size = 0.09, turns = 2 } = {}) {
+        if (!this.effectsEnabled) return;
+        const n = Math.max(1, Math.floor(count * this.perfMonitor.getParticleCount()));
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 * turns;
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 6, 6), this._glowMat(color, 1));
+            mesh.position.set(pos.x + Math.cos(a) * radius, pos.y + 0.2, pos.z + Math.sin(a) * radius);
+            this.scene.add(mesh);
+            const tx = -Math.sin(a) * 2.6, tz = Math.cos(a) * 2.6; // tangential swirl
+            this.hitEffects.push({ mesh, velocity: new THREE.Vector3(tx, rise, tz), life, gravity: -1.2, maxLife: life });
+        }
+    }
+
     // ============ Per-skill spectacular effect ============
     // Dispatched by skill id so each of the 12 skills has its own signature.
     spawnSkillEffect(skillId, origin, targetPos) {
@@ -498,69 +566,99 @@ export class ParticleSystem {
         switch (skillId) {
             // --- Novice / shared ---
             case 'bash':
-                this._fxBurst(at, 0xff7a30, 22, 6, { life: 0.6 });
-                this._fxRing(at, 0xffb060, 0.4, 0.06, 0.2, 0.9);
+                // Heavy impact: white core flash + orange shock + debris.
+                this._fxFlash(at, 0xffd0a0, { r: 0.6, grow: 3.2, life: 0.24, y: 0.9 });
+                this._fxGlowRing(at, 0xffb060, { grow: 7, life: 0.4, r0: 0.2, r1: 0.7, y: 0.9 });
+                this._fxBurst(at, 0xff7a30, 26, 7, { life: 0.6, glow: true });
+                this._fxBurst(at, 0xfff0c0, 10, 9, { life: 0.35, glow: true, size: 0.08 });
                 break;
             case 'heal':
-                this._fxBurst(origin, 0x66ff88, 22, 2, { rise: 3, gravity: -1, life: 1.1, size: 0.08 });
-                this._fxRing(origin, 0x8effa0, 0.7, 0.06, 0.2, 1.1);
-                this._fxPillar(origin, 0x66ff88, 0.7, 2.6, 0.7);
+                // Rising green rune + spiral of restorative motes + soft pillar.
+                this._fxRune(origin, 0x66ff9a, { r0: 0.7, r1: 1.15, life: 0.9, spin: 2.5 });
+                this._fxSpiral(origin, 20, 0x9effb0, { radius: 0.9, rise: 3.2, life: 1.1, size: 0.08 });
+                this._fxBeam(origin, 0x8effa0, { h: 3.2, r: 0.7, life: 0.7, op0: 0.5 });
+                this._fxGlowRing(origin, 0xbdffcf, { grow: 3, life: 0.6, r0: 0.3, r1: 0.6 });
                 break;
             case 'magnumBreak':
-                this._fxBurst(origin, 0xff4010, 40, 9, { rise: 2, life: 0.9 });
-                this._fxRing(origin, 0xff6020, 0.7, 0.06, 0.4, 5.5);
-                this._fxPillar(origin, 0xff5020, 0.6, 3.6, 1.3);
+                // Fiery ground nova: rune + double shock rings + roaring column.
+                this._fxRune(origin, 0xff5020, { r0: 1.0, r1: 2.0, life: 0.7, spin: -3 });
+                this._fxFlash(origin, 0xffb060, { r: 0.9, grow: 4.5, life: 0.3, y: 0.6 });
+                this._fxGlowRing(origin, 0xff6020, { grow: 12, life: 0.7, r0: 0.4, r1: 0.9, y: 0.1 });
+                this._fxGlowRing(origin, 0xffe090, { grow: 8, life: 0.5, r0: 0.3, r1: 0.7, y: 0.15 });
+                this._fxBeam(origin, 0xff5020, { h: 4.2, r: 1.3, life: 0.55, op0: 0.7 });
+                this._fxBurst(origin, 0xff4010, 42, 10, { rise: 2, life: 0.9, glow: true });
                 break;
             // --- Swordsman ---
             case 'endure':
-                this._fxDome(origin, 0xbcd0ff, 0.95, 0.3, 0.7);
-                this._fxRing(origin, 0xcfe0ff, 0.7, 0.06, 0.3, 1.3);
-                this._fxBurst(origin, 0xdfe8ff, 14, 3, { rise: 2, gravity: -1, life: 0.9, size: 0.08 });
+                // Steel-blue guardian barrier: dome + spinning rune + sparks.
+                this._fxDome(origin, 0xbcd0ff, 1.0, 0.32, 0.7);
+                this._fxRune(origin, 0xcfe0ff, { r0: 0.8, r1: 1.25, life: 0.9, spin: 4 });
+                this._fxGlowRing(origin, 0xeaf2ff, { grow: 3.5, life: 0.6, r0: 0.3, r1: 0.6 });
+                this._fxBurst(origin, 0xdfe8ff, 16, 3, { rise: 2, gravity: -1, life: 0.9, size: 0.08, glow: true });
                 break;
             // --- Mage ---
             case 'fireBolt':
-                this._fxBurst(at, 0xff6020, 30, 7, { life: 0.8, rise: 1 });
-                this._fxRing(at, 0xffa040, 0.5, 0.5, 0.2, 1.2);
-                this._fxPillar(at, 0xff7020, 0.5, 2.2, 0.5);
+                // Concentrated fire blast on target with lingering embers.
+                this._fxFlash(at, 0xffc060, { r: 0.55, grow: 3.5, life: 0.26, y: 0.9 });
+                this._fxBeam(at, 0xff7020, { h: 2.8, r: 0.6, life: 0.45, op0: 0.75 });
+                this._fxGlowRing(at, 0xffa040, { grow: 6, life: 0.45, r0: 0.2, r1: 0.6, y: 0.9 });
+                this._fxBurst(at, 0xff6020, 32, 8, { life: 0.8, rise: 1, glow: true });
+                this._fxSpiral(at, 10, 0xffd080, { radius: 0.5, rise: 2.4, life: 0.7, size: 0.07, turns: 1.5 });
                 break;
             case 'frostNova':
-                this._fxBurst(origin, 0x9fe8ff, 36, 8, { rise: 1, life: 0.9, size: 0.14 });
-                this._fxRing(origin, 0x66d0ff, 0.8, 0.06, 0.4, 6);
-                this._fxRing(origin, 0xffffff, 0.6, 0.06, 0.3, 4);
+                // Expanding ice ring with crystalline shards and frozen mist.
+                this._fxRune(origin, 0x9fe8ff, { r0: 1.0, r1: 1.8, life: 0.7, spin: 2 });
+                this._fxGlowRing(origin, 0x66d0ff, { grow: 14, life: 0.8, r0: 0.4, r1: 0.85, y: 0.1 });
+                this._fxGlowRing(origin, 0xffffff, { grow: 10, life: 0.6, r0: 0.3, r1: 0.6, y: 0.14 });
+                this._fxFlash(origin, 0xdff4ff, { r: 0.8, grow: 4, life: 0.3, y: 0.6 });
+                this._fxBurst(origin, 0x9fe8ff, 40, 8, { rise: 1, life: 0.9, size: 0.13, glow: true });
                 break;
             case 'energyCoat':
-                this._fxDome(origin, 0xa070ff, 0.95, 0.3, 0.7);
-                this._fxBurst(origin, 0xb890ff, 20, 3, { rise: 2.5, gravity: -1.2, life: 1.1, size: 0.09 });
-                this._fxRing(origin, 0x9060ff, 0.7, 0.06, 0.3, 1.3);
+                // Violet arcane shell + orbiting spiral of energy.
+                this._fxDome(origin, 0xa070ff, 1.0, 0.32, 0.7);
+                this._fxRune(origin, 0x9060ff, { r0: 0.8, r1: 1.3, life: 0.9, spin: -4 });
+                this._fxSpiral(origin, 18, 0xc0a0ff, { radius: 1.0, rise: 2.6, life: 1.0, size: 0.08 });
+                this._fxGlowRing(origin, 0xd0b0ff, { grow: 3.5, life: 0.6, r0: 0.3, r1: 0.6 });
                 break;
             // --- Archer ---
             case 'doubleStrafe':
-                this._fxBurst(at, 0x9dff70, 16, 6, { life: 0.5 });
-                this._fxBurst(at, 0xd8ffb0, 16, 7, { life: 0.5, yOff: 0.8 });
-                this._fxRing(at, 0xa0ff60, 0.4, 0.5, 0.2, 0.8);
+                // Twin piercing shots: two fast flashes + green shock.
+                this._fxFlash(at, 0xd8ffb0, { r: 0.45, grow: 3, life: 0.2, y: 0.9 });
+                this._fxBeam(at, 0xa0ff60, { h: 2.4, r: 0.4, life: 0.35, op0: 0.7 });
+                this._fxGlowRing(at, 0xa0ff60, { grow: 6, life: 0.4, r0: 0.2, r1: 0.6, y: 0.9 });
+                this._fxBurst(at, 0x9dff70, 22, 8, { life: 0.5, glow: true });
                 break;
             case 'arrowShower':
-                this._fxRain(origin, 0xc8ff90, 40, 5.5);
-                this._fxRing(origin, 0xa0ff60, 0.8, 0.06, 0.4, 5.5);
+                // Rain of glowing arrows over a wide zone + target rune.
+                this._fxRune(origin, 0xa0ff60, { r0: 1.2, r1: 2.2, life: 0.9, spin: 1.5 });
+                this._fxRain(origin, 0xc8ff90, 46, 5.5);
+                this._fxGlowRing(origin, 0xa0ff60, { grow: 14, life: 0.8, r0: 0.4, r1: 0.9, y: 0.1 });
                 break;
             case 'concentration':
-                this._fxRing(origin, 0xffd24a, 0.8, 0.06, 1.6, 0.2); // ring converging inward look
-                this._fxBurst(origin, 0xffe27a, 22, 3, { rise: 2.5, gravity: -1.2, life: 1.0, size: 0.09 });
-                this._fxPillar(origin, 0xffd24a, 0.7, 2.8, 0.7);
+                // Focus buff: golden rune, converging spiral, aura pillar.
+                this._fxRune(origin, 0xffd24a, { r0: 0.9, r1: 1.4, life: 1.0, spin: 5 });
+                this._fxSpiral(origin, 18, 0xffe27a, { radius: 1.3, rise: 3.0, life: 1.0, size: 0.08, turns: 2.5 });
+                this._fxBeam(origin, 0xffd24a, { h: 3.4, r: 0.7, life: 0.7, op0: 0.55 });
+                this._fxGlowRing(origin, 0xffe8a0, { grow: 3, life: 0.6, r0: 0.3, r1: 0.6 });
                 break;
             // --- Priest ---
             case 'holyLight':
-                this._fxPillar(at, 0xfff2a0, 0.8, 4.5, 1.0);
-                this._fxBurst(at, 0xffffc0, 30, 6, { rise: 2, gravity: 1, life: 0.9, size: 0.1 });
-                this._fxRing(at, 0xfff0a0, 0.6, 0.06, 0.3, 1.6);
+                // Divine beam from the heavens + radiant burst + halo ring.
+                this._fxBeam(at, 0xfff2a0, { h: 8, r: 1.0, life: 0.7, op0: 0.85 });
+                this._fxFlash(at, 0xffffe0, { r: 0.55, grow: 2.8, life: 0.3, y: 1.0 });
+                this._fxGlowRing(at, 0xfff0a0, { grow: 6, life: 0.6, r0: 0.3, r1: 0.7, y: 0.9 });
+                this._fxBurst(at, 0xffffc0, 30, 6, { rise: 2, gravity: 1, life: 0.9, size: 0.1, glow: true });
                 break;
             case 'blessing':
-                this._fxBurst(origin, 0xfff0a0, 26, 3, { rise: 3, gravity: -1.2, life: 1.2, size: 0.09 });
-                this._fxRing(origin, 0xffe98a, 0.8, 0.06, 0.3, 1.4);
-                this._fxPillar(origin, 0xfff2b0, 0.7, 3.2, 0.7);
+                // Warm golden blessing: rune, rising motes, gentle pillar.
+                this._fxRune(origin, 0xffe98a, { r0: 0.85, r1: 1.35, life: 1.0, spin: 3 });
+                this._fxSpiral(origin, 18, 0xfff0a0, { radius: 1.0, rise: 3.4, life: 1.2, size: 0.08 });
+                this._fxBeam(origin, 0xfff2b0, { h: 3.6, r: 0.7, life: 0.7, op0: 0.5 });
+                this._fxGlowRing(origin, 0xfff4c0, { grow: 3, life: 0.6, r0: 0.3, r1: 0.6 });
                 break;
             default:
-                this._fxBurst(at, 0xffffff, 20, 6, { life: 0.7 });
+                this._fxFlash(at, 0xffffff, { r: 0.5, grow: 3, life: 0.24, y: 0.9 });
+                this._fxBurst(at, 0xffffff, 22, 7, { life: 0.7, glow: true });
         }
     }
 
@@ -837,31 +935,32 @@ export class ParticleSystem {
 
     // ============ Sword Slash Arc (Melee) ============
     spawnSlash(position, isCritical = false) {
-        // Crescent arc that flashes across the target and fades quickly
-        const inner = isCritical ? 0.45 : 0.35;
-        const outer = isCritical ? 1.15 : 0.9;
-        const geo = new THREE.RingGeometry(inner, outer, 20, 1, 0, Math.PI * 0.85);
-        const mat = new THREE.MeshBasicMaterial({
-            color: isCritical ? 0xffe060 : 0xffffff,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-        });
-        const slash = new THREE.Mesh(geo, mat);
-        slash.position.copy(position);
-        slash.position.y += 0.9;
-        // Random diagonal orientation for variety
-        const tilt = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4) + (Math.random() - 0.5) * 0.5;
-        // Billboard toward the camera, then apply the diagonal tilt
-        if (this.camera) slash.lookAt(this.camera.position);
-        slash.rotateZ(tilt);
-        this.scene.add(slash);
-        this.slashes.push({
-            mesh: slash,
-            life: 0.2,
-            maxLife: 0.2,
-        });
+        if (!this.effectsEnabled) return;
+        // Bright additive crescent that sweeps across the target. Crits add a
+        // crossing second arc (an "X" slash) + an impact flash for extra punch.
+        const inner = isCritical ? 0.5 : 0.38;
+        const outer = isCritical ? 1.35 : 1.0;
+        const makeArc = (tilt, color) => {
+            const geo = new THREE.RingGeometry(inner, outer, 24, 1, 0, Math.PI * 0.9);
+            const mat = new THREE.MeshBasicMaterial({
+                color, transparent: true, opacity: 0.95, side: THREE.DoubleSide,
+                depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const slash = new THREE.Mesh(geo, mat);
+            slash.position.copy(position);
+            slash.position.y += 0.9;
+            if (this.camera) slash.lookAt(this.camera.position);
+            slash.rotateZ(tilt);
+            this.scene.add(slash);
+            this.slashes.push({ mesh: slash, life: isCritical ? 0.24 : 0.2, maxLife: isCritical ? 0.24 : 0.2 });
+        };
+        const base = (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 4) + (Math.random() - 0.5) * 0.4;
+        makeArc(base, isCritical ? 0xffe060 : 0xffffff);
+        if (isCritical) {
+            makeArc(-base + (Math.random() - 0.5) * 0.3, 0xfff2b0); // crossing arc
+            this._fxFlash(position, 0xfff0c0, { r: 0.45, grow: 3, life: 0.2, y: 0.9 });
+            this._fxBurst(position, 0xffe060, 8, 8, { life: 0.35, glow: true, size: 0.07, yOff: 0.9 });
+        }
     }
 
     // ============ Update ============
@@ -934,6 +1033,21 @@ export class ParticleSystem {
             } else if (wave.type === 'flash') {
                 wave.mesh.scale.set(0.1 + progress * 2, 0.1 + progress * 2, 1);
                 wave.mesh.material.opacity = 0.6 * (1 - progress);
+            } else if (wave.fx) {
+                // Flexible premium FX (glow rings / flashes / beams / runes).
+                const f = wave.fx;
+                if (f.spin) wave.mesh.rotation.z += f.spin * deltaTime;
+                if (f.mode === 'all') {
+                    const s = (f.s0 != null ? f.s0 : 0.2) + progress * f.grow;
+                    wave.mesh.scale.setScalar(s);
+                } else if (f.mode === 'xz') {
+                    const s = (f.s0 != null ? f.s0 : 1) + progress * f.grow;
+                    wave.mesh.scale.set(s, 1, s);
+                }
+                // Quick fade-in then out for a punchy "pop".
+                const op = (f.op0 != null ? f.op0 : 0.8) * (1 - progress) * (progress < 0.12 ? progress / 0.12 : 1);
+                if (f.group) wave.mesh.traverse(c => { if (c.material) c.material.opacity = op; });
+                else if (wave.mesh.material) wave.mesh.material.opacity = op;
             } else {
                 // Generic shockwave behavior
                 wave.mesh.scale.set(1 + progress * 2, 1, 1 + progress * 2);
