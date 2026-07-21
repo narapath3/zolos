@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
@@ -687,6 +687,12 @@ export class GameUI {
       // Show the loaded armor/shield pieces on the hero model.
       if (this.character && this.character.updateGearVisuals) this.character.updateGearVisuals();
 
+      // Re-summon the active companion pet, if one was out.
+      const equippedPet = this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true);
+      if (this.character && this.character.setPet) {
+        this.character.setPet(equippedPet ? petModelOf(equippedPet.item_name) : null);
+      }
+
       // Migrate pickaxes saved before durability existed: a missing `durability`
       // means "bought under the old rules", so give it a full bar rather than
       // letting it read as broken.
@@ -1152,7 +1158,7 @@ export class GameUI {
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
     } else if (this.currentTab === 'equip') {
-      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(i.item_type));
+      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'pet'].includes(i.item_type));
       // Clicking an empty doll slot narrows the list to gear that fits it.
       if (this.equipSlotFilter) {
         filtered = filtered.filter(i => getEquipSlot(i.item_name) === this.equipSlotFilter);
@@ -1188,7 +1194,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
 
-        const equippable = ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(item.item_type);
+        const equippable = ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'pet'].includes(item.item_type);
         slot.addEventListener('click', () => {
           document.querySelectorAll('.inv-slot').forEach(s => s.classList.remove('selected'));
           slot.classList.add('selected');
@@ -1540,6 +1546,8 @@ export class GameUI {
       typeStr = 'Hat · หมวก';
     } else if (item.item_type === 'glasses') {
       typeStr = 'Glasses · แว่นตา';
+    } else if (item.item_type === 'pet') {
+      typeStr = 'Pet · สัตว์เลี้ยง';
     } else if (item.item_type === 'fish') {
       typeStr = 'Fish';
     }
@@ -1564,10 +1572,11 @@ export class GameUI {
     if (item.item_type === 'consumable') {
       useBtn.style.display = 'block';
       useBtn.textContent = `ใช้งาน (x${item.quantity})`;
-    } else if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool'].includes(item.item_type)) {
+    } else if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool', 'pet'].includes(item.item_type)) {
       useBtn.style.display = 'block';
       const isEquipped = item.stats && item.stats.equipped === true;
-      useBtn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
+      if (item.item_type === 'pet') useBtn.textContent = isEquipped ? 'เก็บกลับ' : 'เรียกออกมา';
+      else useBtn.textContent = isEquipped ? 'ถอดออก' : 'สวมใส่';
     } else {
       useBtn.style.display = 'none';
     }
@@ -1581,7 +1590,7 @@ export class GameUI {
 
     const item = this.inventory[itemIdx];
 
-    if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool'].includes(item.item_type)) {
+    if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool', 'pet'].includes(item.item_type)) {
       await this._toggleEquipItem(item);
       return;
     }
@@ -1659,6 +1668,8 @@ export class GameUI {
         // Unequipping the pickaxe stops any mining in progress.
         this.character.equippedPickaxe = null;
         this.stopMining();
+      } else if (item.item_type === 'pet') {
+        this.character.setPet(null);
       }
       if (this.characterId) {
         // Ensure the item row exists in DB with correct quantity before updating stats.
@@ -1727,6 +1738,8 @@ export class GameUI {
         this.character.setGlasses(item.item_name);
       } else if (item.item_type === 'tool') {
         this.character.equippedPickaxe = item.item_name;
+      } else if (item.item_type === 'pet') {
+        this.character.setPet(petModelOf(item.item_name));
       }
 
       if (this.characterId) {
@@ -1738,8 +1751,9 @@ export class GameUI {
         await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
-      this.addCombatLog(`⚔️ สวมใส่ ${item.emoji} ${item.item_name} เพิ่มความแข็งแกร่ง!`, 'system');
-      this._equipToast(`สวมใส่ ${item.item_name}`, true);
+      const isPet = item.item_type === 'pet';
+      this.addCombatLog(`${isPet ? '🐾 เรียก' : '⚔️ สวมใส่'} ${item.emoji} ${item.item_name}${isPet ? ' ออกมาเป็นเพื่อน!' : ' เพิ่มความแข็งแกร่ง!'}`, 'system');
+      this._equipToast(`${isPet ? 'เรียก' : 'สวมใส่'} ${item.item_name}`, true);
     }
 
     // Fix: Ensure the character row itself is updated with the new appearance/weapon
@@ -3738,6 +3752,7 @@ export class GameUI {
       if (this.currentShopTab === 'all') return true;
       if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
       if (this.currentShopTab === 'equip') return ['weapon', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
+      if (this.currentShopTab === 'pet') return itemData.type === 'pet';
       return false;
     });
 

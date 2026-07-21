@@ -99,6 +99,14 @@ export const ITEMS = {
     'Steel Bracer': { emoji: '🧤', type: 'armor', rarity: 'epic', desc: 'สนับข้อมือเหล็กหุ้มหมุด ปัดป้องอาวุธและเสริมพลังแขนขณะปะทะ (DEF +12, HP +140)', price: 3200, defBonus: 12, hpBonus: 140 },
     'Guardian Wristguard': { emoji: '🧤', type: 'armor', rarity: 'legendary', desc: 'สนับข้อมือผู้พิทักษ์ เรืองรัศมีศักดิ์สิทธิ์ ดูดซับดาเมจและเพิ่มพลังชีวิต (DEF +30, HP +500)', price: 16000, defBonus: 30, hpBonus: 500 },
 
+    // ---- PETS (สัตว์เลี้ยงคู่ใจ — เดินตามฮีโร่ ไม่มีผลต่อสเตตัส) ----
+    'Poring Pet': { emoji: '🩷', type: 'pet', pet: 'poring', rarity: 'common', desc: 'โพริ่งเจลลี่สีชมพู เด้งดึ๋งตามเจ้าของไปทุกที่ น่ารักที่สุดในแดนราคนารก', price: 2000 },
+    'Chick Pet': { emoji: '🐤', type: 'pet', pet: 'chick', rarity: 'common', desc: 'ลูกเจี๊ยบขนปุยสีเหลือง ร้องเจี๊ยบๆ กระพือปีกน้อยเดินตามอย่างร่าเริง', price: 3000 },
+    'Kitten Pet': { emoji: '🐱', type: 'pet', pet: 'kitten', rarity: 'rare', desc: 'ลูกแมวขนเทานุ่ม หางชูตั้ง เดินเคียงข้างอย่างสง่างามและอบอุ่น', price: 8000 },
+    'Puppy Pet': { emoji: '🐶', type: 'pet', pet: 'puppy', rarity: 'rare', desc: 'ลูกสุนัขแสนซื่อสัตย์ กระดิกหางวิ่งตามเจ้าของไม่ห่าง เพื่อนแท้ผู้ผจญภัย', price: 10000 },
+    'Owl Pet': { emoji: '🦉', type: 'pet', pet: 'owl', rarity: 'epic', desc: 'นกฮูกผู้รอบรู้ ลอยตามเงียบๆ ดวงตาโตเป็นประกายในยามค่ำคืน', price: 25000 },
+    'Baby Dragon Pet': { emoji: '🐉', type: 'pet', pet: 'baby_dragon', rarity: 'legendary', desc: 'มังกรน้อยกำเนิดใหม่ กระพือปีกลอยเคียงข้าง สง่างามราวจ้าวเวหา', price: 60000 },
+
     // ---- 18 EPIC ITEMS ----
     'Gilding Ingot': { emoji: '🧱', type: 'material', rarity: 'epic', desc: 'แท่งทองคำบริสุทธิ์ผ่านการหลอมสองรอบ ตราสัญลักษณ์ราชกรประทับตรางาม', price: 800 },
     'Wind Element Stone': { emoji: '🌀', type: 'material', rarity: 'epic', desc: 'ก้อนพลังงานธาตุลมสีเขียวครามระยิบ หมุนติ้วปะทะความเร็ววายุ', price: 1000 },
@@ -1412,8 +1420,21 @@ export const SHOP_ITEMS = [
     { name: 'Steel Bracer', price: 3200 },
     { name: 'Plate Legguards', price: 4200 },
     { name: 'Guardian Wristguard', price: 16000 },
-    { name: 'Dragon Greaves', price: 20000 }
+    { name: 'Dragon Greaves', price: 20000 },
+    // ---- Pets (สัตว์เลี้ยง) ----
+    { name: 'Poring Pet', price: 2000 },
+    { name: 'Chick Pet', price: 3000 },
+    { name: 'Kitten Pet', price: 8000 },
+    { name: 'Puppy Pet', price: 10000 },
+    { name: 'Owl Pet', price: 25000 },
+    { name: 'Baby Dragon Pet', price: 60000 }
 ];
+
+// The pet model key for a pet item (or null). Used to build the follower mesh.
+export function petModelOf(itemName) {
+    const it = ITEMS[itemName];
+    return (it && it.type === 'pet') ? (it.pet || null) : null;
+}
 
 // ============ FORGE RECIPES ============
 // Weapon Smith crafting: a base weapon + materials (from your bag) + gold →
