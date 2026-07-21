@@ -2649,6 +2649,16 @@ export class GameUI {
       });
     }
 
+    // Tapping anywhere on the input bar (padding, label, gaps — not the emoji
+    // or send buttons) focuses the input so the whole bar is one big tap target.
+    const chatInputRow = chatPanel.querySelector('.chat-input-row');
+    if (chatInputRow && chatInput) {
+      chatInputRow.addEventListener('click', (e) => {
+        if (e.target.closest('#btn-emoji') || e.target.closest('#btn-send-chat')) return;
+        try { chatInput.focus(); } catch (err) { /* ignore */ }
+      });
+    }
+
     // Focusing the input (tap on mobile, or click on desktop) expands the panel
     // out of preview. Done here — not by re-focusing — to avoid a focus loop.
     if (chatInput) {
