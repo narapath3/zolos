@@ -2838,8 +2838,11 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 .chat-panel.preview-mode { pointer-events: none; height: auto !important; background: transparent !important; }
 .chat-panel.preview-mode .chat-messages-container,
 .chat-panel:not(.preview-mode) .chat-messages-container { background: rgba(8, 12, 22, 0.40) !important; overflow-y: auto !important; }
-.chat-panel.preview-mode .chat-input-row { opacity: 0.5; }
+/* Preview: keep the input bar a clear, obviously-tappable "type here" pill. */
+.chat-panel.preview-mode .chat-input-row { opacity: 0.96; cursor: text; background: rgba(8, 12, 22, 0.82); border-color: rgba(120, 150, 210, 0.5); }
 .chat-panel:not(.preview-mode) .chat-input-row { opacity: 1; background: rgba(8, 12, 22, 0.92); border-color: #6ea8ff; }
+/* Bigger touch target for the input on the bar. */
+#chat-input { min-height: 30px; }
 .chat-panel:not(.preview-mode) .chat-messages-container { background: rgba(8, 12, 22, 0.66) !important; }
 
 /* Touch layouts: the movement joystick is a floating one (appears where you
@@ -2853,8 +2856,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
        onto the menu on notched phones. */
     bottom: calc(92px + env(safe-area-inset-bottom)) !important;
     top: auto !important;
-    width: 64vw !important;
-    max-width: 64vw;
+    width: 78vw !important;
+    max-width: 78vw;
   }
   .chat-messages-container { max-height: 66px; }
   .chat-input-row::before { content: ""; padding: 0; }
@@ -5624,15 +5627,20 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .chat-panel.preview-mode {
-  opacity: 0.4 !important; /* Faded when not interacting */
+  opacity: 0.82 !important; /* clear enough that the tap-to-type bar reads as active */
   background: rgba(0, 0, 0, 0.2) !important;
   backdrop-filter: blur(2px) !important;
   border-color: rgba(255, 255, 255, 0.05) !important;
-  pointer-events: none !important; /* Allows clicking through to the joystick/canvas when not active */
+  pointer-events: none !important; /* messages click through; the input bar re-enables below */
 }
 
 .chat-panel.preview-mode * {
-  pointer-events: none !important; /* Ensure all children also pass through clicks */
+  pointer-events: none !important; /* messages pass through to the joystick/canvas */
+}
+/* …but the input bar itself stays tappable so you can click it to start typing. */
+.chat-panel.preview-mode .chat-input-row,
+.chat-panel.preview-mode .chat-input-row * {
+  pointer-events: auto !important;
 }
 
 .chat-panel.preview-mode:hover {
@@ -5664,7 +5672,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 768px) {
   .chat-panel {
-    width: 260px !important;
+    width: min(82vw, 460px) !important;
+    max-width: 82vw !important;
     height: 110px !important;
     bottom: calc(85px + env(safe-area-inset-bottom)) !important;
   }
