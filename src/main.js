@@ -778,19 +778,25 @@ async function initGame(charData) {
                 remotePlayersMap.set(p.userId, rp);
             }
 
-            // Update position and appearance
-            if (p.x !== undefined && p.y !== undefined && p.z !== undefined) {
-                rp.mesh.position.set(p.x, p.y, p.z);
+            // Store the latest position/rotation as an interpolation TARGET
+            // instead of snapping — updateRemotePlayers() eases the mesh toward
+            // it every frame, so remote heroes glide smoothly even at high ping.
+            if (p.x !== undefined && p.z !== undefined) {
+                if (!rp.targetPos) {
+                    // First sighting: snap so it doesn't slide in from the origin.
+                    rp.mesh.position.set(p.x, p.y ?? rp.mesh.position.y, p.z);
+                    rp.targetPos = new THREE.Vector3(p.x, p.y ?? 0, p.z);
+                } else {
+                    rp.targetPos.set(p.x, p.y ?? rp.targetPos.y, p.z);
+                }
             }
-            if (p.rY !== undefined) {
-                rp.mesh.rotation.y = p.rY;
-            }
+            if (p.rY !== undefined) rp.targetRotY = p.rY;
 
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
 
-                // Step 10 Part B: Robust water detection for remote players.
-                const remoteEnv = sceneManager.getEnvironmentAt(rp.mesh.position);
+                // Step 10 Part B: Robust water detection (based on the target pos).
+                const remoteEnv = sceneManager.getEnvironmentAt(rp.targetPos || rp.mesh.position);
                 if (remoteEnv === 'water') {
                     rp.character.baseY = -0.5;
                     rp.character.state = 'swimming';
@@ -803,8 +809,7 @@ async function initGame(charData) {
                 }
                 // Show this remote player's fishing line while they're fishing
                 rp.character.syncFishingLine(rp.character.state === 'fishing');
-                // Update animations for remote player
-                rp.character.update(1 / 60);
+                // (animation now ticks per-frame in updateRemotePlayers)
             }
 
             // Remote attack SFX — when the attacker's swing counter changes,
@@ -2031,6 +2036,31 @@ function updateBossCombat(dt) {
     registerLocalAttack(character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword');
 }
 
+// ============ Remote player interpolation ============
+// Position updates arrive every ~100–200ms; snapping to them looks jittery at
+// high ping. Instead we ease each remote hero toward its latest target every
+// frame (X/Z only — Y is animation-driven), giving smooth motion regardless of
+// latency. Also ticks their idle/walk animation per frame for fluid bobbing.
+function updateRemotePlayers(dt) {
+    if (!remotePlayersMap || remotePlayersMap.size === 0) return;
+    // Framerate-independent exponential smoothing (~0.1s to catch up).
+    const k = 1 - Math.exp(-dt * 12);
+    for (const [, rp] of remotePlayersMap.entries()) {
+        if (!rp || !rp.mesh) continue;
+        if (rp.targetPos) {
+            rp.mesh.position.x += (rp.targetPos.x - rp.mesh.position.x) * k;
+            rp.mesh.position.z += (rp.targetPos.z - rp.mesh.position.z) * k;
+        }
+        if (rp.targetRotY !== undefined) {
+            let d = rp.targetRotY - rp.mesh.rotation.y;
+            while (d > Math.PI) d -= Math.PI * 2;
+            while (d < -Math.PI) d += Math.PI * 2;
+            rp.mesh.rotation.y += d * k;
+        }
+        if (rp.character && rp.character.update) rp.character.update(dt);
+    }
+}
+
 // ============ Auto-Skill (while AUTO farming) ============
 // When AUTO is on, cast the 3 skills automatically too: Heal when hurt, Magnum
 // Break on clustered monsters, Bash on the current target. castSkill() no-ops
@@ -2284,6 +2314,7 @@ function stepWorld(dt) {
 
     // 5. Updates
     character.update(dt);
+    updateRemotePlayers(dt); // smooth remote heroes toward their latest target
 
     // Fishing line follows the live rod tip (incl. the catch yank)
     if (isFishingActive && sceneManager && character.getRodTipPosition) {
