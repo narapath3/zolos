@@ -1,6 +1,19 @@
 // Monster Manager — Monster spawning, AI, and management
 import * as THREE from 'three';
-import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster } from './GameData.js';
+import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster, getWaterSpawnTable } from './GameData.js';
+
+// Reference level used for the SHARED world spawn tables. Fixed (not the local
+// player's level) so every player — whatever their level — builds the exact
+// same monster layout for a map, i.e. the same types at the same spots.
+const SHARED_SPAWN_LEVEL = 999;
+
+// Stable 32-bit hash of a string, so each map gets its own deterministic layout
+// while every player on that map still matches.
+function hashStr(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h | 0;
+}
 
 const MAX_MONSTERS = 12;
 const MAX_WATER_MONSTERS = 4;
@@ -1152,19 +1165,32 @@ export class MonsterManager {
         return [...this.monsters, ...this.waterMonsters].find(m => m.id === id);
     }
 
-    spawnInitial(playerLevel) {
-        const rng = createSeededRng(getDailySeed());
-        const count = MAX_MONSTERS; // Spawn fixed max count to ensure consistency across all clients
+    // Deterministic weighted pick from a spawn table using the seeded rng, so
+    // every player consumes the rng identically and lands on the same type.
+    _pickWeightedSeeded(table, rng) {
+        const total = table.reduce((s, e) => s + e.weight, 0);
+        if (total <= 0) return table[0] && table[0].type;
+        let roll = rng() * total;
+        for (const e of table) { roll -= e.weight; if (roll <= 0) return e.type; }
+        return table[table.length - 1].type;
+    }
 
-        // Spawn seeded land monsters using map-specific database
-        const spawnTable = getSpawnTable(playerLevel, this.mapId);
+    spawnInitial(playerLevel) {
+        // Seed from the UTC date + this map → identical layout for EVERY player
+        // on the map that day, regardless of their level. (playerLevel is
+        // intentionally ignored here so no two players ever see different mobs.)
+        const rng = createSeededRng((getDailySeed() ^ hashStr(this.mapId || 'prontera')) | 0);
+        const count = MAX_MONSTERS; // fixed count for consistency across clients
+
+        // Full, level-independent spawn table for this map.
+        const spawnTable = getSpawnTable(SHARED_SPAWN_LEVEL, this.mapId);
 
         for (let i = 0; i < count; i++) {
             if (spawnTable.length === 0) continue;
-            const entry = spawnTable[Math.floor(rng() * spawnTable.length)];
-            const pos = this._getRandomPositionForMonster(entry.type, rng);
+            const type = this._pickWeightedSeeded(spawnTable, rng);
+            const pos = this._getRandomPositionForMonster(type, rng);
 
-            const monster = new Monster(this.scene, entry.type, pos);
+            const monster = new Monster(this.scene, type, pos);
             monster.id = `land_${i}`;
             monster.spawnIndex = i;
             monster.spawnPosition = pos.clone();
@@ -1175,14 +1201,16 @@ export class MonsterManager {
         // Spawn water monsters (most maps have a river). Svarrga (Heaven) is a
         // peaceful mining city — no monsters there.
         if (this.mapId !== 'svarrga') {
-            this._spawnWaterMonsters(playerLevel, rng);
+            this._spawnWaterMonsters(rng);
         }
     }
 
-    _spawnWaterMonsters(playerLevel, rng) {
+    _spawnWaterMonsters(rng) {
         const useRng = rng || Math.random;
+        // Level-independent water table + seeded type pick → same for everyone.
+        const table = getWaterSpawnTable(SHARED_SPAWN_LEVEL);
         for (let i = 0; i < MAX_WATER_MONSTERS; i++) {
-            const type = pickRandomWaterMonster(playerLevel);
+            const type = this._pickWeightedSeeded(table, useRng);
             const pos = this._getRandomPositionForMonster(type, useRng);
 
             const monster = new Monster(this.scene, type, pos);
