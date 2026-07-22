@@ -1,6 +1,6 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult } from './GameData.js';
 import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 
@@ -76,6 +76,8 @@ export class CharacterManager {
         // Multi-slot armor: one item per body-part slot, all contributing stats.
         // (head/body/garment/ring/wrist/pants/feet/accessory — see GameData.)
         this.equippedGear = { head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
+        // Refine level (+N) of the item worn in each slot — scales its bonuses.
+        this.equipRefine = { weapon: 0, shield: 0, head: 0, body: 0, garment: 0, ring: 0, wrist: 0, pants: 0, feet: 0, accessory: 0 };
         // Back-compat alias: legacy code reads/writes a single `equippedArmor`.
         // Map it onto the body slot so old saves + call-sites keep working.
         Object.defineProperty(this, 'equippedArmor', {
@@ -163,20 +165,21 @@ export class CharacterManager {
 
     getWeaponAtkBonus(weaponName) {
         if (!weaponName || !ITEMS[weaponName]) return 0;
-        return ITEMS[weaponName].atkBonus || 0;
+        return Math.round((ITEMS[weaponName].atkBonus || 0) * getRefineMult(this.equipRefine.weapon));
     }
 
     getWeaponSpBonus(weaponName) {
         if (!weaponName || !ITEMS[weaponName]) return 0;
-        return ITEMS[weaponName].spBonus || 0;
+        return Math.round((ITEMS[weaponName].spBonus || 0) * getRefineMult(this.equipRefine.weapon));
     }
 
     // Sum a bonus field (defBonus/hpBonus/spBonus) across every equipped gear
-    // piece — the whole paper-doll contributes, not just one armor.
+    // piece — the whole paper-doll contributes, each scaled by its refine level.
     _gearTotal(field) {
         let sum = 0;
-        for (const name of Object.values(this.equippedGear)) {
-            if (name && ITEMS[name]) sum += ITEMS[name][field] || 0;
+        for (const slot of Object.keys(this.equippedGear)) {
+            const name = this.equippedGear[slot];
+            if (name && ITEMS[name]) sum += Math.round((ITEMS[name][field] || 0) * getRefineMult(this.equipRefine[slot] || 0));
         }
         return sum;
     }
@@ -197,7 +200,7 @@ export class CharacterManager {
 
     getShieldDefBonus(shieldName) {
         if (!shieldName || !ITEMS[shieldName]) return 0;
-        return ITEMS[shieldName].defBonus || 0;
+        return Math.round((ITEMS[shieldName].defBonus || 0) * getRefineMult(this.equipRefine.shield));
     }
 
     getAttackRange() {

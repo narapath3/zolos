@@ -107,6 +107,10 @@ export const ITEMS = {
     'Owl Pet': { emoji: '🦉', type: 'pet', pet: 'owl', rarity: 'epic', desc: 'นกฮูกผู้รอบรู้ ลอยตามเงียบๆ ดวงตาโตเป็นประกายในยามค่ำคืน', price: 25000 },
     'Baby Dragon Pet': { emoji: '🐉', type: 'pet', pet: 'baby_dragon', rarity: 'legendary', desc: 'มังกรน้อยกำเนิดใหม่ กระพือปีกลอยเคียงข้าง สง่างามราวจ้าวเวหา', price: 60000 },
 
+    // ---- REFINE ORES (แร่ตีบวก) ----
+    'Oridecon': { emoji: '🔩', type: 'material', rarity: 'rare', desc: 'แร่ออริดิคอนแข็งแกร่ง ใช้ตีบวกอาวุธให้ทรงพลังยิ่งขึ้น ยิ่งบวกสูงยิ่งใช้มาก', price: 2500 },
+    'Elunium': { emoji: '💠', type: 'material', rarity: 'rare', desc: 'แร่อีลูเนียมเปล่งประกาย ใช้ตีบวกเกราะและโล่ให้ป้องกันเหนือชั้น', price: 2500 },
+
     // ---- 18 EPIC ITEMS ----
     'Gilding Ingot': { emoji: '🧱', type: 'material', rarity: 'epic', desc: 'แท่งทองคำบริสุทธิ์ผ่านการหลอมสองรอบ ตราสัญลักษณ์ราชกรประทับตรางาม', price: 800 },
     'Wind Element Stone': { emoji: '🌀', type: 'material', rarity: 'epic', desc: 'ก้อนพลังงานธาตุลมสีเขียวครามระยิบ หมุนติ้วปะทะความเร็ววายุ', price: 1000 },
@@ -1265,6 +1269,48 @@ export function getJobMods(jobId) {
     return (job && job.mods) ? job.mods : { hp: 1, sp: 1, atk: 1, def: 1 };
 }
 
+// ============ REFINE / ตีบวกไอเทม ============
+// Equipment can be refined +0 → +∞ for growing stats. Refine level is stored
+// per inventory item in item.stats.refine, so no schema change is needed.
+export const REFINABLE_TYPES = ['weapon', 'armor', 'shield'];
+
+// Each refine level adds 12% of the item's base bonus (atk/def/hp/sp).
+export function getRefineMult(level) {
+    return 1 + Math.max(0, level | 0) * 0.12;
+}
+
+// Which ore an item type consumes when refining (RO flavour).
+export function refineOreFor(itemType) {
+    return itemType === 'weapon' ? 'Oridecon' : 'Elunium';
+}
+
+// Success chance + failure behaviour when refining FROM `level` to level+1, plus
+// the gold/ore cost. Safe (no downgrade) below +10; forgiving-but-tense design.
+export function refineInfo(level) {
+    const L = Math.max(0, level | 0);
+    let chance;
+    if (L < 4) chance = 1;                                  // +0..+3 always succeed
+    else if (L < 7) chance = 0.85 - (L - 4) * 0.05;         // 85→75
+    else if (L < 10) chance = 0.65 - (L - 7) * 0.06;        // 65→53
+    else if (L < 15) chance = 0.47 - (L - 10) * 0.045;      // 47→29
+    else chance = 0.24 - (L - 15) * 0.015;                  // 24→…
+    chance = Math.max(0.05, chance);
+    const downgrade = L >= 10 ? 1 : 0;   // fail below +10 keeps the level; +10+ drops 1
+    const gold = 400 + Math.floor(Math.pow(L + 1, 2) * 220);
+    const ore = 1 + Math.floor(L / 3);
+    return { chance, downgrade, gold, ore };
+}
+
+// Colour tier for a refine level — drives the +N label colour and hero glow.
+export function refineTierColor(level) {
+    const L = level | 0;
+    if (L >= 15) return '#ff5a7a';
+    if (L >= 10) return '#ffcf4a';
+    if (L >= 7) return '#c774ff';
+    if (L >= 4) return '#6aa8ff';
+    return '#cfe0ff';
+}
+
 // STR/AGI/INT attributes for a class, grown with level along the job's focus.
 // Novice (no job) gets a balanced spread. Shown on the profile screens.
 export function getJobStats(jobId, level = 1) {
@@ -1427,7 +1473,10 @@ export const SHOP_ITEMS = [
     { name: 'Kitten Pet', price: 8000 },
     { name: 'Puppy Pet', price: 10000 },
     { name: 'Owl Pet', price: 25000 },
-    { name: 'Baby Dragon Pet', price: 60000 }
+    { name: 'Baby Dragon Pet', price: 60000 },
+    // ---- Refine ores (แร่ตีบวก) ----
+    { name: 'Oridecon', price: 2500 },
+    { name: 'Elunium', price: 2500 }
 ];
 
 // The pet model key for a pet item (or null). Used to build the follower mesh.

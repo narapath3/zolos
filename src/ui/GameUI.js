@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
@@ -693,6 +693,9 @@ export class GameUI {
         this.character.setPet(equippedPet ? petModelOf(equippedPet.item_name) : null);
       }
 
+      // Apply the refine (+N) bonuses of everything equipped.
+      this._syncEquipRefine();
+
       // Migrate pickaxes saved before durability existed: a missing `durability`
       // means "bought under the old rules", so give it a full bar rather than
       // letting it read as broken.
@@ -1183,9 +1186,11 @@ export class GameUI {
         }
         slot.classList.add(`rarity-${item.rarity || 'common'}`);
 
+        const rfLvl = item.stats && item.stats.refine ? item.stats.refine : 0;
         slot.innerHTML = `
                   <span>${item.emoji}</span>
                   <span class="inv-qty">${item.quantity}</span>
+                  ${rfLvl > 0 ? `<span style="position:absolute;top:1px;left:3px;font-size:10px;font-weight:900;color:${refineTierColor(rfLvl)};text-shadow:0 1px 2px #000;">+${rfLvl}</span>` : ''}
                   ${isEquipped ? '<span class="inv-equipped-badge">E</span>' : ''}
                 `;
         slot.title = `${item.item_name} x${item.quantity}${isEquipped ? ' (Equipped)' : ''}`;
@@ -1305,7 +1310,7 @@ export class GameUI {
         data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
         title="${filled ? name : slot.label + ' (ว่าง)'}">
         <div class="eq-slot-ic">${ic}</div>
-        <div class="eq-slot-lb">${filled ? this._short(name) : slot.label}</div>
+        <div class="eq-slot-lb">${filled ? (this._refinePrefix(name) + this._short(name)) : slot.label}</div>
         ${filled ? '<div class="eq-slot-x">✕</div>' : ''}
       </div>`;
     };
@@ -1382,6 +1387,31 @@ export class GameUI {
       chip('STR', attr.str, '#ff6b6b', 'พลังโจมตี') +
       chip('AGI', attr.agi, '#51cf66', 'ความว่องไว') +
       chip('INT', attr.int, '#748ffc', 'พลังเวท');
+  }
+
+  // Push the refine level (+N) of each equipped item onto the character so its
+  // stat getters scale by refine. Called on load and after every equip/refine.
+  _syncEquipRefine() {
+    const r = this.character && this.character.equipRefine;
+    if (!r) return;
+    for (const k of Object.keys(r)) r[k] = 0;
+    for (const it of (this.inventory || [])) {
+      if (!it.stats || it.stats.equipped !== true) continue;
+      const rf = it.stats.refine || 0;
+      if (it.item_type === 'weapon' || it.item_type === 'fishing_rod') r.weapon = rf;
+      else if (it.item_type === 'shield') r.shield = rf;
+      else if (it.item_type === 'armor') {
+        const slot = getEquipSlot(it.item_name);
+        if (slot && r[slot] !== undefined) r[slot] = rf;
+      }
+    }
+  }
+
+  // "+N " prefix for a refined item name (or '' if not refined / not found).
+  _refinePrefix(itemName) {
+    const it = (this.inventory || []).find(i => i.item_name === itemName);
+    const rf = it && it.stats ? (it.stats.refine || 0) : 0;
+    return rf > 0 ? `+${rf} ` : '';
   }
 
   // Owned items that fit a given doll slot (weapon slot also allows the rod).
@@ -1520,7 +1550,8 @@ export class GameUI {
 
     document.getElementById('detail-icon').textContent = item.emoji;
     const nameEl = document.getElementById('detail-name');
-    nameEl.textContent = item.item_name;
+    const rfx = (item.stats && item.stats.refine) ? `+${item.stats.refine} ` : '';
+    nameEl.textContent = rfx + item.item_name;
     nameEl.className = 'detail-name';
     if (item.rarity) {
       nameEl.classList.add(`color-${item.rarity}`);
@@ -1764,6 +1795,7 @@ export class GameUI {
 
     // Reflect the change on the 3D hero (helmet / armor / cape / boots / shield).
     if (this.character.updateGearVisuals) this.character.updateGearVisuals();
+    this._syncEquipRefine(); // apply the newly-equipped item's +N bonus
 
     this._renderInventory();
     this.updateHUD(this.character.stats);
@@ -4754,27 +4786,187 @@ export class GameUI {
         </div>`;
     }).join('');
 
+    const tab = this.forgeTab || 'craft';
+    const tabBtn = (id, label) => `<button data-forgetab="${id}" style="flex:1;padding:8px 4px;border:none;cursor:pointer;font-weight:800;font-size:12px;border-radius:10px;
+      background:${tab === id ? 'linear-gradient(135deg,#ff9e2e,#ff5a1a)' : 'rgba(255,255,255,.06)'};color:${tab === id ? '#2a1000' : '#e0c0a0'};">${label}</button>`;
+
     card.innerHTML = `
-      <div class="forge-head" style="padding:16px 18px;background:linear-gradient(90deg,#3a1c10,#241109);border-bottom:1px solid #b5642a;">
-        <div style="display:flex;align-items:center;gap:10px;">
+      <div class="forge-head" style="padding:14px 16px 10px;background:linear-gradient(90deg,#3a1c10,#241109);border-bottom:1px solid #b5642a;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
           <div style="font-size:22px;">⚒️</div>
           <div style="flex:1;">
-            <div style="font-weight:900;color:#ffdcb0;font-size:17px;">โรงตีอาวุธ</div>
-            <div style="font-size:11px;color:#c79a78;">รวมส่วนผสมในกระเป๋า → อาวุธพิเศษพลังสูง + เอฟเฟกต์อลังการ</div>
+            <div style="font-weight:900;color:#ffdcb0;font-size:17px;">โรงตีเหล็ก</div>
+            <div style="font-size:11px;color:#c79a78;">ตีอาวุธพิเศษ · ตีบวกเสริมพลังไม่มีเพดาน</div>
           </div>
           <div style="font-size:12px;color:#ffcf6a;font-weight:700;">💰 ${gold.toLocaleString()}</div>
           <button id="forge-close" style="background:rgba(255,255,255,.08);border:none;color:#f0d0b0;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
         </div>
+        <div style="display:flex;gap:6px;">${tabBtn('craft', '⚒️ ตีอาวุธ')}${tabBtn('refine', '✨ ตีบวก')}</div>
       </div>
-      <div class="forge-body" style="padding:14px 16px;">${cards}</div>`;
+      <div class="forge-body" style="padding:14px 16px;">${tab === 'refine' ? this._refineBodyHTML() : cards}</div>`;
 
     card.querySelector('#forge-close').onclick = () => {
       const m = document.getElementById('forge-modal'); if (m) m.style.display = 'none';
       this.updateMobileControlsVisibility();
     };
+    card.querySelectorAll('[data-forgetab]').forEach(b => {
+      b.onclick = () => { this.forgeTab = b.getAttribute('data-forgetab'); this._renderForge(); };
+    });
     card.querySelectorAll('[data-forge]').forEach(b => {
       b.onclick = () => this._forgeItem(FORGE_RECIPES[parseInt(b.getAttribute('data-forge'), 10)]);
     });
+    card.querySelectorAll('[data-rf]').forEach(b => {
+      b.onclick = () => { this.refineSel = b.getAttribute('data-rf'); this._renderForge(); };
+    });
+    const rfBtn = card.querySelector('#refine-go');
+    if (rfBtn) rfBtn.onclick = () => this._performRefine();
+  }
+
+  // The "✨ ตีบวก" tab body: pick a refinable item, preview the next level, cost
+  // and success %, then hammer it. Refine is stored in item.stats.refine.
+  _refineBodyHTML() {
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const gold = this.character ? (Number(this.character.stats.gold) || 0) : 0;
+    const list = (this.inventory || []).filter(i => REFINABLE_TYPES.includes(i.item_type));
+    if (list.length === 0) {
+      return `<div style="text-align:center;color:#c79a78;font-size:13px;padding:24px 8px;">ยังไม่มีอาวุธ/เกราะ/โล่ให้ตีบวก<br/>ไปซื้อหรือฟาร์มมาก่อนนะ แล้วกลับมาตีบวกได้เลย ✨</div>`;
+    }
+    if (!this.refineSel || !list.find(i => i.item_name === this.refineSel)) this.refineSel = list[0].item_name;
+
+    const cells = list.map(i => {
+      const rf = (i.stats && i.stats.refine) || 0;
+      const sel = this.refineSel === i.item_name;
+      const col = refineTierColor(rf);
+      return `<div data-rf="${esc(i.item_name)}" style="position:relative;cursor:pointer;text-align:center;padding:8px 4px;border-radius:10px;
+        background:${sel ? 'rgba(255,180,80,.16)' : 'rgba(0,0,0,.28)'};border:1.5px solid ${sel ? '#ff9e2e' : (rf > 0 ? col + '66' : 'rgba(180,150,120,.25)')};">
+        <div style="font-size:22px;line-height:1;">${i.emoji || '📦'}</div>
+        ${rf > 0 ? `<div style="position:absolute;top:2px;right:5px;font-size:10px;font-weight:900;color:${col};">+${rf}</div>` : ''}
+        <div style="font-size:8.5px;color:#d9c4ad;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${esc(i.item_name)}</div>
+      </div>`;
+    }).join('');
+
+    const sel = list.find(i => i.item_name === this.refineSel);
+    const data = ITEMS[sel.item_name] || {};
+    const L = (sel.stats && sel.stats.refine) || 0;
+    const info = refineInfo(L);
+    const col = refineTierColor(L);
+    const nextCol = refineTierColor(L + 1);
+    const ore = refineOreFor(sel.item_type);
+    const oreHave = this._invCount(ore);
+    const mNow = getRefineMult(L), mNext = getRefineMult(L + 1);
+    const statLine = (label, base) => base ? `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;">
+        <span style="color:#c9b79c;">${label}</span>
+        <span style="color:#fff;font-weight:700;">${Math.round(base * mNow)} <span style="color:#7fe0a0;">→ ${Math.round(base * mNext)}</span></span></div>` : '';
+    const stats = statLine('⚔️ ATK', data.atkBonus) + statLine('🛡️ DEF', data.defBonus) + statLine('❤️ HP', data.hpBonus) + statLine('💧 SP', data.spBonus);
+
+    const chancePct = Math.round(info.chance * 100);
+    const chanceCol = info.chance >= 0.8 ? '#7fe0a0' : info.chance >= 0.5 ? '#ffcf6a' : '#ff8f7a';
+    const goldOk = gold >= info.gold, oreOk = oreHave >= info.ore;
+    const canDo = goldOk && oreOk;
+
+    return `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin-bottom:12px;max-height:120px;overflow-y:auto;">${cells}</div>
+      <div id="refine-stage" style="text-align:center;margin:4px 0 10px;">
+        <div style="font-size:40px;line-height:1;filter:drop-shadow(0 0 10px ${col});">${sel.emoji || '🗡️'}</div>
+        <div style="font-weight:900;font-size:16px;color:${col};margin-top:4px;">${L > 0 ? '+' + L + ' ' : ''}${esc(sel.item_name)}</div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);border:1px solid rgba(180,150,120,.25);border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+        ${stats || '<div style="font-size:12px;color:#c9b79c;text-align:center;">ไอเทมนี้เพิ่มพลังตามระดับตีบวก</div>'}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:12px;color:#c9b79c;">โอกาสสำเร็จ +${L}→+${L + 1}</span>
+        <span style="font-weight:900;font-size:16px;color:${chanceCol};">${chancePct}%</span>
+      </div>
+      ${info.downgrade ? `<div style="font-size:10.5px;color:#ff9a7a;margin-bottom:8px;">⚠️ ถ้าล้มเหลว ระดับตีบวกจะลดลง ${info.downgrade} ระดับ</div>`
+        : `<div style="font-size:10.5px;color:#9fd0a0;margin-bottom:8px;">🛡️ ปลอดภัย: ล้มเหลวก็ไม่ลดระดับ</div>`}
+      <div style="display:flex;gap:14px;justify-content:center;font-size:12px;margin-bottom:12px;">
+        <span style="color:${goldOk ? '#ffcf6a' : '#ff8f7a'};">💰 ${info.gold.toLocaleString()}</span>
+        <span style="color:${oreOk ? '#cfe0ff' : '#ff8f7a'};">${ITEMS[ore] ? ITEMS[ore].emoji : '🔩'} ${ore} ${oreHave}/${info.ore}</span>
+      </div>
+      <button id="refine-go" ${canDo ? '' : 'disabled'} style="width:100%;padding:12px;border:none;border-radius:14px;cursor:${canDo ? 'pointer' : 'not-allowed'};
+        font-weight:900;font-size:15px;color:${canDo ? '#2a1000' : '#8a7a6a'};
+        background:${canDo ? `linear-gradient(135deg,${nextCol},#ff7a2a)` : 'rgba(255,255,255,.06)'};box-shadow:${canDo ? '0 6px 18px rgba(255,140,40,.4)' : 'none'};">
+        ✨ ตีบวก → +${L + 1}
+      </button>`;
+  }
+
+  async _performRefine() {
+    if (!this.character) return;
+    const item = (this.inventory || []).find(i => i.item_name === this.refineSel);
+    if (!item || !REFINABLE_TYPES.includes(item.item_type)) return;
+
+    const L = (item.stats && item.stats.refine) || 0;
+    const info = refineInfo(L);
+    const ore = refineOreFor(item.item_type);
+    const gold = Number(this.character.stats.gold) || 0;
+
+    if (gold < info.gold) { this.addCombatLog('❌ เงิน Zeny ไม่พอตีบวก', 'warning'); return; }
+    if (this._invCount(ore) < info.ore) { this.addCombatLog(`❌ ${ore} ไม่พอ (ต้องใช้ ${info.ore})`, 'warning'); return; }
+
+    // Consume gold + ore up front (win or lose).
+    this.character.stats.gold = gold - info.gold;
+    const oreInv = this.inventory.find(i => i.item_name === ore);
+    if (oreInv) {
+      oreInv.quantity -= info.ore;
+      if (oreInv.quantity <= 0) this.inventory = this.inventory.filter(i => i !== oreInv);
+      if (this.characterId) saveInventoryItem(this.characterId, ore, 'material', -info.ore).catch(() => { });
+    }
+
+    const success = Math.random() < info.chance;
+    if (!item.stats) item.stats = {};
+    let newLevel = L;
+    if (success) {
+      newLevel = L + 1;
+    } else if (info.downgrade) {
+      newLevel = Math.max(0, L - info.downgrade);
+    }
+    item.stats.refine = newLevel;
+
+    // Persist item stats + gold.
+    if (this.characterId) {
+      updateInventoryItemStats(this.characterId, item.item_name, item.stats).catch(() => { });
+      if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => { });
+    }
+
+    // If this item is equipped, its bonus just changed → re-apply + refresh HUD.
+    if (item.stats.equipped === true) {
+      this._syncEquipRefine();
+      this.updateHUD(this.character.stats);
+      this.updateStats(this.character.stats);
+    }
+
+    // Feedback + spectacle.
+    if (success) {
+      this.addCombatLog(`✨✅ ตีบวก ${item.emoji || ''} ${item.item_name} สำเร็จ! เป็น +${newLevel}`, 'levelup');
+      if (this.triggerScreenShake) this.triggerScreenShake(true);
+      if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
+      this._refineFlash(true, newLevel);
+    } else {
+      const msg = info.downgrade && newLevel < L
+        ? `💥 ตีบวกล้มเหลว! ${item.item_name} ลดเหลือ +${newLevel}`
+        : `💨 ตีบวกล้มเหลว! ${item.item_name} ยังคง +${newLevel}`;
+      this.addCombatLog(msg, 'warning');
+      if (this.soundManager && this.soundManager.playErrorSound) this.soundManager.playErrorSound();
+      this._refineFlash(false, newLevel);
+    }
+
+    this._renderForge();
+    this._renderInventory();
+  }
+
+  // Quick success/fail flash over the refine stage.
+  _refineFlash(success, level) {
+    const stage = document.getElementById('refine-stage');
+    if (!stage) return;
+    const badge = document.createElement('div');
+    badge.textContent = success ? `✨ +${level} SUCCESS!` : '💥 FAIL';
+    badge.style.cssText = `position:absolute;left:50%;top:0;transform:translate(-50%,-6px);font-weight:900;font-size:18px;pointer-events:none;
+      color:${success ? '#ffe27a' : '#ff8f7a'};text-shadow:0 2px 10px rgba(0,0,0,.7);opacity:0;transition:opacity .15s,transform .5s;z-index:5;`;
+    stage.style.position = 'relative';
+    stage.appendChild(badge);
+    requestAnimationFrame(() => { badge.style.opacity = '1'; badge.style.transform = 'translate(-50%,-34px)'; });
+    setTimeout(() => { badge.style.opacity = '0'; }, 900);
+    setTimeout(() => badge.remove(), 1200);
   }
 
   _forgeItem(recipe) {
