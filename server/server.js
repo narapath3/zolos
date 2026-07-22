@@ -368,6 +368,19 @@ io.on('connection', (socket) => {
         socket.to(`map:${mapId}`).emit('pos', { ...payload, userId: self.userId, mapId });
     });
 
+    // --- SHARED MONSTER HP --- relay a monster hit to everyone else on the map
+    // so their copy of that (deterministically-spawned) monster drains the same
+    // HP. Pure relay: the server keeps no monster state; sender is excluded.
+    socket.on('monster_hit', (payload) => {
+        if (!payload || typeof payload.monsterId !== 'string') return;
+        const self = trustedSender(socket);
+        if (!self) return;
+        const mapId = payload.mapId || self.mapId || 'prontera_field';
+        const damage = Math.max(0, Math.min(1e7, Number(payload.damage) || 0));
+        if (damage <= 0) return;
+        socket.to(`map:${mapId}`).emit('monster_hit', { monsterId: payload.monsterId, damage });
+    });
+
     // --- LATENCY PONG --- reply to our periodic srv_ping; RTT = now - echoed ts
     socket.on('srv_pong', (t) => {
         const info = onlinePlayers.get(socket.id);

@@ -1152,6 +1152,11 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('boss_dead', (payload) => window.worldBossManager?.onDead?.(payload));
             socket.on('boss_flee', (payload) => window.worldBossManager?.onFlee?.(payload));
 
+            // Shared monster HP — a teammate hit a monster; drain our copy too.
+            socket.on('monster_hit', (payload) => {
+                if (payload) window.applyRemoteMonsterHit?.(payload.monsterId, payload.damage);
+            });
+
             socketListenersAttached = true;
         }
 
@@ -1183,6 +1188,16 @@ export function broadcastPosition(userId, username, level, position, rotationY, 
         if (atkSeq) { payload.aseq = atkSeq; payload.wsc = weaponSoundClass || 'sword'; }
         socket.emit('pos', payload);
         return;
+    }
+}
+
+// Relay a hit on a shared monster to everyone else on the map so their copy of
+// that monster loses the same HP (server excludes the sender).
+export function broadcastMonsterHit(monsterId, damage, currentMapId = 'prontera') {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('monster_hit', { monsterId, damage, mapId: currentMapId });
     }
 }
 
