@@ -2,7 +2,7 @@
 // Shows player stats, skills, and equipment with premium styling
 
 import { JobPreview } from '../engine/JobPreview.js';
-import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS } from '../engine/GameData.js';
+import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats } from '../engine/GameData.js';
 
 export class PlayerProfileModal {
   constructor() {
@@ -451,13 +451,11 @@ export class PlayerProfileModal {
     const job = liveAppearance?.job || dbData?.job || 'Novice';
     const level = dbData?.level || liveAppearance?.level || player.level || 1;
     
-    // STR/AGI/INT fallback logic
-    const defaultStats = JOBS[job]?.stats || { str: 1, agi: 1, int: 1 };
-    const stats = {
-      str: dbData?.str || defaultStats.str,
-      agi: dbData?.agi || defaultStats.agi,
-      int: dbData?.int || defaultStats.int
-    };
+    // STR/AGI/INT are derived from the class + level (the game has no manual
+    // stat allocation, so the DB's str/agi/int columns are just a default 1 and
+    // must not be used — that showed 1/1/1 for everyone).
+    const jobKey = JOBS[job] ? job : (Object.keys(JOBS).find(k => JOBS[k].nameEn === job || JOBS[k].name === job) || null);
+    const stats = getJobStats(jobKey, level);
 
     // Appearance merge
     const appearance = {
@@ -661,11 +659,15 @@ export class PlayerProfileModal {
     // Initialize 3D character preview
     this._init3DPreview(appearance);
 
-    // Animate bars after a short delay
+    // Animate bars after a short delay — scale each relative to this hero's
+    // top attribute so the bars read as a distribution at any level.
     setTimeout(() => {
-      card.querySelectorAll('.stat-bar-fill').forEach(bar => {
-        const val = parseInt(bar.getAttribute('data-val'));
-        bar.style.width = Math.min((val / 10) * 100, 100) + '%';
+      const bars = card.querySelectorAll('.stat-bar-fill');
+      let maxVal = 1;
+      bars.forEach(b => { maxVal = Math.max(maxVal, parseInt(b.getAttribute('data-val')) || 0); });
+      bars.forEach(bar => {
+        const val = parseInt(bar.getAttribute('data-val')) || 0;
+        bar.style.width = Math.max(8, Math.min((val / maxVal) * 100, 100)) + '%';
       });
     }, 50);
 
@@ -791,10 +793,25 @@ export class PlayerProfileModal {
     const badgesEl = card.querySelector('.badges-section');
     if (badgesEl) badgesEl.innerHTML = this._renderBadges({ ...dbData, appearance, level });
 
-    // Update stats bars
-    card.querySelectorAll('.stat-bar-fill').forEach(bar => {
-      const val = parseInt(bar.getAttribute('data-val'));
-      bar.style.width = Math.min((val / 10) * 100, 100) + '%';
+    // Refresh the STR/AGI/INT numbers (level may be more accurate now).
+    if (stats) {
+      const setStat = (cls, v) => {
+        const fill = card.querySelector(`.stat-bar-fill.${cls}`);
+        if (fill) fill.setAttribute('data-val', v);
+        const row = fill ? fill.closest('.stat-row') : null;
+        const valEl = row ? row.querySelector('.stat-value') : null;
+        if (valEl) valEl.textContent = v;
+      };
+      setStat('str', stats.str); setStat('agi', stats.agi); setStat('int', stats.int);
+    }
+
+    // Update stats bars (relative to this hero's top attribute)
+    const bars2 = card.querySelectorAll('.stat-bar-fill');
+    let maxVal2 = 1;
+    bars2.forEach(b => { maxVal2 = Math.max(maxVal2, parseInt(b.getAttribute('data-val')) || 0); });
+    bars2.forEach(bar => {
+      const val = parseInt(bar.getAttribute('data-val')) || 0;
+      bar.style.width = Math.max(8, Math.min((val / maxVal2) * 100, 100)) + '%';
     });
 
     // Update combat stat values
