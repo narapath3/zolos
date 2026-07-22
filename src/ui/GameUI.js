@@ -2652,6 +2652,15 @@ export class GameUI {
       });
     }
 
+    // Tap anywhere OUTSIDE the open chat (the world, a button, the HUD) fades it
+    // back to the faint preview and drops the keyboard — no need to hunt for a
+    // close button on mobile.
+    document.addEventListener('pointerdown', (e) => {
+      if (!chatPanel || chatPanel.classList.contains('preview-mode')) return;
+      if (e.target.closest('#chat-panel') || e.target.closest('#btn-chat-toggle')) return;
+      this._closeChatToPreview();
+    });
+
     // Tapping anywhere on the input bar (padding, label, gaps — not the emoji
     // or send buttons) focuses the input so the whole bar is one big tap target.
     const chatInputRow = chatPanel.querySelector('.chat-input-row');
