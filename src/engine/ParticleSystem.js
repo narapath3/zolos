@@ -58,8 +58,40 @@ export class ParticleSystem {
         // Performance monitoring
         this.perfMonitor = new ParticlePerformanceMonitor();
 
+        // --- FPS-protection for low-spec devices ---
+        // Real per-frame FPS estimate (EMA), independent of
+        // AdaptiveRendererSystem's coarse 2s interval sampler. When the frame
+        // rate sags or the scene is saturated with live effect meshes, new
+        // decorative spawns are skipped so effect spam never turns into a
+        // stutter. Deliberate skill effects get more headroom than the
+        // high-frequency incidental sparks that fire on every single hit.
+        this._fps = 60;
+        this._effectBudget = this.perfMonitor.isLowEndDevice
+            ? { incidental: 18, total: 30, fpsFloor: 24 }
+            : { incidental: 55, total: 90, fpsFloor: 16 };
+
         // Setup procedural textures
         this.textures = this._initProceduralTextures();
+    }
+
+    // Total live decorative meshes currently animating in the scene.
+    _liveEffects() {
+        return this.shockwaves.length + this.hitEffects.length +
+            this.deathEffects.length + this.slashes.length +
+            this.splashEffects.length;
+    }
+
+    // True → skip spawning this effect to protect the frame rate.
+    // `essential` marks deliberate skill effects, which are rarer and more
+    // meaningful than the incidental hit sparks fired on every attack.
+    _throttleEffect(essential = false) {
+        const b = this._effectBudget;
+        if (this._fps < b.fpsFloor) {
+            if (!essential) return true;
+            if (this._fps < b.fpsFloor - 8) return true;
+        }
+        const live = this._liveEffects();
+        return live >= (essential ? b.total : b.incidental);
     }
 
     _initProceduralTextures() {
@@ -203,7 +235,7 @@ export class ParticleSystem {
 
     // ============ Hit Spark Effect ============
     spawnHitEffect(position, isCritical = false) {
-        if (!this.effectsEnabled) return;
+        if (!this.effectsEnabled || this._throttleEffect(false)) return;
         // Adaptive spark count
         let sparkCount = isCritical ? 24 : 12;
         const particleScale = this.perfMonitor.getParticleCount();
@@ -248,6 +280,7 @@ export class ParticleSystem {
 
     // ============ Death Burst ============
     spawnDeathBurst(position) {
+        if (!this.effectsEnabled || this._throttleEffect(false)) return;
         // Adaptive burst count
         let burstCount = 20;
         const particleScale = this.perfMonitor.getParticleCount();
@@ -585,7 +618,7 @@ export class ParticleSystem {
     // ============ Per-skill spectacular effect ============
     // Dispatched by skill id so each of the 12 skills has its own signature.
     spawnSkillEffect(skillId, origin, targetPos) {
-        if (!this.effectsEnabled || !origin) return;
+        if (!this.effectsEnabled || !origin || this._throttleEffect(true)) return;
         const at = targetPos || origin;
         switch (skillId) {
             // --- Novice / shared ---
@@ -1159,6 +1192,7 @@ export class ParticleSystem {
 
     // ============ Sword Slash Arc (Melee) ============
     spawnSlash(position, isCritical = false) {
+        if (!this.effectsEnabled || this._throttleEffect(false)) return;
         // Crescent arc that flashes across the target and fades quickly
         const inner = isCritical ? 0.45 : 0.35;
         const outer = isCritical ? 1.15 : 0.9;
@@ -1188,6 +1222,13 @@ export class ParticleSystem {
 
     // ============ Update ============
     update(deltaTime) {
+        // Per-frame FPS estimate (EMA) that drives effect throttling. Guard
+        // against huge dt from a backgrounded tab so one hitch doesn't nuke
+        // effects; sustained low FPS is caught within ~1s.
+        if (deltaTime > 0 && deltaTime < 0.5) {
+            this._fps += (1 / deltaTime - this._fps) * 0.08;
+        }
+
         // Update projectiles
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
