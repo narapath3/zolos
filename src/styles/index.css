@@ -5627,11 +5627,18 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 }
 
 .chat-panel.preview-mode {
-  opacity: 0.82 !important; /* clear enough that the tap-to-type bar reads as active */
+  opacity: 0.72 !important; /* soft when idle, but the tap-to-type bar still reads */
   background: rgba(0, 0, 0, 0.2) !important;
   backdrop-filter: blur(2px) !important;
   border-color: rgba(255, 255, 255, 0.05) !important;
   pointer-events: none !important; /* messages click through; the input bar re-enables below */
+}
+/* No recent chat → fade the frame right down and drop the empty message box so
+   it isn't a dark rectangle sitting on the map. The input bar stays tappable. */
+.chat-panel.preview-mode.empty { opacity: 0.5 !important; }
+.chat-panel.preview-mode.empty .chat-messages-container {
+  background: transparent !important;
+  border: none !important;
 }
 
 .chat-panel.preview-mode * {
@@ -5672,8 +5679,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 @media (max-width: 768px) {
   .chat-panel {
-    width: min(82vw, 460px) !important;
-    max-width: 82vw !important;
+    width: 62vw !important;      /* clear of the bottom-right action buttons */
+    max-width: 62vw !important;
     height: 110px !important;
     bottom: calc(85px + env(safe-area-inset-bottom)) !important;
   }

@@ -2627,6 +2627,9 @@ export class GameUI {
     const chatInput = document.getElementById('chat-input');
     const sendBtn = document.getElementById('btn-send-chat');
 
+    // Start idle/faint (no messages yet).
+    if (chatPanel) chatPanel.classList.add('empty');
+
     if (btnToggle) {
       btnToggle.addEventListener('click', () => {
         if (chatPanel.classList.contains('preview-mode')) {
@@ -2862,10 +2865,12 @@ export class GameUI {
     // mobile users have something to tap; hiding it left no way to open it.
     if (chatInputRow) chatInputRow.style.display = 'flex';
     if (chatInput) chatInput.blur();
-    
+
     // Auto scroll to bottom
     const chatMessages = document.getElementById('chat-messages');
     if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Back to faint idle look if there's no conversation on screen.
+    if (chatMessages && chatMessages.children.length === 0) chatPanel.classList.add('empty');
   }
 
   setupChatSendCallback(callback) {
@@ -3058,6 +3063,17 @@ export class GameUI {
     row.innerHTML = `<span class="chat-msg-username">[${esc(username)}]:</span> <span class="chat-msg-text">${body}</span>`;
         chatMessages.appendChild(row);
     while (chatMessages.children.length > 80) chatMessages.removeChild(chatMessages.firstChild);
+
+    // A new message wakes the chat out of its faint idle state; it fades back
+    // ~12s after the last message so an idle chat stays unobtrusive.
+    const cp = document.getElementById('chat-panel');
+    if (cp) {
+      cp.classList.remove('empty');
+      clearTimeout(this._chatIdleTimer);
+      this._chatIdleTimer = setTimeout(() => {
+        if (cp.classList.contains('preview-mode')) cp.classList.add('empty');
+      }, 12000);
+    }
 
     setTimeout(() => {
       chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
