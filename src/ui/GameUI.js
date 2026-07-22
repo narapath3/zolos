@@ -6133,6 +6133,12 @@ export class GameUI {
       }
     );
 
+    // Broadcast the cast so everyone on the map sees the skill effect too.
+    if (success && window.broadcastSkillCast) {
+      const tp = target && target.getPosition ? target.getPosition() : null;
+      window.broadcastSkillCast(skillId, tp ? tp.x : null, tp ? tp.z : null);
+    }
+
     return success;
   }
 

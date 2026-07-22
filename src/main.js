@@ -61,6 +61,7 @@ import {
     stopAutoSave,
     broadcastPosition,
     broadcastMonsterHit,
+    broadcastSkillCast,
     broadcastChat,
     updatePresence,
     getDeterministicGuestName,
@@ -424,6 +425,21 @@ async function initGame(charData) {
         if (!m || !m.alive) return;
         const died = m.applyRemoteDamage(damage);
         if (died) combatSystem.handleRemoteKill(m);
+    };
+
+    // ===== See other players' skill effects =====
+    window.broadcastSkillCast = broadcastSkillCast;
+    window.onRemoteSkillCast = (payload) => {
+        if (!particles || !payload || !payload.skillId) return;
+        // Origin = the caster's avatar on our screen (correct position + height).
+        const rp = payload.userId && remotePlayersMap.get(payload.userId);
+        if (!rp || !rp.mesh) return;
+        const origin = rp.mesh.position.clone();
+        // Cull far-away casts so crowded maps stay light.
+        if (character && character.getPosition && origin.distanceTo(character.getPosition()) > 46) return;
+        const target = (payload.tx != null && payload.tz != null)
+            ? new THREE.Vector3(payload.tx, origin.y, payload.tz) : null;
+        particles.spawnSkillEffect(payload.skillId, origin, target);
     };
 
     // Initialize Game UI with character

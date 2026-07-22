@@ -381,6 +381,19 @@ io.on('connection', (socket) => {
         socket.to(`map:${mapId}`).emit('monster_hit', { monsterId: payload.monsterId, damage });
     });
 
+    // --- SKILL EFFECTS --- relay a skill cast to the map so everyone renders the
+    // effect at the caster's avatar. Server stamps the sender's userId so the
+    // receiver anchors the effect on the right hero.
+    socket.on('skill_cast', (payload) => {
+        if (!payload || typeof payload.skillId !== 'string') return;
+        const self = trustedSender(socket);
+        if (!self) return;
+        const mapId = payload.mapId || self.mapId || 'prontera_field';
+        const out = { skillId: payload.skillId, userId: self.userId };
+        if (typeof payload.tx === 'number' && typeof payload.tz === 'number') { out.tx = payload.tx; out.tz = payload.tz; }
+        socket.to(`map:${mapId}`).emit('skill_cast', out);
+    });
+
     // --- LATENCY PONG --- reply to our periodic srv_ping; RTT = now - echoed ts
     socket.on('srv_pong', (t) => {
         const info = onlinePlayers.get(socket.id);
