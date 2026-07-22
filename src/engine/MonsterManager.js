@@ -858,6 +858,22 @@ class Monster {
         return actualDmg;
     }
 
+    // Damage relayed from another player (already post-defense). Drains the same
+    // shared HP so everyone's copy dies together — but does NOT aggro toward the
+    // local hero. Returns true if this hit killed it.
+    applyRemoteDamage(amount) {
+        if (!this.alive) return false;
+        this.hp = Math.max(0, this.hp - Math.max(0, amount | 0));
+        this.hitFlash = Math.max(this.hitFlash, 0.12);
+        if (this.hpBarFill) this.hpBarFill.scale.x = Math.max(0.01, this.hp / this.maxHp);
+        if (this.hp <= 0) {
+            this.alive = false;
+            this.mesh.visible = false;
+            return true;
+        }
+        return false;
+    }
+
     getPosition() {
         return this.mesh.position.clone();
     }
@@ -1079,6 +1095,7 @@ class Monster {
         this._atkCd = 0;
         this.wanderTarget = null;
         this.wanderTimer = 0;
+        this._localContributed = false; // fresh monster — no shared-damage credit yet
     }
 
     destroy() {
@@ -1264,6 +1281,12 @@ export class MonsterManager {
     }
 
     // Queue a monster for respawn
+    // Find a monster by its stable id (land_N / water_N) across both pools.
+    getById(id) {
+        if (!id) return null;
+        return this.monsters.find(m => m.id === id) || this.waterMonsters.find(m => m.id === id) || null;
+    }
+
     queueRespawn(monster) {
         const isWater = monster.isWaterMonster;
         // Deterministic respawn timer based on spawn index

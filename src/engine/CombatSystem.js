@@ -308,6 +308,12 @@ export class CombatSystem {
 
         const actualDmg = monster.takeDamage(baseDmg, isCritical);
 
+        // Shared HP: mark that WE damaged this monster (so we still get loot even
+        // if a teammate lands the final blow) and relay the hit so everyone's
+        // copy drains together and it dies faster.
+        monster._localContributed = true;
+        if (this.onMonsterDamaged) this.onMonsterDamaged(monster.id, actualDmg);
+
         this.onEvent({
             type: 'playerAttack',
             damage: actualDmg,
@@ -361,52 +367,57 @@ export class CombatSystem {
         }
     }
 
-    _onMonsterKilled(monster) {
+    // A monster that WE (or teammates) killed died. `reward` awards exp/gold/loot
+    // — set false when the monster died purely from a teammate's relayed damage
+    // and we never touched it, so bystanders don't farm kills for free.
+    _onMonsterKilled(monster, reward = true) {
         const data = monster.data;
 
-        // EXP
-        const leveledUp = this.character.addExp(data.exp);
-        this.onEvent({
-            type: 'expGain',
-            amount: data.exp,
-            targetPos: monster.getPosition(),
-        });
-
-        if (leveledUp) {
+        if (reward) {
+            // EXP
+            const leveledUp = this.character.addExp(data.exp);
             this.onEvent({
-                type: 'levelUp',
-                level: this.character.stats.level,
+                type: 'expGain',
+                amount: data.exp,
+                targetPos: monster.getPosition(),
             });
-        }
 
-        // Gold
-        const goldAmount = data.gold.min + Math.floor(Math.random() * (data.gold.max - data.gold.min + 1));
-        this.character.stats.gold += goldAmount;
-        this.onEvent({
-            type: 'goldGain',
-            amount: goldAmount,
-            targetPos: monster.getPosition(),
-        });
-
-        // Loot
-        for (const lootEntry of data.loot) {
-            if (Math.random() < lootEntry.chance) {
+            if (leveledUp) {
                 this.onEvent({
-                    type: 'lootDrop',
-                    item: lootEntry,
-                    targetPos: monster.getPosition(),
+                    type: 'levelUp',
+                    level: this.character.stats.level,
                 });
             }
+
+            // Gold
+            const goldAmount = data.gold.min + Math.floor(Math.random() * (data.gold.max - data.gold.min + 1));
+            this.character.stats.gold += goldAmount;
+            this.onEvent({
+                type: 'goldGain',
+                amount: goldAmount,
+                targetPos: monster.getPosition(),
+            });
+
+            // Loot
+            for (const lootEntry of data.loot) {
+                if (Math.random() < lootEntry.chance) {
+                    this.onEvent({
+                        type: 'lootDrop',
+                        item: lootEntry,
+                        targetPos: monster.getPosition(),
+                    });
+                }
+            }
+
+            // Daily Quest hunt progress event
+            this.onEvent({
+                type: 'monsterKilled',
+                monsterName: data.name
+            });
+
+            // Kill count
+            this.character.stats.total_kills++;
         }
-
-        // Daily Quest hunt progress event
-        this.onEvent({
-            type: 'monsterKilled',
-            monsterName: data.name
-        });
-
-        // Kill count
-        this.character.stats.total_kills++;
 
         // Queue respawn
         this.monsters.queueRespawn(monster);
@@ -425,6 +436,13 @@ export class CombatSystem {
         if (this.autoFarm) {
             this.currentTarget = this.monsters.findNearest(this.character.getPosition());
         }
+    }
+
+    // A monster died from combined (relayed) damage on our screen. Reward us only
+    // if we contributed any damage to it; either way it respawns for everyone.
+    handleRemoteKill(monster) {
+        if (!monster) return;
+        this._onMonsterKilled(monster, monster._localContributed === true);
     }
 
     _updateFishing(dt) {

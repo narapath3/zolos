@@ -60,6 +60,7 @@ import {
     startAutoSave,
     stopAutoSave,
     broadcastPosition,
+    broadcastMonsterHit,
     broadcastChat,
     updatePresence,
     getDeterministicGuestName,
@@ -408,6 +409,22 @@ async function initGame(charData) {
                 break;
         }
     }, sceneManager);
+
+    // ===== Shared monster HP (co-op damage) =====
+    // Relay every hit we land so teammates' copies of the monster lose the same
+    // HP — combined damage kills it faster for everyone.
+    combatSystem.onMonsterDamaged = (monsterId, damage) => {
+        broadcastMonsterHit(monsterId, damage, sceneManager.currentMap);
+    };
+    // Apply a teammate's relayed hit to our copy; if it dies from the combined
+    // damage, run the kill (we only get loot if we also damaged it).
+    window.applyRemoteMonsterHit = (monsterId, damage) => {
+        if (!monsters || !combatSystem) return;
+        const m = monsters.getById(monsterId);
+        if (!m || !m.alive) return;
+        const died = m.applyRemoteDamage(damage);
+        if (died) combatSystem.handleRemoteKill(m);
+    };
 
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
