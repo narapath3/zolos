@@ -1157,6 +1157,11 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 if (payload) window.applyRemoteMonsterHit?.(payload.monsterId, payload.damage);
             });
 
+            // A teammate cast a skill — play its effect on our screen too.
+            socket.on('skill_cast', (payload) => {
+                if (payload) window.onRemoteSkillCast?.(payload);
+            });
+
             socketListenersAttached = true;
         }
 
@@ -1198,6 +1203,17 @@ export function broadcastMonsterHit(monsterId, damage, currentMapId = 'prontera'
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         socket.emit('monster_hit', { monsterId, damage, mapId: currentMapId });
+    }
+}
+
+// Tell the map that we cast a skill so everyone can render its effect at our
+// avatar. Only the skill id + optional target position travels; the origin is
+// each receiver's copy of our avatar (server stamps the sender's userId).
+export function broadcastSkillCast(skillId, targetX, targetZ, currentMapId = 'prontera') {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('skill_cast', { skillId, tx: targetX, tz: targetZ, mapId: currentMapId });
     }
 }
 
