@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
@@ -720,6 +720,19 @@ export class GameUI {
         );
       }
 
+      // Restore socketed cards: rebuild equippedCards from card items flagged
+      // equipped + a valid slot. Skips any whose slot no longer accepts it.
+      if (this.character && this.character.equippedCards) {
+        for (const s of Object.keys(this.character.equippedCards)) this.character.equippedCards[s] = null;
+        for (const it of this.inventory) {
+          if (it.item_type !== 'card' || !it.stats || it.stats.equipped !== true) continue;
+          const slot = it.stats.slot;
+          if (slot && this.character.equippedCards[slot] !== undefined && cardFitsSlot(it.item_name, slot)) {
+            this.character.equippedCards[slot] = it.item_name;
+          }
+        }
+      }
+
       // Apply the refine (+N) bonuses of everything equipped.
       this._syncEquipRefine();
 
@@ -1183,9 +1196,9 @@ export class GameUI {
       this.equipSlotFilter = null;
     }
 
-    // Filter based on tab. Pets live in their own tab, so they're kept out of
-    // All / Equip and never mixed in with gear or materials.
-    let filtered = this.inventory.filter(i => i.item_type !== 'pet');
+    // Filter based on tab. Pets and cards each live in their own tab, so
+    // they're kept out of All / Equip and never mixed in with gear or materials.
+    let filtered = this.inventory.filter(i => i.item_type !== 'pet' && i.item_type !== 'card');
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
     } else if (this.currentTab === 'equip') {
@@ -1200,6 +1213,8 @@ export class GameUI {
       filtered = this.inventory.filter(i => i.item_type === 'fish');
     } else if (this.currentTab === 'pet') {
       filtered = this.inventory.filter(i => i.item_type === 'pet');
+    } else if (this.currentTab === 'card') {
+      filtered = this.inventory.filter(i => i.item_type === 'card');
     }
 
     // Fill inventory slots
@@ -1287,6 +1302,18 @@ export class GameUI {
       .equip-hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:10.5px;margin-top:2px;}
       .equip-hero-stats span b{color:#ffd98a;}
       .equip-doll-hint{grid-column:1/-1;font-size:10.5px;color:#8b97ba;text-align:center;margin-top:-2px;}
+      /* Card socket: a small gem-frame at the bottom-left of each gear slot. */
+      .eq-card-socket{position:absolute;left:3px;bottom:2px;width:20px;height:20px;border-radius:6px;
+        display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;cursor:pointer;
+        background:rgba(6,10,20,.85);border:1.5px solid rgba(150,160,190,.5);box-shadow:0 1px 3px rgba(0,0,0,.5);
+        transition:transform .1s,box-shadow .15s,border-color .15s;z-index:2;}
+      .eq-card-socket:hover{transform:scale(1.18);box-shadow:0 0 10px rgba(160,190,255,.7);}
+      .eq-card-socket.empty{color:#7c88a8;border-style:dashed;}
+      .eq-card-socket.filled{background:radial-gradient(circle at 40% 30%,rgba(60,70,110,.9),rgba(10,14,28,.95));}
+      .eq-card-socket.rc-common{border-color:#b8c0cc;}
+      .eq-card-socket.rc-rare{border-color:#5aa9ff;box-shadow:0 0 8px rgba(90,169,255,.6);}
+      .eq-card-socket.rc-epic{border-color:#c07bff;box-shadow:0 0 9px rgba(192,123,255,.65);}
+      .eq-card-socket.rc-legendary{border-color:#ffb43a;box-shadow:0 0 11px rgba(255,180,58,.75);}
       `;
       document.head.appendChild(st);
     }
@@ -1299,6 +1326,13 @@ export class GameUI {
 
     // Delegated click: unequip a filled slot, or filter the list by an empty one.
     doll.addEventListener('click', (e) => {
+      // Card socket takes priority over the gear slot it sits inside.
+      const socket = e.target.closest('.eq-card-socket');
+      if (socket) {
+        e.stopPropagation();
+        this._openCardPicker(socket.getAttribute('data-cardslot'));
+        return;
+      }
       const cell = e.target.closest('.eq-slot');
       if (!cell) return;
       const slotId = cell.getAttribute('data-slot');
@@ -1336,12 +1370,20 @@ export class GameUI {
       const rarity = it && it.rarity ? it.rarity : '';
       const filterCls = this.equipSlotFilter === slot.id ? ' active-filter' : '';
       const ic = filled && it ? (it.emoji || slot.icon) : slot.icon;
+      // Card socket for this slot (shows the socketed card, or a ＋ to add one).
+      const cardName = (ch.equippedCards && ch.equippedCards[slot.id]) || null;
+      const cardIt = cardName ? ITEMS[cardName] : null;
+      const cardRar = cardIt && cardIt.rarity ? cardIt.rarity : 'common';
+      const socket = cardName
+        ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardIt ? cardIt.emoji : '🃏'}</div>`
+        : `<div class="eq-card-socket empty" data-cardslot="${slot.id}" title="ช่องการ์ด (ว่าง) — แตะเพื่อใส่การ์ด">＋</div>`;
       return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
         data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
         title="${filled ? name : slot.label + ' (ว่าง)'}">
         <div class="eq-slot-ic">${ic}</div>
         <div class="eq-slot-lb">${filled ? (this._refinePrefix(name) + this._short(name)) : slot.label}</div>
         ${filled ? '<div class="eq-slot-x">✕</div>' : ''}
+        ${socket}
       </div>`;
     };
     const bySlot = Object.fromEntries(EQUIP_SLOTS.map(s => [s.id, s]));
@@ -1528,6 +1570,123 @@ export class GameUI {
     });
   }
 
+  // Popup list of cards that fit a slot's card socket (plus "remove"). Selecting
+  // one sockets it live; stats + the paper-doll refresh instantly.
+  _openCardPicker(slotId) {
+    if (!this.character) return;
+    const slot = EQUIP_SLOTS.find(s => s.id === slotId);
+    if (!slot) return;
+    const category = cardCategoryForSlot(slotId);
+    const current = this.character.equippedCards ? this.character.equippedCards[slotId] : null;
+    const cards = (this.inventory || []).filter(i => i.item_type === 'card' && cardFitsSlot(i.item_name, slotId));
+    const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[category] || category;
+
+    let ov = document.getElementById('card-picker-overlay');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'card-picker-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(4,7,16,.62);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px;';
+
+    const rows = cards.map(i => {
+      const it = ITEMS[i.item_name] || {};
+      const rar = i.rarity || it.rarity || 'common';
+      const col = RARITY_COLOR[rar] || '#b8c0cc';
+      const inThis = i.item_name === current;
+      const inOther = !inThis && i.stats && i.stats.equipped === true;
+      return `<div class="sp-row cp-row${inThis ? ' sp-eq' : ''}" data-name="${i.item_name}" style="border-left:3px solid ${col};">
+        <span class="sp-ic">${i.emoji || '🃏'}</span>
+        <span class="sp-nm"><b style="color:${col}">${i.item_name}</b><br><span style="font-size:11px;color:#9fb0e0;">${it.desc || ''}</span></span>
+        <span class="sp-tag">${inThis ? '✅ ใส่อยู่' : inOther ? '↪ ช่องอื่น' : ''}</span>
+      </div>`;
+    }).join('');
+
+    ov.innerHTML = `
+      <div class="sp-box" style="background:linear-gradient(160deg,#1b2340,#121627);border:1px solid rgba(130,160,230,.35);
+        border-radius:16px;max-width:360px;width:100%;max-height:72vh;overflow:auto;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div style="font-weight:800;color:#fff;font-size:15px;">🃏 ช่องการ์ด · ${slot.icon} ${slot.label}</div>
+          <div id="cp-close" style="cursor:pointer;color:#9fb0e0;font-size:20px;line-height:1;padding:2px 6px;">✕</div>
+        </div>
+        <div style="font-size:11px;color:#8b97ba;margin-bottom:10px;">ใส่ได้เฉพาะการ์ดประเภท "${catLabel}"</div>
+        <div class="sp-row sp-none" data-name="__none__" style="opacity:${current ? 1 : .5};">
+          <span class="sp-ic">🚫</span><span class="sp-nm">ถอดการ์ดออก</span><span class="sp-tag"></span>
+        </div>
+        ${cards.length ? rows : '<div style="color:#8b97ba;text-align:center;padding:16px 4px;font-size:13px;">ยังไม่มีการ์ดประเภทนี้ — ล่าบอสโลกเพื่อลุ้นการ์ดดรอป!</div>'}
+      </div>`;
+
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.querySelector('#cp-close').addEventListener('click', close);
+    ov.querySelectorAll('.sp-row').forEach(row => {
+      row.addEventListener('click', async () => {
+        const name = row.getAttribute('data-name');
+        if (name === '__none__') await this._unsocketCard(slotId);
+        else if (name !== current) await this._socketCard(slotId, name);
+        close();
+      });
+    });
+  }
+
+  // Socket `cardName` into `slotId`: clears any card already there and moves the
+  // card out of any other slot it occupied. Persists + refreshes stats/doll.
+  async _socketCard(slotId, cardName) {
+    const ch = this.character;
+    if (!ch || !ch.equippedCards) return;
+    const card = this.inventory.find(i => i.item_name === cardName && i.item_type === 'card');
+    if (!card) return;
+    const changed = [];
+
+    // Free the card from a slot it's already in.
+    for (const s of Object.keys(ch.equippedCards)) {
+      if (ch.equippedCards[s] === cardName) ch.equippedCards[s] = null;
+    }
+    // Displace whatever card currently sits in the target slot.
+    const prev = ch.equippedCards[slotId];
+    if (prev && prev !== cardName) {
+      const prevItem = this.inventory.find(i => i.item_name === prev);
+      if (prevItem && prevItem.stats) { prevItem.stats.equipped = false; delete prevItem.stats.slot; changed.push(prevItem); }
+    }
+    ch.equippedCards[slotId] = cardName;
+    if (!card.stats) card.stats = {};
+    card.stats.equipped = true;
+    card.stats.slot = slotId;
+    changed.push(card);
+
+    await this._persistCardStats(changed);
+    this._afterCardChange(`ใส่การ์ด ${card.emoji || '🃏'} ${cardName}`);
+  }
+
+  async _unsocketCard(slotId) {
+    const ch = this.character;
+    if (!ch || !ch.equippedCards) return;
+    const cardName = ch.equippedCards[slotId];
+    if (!cardName) return;
+    ch.equippedCards[slotId] = null;
+    const card = this.inventory.find(i => i.item_name === cardName);
+    if (card && card.stats) { card.stats.equipped = false; delete card.stats.slot; }
+    if (card) await this._persistCardStats([card]);
+    this._afterCardChange(`ถอดการ์ด ${card ? (card.emoji || '🃏') + ' ' + cardName : ''}`);
+  }
+
+  async _persistCardStats(items) {
+    if (!this.characterId) return;
+    for (const it of items) {
+      try { await updateInventoryItemStats(this.characterId, it.item_name, it.stats || {}); } catch (e) { /* ignore */ }
+    }
+  }
+
+  // Shared refresh after any card change: recompute stats, redraw doll + HUD.
+  _afterCardChange(msg) {
+    if (msg) { this.addCombatLog(`🃏 ${msg}`, 'system'); this._equipToast(msg, true); }
+    if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
+    if (this.currentTab === 'equip') this._renderEquipDoll();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
+  }
+
   // Trim a long item name so it fits a slot label.
   _short(name) {
     if (!name) return '';
@@ -1606,6 +1765,9 @@ export class GameUI {
       typeStr = 'Glasses · แว่นตา';
     } else if (item.item_type === 'pet') {
       typeStr = 'Pet · สัตว์เลี้ยง';
+    } else if (item.item_type === 'card') {
+      const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[ITEMS[item.item_name]?.cardSlot] || 'การ์ด';
+      typeStr = 'Card · ' + catLabel;
     } else if (item.item_type === 'fish') {
       typeStr = 'Fish';
     }
@@ -1640,7 +1802,19 @@ export class GameUI {
         + `<div style="height:100%;width:${pct}%;background:${barCol};border-radius:5px"></div></div>`
         + (lvl >= 40 ? '' : `<span style="font-size:11px;color:var(--text-dim)">EXP ${xp}/${need} — ฆ่ามอนสเตอร์เพื่อเพิ่มเลเวลและเอฟเฟค</span>`);
     }
-    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + petHtml + droppedByHtml;
+    let cardHtml = '';
+    if (item.item_type === 'card') {
+      const it = ITEMS[item.item_name] || {};
+      const rar = item.rarity || it.rarity || 'common';
+      const col = RARITY_COLOR[rar] || '#b8c0cc';
+      const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[it.cardSlot] || 'การ์ด';
+      const socketed = item.stats && item.stats.equipped === true;
+      cardHtml = `<br/><br/><strong style="color:${col}">🃏 ความสามารถการ์ด (${rar.toUpperCase()}):</strong> ${it.desc || ''}`
+        + `<br/><span style="font-size:12px;color:var(--text-dim)">ใส่ได้กับช่องประเภท "${catLabel}"`
+        + (socketed ? ` · <span style="color:#8fe0a8">กำลังใส่อยู่</span>` : ` · ไปที่แท็บ Equip แล้วแตะช่องการ์ด (🃏) บนอุปกรณ์เพื่อสวม`)
+        + `</span>`;
+    }
+    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + petHtml + cardHtml + droppedByHtml;
     document.getElementById('detail-price-val').textContent = item.price;
 
     const useBtn = document.getElementById('btn-use-item');

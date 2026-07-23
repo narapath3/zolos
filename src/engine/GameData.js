@@ -107,6 +107,31 @@ export const ITEMS = {
     'Owl Pet': { emoji: '🦉', type: 'pet', pet: 'owl', rarity: 'epic', desc: 'นกฮูกผู้รอบรู้ ลอยตามเงียบๆ ดวงตาโตเป็นประกายในยามค่ำคืน', price: 25000 },
     'Baby Dragon Pet': { emoji: '🐉', type: 'pet', pet: 'baby_dragon', rarity: 'legendary', desc: 'มังกรน้อยกำเนิดใหม่ กระพือปีกลอยเคียงข้าง สง่างามราวจ้าวเวหา', price: 60000 },
 
+    // ---- CARDS (การ์ดมอนสเตอร์ — สวมลงช่องการ์ดของอุปกรณ์ เสริมพลังพิเศษ) ----
+    // cardSlot: 'weapon' | 'armor' | 'shield' | 'accessory' — บอกว่าใส่ช่องไหนได้
+    // card: { atkBonus, defBonus, hpBonus, spBonus, critBonus(0-1), dmgPct(0-1), lifestealPct(0-1) }
+    // --- Common ---
+    'Willow Card': { emoji: '🌿', type: 'card', cardSlot: 'weapon', rarity: 'common', card: { atkBonus: 8 }, desc: 'พลังโจมตี +8', price: 1500 },
+    'Andre Card': { emoji: '🐜', type: 'card', cardSlot: 'weapon', rarity: 'common', card: { atkBonus: 12 }, desc: 'พลังโจมตี +12', price: 2200 },
+    'Poring Card': { emoji: '🟠', type: 'card', cardSlot: 'armor', rarity: 'common', card: { hpBonus: 70 }, desc: 'HP +70', price: 1500 },
+    'Pupa Card': { emoji: '🥚', type: 'card', cardSlot: 'armor', rarity: 'common', card: { hpBonus: 100 }, desc: 'HP +100', price: 2200 },
+    'Lunatic Card': { emoji: '🌙', type: 'card', cardSlot: 'accessory', rarity: 'common', card: { critBonus: 0.03 }, desc: 'อัตราคริติคอล +3%', price: 1800 },
+    'Vadon Card': { emoji: '🦀', type: 'card', cardSlot: 'shield', rarity: 'common', card: { defBonus: 8 }, desc: 'ป้องกัน +8', price: 1800 },
+    // --- Rare ---
+    'Skeleton Card': { emoji: '💀', type: 'card', cardSlot: 'weapon', rarity: 'rare', card: { atkBonus: 20 }, desc: 'พลังโจมตี +20', price: 6000 },
+    'Fabre Card': { emoji: '🐛', type: 'card', cardSlot: 'armor', rarity: 'rare', card: { hpBonus: 150, defBonus: 4 }, desc: 'HP +150, ป้องกัน +4', price: 6000 },
+    'Rocker Card': { emoji: '🎸', type: 'card', cardSlot: 'accessory', rarity: 'rare', card: { atkBonus: 6, critBonus: 0.04 }, desc: 'พลังโจมตี +6, คริ +4%', price: 7000 },
+    'Sohee Card': { emoji: '🧚', type: 'card', cardSlot: 'shield', rarity: 'rare', card: { defBonus: 14, hpBonus: 90 }, desc: 'ป้องกัน +14, HP +90', price: 7500 },
+    // --- Epic ---
+    'Goblin Card': { emoji: '👺', type: 'card', cardSlot: 'weapon', rarity: 'epic', card: { atkBonus: 30, dmgPct: 0.05 }, desc: 'พลังโจมตี +30, ดาเมจ +5%', price: 18000 },
+    'Marina Card': { emoji: '🪼', type: 'card', cardSlot: 'armor', rarity: 'epic', card: { hpBonus: 260, spBonus: 40 }, desc: 'HP +260, SP +40', price: 18000 },
+    'Mantis Card': { emoji: '🦗', type: 'card', cardSlot: 'accessory', rarity: 'epic', card: { critBonus: 0.08, atkBonus: 8 }, desc: 'คริ +8%, พลังโจมตี +8', price: 20000 },
+    // --- Legendary ---
+    'Doppelganger Card': { emoji: '👥', type: 'card', cardSlot: 'weapon', rarity: 'legendary', card: { atkBonus: 45, dmgPct: 0.10, critBonus: 0.05 }, desc: 'พลังโจมตี +45, ดาเมจ +10%, คริ +5%', price: 60000 },
+    'Angeling Card': { emoji: '😇', type: 'card', cardSlot: 'armor', rarity: 'legendary', card: { hpBonus: 450, defBonus: 14, lifestealPct: 0.04 }, desc: 'HP +450, ป้องกัน +14, ดูดเลือด 4%', price: 60000 },
+    'Ghostring Card': { emoji: '👻', type: 'card', cardSlot: 'accessory', rarity: 'legendary', card: { lifestealPct: 0.06, atkBonus: 18 }, desc: 'ดูดเลือด 6%, พลังโจมตี +18', price: 65000 },
+    'Golden Thief Bug Card': { emoji: '🪲', type: 'card', cardSlot: 'shield', rarity: 'legendary', card: { defBonus: 26, dmgPct: 0.06, hpBonus: 120 }, desc: 'ป้องกัน +26, ดาเมจ +6%, HP +120', price: 68000 },
+
     // ---- REFINE ORES (แร่ตีบวก) ----
     'Oridecon': { emoji: '🔩', type: 'material', rarity: 'rare', desc: 'แร่ออริดิคอนแข็งแกร่ง ใช้ตีบวกอาวุธให้ทรงพลังยิ่งขึ้น ยิ่งบวกสูงยิ่งใช้มาก', price: 2500 },
     'Elunium': { emoji: '💠', type: 'material', rarity: 'rare', desc: 'แร่อีลูเนียมเปล่งประกาย ใช้ตีบวกเกราะและโล่ให้ป้องกันเหนือชั้น', price: 2500 },
@@ -1415,6 +1440,49 @@ export function getEquipSlot(itemName) {
     if (it.type === 'glasses') return 'glasses';
     if (it.type === 'armor') return ARMOR_ITEM_SLOT[itemName] || 'body';
     return null;
+}
+
+// ===== CARDS =====
+// Which card category a paper-doll slot accepts. A card fits a slot only when
+// its `cardSlot` equals this category.
+export function cardCategoryForSlot(slotId) {
+    if (slotId === 'weapon') return 'weapon';
+    if (slotId === 'shield') return 'shield';
+    if (slotId === 'ring' || slotId === 'wrist' || slotId === 'accessory') return 'accessory';
+    // head / body / garment / pants / feet / hat / glasses
+    return 'armor';
+}
+
+// True if `cardName` can be socketed into paper-doll slot `slotId`.
+export function cardFitsSlot(cardName, slotId) {
+    const it = ITEMS[cardName];
+    if (!it || it.type !== 'card') return false;
+    return it.cardSlot === cardCategoryForSlot(slotId);
+}
+
+// Border/text colour for a rarity (shared by card frames + rarity chips).
+export const RARITY_COLOR = {
+    common: '#b8c0cc', rare: '#5aa9ff', epic: '#c07bff', legendary: '#ffb43a',
+};
+
+// Drop chance per card on a world-boss kill (per participant). Rarer = lower.
+// A player usually walks away with 0–1 cards; legendaries are a rare thrill.
+const CARD_DROP_CHANCE = { common: 0.08, rare: 0.04, epic: 0.015, legendary: 0.004 };
+
+// All card item names, cached once.
+export const ALL_CARDS = Object.keys(ITEMS).filter(n => ITEMS[n].type === 'card');
+
+// Roll world-boss card drops. Each card rolls independently; result is capped
+// at 2 per kill (keeps the highest-rarity hits) so drops feel special, not spammy.
+export function rollBossCards() {
+    const rank = { legendary: 4, epic: 3, rare: 2, common: 1 };
+    const hits = [];
+    for (const name of ALL_CARDS) {
+        const r = ITEMS[name].rarity || 'common';
+        if (Math.random() < (CARD_DROP_CHANCE[r] || 0)) hits.push(name);
+    }
+    hits.sort((a, b) => (rank[ITEMS[b].rarity] || 0) - (rank[ITEMS[a].rarity] || 0));
+    return hits.slice(0, 2);
 }
 
 // Celestial mining pickaxe ladder, cheapest → rarest. The Heaven Merchant sells

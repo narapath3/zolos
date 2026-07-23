@@ -298,15 +298,27 @@ export class CombatSystem {
     _resolveDamage(monster, weaponClass = null) {
         if (!monster || !monster.alive) return;
 
-        // Player attacks monster
-        const isCritical = Math.random() < 0.1;
+        // Player attacks monster. Card sockets can raise crit chance and add a
+        // flat damage multiplier on top of the base 10%.
+        const critBonus = this.character.getCritChanceBonus ? this.character.getCritChanceBonus() : 0;
+        const isCritical = Math.random() < (0.1 + critBonus);
 
         // Ensure stats are numbers
         const charAtk = isNaN(this.character.stats.atk) ? 10 : this.character.stats.atk;
         let baseDmg = charAtk + Math.floor(Math.random() * 5);
         if (isCritical) baseDmg = Math.floor(baseDmg * 1.8);
+        const dmgPct = this.character.getDamagePct ? this.character.getDamagePct() : 0;
+        if (dmgPct > 0) baseDmg = Math.floor(baseDmg * (1 + dmgPct));
 
         const actualDmg = monster.takeDamage(baseDmg, isCritical);
+
+        // Lifesteal: heal a fraction of damage dealt (legendary card ability).
+        const leech = this.character.getLifestealPct ? this.character.getLifestealPct() : 0;
+        if (leech > 0 && this.character.stats) {
+            const s = this.character.stats;
+            const healed = Math.max(1, Math.floor(actualDmg * leech));
+            s.hp = Math.min(s.max_hp, (Number(s.hp) || 0) + healed);
+        }
 
         // Shared HP: mark that WE damaged this monster (so we still get loot even
         // if a teammate lands the final blow) and relay the hit so everyone's
