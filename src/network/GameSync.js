@@ -899,6 +899,66 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
     }
 }
 
+/**
+ * SET an inventory item's quantity to an ABSOLUTE value (and its stats),
+ * inserting the row if missing. Unlike saveInventoryItem (which ADDS a delta),
+ * this is idempotent — calling it repeatedly with the same quantity never
+ * inflates the stack. Use it to persist the in-memory truth (periodic flush,
+ * "ensure the row exists" before a stats update); use saveInventoryItem only
+ * for +N / -N gameplay adjustments (pickups, uses, sells, trades).
+ */
+export async function setInventoryItemQuantity(characterId, itemName, itemType, quantity, stats = {}) {
+    const qty = Math.max(0, Math.floor(quantity) || 0);
+
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        const inv = localDb.get(`inventory_${characterId}`) || [];
+        const existing = inv.find(i => i.item_name === itemName);
+        if (existing) {
+            if (qty <= 0) {
+                inv.splice(inv.indexOf(existing), 1);
+            } else {
+                existing.quantity = qty;
+                existing.stats = stats;
+            }
+        } else if (qty > 0) {
+            inv.push({
+                id: 'inv_' + Math.random().toString(36).substring(2, 10),
+                character_id: characterId, item_name: itemName, item_type: itemType,
+                quantity: qty, stats,
+            });
+        }
+        localDb.set(`inventory_${characterId}`, inv);
+        return;
+    }
+
+    try {
+        const { data: existing, error: fetchError } = await supabase
+            .from('inventory')
+            .select('id')
+            .eq('character_id', characterId)
+            .eq('item_name', itemName)
+            .limit(1)
+            .single();
+
+        if (fetchError && fetchError.code === 'PGRST116') {
+            if (qty > 0) {
+                await supabase.from('inventory')
+                    .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity: qty, stats });
+            }
+        } else if (fetchError) {
+            throw fetchError;
+        } else if (qty <= 0) {
+            await supabase.from('inventory').delete().eq('id', existing.id);
+        } else {
+            await supabase.from('inventory')
+                .update({ quantity: qty, stats })
+                .eq('id', existing.id);
+        }
+    } catch (e) {
+        console.error(`[Zolos] ❌ setInventoryItemQuantity FAILED for characterId=${characterId}, itemName=${itemName}:`, e.message);
+    }
+}
+
 export async function updateInventoryItemStats(characterId, itemName, stats) {
     console.log(`[Zolos] 🔄 updateInventoryItemStats called: characterId=${characterId}, itemName=${itemName}, stats=${JSON.stringify(stats)}`);
 
