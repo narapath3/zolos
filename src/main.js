@@ -336,6 +336,7 @@ async function initGame(charData) {
             case 'petLevelUp':
                 if (soundManager && soundManager.playLevelUpSound) soundManager.playLevelUpSound();
                 if (gameUI) gameUI.addCombatLog(`🐾 สัตว์เลี้ยงเลเวลอัพ! ตอนนี้เลเวล ${event.level} ✨`, 'levelup');
+                if (gameUI && gameUI.flashPetHud) gameUI.flashPetHud();
                 if (particles && character && particles.spawnLevelUpEffect) {
                     particles.spawnLevelUpEffect(character.getPosition());
                 }

@@ -182,6 +182,78 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   box-shadow: 0 0 10px rgba(64, 224, 128, 0.4);
 }
 
+/* Pet companion HUD: emoji + level + a compact XP bar under the player bars */
+#pet-hud {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 3px 6px;
+  border-radius: 9px;
+  background: rgba(30, 22, 40, 0.5);
+  border: 1px solid rgba(180, 150, 255, 0.35);
+}
+
+#pet-hud.pet-levelup {
+  animation: petHudPop 0.6s ease;
+}
+
+@keyframes petHudPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06); border-color: #ffd86a; box-shadow: 0 0 14px rgba(255, 210, 90, 0.6); }
+  100% { transform: scale(1); }
+}
+
+#pet-hud-emoji {
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px rgba(200, 160, 255, 0.6));
+}
+
+.pet-hud-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pet-hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+#pet-hud-name {
+  color: #d8c8ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#pet-hud-level {
+  color: #ffd86a;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pet-xp-bar {
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(120, 90, 180, 0.28);
+}
+
+.pet-xp-bar .bar-fill {
+  background: linear-gradient(90deg, #a070ff, #d0a0ff);
+  width: 0%;
+  border-radius: 5px;
+  box-shadow: 0 0 8px rgba(180, 140, 255, 0.5);
+}
+
+.pet-xp-bar .bar-text {
+  font-size: 8px;
+}
+
 .bar-text {
   position: absolute;
   inset: 0;

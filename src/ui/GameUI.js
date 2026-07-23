@@ -485,6 +485,9 @@ export class GameUI {
     if (hudGold) hudGold.textContent = stats.gold.toLocaleString();
     const hudZol = document.getElementById('hud-zol-amount');
     if (hudZol) hudZol.textContent = (Number(stats.zol) || 0).toLocaleString();
+
+    // Live pet level + XP badge.
+    this.updatePetHud();
   }
 
   updateStats(stats) {
@@ -1825,6 +1828,50 @@ export class GameUI {
     this.updateStats(this.character.stats);
     // Sync: Inventory → Profile Editor (refresh dropdowns if open)
     this._refreshProfileEditorEquipment();
+  }
+
+  // Live pet badge on the top HUD: emoji + level + XP bar. Refreshed every
+  // time the HUD updates (which happens on every kill / exp gain), so the cat
+  // visibly fills its bar and levels up while you fight.
+  updatePetHud() {
+    const el = document.getElementById('pet-hud');
+    if (!el) return;
+    const c = this.character;
+    if (!c || !c.equippedPet) { el.style.display = 'none'; return; }
+    el.style.display = 'flex';
+    const petItem = this.inventory
+      ? this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true)
+      : null;
+    const lvl = c.petLevel || 1;
+    const xp = Math.floor(c.petXp || 0);
+    const need = c.getPetXpRequired ? c.getPetXpRequired(lvl) : Math.floor(60 * Math.pow(lvl, 1.5));
+    const emojiEl = document.getElementById('pet-hud-emoji');
+    const nameEl = document.getElementById('pet-hud-name');
+    const lvlEl = document.getElementById('pet-hud-level');
+    const fillEl = document.getElementById('pet-xp-fill');
+    const txtEl = document.getElementById('pet-xp-text');
+    if (emojiEl && petItem) emojiEl.textContent = petItem.emoji || '🐾';
+    if (nameEl) nameEl.textContent = petItem ? petItem.item_name.replace(/ Pet$/, '') : 'สัตว์เลี้ยง';
+    if (lvlEl) lvlEl.textContent = 'Lv.' + lvl + (lvl >= 40 ? ' MAX' : '');
+    if (lvl >= 40) {
+      if (fillEl) fillEl.style.width = '100%';
+      if (txtEl) txtEl.textContent = 'สูงสุด';
+    } else {
+      const pct = Math.min(100, Math.round((xp / need) * 100));
+      if (fillEl) fillEl.style.width = pct + '%';
+      if (txtEl) txtEl.textContent = `${xp}/${need}`;
+    }
+  }
+
+  // Brief pop on the pet badge when it levels up (draws the eye).
+  flashPetHud() {
+    const el = document.getElementById('pet-hud');
+    if (!el) return;
+    this.updatePetHud();
+    el.classList.remove('pet-levelup');
+    void el.offsetWidth; // restart the CSS animation
+    el.classList.add('pet-levelup');
+    setTimeout(() => el.classList.remove('pet-levelup'), 700);
   }
 
   // Copy the live pet level/xp from the character onto its inventory item so
