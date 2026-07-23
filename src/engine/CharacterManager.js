@@ -25,6 +25,8 @@ export class CharacterManager {
         this.equippedHat = 'None';
         this.equippedGlasses = 'None';
         this.equippedPet = null;   // companion pet model key (see PetModels)
+        this.equippedPetUid = null; // which owned pet instance is summoned
+        this.petName = null;       // the summoned pet's custom name (others see it)
         this.petLevel = 1;         // pet grows as its owner fights; drives its aura tier
         this.petXp = 0;
         this.hatMesh = null;
@@ -1275,9 +1277,11 @@ export class CharacterManager {
     // character mesh (so it moves + rotates with the hero for free — works for
     // remote players too), positioned to the hero's right and animated with a
     // gentle hop in update(). Cheap: one small static voxel group, no particles.
-    setPet(petKey, level = 1, xp = 0) {
+    setPet(petKey, level = 1, xp = 0, name = null) {
         const key = (petKey && petKey !== 'None') ? petKey : null;
         this.equippedPet = key;
+        this.petName = key ? (name || null) : null;
+        if (!key) this.equippedPetUid = null;
         this.petLevel = Math.max(1, Math.floor(level) || 1);
         this.petXp = Math.max(0, xp || 0);
         if (this.petMesh) {
@@ -2515,6 +2519,7 @@ export class CharacterManager {
             gear: { ...(this.equippedGear || {}) }, // helmet/body/cape/boots so others see them
             pet: this.equippedPet || null,          // companion so others see it too
             petLevel: this.petLevel || 1,           // so others see the right aura tier
+            petName: this.petName || null,          // custom pet name others can see
             refine: { ...(this.equipRefine || {}) }, // +N per slot so profiles show refine
             cards: { ...(this.equippedCards || {}) }, // socketed cards so profiles show them
             job: this.stats ? (this.stats.job || null) : null,
@@ -2546,11 +2551,14 @@ export class CharacterManager {
         }
         if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
         if (app.pet !== undefined && app.pet !== this.equippedPet) {
-            this.setPet(app.pet, app.petLevel || 1);
-        } else if (app.pet !== undefined && (app.petLevel || 1) !== this.petLevel) {
-            // Same pet, new level (teammate levelled up) → rebuild its aura tier.
-            this.petLevel = app.petLevel || 1;
-            if (this.petMesh) this._buildPetAura(this.petLevel);
+            this.setPet(app.pet, app.petLevel || 1, 0, app.petName || null);
+        } else if (app.pet !== undefined) {
+            // Same pet key — sync level (teammate levelled up) and/or name.
+            if ((app.petLevel || 1) !== this.petLevel) {
+                this.petLevel = app.petLevel || 1;
+                if (this.petMesh) this._buildPetAura(this.petLevel);
+            }
+            if (app.petName !== undefined) this.petName = app.petName || null;
         }
         // Sync class so other players see this hero's job-specific look.
         if (app.job !== undefined) {
