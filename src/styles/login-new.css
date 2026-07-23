@@ -239,7 +239,7 @@
 }
 
 .game-tagline {
-  font-family: 'Itim', cursive;
+  font-family: 'Kanit', sans-serif;
   font-size: clamp(12px, 2.5vw, 16px);
   color: rgba(255, 255, 255, 0.6);
   margin-bottom: clamp(14px, 3vw, 24px);

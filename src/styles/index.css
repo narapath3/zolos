@@ -31,9 +31,13 @@
   --border: rgba(100, 140, 255, 0.25);
   --glass-border: rgba(255, 255, 255, 0.1);
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
-  --font-pixel: 'Press Start 2P', monospace;
-  --font-main: 'Fredoka One', cursive;
-  --font-ui: 'Inter', system-ui, sans-serif;
+  /* Ragnarok-flavoured, Thai-capable type system. Chakra Petch gives the
+     angular, gamey HUD/header look; Kanit is the clean, readable body face;
+     Press Start 2P is kept for the retro damage numbers (--font-retro). */
+  --font-pixel: 'Chakra Petch', 'Kanit', system-ui, sans-serif;
+  --font-main: 'Chakra Petch', 'Kanit', system-ui, sans-serif;
+  --font-ui: 'Kanit', 'Chakra Petch', system-ui, sans-serif;
+  --font-retro: 'Press Start 2P', monospace;
   --radius: 12px;
   --radius-sm: 10px;
   --radius-xl: 40px;
@@ -1559,8 +1563,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 /* ========== DAMAGE NUMBERS (3D overlay) ========== */
 .damage-number {
   position: fixed;
-  font-family: var(--font-pixel);
-  font-size: 16px;
+  font-family: var(--font-retro);
+  font-size: 15px;
   font-weight: 900;
   pointer-events: none;
   z-index: 150;
