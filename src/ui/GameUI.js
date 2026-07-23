@@ -638,7 +638,9 @@ export class GameUI {
       // non-stackable items (gear/pets/tools) can only ever be 1; stackables
       // are clamped to a sane cap. Corrections are persisted (SET, not add) so
       // the fix is durable. Harmless once quantities are already sane.
-      const NON_STACK = new Set(['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'pet', 'tool']);
+      // Pets are excluded: they no longer force-to-1 because each pet is now an
+      // individual instance stored inside one row's stats (quantity = count).
+      const NON_STACK = new Set(['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool']);
       const MAX_STACK = 9999;
       for (const it of this.inventory) {
         const before = it.quantity;
@@ -710,14 +712,23 @@ export class GameUI {
       // Show the loaded armor/shield pieces on the hero model.
       if (this.character && this.character.updateGearVisuals) this.character.updateGearVisuals();
 
-      // Re-summon the active companion pet, if one was out.
-      const equippedPet = this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true);
+      // Normalize every pet row into per-pet instances (migrates legacy stacks),
+      // then re-summon whichever instance was out.
+      for (const it of this.inventory) {
+        if (it.item_type === 'pet') this._ensurePetInstances(it);
+      }
+      const equippedPetRow = this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true && i.stats.equippedUid);
+      const equippedInst = equippedPetRow
+        ? (equippedPetRow.stats.instances || []).find(x => x.uid === equippedPetRow.stats.equippedUid)
+        : null;
       if (this.character && this.character.setPet) {
-        this.character.setPet(
-          equippedPet ? petModelOf(equippedPet.item_name) : null,
-          equippedPet?.stats?.petLevel || 1,
-          equippedPet?.stats?.petXp || 0,
-        );
+        if (equippedPetRow && equippedInst) {
+          this.character.setPet(petModelOf(equippedPetRow.item_name), equippedInst.level || 1, equippedInst.xp || 0, equippedInst.name || null);
+          this.character.equippedPetUid = equippedInst.uid;
+        } else {
+          this.character.setPet(null);
+          this.character.equippedPetUid = null;
+        }
       }
 
       // Restore socketed cards: rebuild equippedCards from card items flagged
@@ -1212,7 +1223,8 @@ export class GameUI {
     } else if (this.currentTab === 'fish') {
       filtered = this.inventory.filter(i => i.item_type === 'fish');
     } else if (this.currentTab === 'pet') {
-      filtered = this.inventory.filter(i => i.item_type === 'pet');
+      // Expand each owned pet into its own slot so each can be named/summoned.
+      filtered = this._allPetInstances().map(pi => ({ __pet: true, item: pi.item, inst: pi.inst }));
     } else if (this.currentTab === 'card') {
       filtered = this.inventory.filter(i => i.item_type === 'card');
     }
@@ -1225,6 +1237,30 @@ export class GameUI {
 
       if (i < filtered.length) {
         const item = filtered[i];
+
+        // Pet instance slot: one per owned pet, shows its custom name.
+        if (item.__pet) {
+          const petItem = item.item, inst = item.inst;
+          const isEq = this.character && this.character.equippedPetUid === inst.uid;
+          if (isEq) slot.classList.add('equipped');
+          slot.classList.add(`rarity-${petItem.rarity || 'common'}`);
+          const nm = this._petDisplayName(petItem, inst);
+          const named = !!(inst && inst.name);
+          slot.innerHTML = `
+            <span>${petItem.emoji}</span>
+            <span class="inv-pet-name" style="position:absolute;bottom:1px;left:0;right:0;font-size:8px;font-weight:700;color:${named ? '#e8dcff' : '#8b82ad'};text-align:center;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${this._short(nm)}</span>
+            ${isEq ? '<span class="inv-equipped-badge">E</span>' : ''}
+          `;
+          slot.title = `${nm} · Lv.${(isEq ? this.character.petLevel : inst.level) || 1}${isEq ? ' — เรียกอยู่' : ''}`;
+          if (this.selectedPetUid === inst.uid) slot.classList.add('selected');
+          slot.addEventListener('click', () => {
+            this.selectedPetUid = inst.uid;
+            this._openPetInstance(inst.uid);
+          });
+          grid.appendChild(slot);
+          continue;
+        }
+
         const isEquipped = item.stats && item.stats.equipped === true;
         if (isEquipped) {
           slot.classList.add('equipped');
@@ -2046,7 +2082,7 @@ export class GameUI {
     const fillEl = document.getElementById('pet-xp-fill');
     const txtEl = document.getElementById('pet-xp-text');
     if (emojiEl && petItem) emojiEl.textContent = petItem.emoji || '🐾';
-    if (nameEl) nameEl.textContent = petItem ? petItem.item_name.replace(/ Pet$/, '') : 'สัตว์เลี้ยง';
+    if (nameEl) nameEl.textContent = c.petName || (petItem ? petItem.item_name.replace(/ Pet$/, '') : 'สัตว์เลี้ยง');
     if (lvlEl) lvlEl.textContent = 'Lv.' + lvl + (lvl >= 40 ? ' MAX' : '');
     if (lvl >= 40) {
       if (fillEl) fillEl.style.width = '100%';
@@ -2069,30 +2105,267 @@ export class GameUI {
     setTimeout(() => el.classList.remove('pet-levelup'), 700);
   }
 
-  // Copy the live pet level/xp from the character onto its inventory item so
-  // the values ride along on the next DB flush (keeps in-memory in sync).
-  _syncPetItemStats() {
-    if (!this.character || !this.character.equippedPet || !this.inventory) return null;
-    const petItem = this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true);
-    if (!petItem) return null;
-    if (!petItem.stats) petItem.stats = {};
-    petItem.stats.petLevel = this.character.petLevel;
-    petItem.stats.petXp = Math.floor(this.character.petXp);
-    return petItem;
+  // ===== Pet instances (each owned pet is individual: own name + level/xp) =====
+  _newPetUid() { return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  // Ensure a pet row carries a per-pet `instances` array, migrating legacy
+  // stacked pets (that only had petLevel/petXp + a quantity). Returns the array.
+  _ensurePetInstances(item) {
+    if (!item || item.item_type !== 'pet') return [];
+    if (!item.stats) item.stats = {};
+    if (!Array.isArray(item.stats.instances)) {
+      const n = Math.max(1, item.quantity || 1);
+      const arr = [];
+      for (let k = 0; k < n; k++) {
+        arr.push({ uid: this._newPetUid(), name: null, level: item.stats.petLevel || 1, xp: item.stats.petXp || 0 });
+      }
+      if (item.stats.equipped === true) item.stats.equippedUid = arr[0].uid;
+      item.stats.instances = arr;
+    }
+    item.quantity = item.stats.instances.length;
+    return item.stats.instances;
   }
 
-  // Persist the active pet's level/xp immediately (called on level-up, rare).
+  // Every owned pet as {item, inst}, for expanding into one slot each.
+  _allPetInstances() {
+    const out = [];
+    for (const item of (this.inventory || [])) {
+      if (item.item_type !== 'pet') continue;
+      for (const inst of this._ensurePetInstances(item)) out.push({ item, inst });
+    }
+    return out;
+  }
+
+  // Locate a pet instance by uid → {item, inst} or null.
+  _findPetInstance(uid) {
+    for (const item of (this.inventory || [])) {
+      if (item.item_type !== 'pet' || !item.stats || !Array.isArray(item.stats.instances)) continue;
+      const inst = item.stats.instances.find(x => x.uid === uid);
+      if (inst) return { item, inst };
+    }
+    return null;
+  }
+
+  // Display name for a pet instance (its custom name, else the species).
+  _petDisplayName(item, inst) {
+    if (inst && inst.name) return inst.name;
+    return (item.item_name || 'Pet').replace(/ Pet$/, '');
+  }
+
+  // Copy the live level/xp of the SUMMONED pet back onto its instance so the
+  // values ride along on the next DB flush (keeps in-memory in sync).
+  _syncPetItemStats() {
+    const c = this.character;
+    if (!c || !c.equippedPet || !c.equippedPetUid) return null;
+    const found = this._findPetInstance(c.equippedPetUid);
+    if (!found) return null;
+    found.inst.level = c.petLevel;
+    found.inst.xp = Math.floor(c.petXp);
+    if (c.petName !== undefined) found.inst.name = c.petName || null;
+    found.item.stats.equipped = true;
+    found.item.stats.equippedUid = c.equippedPetUid;
+    return found.item;
+  }
+
+  // Persist the active pet's progress immediately (called on level-up).
   async persistPetProgress() {
     const petItem = this._syncPetItemStats();
     if (petItem && this.characterId) {
       const { updateInventoryItemStats } = await import('../network/GameSync.js');
       await updateInventoryItemStats(this.characterId, petItem.item_name, petItem.stats);
     }
-    // Refresh the detail box if the pet is currently selected, so its level
-    // bar updates live.
-    if (this.selectedItemName && petItem && this.selectedItemName === petItem.item_name) {
-      this._updateDetailBox();
+  }
+
+  // Persist a pet row's stats (instances/equipped) to the DB.
+  async _persistPetRow(item) {
+    if (item && this.characterId) {
+      const { updateInventoryItemStats } = await import('../network/GameSync.js');
+      await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
     }
+  }
+
+  // Summon / store a specific pet instance.
+  async _equipPetInstance(uid) {
+    const found = this._findPetInstance(uid);
+    if (!found || !this.character) return;
+    const { item, inst } = found;
+    const c = this.character;
+    const alreadyThis = c.equippedPetUid === uid && c.equippedPet;
+
+    // Save the currently-summoned pet's progress back to its instance first.
+    if (c.equippedPetUid) this._syncPetItemStats();
+
+    const touched = new Set();
+    // Clear equipped flags on all pet rows (only one pet out at a time).
+    for (const it of this.inventory) {
+      if (it.item_type === 'pet' && it.stats && (it.stats.equipped || it.stats.equippedUid)) {
+        it.stats.equipped = false; it.stats.equippedUid = null; touched.add(it);
+      }
+    }
+
+    if (alreadyThis) {
+      // Toggle off → store the pet.
+      c.setPet(null);
+      c.equippedPetUid = null;
+      this._equipToast(`เก็บ ${this._petDisplayName(item, inst)} กลับกระเป๋า`, true);
+    } else {
+      c.setPet(petModelOf(item.item_name), inst.level || 1, inst.xp || 0, inst.name || null);
+      c.equippedPetUid = uid;
+      item.stats.equipped = true;
+      item.stats.equippedUid = uid;
+      touched.add(item);
+      this._equipToast(`เรียก ${this._petDisplayName(item, inst)} ออกมา!`, true);
+    }
+
+    for (const it of touched) await this._persistPetRow(it);
+    if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+  }
+
+  // Rename a pet instance (max 16 chars). Others see it via the appearance.
+  async _renamePetInstance(uid, rawName) {
+    const found = this._findPetInstance(uid);
+    if (!found) return;
+    const name = (rawName || '').trim().slice(0, 16) || null;
+    found.inst.name = name;
+    // If this pet is currently summoned, update the live name so teammates see it.
+    if (this.character && this.character.equippedPetUid === uid) {
+      this.character.petName = name;
+    }
+    await this._persistPetRow(found.item);
+    this.addCombatLog(`🐾 ตั้งชื่อสัตว์เลี้ยงเป็น "${name || '(ไม่มีชื่อ)'}" แล้ว`, 'system');
+    this.updatePetHud();
+    this._renderInventory();
+  }
+
+  _ensurePetInstStyles() {
+    if (document.getElementById('pet-inst-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'pet-inst-styles';
+    st.textContent = `
+    #pet-inst-overlay{position:fixed;inset:0;z-index:100001;background:rgba(4,7,16,.66);
+      display:flex;align-items:center;justify-content:center;padding:20px;animation:bcFade .15s ease;}
+    .pi-box{width:100%;max-width:320px;background:linear-gradient(160deg,#231a3a,#12111f);
+      border:1px solid rgba(180,150,255,.4);border-radius:18px;padding:20px 18px 14px;text-align:center;
+      box-shadow:0 24px 70px rgba(0,0,0,.7);animation:bcPop .2s cubic-bezier(.34,1.56,.64,1);}
+    .pi-emoji{font-size:52px;line-height:1;filter:drop-shadow(0 0 8px rgba(200,160,255,.5));}
+    #pi-name{width:100%;margin:12px 0 6px;padding:10px 12px;text-align:center;font-size:16px;font-weight:800;
+      color:#fff;background:rgba(0,0,0,.3);border:1px solid rgba(180,150,255,.35);border-radius:10px;
+      font-family:var(--font-ui);}
+    #pi-name:focus{outline:none;border-color:#b89cff;box-shadow:0 0 10px rgba(180,150,255,.4);}
+    .pi-species{font-size:12px;color:#c8bce8;margin-bottom:8px;}
+    .pi-bar{height:8px;border-radius:5px;background:rgba(120,90,180,.28);overflow:hidden;margin-bottom:4px;}
+    .pi-fill{height:100%;background:linear-gradient(90deg,#a070ff,#d0a0ff);border-radius:5px;}
+    .pi-xp{font-size:11px;color:var(--text-dim);margin-bottom:12px;}
+    .pi-actions{display:flex;gap:8px;}
+    .pi-btn{flex:1;padding:11px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:none;font-family:var(--font-ui);}
+    .pi-btn:active{transform:scale(.96);}
+    .pi-cancel{background:rgba(255,255,255,.08);color:#cdd6ee;border:1px solid rgba(255,255,255,.12);}
+    .pi-equip{background:#a070ff;color:#fff;}
+    .pi-hint{font-size:10.5px;color:#8b82ad;margin-top:10px;}
+    `;
+    document.head.appendChild(st);
+  }
+
+  // Per-pet popup: rename the pet + summon/store it. Naming persists and, if the
+  // pet is summoned, broadcasts so other players see its name.
+  _openPetInstance(uid) {
+    const found = this._findPetInstance(uid);
+    if (!found || !this.character) return;
+    this._ensurePetInstStyles();
+    const { item, inst } = found;
+    const c = this.character;
+    const isEq = c.equippedPetUid === uid;
+    const lvl = isEq ? (c.petLevel || 1) : (inst.level || 1);
+    const xp = isEq ? Math.floor(c.petXp || 0) : (inst.xp || 0);
+    const need = c.getPetXpRequired ? c.getPetXpRequired(lvl) : Math.floor(60 * Math.pow(lvl, 1.5));
+    const pct = lvl >= 40 ? 100 : Math.min(100, Math.round((xp / need) * 100));
+    const tier = ['ธรรมดา', 'ออร่า ✨', 'ออร่า+เกล็ดแสง 🌟', 'เรืองรอง 💫', 'สุดยอดตำนาน 🌈'][
+      lvl >= 30 ? 4 : lvl >= 20 ? 3 : lvl >= 10 ? 2 : lvl >= 5 ? 1 : 0];
+
+    let ov = document.getElementById('pet-inst-overlay');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'pet-inst-overlay';
+    ov.innerHTML = `
+      <div class="pi-box">
+        <div class="pi-emoji">${item.emoji}</div>
+        <input id="pi-name" maxlength="16" placeholder="ตั้งชื่อน้อง..." value="${(inst.name || '').replace(/"/g, '&quot;')}" />
+        <div class="pi-species">${item.item_name.replace(/ Pet$/, '')} · Lv.${lvl}${lvl >= 40 ? ' MAX' : ''} · ${tier}</div>
+        <div class="pi-bar"><div class="pi-fill" style="width:${pct}%"></div></div>
+        <div class="pi-xp">${lvl >= 40 ? 'สูงสุด' : `EXP ${xp}/${need}`}</div>
+        <div class="pi-actions">
+          <button class="pi-btn pi-cancel">ปิด</button>
+          <button class="pi-btn pi-equip">${isEq ? '🔙 เก็บกลับ' : '🐾 เรียกออกมา'}</button>
+        </div>
+        <button class="pi-btn pi-sell" style="width:100%;margin-top:8px;background:#c88f1a;color:#fff;">💰 ขายให้ NPC (${this._petSellPrice(item, inst).toLocaleString()} z)</button>
+        <div class="pi-hint">ตั้งชื่อแล้วกดปิด — คนอื่นจะเห็นชื่อน้องของคุณ</div>
+      </div>`;
+    document.body.appendChild(ov);
+    const nameInput = ov.querySelector('#pi-name');
+    const saveName = async () => { await this._renamePetInstance(uid, nameInput.value); };
+    const close = async () => { await saveName(); ov.remove(); };
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.querySelector('.pi-cancel').onclick = close;
+    ov.querySelector('.pi-equip').onclick = async () => { await saveName(); ov.remove(); await this._equipPetInstance(uid); };
+    // Sell: two-tap confirm on the button itself.
+    const sellBtn = ov.querySelector('.pi-sell');
+    let armed = false;
+    sellBtn.onclick = async () => {
+      if (!armed) {
+        armed = true;
+        sellBtn.textContent = `⚠️ กดอีกครั้งเพื่อยืนยันขาย (${this._petSellPrice(item, inst).toLocaleString()} z)`;
+        sellBtn.style.background = '#d9534f';
+        setTimeout(() => { if (sellBtn.isConnected) { armed = false; sellBtn.textContent = `💰 ขายให้ NPC (${this._petSellPrice(item, inst).toLocaleString()} z)`; sellBtn.style.background = '#c88f1a'; } }, 2500);
+        return;
+      }
+      ov.remove();
+      await this._sellPetInstanceNpc(uid);
+    };
+  }
+
+  // Level-scaled NPC sell price for one pet instance (mirrors _sellUnitPrice).
+  _petSellPrice(item, inst) {
+    const lvl = (inst && inst.level) || 1;
+    return Math.floor((item.price || 0) * 0.8 * (1 + (lvl - 1) * 0.12));
+  }
+
+  // Sell one pet instance to the NPC for gold, removing it from its row.
+  async _sellPetInstanceNpc(uid) {
+    const found = this._findPetInstance(uid);
+    if (!found || !this.character) return;
+    const { item, inst } = found;
+    const gold = this._petSellPrice(item, inst);
+    const wasEquipped = this.character.equippedPetUid === uid;
+
+    // Remove the instance.
+    const arr = item.stats.instances;
+    const idx = arr.findIndex(x => x.uid === uid);
+    if (idx < 0) return;
+    arr.splice(idx, 1);
+    item.quantity = arr.length;
+
+    if (wasEquipped) { this.character.setPet(null); this.character.equippedPetUid = null; item.stats.equipped = false; item.stats.equippedUid = null; }
+
+    this.character.stats.gold = (this.character.stats.gold || 0) + gold;
+
+    // Persist: update the row (or delete it if no pets of this type remain).
+    if (this.characterId) {
+      const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+      await setInventoryItemQuantity(this.characterId, item.item_name, 'pet', item.quantity, item.stats);
+      if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+    }
+    if (item.quantity <= 0) {
+      const i = this.inventory.indexOf(item);
+      if (i >= 0) this.inventory.splice(i, 1);
+    }
+
+    this.addCombatLog(`💰 ขาย ${this._petDisplayName(item, inst)} สำเร็จ (+${gold.toLocaleString()} Zeny)`, 'system');
+    this._equipToast(`ขายสัตว์เลี้ยงสำเร็จ +${gold.toLocaleString()}z`, true);
+    if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
   }
 
   // ============ Leaderboard ============
@@ -4368,30 +4641,52 @@ export class GameUI {
     // Deduct gold
     this.character.stats.gold -= totalCost;
 
-    // Add to inventory
-    const existing = this.inventory.find(i => i.item_name === item.name);
-    if (existing) {
-      existing.quantity += qty;
+    if (itemData.type === 'pet') {
+      // Pets don't stack — each purchased pet becomes its own nameable instance.
+      let row = this.inventory.find(i => i.item_name === item.name && i.item_type === 'pet');
+      if (!row) {
+        row = {
+          item_name: item.name, item_type: 'pet', emoji: itemData.emoji, desc: itemData.desc,
+          price: itemData.price || item.price, rarity: itemData.rarity || 'common',
+          quantity: 0, stats: { instances: [] },
+        };
+        this.inventory.push(row);
+      }
+      this._ensurePetInstances(row);
+      for (let k = 0; k < qty; k++) {
+        row.stats.instances.push({ uid: this._newPetUid(), name: null, level: 1, xp: 0 });
+      }
+      row.quantity = row.stats.instances.length;
+      if (this.characterId) {
+        const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+        await setInventoryItemQuantity(this.characterId, item.name, 'pet', row.quantity, row.stats);
+        if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+      }
     } else {
-      this.inventory.push({
-        item_name: item.name,
-        item_type: itemData.type,
-        emoji: itemData.emoji,
-        desc: itemData.desc,
-        price: itemData.price || item.price,
-        healHp: itemData.healHp || 0,
-        restoreSp: itemData.restoreSp || 0,
-        quantity: qty,
-        stats: itemData.stats || {}
-      });
-    }
-
-    // Save persistence
-    if (this.characterId) {
-      // Fixed argument order: (characterId, itemName, itemType, quantity)
-      await saveInventoryItem(this.characterId, item.name, itemData.type, qty);
-      if (this.character.saveStatsToDatabase) {
-        await this.character.saveStatsToDatabase();
+      // Add to inventory (normal stackable/equipment path).
+      const existing = this.inventory.find(i => i.item_name === item.name);
+      if (existing) {
+        existing.quantity += qty;
+      } else {
+        this.inventory.push({
+          item_name: item.name,
+          item_type: itemData.type,
+          emoji: itemData.emoji,
+          desc: itemData.desc,
+          price: itemData.price || item.price,
+          healHp: itemData.healHp || 0,
+          restoreSp: itemData.restoreSp || 0,
+          quantity: qty,
+          stats: itemData.stats || {}
+        });
+      }
+      // Save persistence
+      if (this.characterId) {
+        // Fixed argument order: (characterId, itemName, itemType, quantity)
+        await saveInventoryItem(this.characterId, item.name, itemData.type, qty);
+        if (this.character.saveStatsToDatabase) {
+          await this.character.saveStatsToDatabase();
+        }
       }
     }
 
@@ -5511,8 +5806,9 @@ export class GameUI {
       goldDisplay.textContent = this.character.stats.gold.toLocaleString();
     }
 
-    // Show only non-equipped sellable items
-    const sellableItems = this.inventory.filter(i => !this._isItemEquipped(i));
+    // Show only non-equipped sellable items. Pets are excluded — they're sold
+    // per-instance from the pet popup so each named pet is handled individually.
+    const sellableItems = this.inventory.filter(i => !this._isItemEquipped(i) && i.item_type !== 'pet');
 
     sellableItems.forEach(item => {
       const slot = document.createElement('div');
@@ -5937,8 +6233,9 @@ export class GameUI {
     if (!grid) return;
     grid.innerHTML = '';
 
-    // Filter only non-equipped sellable items
-    const sellable = this.inventory.filter(item => !this._isItemEquipped(item));
+    // Filter only non-equipped sellable items (pets are listed per-instance
+    // from the pet popup so their custom names carry to the market).
+    const sellable = this.inventory.filter(item => !this._isItemEquipped(item) && item.item_type !== 'pet');
 
     if (sellable.length === 0) {
       grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
