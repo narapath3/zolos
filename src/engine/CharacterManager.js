@@ -2511,6 +2511,8 @@ export class CharacterManager {
             gear: { ...(this.equippedGear || {}) }, // helmet/body/cape/boots so others see them
             pet: this.equippedPet || null,          // companion so others see it too
             petLevel: this.petLevel || 1,           // so others see the right aura tier
+            refine: { ...(this.equipRefine || {}) }, // +N per slot so profiles show refine
+            cards: { ...(this.equippedCards || {}) }, // socketed cards so profiles show them
             job: this.stats ? (this.stats.job || null) : null,
             title: this.title
         };
@@ -2530,6 +2532,14 @@ export class CharacterManager {
             for (const k of Object.keys(this.equippedGear)) this.equippedGear[k] = app.gear[k] || null;
         }
         if (app.shield !== undefined) this.equippedShield = app.shield || null;
+        // Refine (+N) per slot + socketed cards, so remote heroes carry them and
+        // re-broadcast correctly (used by the profile popup to show +N / cards).
+        if (app.refine && this.equipRefine) {
+            for (const k of Object.keys(this.equipRefine)) this.equipRefine[k] = app.refine[k] || 0;
+        }
+        if (app.cards && this.equippedCards) {
+            for (const k of Object.keys(this.equippedCards)) this.equippedCards[k] = app.cards[k] || null;
+        }
         if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
         if (app.pet !== undefined && app.pet !== this.equippedPet) {
             this.setPet(app.pet, app.petLevel || 1);
