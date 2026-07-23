@@ -2,7 +2,7 @@
 // Shows player stats, skills, and equipment with premium styling
 
 import { JobPreview } from '../engine/JobPreview.js';
-import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats } from '../engine/GameData.js';
+import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats, RARITY_COLOR } from '../engine/GameData.js';
 
 export class PlayerProfileModal {
   constructor() {
@@ -301,6 +301,33 @@ export class PlayerProfileModal {
         text-overflow: ellipsis;
       }
 
+      .equip-item { position: relative; }
+      .equip-item.rar-rare.filled { border-color: rgba(90,170,255,.5); }
+      .equip-item.rar-epic.filled { border-color: rgba(190,120,255,.55); }
+      .equip-item.rar-legendary.filled { border-color: rgba(255,190,70,.7); box-shadow: 0 0 10px rgba(255,190,70,.25); }
+      /* +N refine badge (top-right) */
+      .equip-refine {
+        position: absolute; top: 3px; right: 5px; font-size: 10px; font-weight: 900;
+        color: #ffd86a; text-shadow: 0 1px 2px #000; letter-spacing: .2px;
+      }
+      /* socketed-card gem (bottom-left) */
+      .equip-card-badge {
+        position: absolute; left: 3px; bottom: 3px; width: 17px; height: 17px; border-radius: 5px;
+        display: flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1;
+        background: rgba(6,10,20,.9); border: 1.5px solid #b8c0cc; box-shadow: 0 1px 3px rgba(0,0,0,.5);
+      }
+      /* Companion pet card */
+      .pet-section { }
+      .pet-display {
+        display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+        background: linear-gradient(135deg, rgba(70,50,110,.28), rgba(20,16,34,.4));
+        border: 1px solid rgba(180,150,255,.28);
+      }
+      .pet-emoji { font-size: 34px; line-height: 1; filter: drop-shadow(0 0 6px rgba(200,160,255,.5)); }
+      .pet-info { display: flex; flex-direction: column; gap: 3px; }
+      .pet-name { font-size: 14px; font-weight: 800; color: #e8dcff; }
+      .pet-lvl { font-size: 12px; font-weight: 700; }
+
       /* Badges */
       .badges-section {
         display: flex;
@@ -468,6 +495,10 @@ export class PlayerProfileModal {
       weapon: liveAppearance?.weapon || dbData?.weapon || 'None',
       shield: liveAppearance?.shield || dbData?.shield || 'None',
       gear: liveAppearance?.gear || { body: dbData?.armor },
+      pet: liveAppearance?.pet || null,
+      petLevel: liveAppearance?.petLevel || 1,
+      refine: liveAppearance?.refine || {},
+      cards: liveAppearance?.cards || {},
       job: job,
       title: liveAppearance?.title || dbData?.title
     };
@@ -569,8 +600,14 @@ export class PlayerProfileModal {
             </div>
           </div>
 
+          ${appearance.pet ? `
           <div>
-            <div class="section-title">Equipment</div>
+            <div class="section-title">Companion · สัตว์เลี้ยง</div>
+            <div class="pet-section">${this._renderPet(appearance)}</div>
+          </div>` : ''}
+
+          <div>
+            <div class="section-title">Equipment · ที่สวมใส่</div>
             <div class="equip-grid">
               ${this._renderEquipment(appearance)}
             </div>
@@ -834,6 +871,10 @@ export class PlayerProfileModal {
     // Update equipment grid
     const equipGrid = card.querySelector('.equip-grid');
     if (equipGrid) equipGrid.innerHTML = this._renderEquipment(appearance);
+
+    // Update companion pet display (if present)
+    const petSection = card.querySelector('.pet-section');
+    if (petSection) petSection.innerHTML = this._renderPet(appearance);
   }
 
   _renderStatRow(label, value, className) {
@@ -860,17 +901,24 @@ export class PlayerProfileModal {
     }).join('');
   }
 
+  // Every worn slot, with the item's +N refine prefix and a socketed-card badge.
   _renderEquipment(appearance) {
     const slots = [
       { id: 'weapon', label: 'Weapon' },
       { id: 'shield', label: 'Shield' },
       { id: 'hat', label: 'Head' },
       { id: 'glasses', label: 'Eyes' },
+      { id: 'head', label: 'Helm' },
       { id: 'body', label: 'Armor' },
       { id: 'garment', label: 'Garment' },
-      { id: 'ring', label: 'Accessory' },
-      { id: 'feet', label: 'Shoes' }
+      { id: 'pants', label: 'Pants' },
+      { id: 'feet', label: 'Shoes' },
+      { id: 'ring', label: 'Ring' },
+      { id: 'wrist', label: 'Wrist' },
+      { id: 'accessory', label: 'Charm' },
     ];
+    const refine = appearance.refine || {};
+    const cards = appearance.cards || {};
 
     return slots.map(slot => {
       let itemName = 'None';
@@ -884,16 +932,47 @@ export class PlayerProfileModal {
       const isFilled = itemName && itemName !== 'None';
       const itemData = isFilled ? ITEMS[itemName] : null;
       const emoji = itemData?.emoji || '➖';
-      const displayName = isFilled ? itemName : 'Empty';
+      const rf = refine[slot.id] || 0;
+      const displayName = isFilled ? ((rf > 0 ? `+${rf} ` : '') + itemName) : 'Empty';
+      const rarCls = itemData?.rarity ? ` rar-${itemData.rarity}` : '';
+
+      const cardName = cards[slot.id];
+      const cardIt = cardName ? ITEMS[cardName] : null;
+      const cardBadge = cardIt
+        ? `<div class="equip-card-badge" title="การ์ด: ${cardName}" style="border-color:${RARITY_COLOR[cardIt.rarity] || '#b8c0cc'}">${cardIt.emoji}</div>`
+        : '';
 
       return `
-        <div class="equip-item ${isFilled ? 'filled' : ''}">
+        <div class="equip-item ${isFilled ? 'filled' : ''}${rarCls}">
+          ${rf > 0 ? `<div class="equip-refine">+${rf}</div>` : ''}
           <div class="equip-emoji">${emoji}</div>
           <div class="equip-slot-label">${slot.label}</div>
           <div class="equip-name" title="${displayName}">${displayName}</div>
+          ${cardBadge}
         </div>
       `;
     }).join('');
+  }
+
+  // Companion pet display (emoji + name + aura tier). Empty string when none.
+  _renderPet(appearance) {
+    const petKey = appearance.pet;
+    if (!petKey) return '';
+    const petItemName = Object.keys(ITEMS).find(n => ITEMS[n].type === 'pet' && ITEMS[n].pet === petKey);
+    const it = petItemName ? ITEMS[petItemName] : null;
+    const emoji = it?.emoji || '🐾';
+    const name = petItemName ? petItemName.replace(/ Pet$/, '') : petKey;
+    const lvl = appearance.petLevel || 1;
+    const tier = ['ธรรมดา', 'ออร่า ✨', 'ออร่า+เกล็ดแสง 🌟', 'เรืองรอง 💫', 'สุดยอดตำนาน 🌈'][
+      lvl >= 30 ? 4 : lvl >= 20 ? 3 : lvl >= 10 ? 2 : lvl >= 5 ? 1 : 0];
+    const col = lvl >= 30 ? '#ffcf6a' : lvl >= 20 ? '#c9a0ff' : lvl >= 10 ? '#7be0ff' : '#8fd0a0';
+    return `<div class="pet-display">
+        <div class="pet-emoji">${emoji}</div>
+        <div class="pet-info">
+          <div class="pet-name">${name}</div>
+          <div class="pet-lvl" style="color:${col}">🐾 Lv.${lvl} · ${tier}</div>
+        </div>
+      </div>`;
   }
 
   _renderBadges(data) {
