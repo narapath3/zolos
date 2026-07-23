@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 
@@ -632,6 +632,26 @@ export class GameUI {
       const rawInv = await loadInventory(characterId);
       this.inventory = rawInv.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
 
+      // --- Self-heal for the quantity-inflation bug ---
+      // A prior bug re-added the whole stack on every save/equip, ballooning
+      // quantities into the tens/hundreds of thousands. Repair on load:
+      // non-stackable items (gear/pets/tools) can only ever be 1; stackables
+      // are clamped to a sane cap. Corrections are persisted (SET, not add) so
+      // the fix is durable. Harmless once quantities are already sane.
+      const NON_STACK = new Set(['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'pet', 'tool']);
+      const MAX_STACK = 9999;
+      for (const it of this.inventory) {
+        const before = it.quantity;
+        if (NON_STACK.has(it.item_type)) {
+          if (it.quantity !== 1) it.quantity = 1;
+        } else if (it.quantity > MAX_STACK) {
+          it.quantity = MAX_STACK;
+        }
+        if (it.quantity !== before && this.characterId) {
+          setInventoryItemQuantity(this.characterId, it.item_name, it.item_type, it.quantity, it.stats || {}).catch(() => { });
+        }
+      }
+
       // Job locking: auto-unequip any worn item (weapon/hat/glasses) this class
       // can't use — e.g. gear equipped before this update or before a job change.
       const myJob = this.character?.stats?.job || null;
@@ -829,18 +849,16 @@ export class GameUI {
     if (!this.characterId || !this.inventory) return;
     // Fold live pet growth into its item's stats so it's saved with the batch.
     this._syncPetItemStats();
-    const { saveInventoryItem, updateInventoryItemStats } = await import('../network/GameSync.js');
+    const { setInventoryItemQuantity } = await import('../network/GameSync.js');
 
     // Flush ALL items (not just equipped ones) so that items bought but never
     // equipped still have a confirmed DB row with the right quantity.
+    // IMPORTANT: SET the absolute quantity from our in-memory truth. Using the
+    // delta-based saveInventoryItem here re-added the whole stack every flush,
+    // which inflated quantities without bound (the "หลักหมื่นหลักแสน" bug).
     for (const item of this.inventory) {
       try {
-        // First ensure the item exists in DB with correct quantity
-        await saveInventoryItem(this.characterId, item.item_name, item.item_type, item.quantity, item.stats || {});
-        // Then update the stats (equipped state, durability, etc.)
-        if (item.stats && Object.keys(item.stats).length > 0) {
-          await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
-        }
+        await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity, item.stats || {});
       } catch (e) {
         console.error(`[Zolos] ❌ _flushInventoryToDB failed for ${item.item_name}:`, e.message);
       }
@@ -1734,10 +1752,9 @@ export class GameUI {
         this.character.setPet(null);
       }
       if (this.characterId) {
-        // Ensure the item row exists in DB with correct quantity before updating stats.
-        await saveInventoryItem(this.characterId, item.item_name, item.item_type, item.quantity || 1, {});
-        // Send the full stats object (not {}) so a tool's durability survives.
-        await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
+        // SET (not add) the row's quantity + stats so equipping never inflates
+        // the stack. The full stats object keeps a tool's durability, etc.
+        await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity || 1, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
       this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
@@ -1772,9 +1789,8 @@ export class GameUI {
         if (isSameSlot && otherItem.stats && otherItem.stats.equipped === true) {
           otherItem.stats.equipped = false;
           if (this.characterId) {
-            // Ensure DB row exists with correct quantity before updating stats
-            await saveInventoryItem(this.characterId, otherItem.item_name, otherItem.item_type, otherItem.quantity || 1, {});
-            await updateInventoryItemStats(this.characterId, otherItem.item_name, otherItem.stats);
+            // SET (not add) quantity + stats so swapping gear never inflates it.
+            await setInventoryItemQuantity(this.characterId, otherItem.item_name, otherItem.item_type, otherItem.quantity || 1, otherItem.stats || {});
           }
         }
       }
@@ -1805,12 +1821,9 @@ export class GameUI {
       }
 
       if (this.characterId) {
-        // Ensure the item row exists in DB with correct quantity before updating stats.
-        // This handles the case where a player bought an item but the save was
-        // interrupted before the DB row was created.
-        await saveInventoryItem(this.characterId, item.item_name, item.item_type, item.quantity || 1, {});
-        // Send the full stats object so a tool's durability isn't wiped.
-        await updateInventoryItemStats(this.characterId, item.item_name, item.stats);
+        // SET (not add) the row's quantity + stats. Also creates the row if a
+        // buy save was interrupted. Never inflates the stack on equip.
+        await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity || 1, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
       const isPet = item.item_type === 'pet';
