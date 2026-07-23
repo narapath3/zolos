@@ -333,6 +333,17 @@ async function initGame(charData) {
                     setTimeout(() => gameUI.maybePromptJobSelect(), 800);
                 }
                 break;
+            case 'petLevelUp':
+                if (soundManager && soundManager.playLevelUpSound) soundManager.playLevelUpSound();
+                if (gameUI) gameUI.addCombatLog(`🐾 สัตว์เลี้ยงเลเวลอัพ! ตอนนี้เลเวล ${event.level} ✨`, 'levelup');
+                if (particles && character && particles.spawnLevelUpEffect) {
+                    particles.spawnLevelUpEffect(character.getPosition());
+                }
+                // Persist the pet's new level/xp to its inventory item so it
+                // survives reloads. The next position broadcast carries the new
+                // petLevel to teammates, so their view upgrades the aura too.
+                if (gameUI && gameUI.persistPetProgress) gameUI.persistPetProgress();
+                break;
             case 'lootDrop':
                 if (gameUI) gameUI.addCombatLog(`🎁 Dropped: ${event.item.name}`, 'loot');
                 if (gameUI) gameUI.addItem(event.item);

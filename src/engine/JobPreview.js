@@ -72,7 +72,7 @@ export class JobPreview {
         }
         c.equippedShield = app.shield || null;
         if (c.updateGearVisuals) c.updateGearVisuals();
-        if (c.setPet) c.setPet(app.pet || null);
+        if (c.setPet) c.setPet(app.pet || null, app.petLevel || 1);
         if (c.nameSprite) c.nameSprite.visible = false;
         const ringColor = { swordsman: 0xff6a6a, mage: 0xb080ff, archer: 0x7be08a, priest: 0xffe98a }[app.job] || 0xffd24a;
         this.ring.material.color.setHex(ringColor);

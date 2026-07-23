@@ -409,6 +409,14 @@ export class CombatSystem {
                 }
             }
 
+            // Pet companion shares a slice of the spoils and grows over time.
+            if (this.character.equippedPet && this.character.addPetXp) {
+                const petLeveled = this.character.addPetXp(Math.max(1, Math.round(data.exp * 0.5)));
+                if (petLeveled) {
+                    this.onEvent({ type: 'petLevelUp', level: this.character.petLevel });
+                }
+            }
+
             // Daily Quest hunt progress event
             this.onEvent({
                 type: 'monsterKilled',

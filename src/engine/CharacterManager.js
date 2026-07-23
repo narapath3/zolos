@@ -25,9 +25,13 @@ export class CharacterManager {
         this.equippedHat = 'None';
         this.equippedGlasses = 'None';
         this.equippedPet = null;   // companion pet model key (see PetModels)
+        this.petLevel = 1;         // pet grows as its owner fights; drives its aura tier
+        this.petXp = 0;
         this.hatMesh = null;
         this.glassesMesh = null;
         this.petMesh = null;
+        this.petParts = null;      // { wings:[], aura:{ring,sparkles,glow}, body } for animation
+        this.petLevelFlash = 0;    // >0 while a level-up pop plays
         this.title = null; // achievement title over the name (e.g. 'master_angler')
 
         // State
@@ -1237,9 +1241,11 @@ export class CharacterManager {
     // character mesh (so it moves + rotates with the hero for free — works for
     // remote players too), positioned to the hero's right and animated with a
     // gentle hop in update(). Cheap: one small static voxel group, no particles.
-    setPet(petKey) {
+    setPet(petKey, level = 1, xp = 0) {
         const key = (petKey && petKey !== 'None') ? petKey : null;
         this.equippedPet = key;
+        this.petLevel = Math.max(1, Math.floor(level) || 1);
+        this.petXp = Math.max(0, xp || 0);
         if (this.petMesh) {
             this.mesh.remove(this.petMesh);
             this.petMesh.traverse(c => {
@@ -1247,6 +1253,7 @@ export class CharacterManager {
                 if (c.material) Array.isArray(c.material) ? c.material.forEach(m => m.dispose()) : c.material.dispose();
             });
             this.petMesh = null;
+            this.petParts = null;
         }
         if (!key) return;
         const pet = buildPet(key);
@@ -1255,6 +1262,130 @@ export class CharacterManager {
         pet.rotation.y = -0.35;           // angle it to face roughly where the hero looks
         this.mesh.add(pet);
         this.petMesh = pet;
+
+        // Collect animatable parts (flappable wings) once, then build the
+        // level-scaled aura. Higher-level pets look more impressive.
+        const wings = [];
+        pet.traverse(c => { if (c.userData && c.userData.role === 'wing') wings.push(c); });
+        this.petParts = { wings, aura: null, baseY: pet.userData.float ? 0.35 : 0 };
+        this._buildPetAura(this.petLevel);
+    }
+
+    // XP a pet needs to reach `level+1`. Gentle curve so early levels come
+    // quickly (visible reward) and later ones stretch out.
+    getPetXpRequired(level) {
+        return Math.floor(60 * Math.pow(level, 1.5));
+    }
+
+    // Grant pet XP (called on the owner's kills). Returns true if it levelled up.
+    addPetXp(amount) {
+        if (!this.equippedPet || !(amount > 0)) return false;
+        this.petXp += amount;
+        let leveled = false;
+        // Cap at 40 so the aura tiers have a sensible ceiling.
+        while (this.petLevel < 40 && this.petXp >= this.getPetXpRequired(this.petLevel)) {
+            this.petXp -= this.getPetXpRequired(this.petLevel);
+            this.petLevel++;
+            leveled = true;
+        }
+        if (leveled) {
+            this._buildPetAura(this.petLevel);
+            this.petLevelFlash = 1.0; // triggers the pop in update()
+        }
+        return leveled;
+    }
+
+    // Aura tier from level: the visual "power band" a pet is in.
+    _petTier(level) {
+        if (level >= 30) return 4;
+        if (level >= 20) return 3;
+        if (level >= 10) return 2;
+        if (level >= 5) return 1;
+        return 0;
+    }
+
+    // Signature aura colour per pet species.
+    _petAuraColor() {
+        const MAP = {
+            poring: 0xff6fae, chick: 0xffd54a, kitten: 0x9fd0ff,
+            puppy: 0xffb060, owl: 0xc9a0ff, baby_dragon: 0x5affc0,
+        };
+        return MAP[this.equippedPet] || 0x8fd0ff;
+    }
+
+    // Build the level-scaled aura as children of the pet mesh. Deliberately
+    // cheap and animation-only (spin/orbit, no per-frame particle spawning) so
+    // it stays FPS-safe even with many pets on screen — same discipline as the
+    // hero aura. Tier 0 (level < 5) adds nothing.
+    _buildPetAura(level) {
+        // Tear down any previous aura.
+        if (this.petParts && this.petParts.aura) {
+            const a = this.petParts.aura;
+            [a.ring, a.glow, ...(a.sparkles || [])].forEach(m => {
+                if (!m) return;
+                this.petMesh.remove(m);
+                if (m.geometry) m.geometry.dispose();
+                if (m.material) m.material.dispose();
+            });
+            this.petParts.aura = null;
+        }
+        if (!this.petMesh || !this.petParts) return;
+        const tier = this._petTier(level);
+        if (tier === 0) return;
+        const color = this._petAuraColor();
+        const floats = this.petMesh.userData.float;
+        const groundY = floats ? 0.05 : 0.02;
+        const aura = { ring: null, glow: null, sparkles: [] };
+
+        // Ground halo ring (tier 1+): a thin glowing torus that spins.
+        const ringR = 0.34 + tier * 0.05;
+        const ringGeo = new THREE.TorusGeometry(ringR, 0.02 + tier * 0.006, 8, 24);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color, transparent: true, opacity: 0.55 + tier * 0.06,
+            blending: THREE.AdditiveBlending, depthWrite: false,
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = groundY;
+        this.petMesh.add(ring);
+        aura.ring = ring;
+
+        // Orbiting sparkles (tier 2+): a few tiny glow motes circling the pet.
+        if (tier >= 2) {
+            const count = tier >= 4 ? 5 : (tier >= 3 ? 4 : 3);
+            const orbitR = ringR + 0.04;
+            const orbitY = floats ? 0.5 : 0.28;
+            for (let i = 0; i < count; i++) {
+                const s = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.035 + tier * 0.006, 6, 6),
+                    new THREE.MeshBasicMaterial({
+                        color, transparent: true, opacity: 0.9,
+                        blending: THREE.AdditiveBlending, depthWrite: false,
+                    })
+                );
+                s.userData.phase = (i / count) * Math.PI * 2;
+                s.userData.orbitR = orbitR;
+                s.userData.orbitY = orbitY;
+                this.petMesh.add(s);
+                aura.sparkles.push(s);
+            }
+        }
+
+        // Radiant body glow (tier 3+): a soft additive shell that breathes.
+        if (tier >= 3) {
+            const glow = new THREE.Mesh(
+                new THREE.SphereGeometry(floats ? 0.34 : 0.3, 10, 10),
+                new THREE.MeshBasicMaterial({
+                    color, transparent: true, opacity: 0.16 + (tier - 3) * 0.06,
+                    blending: THREE.AdditiveBlending, depthWrite: false,
+                })
+            );
+            glow.position.y = floats ? 0.5 : 0.26;
+            this.petMesh.add(glow);
+            aura.glow = glow;
+        }
+
+        this.petParts.aura = aura;
     }
 
     // ===== Worn gear visuals (helmet / body armor / cape / boots / shield) =====
@@ -1878,16 +2009,68 @@ export class CharacterManager {
             this.auraRing.scale.set(s, s, 1);
         }
 
-        // Pet idle animation: ground pets hop; floating pets bob + sway.
+        // Pet idle animation: ground pets bounce with a lively squash/stretch;
+        // floating pets bob, sway and flap. Higher-level pets move a touch
+        // faster and their aura spins/orbits. All rotation/scale only — cheap.
         if (this.petMesh) {
             const floats = this.petMesh.userData.float;
             const t = this.animTimer;
+            const speed = 1 + Math.min(this.petLevel, 40) * 0.012; // livelier as it grows
+
             if (floats) {
-                this.petMesh.position.y = 0.35 + Math.sin(t * 2.4) * 0.09;
-                this.petMesh.rotation.y = -0.35 + Math.sin(t * 1.3) * 0.15;
+                this.petMesh.position.y = 0.35 + Math.sin(t * 2.4 * speed) * 0.1;
+                this.petMesh.rotation.y = -0.35 + Math.sin(t * 1.3) * 0.16;
+                this.petMesh.rotation.z = Math.sin(t * 2.4 * speed) * 0.06;
+                this.petMesh.scale.set(1, 1, 1);
             } else {
-                this.petMesh.position.y = Math.max(0, Math.abs(Math.sin(t * 3.2)) * 0.12);
-                this.petMesh.rotation.y = -0.35 + Math.sin(t * 2.0) * 0.08;
+                // Bouncy hop: |sin| gives a springy up-down; squash on the
+                // ground, stretch at the top of the arc → "ดุ๊กดิ๊ก".
+                const hop = Math.abs(Math.sin(t * 3.4 * speed));
+                this.petMesh.position.y = hop * 0.14;
+                const stretch = 1 + hop * 0.16;
+                const squash = 1 - hop * 0.1;
+                this.petMesh.scale.set(squash, stretch, squash);
+                this.petMesh.rotation.y = -0.35 + Math.sin(t * 2.2 * speed) * 0.1;
+                this.petMesh.rotation.z = Math.sin(t * 6.8 * speed) * 0.05; // wiggle
+            }
+
+            // Flap any tagged wings.
+            if (this.petParts && this.petParts.wings.length) {
+                const flap = Math.sin(t * (floats ? 9 : 13) * speed) * (floats ? 0.5 : 0.7);
+                for (const w of this.petParts.wings) {
+                    const base = w.userData.baseRotZ || 0;
+                    w.rotation.z = base + flap * (w.userData.side || 1);
+                }
+            }
+
+            // Animate the level-scaled aura.
+            const aura = this.petParts && this.petParts.aura;
+            if (aura) {
+                if (aura.ring) {
+                    aura.ring.rotation.z += dt * 1.6;
+                    aura.ring.material.opacity = (0.5 + Math.sin(t * 3) * 0.1);
+                }
+                if (aura.sparkles) {
+                    for (const s of aura.sparkles) {
+                        const a = s.userData.phase + t * 2.2;
+                        s.position.set(
+                            Math.cos(a) * s.userData.orbitR,
+                            s.userData.orbitY + Math.sin(t * 4 + s.userData.phase) * 0.05,
+                            Math.sin(a) * s.userData.orbitR
+                        );
+                    }
+                }
+                if (aura.glow) {
+                    const g = 1 + Math.sin(t * 3.5) * 0.08;
+                    aura.glow.scale.set(g, g, g);
+                }
+            }
+
+            // Level-up pop: a quick over-scale that eases back to normal.
+            if (this.petLevelFlash > 0) {
+                this.petLevelFlash = Math.max(0, this.petLevelFlash - dt * 2.2);
+                const pop = 1 + this.petLevelFlash * 0.4;
+                this.petMesh.scale.multiplyScalar(pop);
             }
         }
 
@@ -2293,6 +2476,7 @@ export class CharacterManager {
             shield: this.equippedShield || null,
             gear: { ...(this.equippedGear || {}) }, // helmet/body/cape/boots so others see them
             pet: this.equippedPet || null,          // companion so others see it too
+            petLevel: this.petLevel || 1,           // so others see the right aura tier
             job: this.stats ? (this.stats.job || null) : null,
             title: this.title
         };
@@ -2313,7 +2497,13 @@ export class CharacterManager {
         }
         if (app.shield !== undefined) this.equippedShield = app.shield || null;
         if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
-        if (app.pet !== undefined && app.pet !== this.equippedPet) this.setPet(app.pet);
+        if (app.pet !== undefined && app.pet !== this.equippedPet) {
+            this.setPet(app.pet, app.petLevel || 1);
+        } else if (app.pet !== undefined && (app.petLevel || 1) !== this.petLevel) {
+            // Same pet, new level (teammate levelled up) → rebuild its aura tier.
+            this.petLevel = app.petLevel || 1;
+            if (this.petMesh) this._buildPetAura(this.petLevel);
+        }
         // Sync class so other players see this hero's job-specific look.
         if (app.job !== undefined) {
             if (!this.stats) this.stats = {};
