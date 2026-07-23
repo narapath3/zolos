@@ -690,7 +690,11 @@ export class GameUI {
       // Re-summon the active companion pet, if one was out.
       const equippedPet = this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true);
       if (this.character && this.character.setPet) {
-        this.character.setPet(equippedPet ? petModelOf(equippedPet.item_name) : null);
+        this.character.setPet(
+          equippedPet ? petModelOf(equippedPet.item_name) : null,
+          equippedPet?.stats?.petLevel || 1,
+          equippedPet?.stats?.petXp || 0,
+        );
       }
 
       // Apply the refine (+N) bonuses of everything equipped.
@@ -820,6 +824,8 @@ export class GameUI {
    */
   async _flushInventoryToDB() {
     if (!this.characterId || !this.inventory) return;
+    // Fold live pet growth into its item's stats so it's saved with the batch.
+    this._syncPetItemStats();
     const { saveInventoryItem, updateInventoryItemStats } = await import('../network/GameSync.js');
 
     // Flush ALL items (not just equipped ones) so that items bought but never
@@ -1593,7 +1599,24 @@ export class GameUI {
       const maxDur = ITEMS[item.item_name].durability;
       durHtml = `<br/><br/><strong style="color:${durLeft > 0 ? '#7fe0ff' : '#ff6060'}">🔧 ความทนทาน:</strong> ${durLeft}/${maxDur} ครั้ง${durLeft <= 0 ? ' (พังแล้ว)' : ''}`;
     }
-    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + droppedByHtml;
+    let petHtml = '';
+    if (item.item_type === 'pet') {
+      const isEq = item.stats && item.stats.equipped === true;
+      // Live values for the active pet; stored values otherwise.
+      const lvl = (isEq && this.character) ? this.character.petLevel : (item.stats?.petLevel || 1);
+      const xp = (isEq && this.character) ? Math.floor(this.character.petXp) : (item.stats?.petXp || 0);
+      const need = (this.character && this.character.getPetXpRequired) ? this.character.getPetXpRequired(lvl) : Math.floor(60 * Math.pow(lvl, 1.5));
+      const pct = lvl >= 40 ? 100 : Math.min(100, Math.round((xp / need) * 100));
+      const tierName = ['ธรรมดา', 'ประกายออร่า ✨', 'ออร่า+เกล็ดแสง 🌟', 'เรืองรอง+วงแหวน 💫', 'สุดยอดตำนาน 🌈'][
+        lvl >= 30 ? 4 : lvl >= 20 ? 3 : lvl >= 10 ? 2 : lvl >= 5 ? 1 : 0
+      ];
+      const barCol = lvl >= 30 ? '#ffcf6a' : lvl >= 20 ? '#c9a0ff' : lvl >= 10 ? '#7be0ff' : '#8fd0a0';
+      petHtml = `<br/><br/><strong style="color:${barCol}">🐾 เลเวลสัตว์เลี้ยง:</strong> Lv.${lvl}${lvl >= 40 ? ' (สูงสุด)' : ''} · ${tierName}`
+        + `<div style="margin-top:5px;height:8px;border-radius:5px;background:rgba(255,255,255,0.12);overflow:hidden">`
+        + `<div style="height:100%;width:${pct}%;background:${barCol};border-radius:5px"></div></div>`
+        + (lvl >= 40 ? '' : `<span style="font-size:11px;color:var(--text-dim)">EXP ${xp}/${need} — ฆ่ามอนสเตอร์เพื่อเพิ่มเลเวลและเอฟเฟค</span>`);
+    }
+    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + petHtml + droppedByHtml;
     document.getElementById('detail-price-val').textContent = item.price;
 
     const useBtn = document.getElementById('btn-use-item');
@@ -1767,7 +1790,7 @@ export class GameUI {
       } else if (item.item_type === 'tool') {
         this.character.equippedPickaxe = item.item_name;
       } else if (item.item_type === 'pet') {
-        this.character.setPet(petModelOf(item.item_name));
+        this.character.setPet(petModelOf(item.item_name), item.stats.petLevel || 1, item.stats.petXp || 0);
       }
 
       if (this.characterId) {
@@ -1802,6 +1825,32 @@ export class GameUI {
     this.updateStats(this.character.stats);
     // Sync: Inventory → Profile Editor (refresh dropdowns if open)
     this._refreshProfileEditorEquipment();
+  }
+
+  // Copy the live pet level/xp from the character onto its inventory item so
+  // the values ride along on the next DB flush (keeps in-memory in sync).
+  _syncPetItemStats() {
+    if (!this.character || !this.character.equippedPet || !this.inventory) return null;
+    const petItem = this.inventory.find(i => i.item_type === 'pet' && i.stats && i.stats.equipped === true);
+    if (!petItem) return null;
+    if (!petItem.stats) petItem.stats = {};
+    petItem.stats.petLevel = this.character.petLevel;
+    petItem.stats.petXp = Math.floor(this.character.petXp);
+    return petItem;
+  }
+
+  // Persist the active pet's level/xp immediately (called on level-up, rare).
+  async persistPetProgress() {
+    const petItem = this._syncPetItemStats();
+    if (petItem && this.characterId) {
+      const { updateInventoryItemStats } = await import('../network/GameSync.js');
+      await updateInventoryItemStats(this.characterId, petItem.item_name, petItem.stats);
+    }
+    // Refresh the detail box if the pet is currently selected, so its level
+    // bar updates live.
+    if (this.selectedItemName && petItem && this.selectedItemName === petItem.item_name) {
+      this._updateDetailBox();
+    }
   }
 
   // ============ Leaderboard ============

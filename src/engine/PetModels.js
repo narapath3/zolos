@@ -70,7 +70,11 @@ export const PET_BUILDERS = {
         const body = sph(0.22, 0xffd84a, 0, 0.24, 0, 12); body.scale.set(1, 1.1, 1); g.add(body);
         eyes(g, 0.3, 0.2, 0.07, 0.035);
         g.add(cone(0.05, 0.1, 0xff8a30, 0, 0.26, 0.24).rotateX(Math.PI / 2)); // beak
-        [-0.16, 0.16].forEach(x => { const w = box(0.06, 0.16, 0.2, 0xf5c33a, x, 0.24, 0); g.add(w); });
+        [-0.16, 0.16].forEach(x => {
+            const w = box(0.06, 0.16, 0.2, 0xf5c33a, x, 0.24, 0);
+            w.userData.role = 'wing'; w.userData.side = x < 0 ? -1 : 1;
+            g.add(w);
+        });
         g.userData.float = false;
         return g;
     },
@@ -81,7 +85,13 @@ export const PET_BUILDERS = {
         g.add(box(0.24, 0.24, 0.24, 0x46bd76, 0, 0.62, 0.26));   // head
         [-0.08, 0.08].forEach(x => g.add(cone(0.05, 0.13, 0xffe08a, x, 0.78, 0.26)));   // horns
         eyes(g, 0.66, 0.37, 0.07, 0.033);
-        [-0.2, 0.2].forEach(x => { const w = box(0.05, 0.28, 0.34, 0x8fe0b0, x, 0.55, -0.05); w.rotation.z = x < 0 ? 0.5 : -0.5; g.add(w); }); // wings
+        [-0.2, 0.2].forEach(x => {
+            const w = box(0.05, 0.28, 0.34, 0x8fe0b0, x, 0.55, -0.05);
+            w.rotation.z = x < 0 ? 0.5 : -0.5;
+            w.userData.role = 'wing'; w.userData.side = x < 0 ? -1 : 1;
+            w.userData.baseRotZ = w.rotation.z;
+            g.add(w);
+        }); // wings
         g.add(box(0.08, 0.08, 0.26, 0x3fae6a, 0, 0.48, -0.28));  // tail
         g.userData.float = true;
         return g;
