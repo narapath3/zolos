@@ -4094,11 +4094,11 @@ export class GameUI {
       });
     });
 
-    // Buy button
+    // Buy button → open a confirmation dialog first.
     const buyBtn = document.getElementById('btn-buy-npc-item');
     if (buyBtn) {
-      buyBtn.addEventListener('click', async () => {
-        await this._performShopAction();
+      buyBtn.addEventListener('click', () => {
+        this._confirmBuyDialog();
       });
     }
 
@@ -4246,6 +4246,107 @@ export class GameUI {
     if (affEl) affEl.textContent = `ซื้อได้สูงสุด: ${affordable.toLocaleString()}`;
   }
 
+  _ensureBuyDialogStyles() {
+    if (document.getElementById('buy-dialog-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'buy-dialog-styles';
+    st.textContent = `
+    #buy-confirm-overlay{position:fixed;inset:0;z-index:100001;background:rgba(4,7,16,.66);
+      display:flex;align-items:center;justify-content:center;padding:20px;animation:bcFade .15s ease;}
+    @keyframes bcFade{from{opacity:0}to{opacity:1}}
+    .bc-box{width:100%;max-width:320px;background:linear-gradient(160deg,#1c2542,#111528);
+      border:1px solid rgba(240,192,64,.4);border-radius:18px;padding:20px 18px 16px;text-align:center;
+      box-shadow:0 24px 70px rgba(0,0,0,.7);animation:bcPop .2s cubic-bezier(.34,1.56,.64,1);}
+    @keyframes bcPop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+    .bc-emoji{font-size:44px;line-height:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5));}
+    .bc-title{font-size:16px;font-weight:800;color:#fff;margin:8px 0 10px;}
+    .bc-item{font-size:14px;color:#ffe6a2;margin-bottom:12px;}
+    .bc-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;text-align:left;}
+    .bc-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);
+      padding:6px 10px;background:rgba(255,255,255,.04);border-radius:8px;}
+    .bc-row span:last-child{color:#fff;font-weight:700;}
+    .bc-row.bc-total{background:rgba(240,192,64,.1);border:1px solid rgba(240,192,64,.25);}
+    .bc-row.bc-total span:last-child{color:#ffd94a;}
+    .bc-warn{color:#ff7a7a;font-size:12px;font-weight:700;margin-bottom:10px;}
+    .bc-actions{display:flex;gap:8px;}
+    .bc-btn{flex:1;padding:11px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:none;
+      font-family:var(--font-ui);transition:transform .1s,filter .15s;}
+    .bc-btn:active{transform:scale(.96);}
+    .bc-cancel{background:rgba(255,255,255,.08);color:#cdd6ee;border:1px solid rgba(255,255,255,.12);}
+    .bc-ok{background:#f0c040;color:#000;}
+    .bc-ok:hover:not(:disabled){filter:brightness(1.08);}
+    .bc-ok:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(1);}
+    #buy-success-toast{position:fixed;left:50%;top:26%;transform:translate(-50%,-8px);z-index:100002;
+      display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:14px;pointer-events:none;
+      background:linear-gradient(135deg,#1e6b3a,#134a28);border:1px solid rgba(120,255,160,.4);
+      box-shadow:0 12px 34px rgba(0,0,0,.55);opacity:0;transition:opacity .2s,transform .2s;}
+    #buy-success-toast.show{opacity:1;transform:translate(-50%,0);}
+    #buy-success-toast .bs-check{font-size:30px;animation:bsPop .4s ease;}
+    @keyframes bsPop{0%{transform:scale(.3)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+    #buy-success-toast .bs-text{font-size:14px;font-weight:800;color:#fff;line-height:1.35;text-align:left;}
+    #buy-success-toast .bs-text span{font-size:12px;font-weight:600;color:#c7f6d4;}
+    `;
+    document.head.appendChild(st);
+  }
+
+  // Confirmation popup shown when the player taps "Buy". Confirming runs the
+  // purchase; the success status then pops up.
+  _confirmBuyDialog() {
+    if (!this.selectedShopItem || !this.character) return;
+    this._ensureBuyDialogStyles();
+    const item = this.selectedShopItem;
+    const itemData = ITEMS[item.name];
+    if (!itemData) return;
+    const qtyInput = document.getElementById('shop-qty-input');
+    let qty = parseInt(qtyInput && qtyInput.value) || 1;
+    if (qty < 1) qty = 1;
+    const total = item.price * qty;
+    const gold = this.character.stats.gold || 0;
+    const enough = gold >= total;
+
+    let ov = document.getElementById('buy-confirm-overlay');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'buy-confirm-overlay';
+    ov.innerHTML = `
+      <div class="bc-box">
+        <div class="bc-emoji">${itemData.emoji}</div>
+        <div class="bc-title">ยืนยันการซื้อ?</div>
+        <div class="bc-item">${itemData.emoji} ${item.name} <b>x${qty}</b></div>
+        <div class="bc-rows">
+          <div class="bc-row"><span>ราคาชิ้นละ</span><span>${item.price.toLocaleString()} z</span></div>
+          <div class="bc-row bc-total"><span>รวมทั้งหมด</span><span>${total.toLocaleString()} z</span></div>
+          <div class="bc-row"><span>เงินคงเหลือหลังซื้อ</span><span style="color:${enough ? '#8fe0a8' : '#ff7a7a'}">${(gold - total).toLocaleString()} z</span></div>
+        </div>
+        ${enough ? '' : '<div class="bc-warn">❌ เงิน Zeny ไม่พอ</div>'}
+        <div class="bc-actions">
+          <button class="bc-btn bc-cancel">ยกเลิก</button>
+          <button class="bc-btn bc-ok" ${enough ? '' : 'disabled'}>✅ ตกลง ซื้อเลย</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = () => ov.remove();
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    ov.querySelector('.bc-cancel').onclick = close;
+    const ok = ov.querySelector('.bc-ok');
+    if (ok && enough) {
+      ok.onclick = async () => { close(); await this._performShopAction(); };
+    }
+  }
+
+  // Success status popup after a completed purchase.
+  _purchaseSuccessToast(itemData, item, qty) {
+    this._ensureBuyDialogStyles();
+    let t = document.getElementById('buy-success-toast');
+    if (t) t.remove();
+    t = document.createElement('div');
+    t.id = 'buy-success-toast';
+    t.innerHTML = `<div class="bs-check">✅</div><div class="bs-text">ซื้อไอเทมสำเร็จ!<br><span>${itemData.emoji} ${item.name} x${qty}</span></div>`;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, 2000);
+  }
+
   async _performShopAction() {
     if (!this.selectedShopItem || !this.character) return;
 
@@ -4295,6 +4396,7 @@ export class GameUI {
     }
 
     this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} x${qty} สำเร็จ (-${totalCost.toLocaleString()} Zeny)`, 'system');
+    this._purchaseSuccessToast(itemData, item, qty);
 
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
