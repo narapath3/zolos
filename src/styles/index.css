@@ -182,16 +182,26 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   box-shadow: 0 0 10px rgba(64, 224, 128, 0.4);
 }
 
-/* Pet companion HUD: emoji + level + a compact XP bar under the player bars */
+/* Pet companion HUD: emoji + level + a compact XP bar. Its own fixed row on
+   the top-left, directly below the currency widget, so it never overlaps the
+   money/ZOL/online bar (which sits at its own fixed top). */
 #pet-hud {
+  position: fixed;
+  top: 160px; /* below the currency widget (desktop) */
+  left: 16px;
+  z-index: 101;
+  width: 208px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 2px;
-  padding: 3px 6px;
-  border-radius: 9px;
-  background: rgba(30, 22, 40, 0.5);
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(30, 22, 44, 0.9), rgba(18, 14, 28, 0.8));
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(180, 150, 255, 0.35);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 #pet-hud.pet-levelup {
@@ -252,6 +262,19 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
 
 .pet-xp-bar .bar-text {
   font-size: 8px;
+}
+
+/* Keep the pet badge tucked just below the currency widget at every size. */
+@media (max-width: 1024px) {
+  #pet-hud { top: 140px; left: 16px; width: 196px; }
+}
+@media (max-width: 768px) {
+  #pet-hud { top: 132px; left: 10px; width: 178px; gap: 5px; padding: 2px 7px; }
+  #pet-hud-emoji { font-size: 18px; }
+  .pet-hud-top { font-size: 10px; }
+}
+@media (max-width: 480px) {
+  #pet-hud { top: 126px; left: 8px; width: 168px; }
 }
 
 .bar-text {
