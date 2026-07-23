@@ -474,8 +474,26 @@
               </div>
             </div>
             <div id="shop-detail-desc" class="detail-desc">Description.</div>
-            <div class="detail-actions">
-              <span class="detail-price"><span id="shop-price-label">ราคา</span>: <span id="shop-detail-price-val">0</span> z</span>
+
+            <div class="form-group" style="margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label for="shop-qty-input" style="font-size: 11px; color: var(--text);">จำนวนที่จะซื้อ:</label>
+                <span id="shop-affordable" style="font-size: 11px; color: var(--text-dim);">ซื้อได้สูงสุด: 0</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button id="btn-shop-qty-minus" class="btn-secondary" style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">−</button>
+                <input type="number" id="shop-qty-input" min="1" value="1"
+                  style="flex: 1; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: var(--font-pixel); text-align: center;">
+                <button id="btn-shop-qty-plus" class="btn-secondary" style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">+</button>
+                <button id="btn-shop-qty-max" class="btn-secondary" style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
+              </div>
+            </div>
+
+            <div class="detail-actions" style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+              <div class="price-info" style="display: flex; flex-direction: column;">
+                <span style="font-size: 10px; color: var(--text-dim);"><span id="shop-price-label">ราคา</span>ชิ้นละ: <span id="shop-detail-price-val">0</span> z</span>
+                <span class="detail-price" style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); white-space: nowrap;">รวมทั้งหมด: <span id="shop-total-price">0</span> z</span>
+              </div>
               <button id="btn-buy-npc-item" class="btn-use-item">ซื้อไอเทม</button>
             </div>
           </div>

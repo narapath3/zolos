@@ -4102,6 +4102,23 @@ export class GameUI {
       });
     }
 
+    // Quantity controls (− / + / MAX / manual input) for the buy shop.
+    const qtyInput = document.getElementById('shop-qty-input');
+    const stepQty = (delta) => {
+      if (!qtyInput) return;
+      qtyInput.value = (parseInt(qtyInput.value) || 1) + delta;
+      this._updateShopTotal();
+    };
+    const minusBtn = document.getElementById('btn-shop-qty-minus');
+    const plusBtn = document.getElementById('btn-shop-qty-plus');
+    const maxBtn = document.getElementById('btn-shop-qty-max');
+    if (minusBtn) minusBtn.addEventListener('click', () => stepQty(-1));
+    if (plusBtn) plusBtn.addEventListener('click', () => stepQty(1));
+    if (maxBtn) maxBtn.addEventListener('click', () => {
+      if (qtyInput) qtyInput.value = Math.max(1, this._shopMaxAffordable());
+      this._updateShopTotal();
+    });
+    if (qtyInput) qtyInput.addEventListener('input', () => this._updateShopTotal());
   }
 
   // Open the buy shop pre-filtered to a tab ('all' | 'usable' | 'equip').
@@ -4193,6 +4210,40 @@ export class GameUI {
     if (buyBtn) buyBtn.style.display = 'block';
     const priceLabel = document.getElementById('shop-price-label');
     if (priceLabel) priceLabel.textContent = 'ราคา';
+
+    // Reset the quantity to 1 whenever a new item is selected, then refresh
+    // the "affordable" hint + total.
+    const qtyInput = document.getElementById('shop-qty-input');
+    if (qtyInput) qtyInput.value = 1;
+    this._updateShopTotal();
+  }
+
+  // How many of the selected item the player can afford (min 1 shown, 0 real).
+  _shopMaxAffordable() {
+    if (!this.selectedShopItem || !this.character) return 0;
+    const price = this.selectedShopItem.price || 0;
+    if (price <= 0) return 999;
+    return Math.floor((this.character.stats.gold || 0) / price);
+  }
+
+  // Recompute the total price for the chosen quantity, clamping the input to
+  // [1, affordable] (but never below 1 so the field stays usable).
+  _updateShopTotal() {
+    if (!this.selectedShopItem) return;
+    const qtyInput = document.getElementById('shop-qty-input');
+    const totalEl = document.getElementById('shop-total-price');
+    const affEl = document.getElementById('shop-affordable');
+    const price = this.selectedShopItem.price || 0;
+    const affordable = this._shopMaxAffordable();
+
+    let qty = parseInt(qtyInput && qtyInput.value) || 1;
+    if (qty < 1) qty = 1;
+    // Cap at what they can afford (but allow 1 so the buy button can warn).
+    if (affordable >= 1 && qty > affordable) qty = affordable;
+    if (qtyInput) qtyInput.value = qty;
+
+    if (totalEl) totalEl.textContent = (price * qty).toLocaleString();
+    if (affEl) affEl.textContent = `ซื้อได้สูงสุด: ${affordable.toLocaleString()}`;
   }
 
   async _performShopAction() {
@@ -4201,19 +4252,25 @@ export class GameUI {
     const item = this.selectedShopItem;
     const itemData = ITEMS[item.name];
 
-    if (this.character.stats.gold < item.price) {
-      this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system');
+    // Quantity chosen in the detail box (clamped to a sane range).
+    const qtyInput = document.getElementById('shop-qty-input');
+    let qty = parseInt(qtyInput && qtyInput.value) || 1;
+    if (qty < 1) qty = 1;
+    const totalCost = item.price * qty;
+
+    if (this.character.stats.gold < totalCost) {
+      this.addCombatLog(`❌ เงิน Zeny ไม่พอ (ต้องใช้ ${totalCost.toLocaleString()})`, 'system');
       if (this.soundManager && this.soundManager.playErrorSound) this.soundManager.playErrorSound();
       return;
     }
 
     // Deduct gold
-    this.character.stats.gold -= item.price;
+    this.character.stats.gold -= totalCost;
 
     // Add to inventory
     const existing = this.inventory.find(i => i.item_name === item.name);
     if (existing) {
-      existing.quantity += 1;
+      existing.quantity += qty;
     } else {
       this.inventory.push({
         item_name: item.name,
@@ -4223,7 +4280,7 @@ export class GameUI {
         price: itemData.price || item.price,
         healHp: itemData.healHp || 0,
         restoreSp: itemData.restoreSp || 0,
-        quantity: 1,
+        quantity: qty,
         stats: itemData.stats || {}
       });
     }
@@ -4231,24 +4288,25 @@ export class GameUI {
     // Save persistence
     if (this.characterId) {
       // Fixed argument order: (characterId, itemName, itemType, quantity)
-      await saveInventoryItem(this.characterId, item.name, itemData.type, 1);
+      await saveInventoryItem(this.characterId, item.name, itemData.type, qty);
       if (this.character.saveStatsToDatabase) {
         await this.character.saveStatsToDatabase();
       }
     }
 
-    this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} สำเร็จ (-${item.price} Zeny)`, 'system');
+    this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} x${qty} สำเร็จ (-${totalCost.toLocaleString()} Zeny)`, 'system');
 
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
       else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
     }
 
-    // Refresh UI
+    // Refresh UI (gold changed → re-clamp the affordable count + total).
     this._renderShop();
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+    this._updateShopTotal();
   }
 
   // ============ Heaven Merchant (Svarrga) — pickaxe shop + ore→ZOL ============
