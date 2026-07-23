@@ -82,6 +82,9 @@ export class CharacterManager {
         this.equippedGear = { head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
         // Refine level (+N) of the item worn in each slot — scales its bonuses.
         this.equipRefine = { weapon: 0, shield: 0, head: 0, body: 0, garment: 0, ring: 0, wrist: 0, pants: 0, feet: 0, accessory: 0 };
+        // Card socketed into each slot (card item name or null). Cards add stat
+        // bonuses + special effects (crit/damage%/lifesteal) via getCardTotal().
+        this.equippedCards = { weapon: null, shield: null, hat: null, glasses: null, head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
         // Back-compat alias: legacy code reads/writes a single `equippedArmor`.
         // Map it onto the body slot so old saves + call-sites keep working.
         Object.defineProperty(this, 'equippedArmor', {
@@ -112,7 +115,7 @@ export class CharacterManager {
 
         Object.defineProperty(this.stats, 'atk', {
             get: () => {
-                const bonus = this.getWeaponAtkBonus(this.equippedWeapon);
+                const bonus = this.getWeaponAtkBonus(this.equippedWeapon) + this.getCardTotal('atkBonus');
                 const base = isNaN(this.stats._baseAtk) ? 10 : this.stats._baseAtk;
                 return Math.floor((base + bonus) * this._jobMod('atk') * (1 + this.getBuffPct('atk')));
             },
@@ -125,7 +128,7 @@ export class CharacterManager {
 
         Object.defineProperty(this.stats, 'max_sp', {
             get: () => {
-                const bonus = this.getWeaponSpBonus(this.equippedWeapon) + this.getArmorSpBonus(this.equippedArmor);
+                const bonus = this.getWeaponSpBonus(this.equippedWeapon) + this.getArmorSpBonus(this.equippedArmor) + this.getCardTotal('spBonus');
                 const base = isNaN(this.stats._baseMaxSp) ? 50 : this.stats._baseMaxSp;
                 return Math.floor(base * this._jobMod('sp')) + bonus;
             },
@@ -138,7 +141,7 @@ export class CharacterManager {
 
         Object.defineProperty(this.stats, 'max_hp', {
             get: () => {
-                const bonus = this.getArmorHpBonus(this.equippedArmor);
+                const bonus = this.getArmorHpBonus(this.equippedArmor) + this.getCardTotal('hpBonus');
                 const base = isNaN(this.stats._baseMaxHp) ? 100 : this.stats._baseMaxHp;
                 return Math.floor(base * this._jobMod('hp')) + bonus;
             },
@@ -151,7 +154,7 @@ export class CharacterManager {
 
         Object.defineProperty(this.stats, 'def', {
             get: () => {
-                const bonus = this.getArmorDefBonus(this.equippedArmor) + this.getShieldDefBonus(this.equippedShield);
+                const bonus = this.getArmorDefBonus(this.equippedArmor) + this.getShieldDefBonus(this.equippedShield) + this.getCardTotal('defBonus');
                 const base = isNaN(this.stats._baseDef) ? 5 : this.stats._baseDef;
                 return Math.floor((base + bonus) * this._jobMod('def') * (1 + this.getBuffPct('def')));
             },
@@ -205,6 +208,37 @@ export class CharacterManager {
     getShieldDefBonus(shieldName) {
         if (!shieldName || !ITEMS[shieldName]) return 0;
         return Math.round((ITEMS[shieldName].defBonus || 0) * getRefineMult(this.equipRefine.shield));
+    }
+
+    // ===== Cards =====
+    // Sum a `card` bonus field across every socketed card. Core fields
+    // (atkBonus/defBonus/hpBonus/spBonus) fold into the stat getters below;
+    // special fields (critBonus/dmgPct/lifestealPct) are read by CombatSystem.
+    getCardTotal(field) {
+        let sum = 0;
+        for (const slot of Object.keys(this.equippedCards)) {
+            const name = this.equippedCards[slot];
+            const it = name && ITEMS[name];
+            if (it && it.card && it.card[field]) sum += it.card[field];
+        }
+        return sum;
+    }
+
+    // Combat hooks (used by CombatSystem._resolveDamage).
+    getCritChanceBonus() { return this.getCardTotal('critBonus'); }
+    getDamagePct() { return this.getCardTotal('dmgPct'); }
+    getLifestealPct() { return this.getCardTotal('lifestealPct'); }
+
+    // Socket / remove a card in a slot. Returns true on success.
+    equipCard(slotId, cardName) {
+        if (!(slotId in this.equippedCards)) return false;
+        this.equippedCards[slotId] = cardName || null;
+        return true;
+    }
+    unequipCard(slotId) {
+        if (!(slotId in this.equippedCards)) return false;
+        this.equippedCards[slotId] = null;
+        return true;
     }
 
     getAttackRange() {
