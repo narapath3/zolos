@@ -92,7 +92,7 @@ export async function loadCharacter(userId) {
 export async function fetchCharacterByUsername(username) {
     if (!supabase || isOfflineMode || !username) return null;
     try {
-        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color';
+        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color, appearance';
         const { data, error } = await supabase
             .from('characters')
             .select(fields)
@@ -123,7 +123,7 @@ export async function fetchPublicCharacter(userId) {
         // the first query to ALWAYS fail with PGRST204, forcing a second
         // network round-trip on every profile load — the main cause of
         // the slow profile popup.
-        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color';
+        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color, appearance';
         const { data, error } = await supabase
             .from('characters')
             .select(fields)
@@ -292,7 +292,8 @@ export async function saveCharacter(characterId, updates) {
         'job',
         'weapon', 'hat', 'glasses', 'shield', 'armor',
         'body_color', 'hair_color', 'pants_color', 'gender',
-        'sound_enabled', 'graphics_quality', 'fps_enabled'
+        'sound_enabled', 'graphics_quality', 'fps_enabled',
+        'appearance' // full look JSON (pet/refine/cards/all gear) for offline profiles
     ];
 
     // Optional appearance fields (may not be in DB yet)
@@ -400,7 +401,8 @@ export async function saveCharacterByUserId(userId, updates) {
         'job',
         'weapon', 'hat', 'glasses', 'shield', 'armor',
         'body_color', 'hair_color', 'pants_color', 'gender',
-        'sound_enabled', 'graphics_quality', 'fps_enabled'
+        'sound_enabled', 'graphics_quality', 'fps_enabled',
+        'appearance' // full look JSON (pet/refine/cards/all gear) for offline profiles
     ];
 
     const filteredUpdates = {};
@@ -428,6 +430,19 @@ export async function saveCharacterByUserId(userId, updates) {
 
     if (error) {
         console.error('[Zolos] ❌ saveCharacterByUserId error:', error.message, error.details, error.hint);
+        // If the DB doesn't have the `appearance` column yet, drop it and retry
+        // so core stats still persist (the offline-profile feature just stays
+        // dormant until the column is added). Prevents a schema mismatch from
+        // silently breaking all saves.
+        if (filteredUpdates.appearance !== undefined) {
+            const { appearance, ...rest } = filteredUpdates;
+            const { error: retryErr } = await supabase
+                .from('characters')
+                .update({ ...rest, updated_at: new Date().toISOString() })
+                .eq('user_id', userId);
+            if (retryErr) console.error('[Zolos] ❌ retry without appearance failed:', retryErr.message);
+            else console.log('[Zolos] ✅ saved (without appearance — column missing)');
+        }
     } else {
         if (count > 0) {
             console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', count);

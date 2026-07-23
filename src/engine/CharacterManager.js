@@ -2026,7 +2026,11 @@ export class CharacterManager {
                 // the whole UPDATE fail (invalid integer), so nothing persisted.
                 body_color: (this.bodyColor | 0),
                 hair_color: (this.hairColor | 0),
-                pants_color: (this.pantsColor | 0)
+                pants_color: (this.pantsColor | 0),
+                // Full look (pet / refine / cards / every gear slot) as a JSON
+                // blob so OFFLINE players' profiles can render the complete
+                // appearance — the single columns above can't hold all of it.
+                appearance: this.getAppearance()
             }
         };
     }

@@ -484,23 +484,28 @@ export class PlayerProfileModal {
     const jobKey = JOBS[job] ? job : (Object.keys(JOBS).find(k => JOBS[k].nameEn === job || JOBS[k].name === job) || null);
     const stats = getJobStats(jobKey, level);
 
-    // Appearance merge
+    // Appearance merge. Prefer the LIVE look (online players); otherwise fall
+    // back to the stored appearance JSON saved in the DB (so OFFLINE players
+    // still show their pet / refine / cards / full gear), then to the legacy
+    // single columns as a last resort.
+    const stored = (dbData && dbData.appearance && typeof dbData.appearance === 'object') ? dbData.appearance : null;
+    const src = liveAppearance || stored || {};
     const appearance = {
-      gender: liveAppearance?.gender || dbData?.gender || 'male',
-      bodyColor: liveAppearance?.bodyColor || dbData?.body_color || 0x4060c0,
-      hairColor: liveAppearance?.hairColor || dbData?.hair_color || 0xc04040,
-      pantsColor: liveAppearance?.pantsColor || dbData?.pants_color || 0x3a3a5a,
-      hat: liveAppearance?.hat || dbData?.hat || 'None',
-      glasses: liveAppearance?.glasses || dbData?.glasses || 'None',
-      weapon: liveAppearance?.weapon || dbData?.weapon || 'None',
-      shield: liveAppearance?.shield || dbData?.shield || 'None',
-      gear: liveAppearance?.gear || { body: dbData?.armor },
-      pet: liveAppearance?.pet || null,
-      petLevel: liveAppearance?.petLevel || 1,
-      refine: liveAppearance?.refine || {},
-      cards: liveAppearance?.cards || {},
+      gender: src.gender || dbData?.gender || 'male',
+      bodyColor: src.bodyColor ?? dbData?.body_color ?? 0x4060c0,
+      hairColor: src.hairColor ?? dbData?.hair_color ?? 0xc04040,
+      pantsColor: src.pantsColor ?? dbData?.pants_color ?? 0x3a3a5a,
+      hat: src.hat || dbData?.hat || 'None',
+      glasses: src.glasses || dbData?.glasses || 'None',
+      weapon: src.weapon || dbData?.weapon || 'None',
+      shield: src.shield || dbData?.shield || 'None',
+      gear: src.gear || { body: dbData?.armor },
+      pet: src.pet || null,
+      petLevel: src.petLevel || 1,
+      refine: src.refine || {},
+      cards: src.cards || {},
       job: job,
-      title: liveAppearance?.title || dbData?.title
+      title: src.title || dbData?.title
     };
 
     const jobInfo = JOBS[job] || { name: 'Adventurer', emoji: '⚔️' };
