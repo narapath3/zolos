@@ -1165,12 +1165,13 @@ export class GameUI {
       this.equipSlotFilter = null;
     }
 
-    // Filter based on tab
-    let filtered = this.inventory;
+    // Filter based on tab. Pets live in their own tab, so they're kept out of
+    // All / Equip and never mixed in with gear or materials.
+    let filtered = this.inventory.filter(i => i.item_type !== 'pet');
     if (this.currentTab === 'usable') {
       filtered = this.inventory.filter(i => i.item_type === 'consumable');
     } else if (this.currentTab === 'equip') {
-      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'pet'].includes(i.item_type));
+      filtered = this.inventory.filter(i => ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(i.item_type));
       // Clicking an empty doll slot narrows the list to gear that fits it.
       if (this.equipSlotFilter) {
         filtered = filtered.filter(i => getEquipSlot(i.item_name) === this.equipSlotFilter);
@@ -1179,6 +1180,8 @@ export class GameUI {
       filtered = this.inventory.filter(i => i.item_type === 'material' || i.item_type === 'tool');
     } else if (this.currentTab === 'fish') {
       filtered = this.inventory.filter(i => i.item_type === 'fish');
+    } else if (this.currentTab === 'pet') {
+      filtered = this.inventory.filter(i => i.item_type === 'pet');
     }
 
     // Fill inventory slots
@@ -1217,7 +1220,7 @@ export class GameUI {
           // On the Equip screen a single tap equips/unequips right away — the
           // detail box's "สวมใส่" button sits below the paper-doll and is easy
           // to miss on mobile, which made gear feel un-equippable.
-          if (this.currentTab === 'equip' && equippable) {
+          if ((this.currentTab === 'equip' || this.currentTab === 'pet') && equippable) {
             this._toggleEquipItem(item);
           }
         });
@@ -1723,6 +1726,11 @@ export class GameUI {
         this.character.equippedPickaxe = null;
         this.stopMining();
       } else if (item.item_type === 'pet') {
+        // Preserve the pet's grown level/xp on its item before storing it away,
+        // so a fattened pet keeps its level (and higher sell value).
+        if (!item.stats) item.stats = {};
+        item.stats.petLevel = this.character.petLevel;
+        item.stats.petXp = Math.floor(this.character.petXp);
         this.character.setPet(null);
       }
       if (this.characterId) {
@@ -3934,7 +3942,7 @@ export class GameUI {
       const itemData = ITEMS[item.name];
       if (!itemData) return false;
 
-      if (this.currentShopTab === 'all') return true;
+      if (this.currentShopTab === 'all') return itemData.type !== 'pet'; // pets have their own tab
       if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
       if (this.currentShopTab === 'equip') return ['weapon', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
       if (this.currentShopTab === 'pet') return itemData.type === 'pet';
@@ -5136,6 +5144,16 @@ export class GameUI {
     }
   }
 
+  // Sell price for one unit. Base is 80% of buy price; a pet earns +12% per
+  // level so a fattened pet is worth far more than a fresh one ("ขุนแล้วขาย").
+  _sellUnitPrice(item) {
+    if (item.item_type === 'pet') {
+      const lvl = (item.stats && item.stats.petLevel) || 1;
+      return Math.floor((item.price || 0) * 0.8 * (1 + (lvl - 1) * 0.12));
+    }
+    return Math.floor((item.price || 0) * 0.8);
+  }
+
   _renderSellShop() {
     const grid = document.getElementById('sell-shop-inventory-grid');
     if (!grid) return;
@@ -5192,10 +5210,16 @@ export class GameUI {
     document.getElementById('sell-shop-detail-icon').textContent = item.emoji;
     document.getElementById('sell-shop-detail-name').textContent = item.item_name;
     document.getElementById('sell-shop-detail-type').textContent = item.item_type.toUpperCase();
-    document.getElementById('sell-shop-detail-desc').textContent = item.desc || '';
+    // For pets, spell out that the higher price comes from its level.
+    let descText = item.desc || '';
+    if (item.item_type === 'pet') {
+      const lvl = (item.stats && item.stats.petLevel) || 1;
+      descText += `\n🐾 เลเวลสัตว์เลี้ยง: Lv.${lvl} — ยิ่งเลเวลสูง ราคาขายยิ่งแพง (ขุนแล้วขาย)`;
+    }
+    document.getElementById('sell-shop-detail-desc').textContent = descText;
     document.getElementById('sell-shop-owned-qty').textContent = `มีอยู่: ${item.quantity} ชิ้น`;
 
-    const unitPrice = Math.floor(item.price * 0.8);
+    const unitPrice = this._sellUnitPrice(item);
     document.getElementById('sell-shop-unit-price').textContent = unitPrice.toLocaleString();
 
     const qtyInput = document.getElementById('sell-shop-qty-input');
@@ -5213,7 +5237,7 @@ export class GameUI {
     const totalDisplay = document.getElementById('sell-shop-total-price');
     if (!qtyInput || !totalDisplay) return;
 
-    const unitPrice = Math.floor(this.selectedSellShopItem.price * 0.8);
+    const unitPrice = this._sellUnitPrice(this.selectedSellShopItem);
     const qty = parseInt(qtyInput.value) || 0;
     totalDisplay.textContent = (unitPrice * qty).toLocaleString();
   }
@@ -5233,7 +5257,7 @@ export class GameUI {
       return;
     }
 
-    const unitPrice = Math.floor(item.price * 0.8);
+    const unitPrice = this._sellUnitPrice(item);
     const totalGold = unitPrice * sellQty;
 
     // Update state
