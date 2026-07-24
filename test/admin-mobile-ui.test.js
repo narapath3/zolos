@@ -1,0 +1,99 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const adminUrl = new URL('../src/ui/AdminUI.js', import.meta.url);
+const cssUrl = new URL('../src/styles/admin.css', import.meta.url);
+const adminSource = fs.readFileSync(adminUrl, 'utf8');
+const announcementSource = fs.readFileSync(
+  new URL('../src/ui/AdminAnnouncementPanel.js', import.meta.url),
+  'utf8'
+);
+
+test('admin shell exposes responsive hooks and imports its stylesheet', () => {
+  assert.match(adminSource, /import ['"]\.\.\/styles\/admin\.css['"]/);
+
+  for (const className of [
+    'admin-panel',
+    'admin-header',
+    'admin-tabs',
+    'admin-tab',
+    'admin-content',
+  ]) {
+    assert.match(adminSource, new RegExp(className));
+  }
+});
+
+test('admin mobile shell fills the viewport without horizontal overflow', () => {
+  assert.equal(fs.existsSync(cssUrl), true, 'responsive Admin stylesheet must exist');
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  assert.match(adminCss, /@media\s*\(max-width:\s*720px\)/);
+  assert.match(adminCss, /\.admin-panel[\s\S]*width:\s*100%/);
+  assert.match(adminCss, /\.admin-tabs[\s\S]*overflow-x:\s*auto/);
+  assert.match(adminCss, /env\(safe-area-inset-bottom/);
+});
+
+test('admin lists provide desktop tables and mobile cards', () => {
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  for (const className of [
+    'admin-desktop-table',
+    'admin-mobile-list',
+    'admin-card',
+    'admin-stat-grid',
+    'admin-action-grid',
+    'admin-filter-bar',
+  ]) {
+    assert.match(adminSource, new RegExp(className));
+  }
+
+  assert.match(adminCss, /\.admin-mobile-list\s*\{[\s\S]*display:\s*none/);
+  assert.match(
+    adminCss,
+    /@media\s*\(max-width:\s*720px\)[\s\S]*\.admin-desktop-table[\s\S]*display:\s*none/
+  );
+  assert.match(
+    adminCss,
+    /@media\s*\(max-width:\s*720px\)[\s\S]*\.admin-mobile-list[\s\S]*display:\s*(?:grid|flex|block)/
+  );
+});
+
+test('admin forms expose accessible mobile layout hooks', () => {
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  for (const className of [
+    'admin-announcement-panel',
+    'admin-announcement-fields',
+    'admin-announcement-actions',
+  ]) {
+    assert.match(announcementSource, new RegExp(className));
+  }
+
+  for (const className of [
+    'admin-edit-overlay',
+    'admin-edit-dialog',
+    'admin-edit-actions',
+  ]) {
+    assert.match(adminSource, new RegExp(className));
+  }
+
+  assert.match(
+    adminSource,
+    /setAttribute\(['"]aria-label['"],\s*['"]Close Admin Dashboard['"]\)/
+  );
+  assert.match(adminSource, /aria-selected/);
+  assert.match(adminCss, /\.admin-edit-dialog[\s\S]*overflow-y:\s*auto/);
+});
+
+test('mobile escape controls and edit dialog keyboard behavior are explicit', () => {
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  assert.match(
+    adminCss,
+    /\.admin-header\s*>\s*button[\s\S]*min-width:\s*44px[\s\S]*min-height:\s*44px/
+  );
+  assert.match(adminSource, /event\.key\s*===\s*['"]Escape['"]/);
+  assert.match(adminSource, /event\.key\s*===\s*['"]Tab['"]/);
+  assert.match(adminSource, /\.focus\(\)/);
+});

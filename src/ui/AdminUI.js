@@ -1,5 +1,6 @@
 import { supabase, isOfflineMode, localDb } from '../network/SupabaseClient.js';
 import { saveInventoryItem, saveCharacter } from '../network/GameSync.js';
+import '../styles/admin.css';
 
 export class AdminUI {
     constructor() {
@@ -297,6 +298,7 @@ export class AdminUI {
     _createUI() {
         this.container = document.createElement('div');
         this.container.id = 'admin-panel';
+        this.container.className = 'admin-panel';
         this.container.style.cssText = `
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 900px; max-height: 700px; background: rgba(20, 20, 30, 0.98);
@@ -308,6 +310,7 @@ export class AdminUI {
         `;
 
         const header = document.createElement('div');
+        header.className = 'admin-header';
         header.style.cssText = 'padding: 15px; background: linear-gradient(90deg, #333 0%, #444 100%); border-bottom: 2px solid #ffd700; display: flex; justify-content: space-between; align-items: center;';
 
         const titleContainer = document.createElement('div');
@@ -323,11 +326,13 @@ export class AdminUI {
 
         const closeBtn = document.createElement('button');
         closeBtn.innerText = '✕';
+        closeBtn.setAttribute('aria-label', 'Close Admin Dashboard');
         closeBtn.style.cssText = 'background: none; border: none; color: #ffd700; font-size: 24px; cursor: pointer; font-weight: bold;';
         closeBtn.onclick = () => this.toggle();
         header.appendChild(closeBtn);
 
         const tabs = document.createElement('div');
+        tabs.className = 'admin-tabs';
         tabs.style.cssText = 'display: flex; background: #222; padding: 5px 10px; border-bottom: 1px solid #444;';
 
         const userTab = this._createTabBtn('👥 Players', 'users');
@@ -338,6 +343,7 @@ export class AdminUI {
         tabs.appendChild(announcementTab);
 
         this.content = document.createElement('div');
+        this.content.className = 'admin-content';
         this.content.style.cssText = 'flex: 1; overflow-y: auto; padding: 20px; background: rgba(10, 10, 20, 0.5);';
 
         this.container.appendChild(header);
@@ -358,7 +364,10 @@ export class AdminUI {
 
     _createTabBtn(text, tabId) {
         const btn = document.createElement('button');
+        btn.className = 'admin-tab';
         btn.innerText = text;
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', String(this.currentTab === tabId));
         btn.style.cssText = 'padding: 10px 20px; background: none; border: none; color: #aaa; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s;';
         if (this.currentTab === tabId) {
             btn.style.color = '#ffd700';
@@ -385,6 +394,7 @@ export class AdminUI {
                     (b.innerText.includes('Announcements') && this.currentTab === 'announcements');
                 b.style.color = isActive ? '#ffd700' : '#aaa';
                 b.style.borderBottomColor = isActive ? '#ffd700' : 'transparent';
+                b.setAttribute('aria-selected', String(isActive));
             }
         });
     }
@@ -409,6 +419,7 @@ export class AdminUI {
 
     _renderUserList() {
         const table = document.createElement('table');
+        table.className = 'admin-desktop-table';
         table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;';
         table.innerHTML = `
             <thead>
@@ -425,6 +436,9 @@ export class AdminUI {
         `;
 
         const tbody = table.querySelector('tbody');
+        const mobileList = document.createElement('div');
+        mobileList.className = 'admin-mobile-list';
+
         this.users.forEach((user, idx) => {
             const tr = document.createElement('tr');
             tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
@@ -449,8 +463,8 @@ export class AdminUI {
                 </td>
             `;
 
-            tr.querySelector('.edit-btn').onclick = () => {
-                this.openEditModal(user);
+            tr.querySelector('.edit-btn').onclick = (event) => {
+                this.openEditModal(user, event.currentTarget);
             };
 
             tr.querySelector('.give-btn').onclick = () => {
@@ -470,9 +484,45 @@ export class AdminUI {
             };
 
             tbody.appendChild(tr);
+
+            const card = document.createElement('article');
+            card.className = 'admin-card admin-player-card';
+            card.innerHTML = `
+                <div class="admin-card-heading">
+                    <span class="admin-card-kicker">Player</span>
+                    <strong>${user.username}</strong>
+                </div>
+                <div class="admin-stat-grid">
+                    <div><span>Level</span><strong>Lv.${user.level}</strong></div>
+                    <div><span>Gold</span><strong>${(user.gold || 0).toLocaleString()}</strong></div>
+                    <div><span>Kills</span><strong>${(user.total_kills || 0).toLocaleString()}</strong></div>
+                    <div><span>Play time</span><strong>${playTimeStr}</strong></div>
+                </div>
+                <div class="admin-action-grid">
+                    <button class="edit-btn admin-action admin-action-edit">Edit</button>
+                    <button class="give-btn admin-action admin-action-give">Give</button>
+                    <button class="reset-btn admin-action admin-action-reset">Reset</button>
+                    <button class="delete-btn admin-action admin-action-delete">Delete</button>
+                </div>
+            `;
+
+            card.querySelector('.edit-btn').onclick = (event) => {
+                this.openEditModal(user, event.currentTarget);
+            };
+            card.querySelector('.give-btn').onclick = () => {
+                const itemName = prompt(`Item name to give to ${user.username}:`, 'Sword');
+                if (itemName) {
+                    const qty = prompt('Quantity:', '1');
+                    if (qty) this.giveItem(user.id, itemName, parseInt(qty));
+                }
+            };
+            card.querySelector('.reset-btn').onclick = () => this.resetPlayer(user.id);
+            card.querySelector('.delete-btn').onclick = () => this.deletePlayer(user.id);
+            mobileList.appendChild(card);
         });
 
         this.content.appendChild(table);
+        this.content.appendChild(mobileList);
 
         if (this.users.length === 0) {
             this.content.innerHTML = '<div style="text-align:center; padding: 50px; color: #888;">No players found</div>';
@@ -481,6 +531,7 @@ export class AdminUI {
 
     _renderItemList() {
         const searchDiv = document.createElement('div');
+        searchDiv.className = 'admin-filter-bar';
         searchDiv.style.cssText = 'margin-bottom: 15px; display: flex; gap: 10px;';
 
         const searchInput = document.createElement('input');
@@ -497,6 +548,7 @@ export class AdminUI {
         this.content.appendChild(searchDiv);
 
         const table = document.createElement('table');
+        table.className = 'admin-desktop-table';
         table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;';
         table.innerHTML = `
             <thead>
@@ -513,9 +565,12 @@ export class AdminUI {
         `;
 
         const tbody = table.querySelector('tbody');
+        const mobileList = document.createElement('div');
+        mobileList.className = 'admin-mobile-list';
 
         const renderItems = () => {
             tbody.innerHTML = '';
+            mobileList.innerHTML = '';
             const searchTerm = searchInput.value.toLowerCase();
             const rarityTerm = rarityFilter.value;
 
@@ -527,6 +582,7 @@ export class AdminUI {
 
             if (filtered.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #888;">No items found</td></tr>';
+                mobileList.innerHTML = '<div class="admin-empty-state">No items found</div>';
                 return;
             }
 
@@ -553,6 +609,24 @@ export class AdminUI {
                     <td style="padding: 10px; font-size: 11px; color: #bbb;">${item.desc.substring(0, 50)}...</td>
                 `;
                 tbody.appendChild(tr);
+
+                const card = document.createElement('article');
+                card.className = 'admin-card admin-item-card';
+                card.innerHTML = `
+                    <div class="admin-item-heading">
+                        <span class="admin-item-icon" aria-hidden="true">${item.emoji}</span>
+                        <div>
+                            <strong>${item.name}</strong>
+                            <span style="color:${rarityColor}">${item.rarity}</span>
+                        </div>
+                        <strong class="admin-item-price">${item.price.toLocaleString()}</strong>
+                    </div>
+                    <div class="admin-item-meta">
+                        <span>${item.type}</span>
+                        <span>${item.desc}</span>
+                    </div>
+                `;
+                mobileList.appendChild(card);
             });
         };
 
@@ -560,11 +634,13 @@ export class AdminUI {
         rarityFilter.addEventListener('change', renderItems);
 
         this.content.appendChild(table);
+        this.content.appendChild(mobileList);
         renderItems();
     }
 
-    openEditModal(user) {
+    openEditModal(user, triggerElement = null) {
         this.selectedUser = user;
+        this.editModalTrigger = triggerElement;
         this._createEditModal();
     }
 
@@ -577,6 +653,10 @@ export class AdminUI {
 
         const modal = document.createElement('div');
         modal.id = 'admin-edit-modal';
+        modal.className = 'admin-edit-overlay';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'admin-edit-title');
         modal.style.cssText = `
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center;
@@ -584,6 +664,7 @@ export class AdminUI {
         `;
 
         const content = document.createElement('div');
+        content.className = 'admin-edit-dialog';
         content.style.cssText = `
             background: rgba(20, 20, 30, 0.98); border: 2px solid #ffd700; border-radius: 10px;
             padding: 30px; width: 90%; max-width: 500px; color: white;
@@ -591,6 +672,7 @@ export class AdminUI {
         `;
 
         const title = document.createElement('h2');
+        title.id = 'admin-edit-title';
         title.innerText = `Edit Player: ${this.selectedUser.username}`;
         title.style.cssText = 'margin: 0 0 20px 0; color: #ffd700; font-size: 18px;';
         content.appendChild(title);
@@ -603,6 +685,7 @@ export class AdminUI {
         ];
 
         const formData = {};
+        const formInputs = [];
         fields.forEach(field => {
             const group = document.createElement('div');
             group.style.cssText = 'margin-bottom: 15px;';
@@ -625,6 +708,7 @@ export class AdminUI {
             input.addEventListener('change', (e) => {
                 formData[field.key] = field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
             });
+            formInputs.push(input);
             group.appendChild(input);
             content.appendChild(group);
 
@@ -633,7 +717,41 @@ export class AdminUI {
         });
 
         const buttonGroup = document.createElement('div');
+        buttonGroup.className = 'admin-edit-actions';
         buttonGroup.style.cssText = 'display: flex; gap: 10px; margin-top: 25px;';
+
+        const closeModal = () => {
+            document.removeEventListener('keydown', handleModalKeydown);
+            modal.remove();
+            if (this.editModalTrigger?.isConnected) {
+                this.editModalTrigger.focus();
+            }
+            this.editModalTrigger = null;
+        };
+
+        const handleModalKeydown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeModal();
+                return;
+            }
+
+            if (event.key === 'Tab') {
+                const focusable = [...modal.querySelectorAll('input, button')].filter(
+                    (element) => !element.disabled
+                );
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
 
         const saveBtn = document.createElement('button');
         saveBtn.innerText = 'Save Changes';
@@ -646,7 +764,7 @@ export class AdminUI {
         saveBtn.onmouseout = () => saveBtn.style.background = '#2a8a4a';
         saveBtn.onclick = async () => {
             await this.updatePlayer(this.selectedUser.id, formData);
-            modal.remove();
+            closeModal();
             await this.refreshData();
         };
 
@@ -659,7 +777,7 @@ export class AdminUI {
         `;
         cancelBtn.onmouseover = () => cancelBtn.style.background = '#aa7a3a';
         cancelBtn.onmouseout = () => cancelBtn.style.background = '#8a5a2a';
-        cancelBtn.onclick = () => modal.remove();
+        cancelBtn.onclick = () => closeModal();
 
         buttonGroup.appendChild(saveBtn);
         buttonGroup.appendChild(cancelBtn);
@@ -667,10 +785,12 @@ export class AdminUI {
 
         modal.appendChild(content);
         document.body.appendChild(modal);
+        document.addEventListener('keydown', handleModalKeydown);
+        formInputs[0]?.focus();
 
         // Close modal when clicking outside
         modal.onclick = (e) => {
-            if (e.target === modal) modal.remove();
+            if (e.target === modal) closeModal();
         };
     }
 }
