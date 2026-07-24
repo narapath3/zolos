@@ -36,26 +36,38 @@
     <!-- Cinematic light beams -->
     <div class="auth-lightbeam"></div>
     <div class="auth-lightbeam" style="animation-delay: -3s; opacity: 0.5;"></div>
+    <div class="auth-lightbeam" style="animation-delay: -6s; opacity: 0.3; left: 30%;"></div>
 
     <!-- Rune circle decorations -->
-    <svg class="rune-circle left" width="260" height="260" viewBox="0 0 260 260">
-      <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(240,192,64,0.6)" stroke-width="1" stroke-dasharray="8 12"/>
-      <circle cx="130" cy="130" r="95" fill="none" stroke="rgba(96,160,255,0.4)" stroke-width="0.5" stroke-dasharray="4 8"/>
-      <circle cx="130" cy="130" r="70" fill="none" stroke="rgba(240,192,64,0.3)" stroke-width="0.5" stroke-dasharray="2 6"/>
+    <svg class="rune-circle left" width="320" height="320" viewBox="0 0 320 320">
+      <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(240,192,64,0.6)" stroke-width="1"
+        stroke-dasharray="12 18" />
+      <circle cx="160" cy="160" r="120" fill="none" stroke="rgba(96,160,255,0.5)" stroke-width="0.75"
+        stroke-dasharray="6 12" />
+      <circle cx="160" cy="160" r="90" fill="none" stroke="rgba(240,192,64,0.4)" stroke-width="0.5"
+        stroke-dasharray="3 8" />
+      <polygon points="160,20 281,230 39,230" fill="none" stroke="rgba(160,96,255,0.25)" stroke-width="1" />
+      <polygon points="160,300 39,90 281,90" fill="none" stroke="rgba(240,192,64,0.25)" stroke-width="1" />
     </svg>
-    <svg class="rune-circle right" width="260" height="260" viewBox="0 0 260 260">
-      <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(96,160,255,0.6)" stroke-width="1" stroke-dasharray="8 12"/>
-      <circle cx="130" cy="130" r="95" fill="none" stroke="rgba(240,192,64,0.4)" stroke-width="0.5" stroke-dasharray="4 8"/>
-      <circle cx="130" cy="130" r="70" fill="none" stroke="rgba(96,160,255,0.3)" stroke-width="0.5" stroke-dasharray="2 6"/>
+    <svg class="rune-circle right" width="320" height="320" viewBox="0 0 320 320">
+      <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(96,160,255,0.6)" stroke-width="1"
+        stroke-dasharray="12 18" />
+      <circle cx="160" cy="160" r="120" fill="none" stroke="rgba(240,192,64,0.5)" stroke-width="0.75"
+        stroke-dasharray="6 12" />
+      <circle cx="160" cy="160" r="90" fill="none" stroke="rgba(96,160,255,0.4)" stroke-width="0.5"
+        stroke-dasharray="3 8" />
+      <polygon points="160,20 281,230 39,230" fill="none" stroke="rgba(96,160,255,0.25)" stroke-width="1" />
+      <polygon points="160,300 39,90 281,90" fill="none" stroke="rgba(240,192,64,0.25)" stroke-width="1" />
     </svg>
 
     <div class="auth-container">
       <div class="auth-logo">
         <div class="logo-aura"></div>
+        <div class="logo-aura-outer"></div>
         <img src="/src/assets/zolos_icon.png" alt="Zolos Icon" class="auth-icon-img" />
-        <h1 class="game-title-new">ZOLOS</h1>
+        <h1 class="game-title-new" data-text="ZOLOS">ZOLOS</h1>
         <p class="game-subtitle">Idle RPG Online</p>
-        <p class="game-tagline">เข้าสู่โลกแห่งการผจญภัย</p>
+        <p class="game-tagline">เข้าสู่โลกแห่งการผจญภัยในตำนาน</p>
       </div>
 
       <!-- Start Game Splash -->
@@ -78,7 +90,8 @@
 
       <!-- Login Form (Initially Hidden) -->
       <div id="auth-form-wrapper" style="display: none;">
-        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account / Logout</button>
+        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account /
+          Logout</button>
         <div class="auth-form" id="login-form">
           <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
           <div style="display: flex; flex-direction: column;">
@@ -117,7 +130,7 @@
         📱 ติดตั้งบน iPhone/iPad: แตะปุ่ม <b>แชร์ ⬆️</b> ด้านล่าง แล้วเลือก <b>“Add to Home Screen”</b>
       </div>
     </div>
-    
+
   </div>
 
   <!-- Game Screen -->
@@ -142,7 +155,7 @@
     </div>
 
     <!-- Respawn Shortcut Button -->
-<!-- <button id="btn-respawn-now" class="btn-respawn-now" style="display: none;">⚔️ Respawn Now</button> -->
+    <!-- <button id="btn-respawn-now" class="btn-respawn-now" style="display: none;">⚔️ Respawn Now</button> -->
 
 
     <!-- Top HUD -->
@@ -209,7 +222,8 @@
     <!-- Network Status Indicator -->
     <div id="network-status"
       style="position:fixed;top:4px;right:75px;background:rgba(0,0,0,0.55);color:#ff4444;font-family:monospace;font-size:11px;padding:2px 7px;border-radius:4px;z-index:9999;pointer-events:none;display:flex;align-items:center;gap:5px;">
-      <span style="width:6px;height:6px;border-radius:50%;background:#ff4444;display:inline-block;" id="network-dot"></span>
+      <span style="width:6px;height:6px;border-radius:50%;background:#ff4444;display:inline-block;"
+        id="network-dot"></span>
       <span id="network-text">OFFLINE</span>
     </div>
 
@@ -386,7 +400,7 @@
           <div class="market-search">
             <input type="text" id="market-search-input" placeholder="🔍 ค้นหาไอเทมตั้งขาย..." autocomplete="off">
           </div>
-          
+
           <div class="market-categories">
             <button class="market-cat-btn active" data-cat="all">ทั้งหมด</button>
             <button class="market-cat-btn" data-cat="weapon">อาวุธ</button>
@@ -481,18 +495,25 @@
                 <span id="shop-affordable" style="font-size: 11px; color: var(--text-dim);">ซื้อได้สูงสุด: 0</span>
               </div>
               <div style="display: flex; gap: 6px;">
-                <button id="btn-shop-qty-minus" class="btn-secondary" style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">−</button>
+                <button id="btn-shop-qty-minus" class="btn-secondary"
+                  style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">−</button>
                 <input type="number" id="shop-qty-input" min="1" value="1"
                   style="flex: 1; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: var(--font-pixel); text-align: center;">
-                <button id="btn-shop-qty-plus" class="btn-secondary" style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">+</button>
-                <button id="btn-shop-qty-max" class="btn-secondary" style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
+                <button id="btn-shop-qty-plus" class="btn-secondary"
+                  style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">+</button>
+                <button id="btn-shop-qty-max" class="btn-secondary"
+                  style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
               </div>
             </div>
 
-            <div class="detail-actions" style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="detail-actions"
+              style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
               <div class="price-info" style="display: flex; flex-direction: column;">
-                <span style="font-size: 10px; color: var(--text-dim);"><span id="shop-price-label">ราคา</span>ชิ้นละ: <span id="shop-detail-price-val">0</span> z</span>
-                <span class="detail-price" style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); white-space: nowrap;">รวมทั้งหมด: <span id="shop-total-price">0</span> z</span>
+                <span style="font-size: 10px; color: var(--text-dim);"><span id="shop-price-label">ราคา</span>ชิ้นละ:
+                  <span id="shop-detail-price-val">0</span> z</span>
+                <span class="detail-price"
+                  style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); white-space: nowrap;">รวมทั้งหมด:
+                  <span id="shop-total-price">0</span> z</span>
               </div>
               <button id="btn-buy-npc-item" class="btn-use-item">ซื้อไอเทม</button>
             </div>
@@ -712,7 +733,8 @@
           <button id="btn-popup-duel" class="btn-secondary"
             style="margin-top: 8px; width: 100%; border-color: #e0483a; color: #ffb0a8;">⚔️ ท้าดวล PVP</button>
           <button id="btn-popup-warp" class="btn-secondary"
-            style="margin-top: 8px; width: 100%; border-color: #7a5cff; color: #c9b8ff; display: none;">🌀 วาปไปหา (Warp)</button>
+            style="margin-top: 8px; width: 100%; border-color: #7a5cff; color: #c9b8ff; display: none;">🌀 วาปไปหา
+            (Warp)</button>
         </div>
       </div>
     </div>
@@ -841,7 +863,8 @@
               <div class="settings-row">
                 <div class="settings-row-text">
                   <div class="settings-row-label">ปิดเอฟเฟกต์ภาพ</div>
-                  <div class="settings-row-sub">ปิดอนุภาคและเอฟเฟกต์ทั้งหมด (ระเบิด/ฮีล/ตัวเลขดาเมจ) เพื่อลดภาระเครื่อง</div>
+                  <div class="settings-row-sub">ปิดอนุภาคและเอฟเฟกต์ทั้งหมด (ระเบิด/ฮีล/ตัวเลขดาเมจ) เพื่อลดภาระเครื่อง
+                  </div>
                 </div>
                 <input type="checkbox" id="settings-hide-effects" class="settings-switch" />
               </div>
@@ -880,7 +903,8 @@
                 <span id="settings-auto-hp-label" class="settings-value">40%</span>
                 <input type="checkbox" id="settings-auto-hp" class="settings-switch" />
               </div>
-              <input type="range" id="settings-auto-hp-threshold" class="settings-slider" min="10" max="90" value="40" />
+              <input type="range" id="settings-auto-hp-threshold" class="settings-slider" min="10" max="90"
+                value="40" />
 
               <hr class="settings-divider" />
 
@@ -892,7 +916,8 @@
                 <span id="settings-auto-sp-label" class="settings-value">25%</span>
                 <input type="checkbox" id="settings-auto-sp" class="settings-switch" />
               </div>
-              <input type="range" id="settings-auto-sp-threshold" class="settings-slider" min="10" max="90" value="25" />
+              <input type="range" id="settings-auto-sp-threshold" class="settings-slider" min="10" max="90"
+                value="25" />
 
               <p class="settings-hint">
                 เกมจะใช้ขวดเล็กสุดที่พอฟื้นได้ก่อน และเว้นจังหวะระหว่างการใช้ราว 1.5 วินาที
@@ -924,9 +949,12 @@
             <!-- UI Layout -->
             <div class="settings-section">
               <div class="settings-section-title">🎨 UI Layout / ปรับแต่งตำแหน่ง UI</div>
-              <button id="btn-edit-layout" class="btn-primary settings-btn">🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)</button>
-              <button id="btn-reset-layout" class="btn-secondary settings-btn">🔄 Reset to Default (คืนค่าเริ่มต้น)</button>
-              <p class="settings-hint" style="text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง แล้วกดปุ่มเดิมอีกครั้งเพื่อบันทึก</p>
+              <button id="btn-edit-layout" class="btn-primary settings-btn">🛠️ Edit Layout Mode
+                (เปิดโหมดแก้ไข)</button>
+              <button id="btn-reset-layout" class="btn-secondary settings-btn">🔄 Reset to Default
+                (คืนค่าเริ่มต้น)</button>
+              <p class="settings-hint" style="text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง
+                แล้วกดปุ่มเดิมอีกครั้งเพื่อบันทึก</p>
             </div>
 
             <!-- Guest Account Linking Section -->
@@ -936,9 +964,11 @@
                 ผูกบัญชี Guest ด้วย Email และ Password เพื่อป้องกันตัวละครหายและเข้าสู่ระบบจากเครื่องอื่นได้
               </p>
               <input type="email" id="link-account-email" class="settings-input" placeholder="อีเมล (Email)" />
-              <input type="password" id="link-account-password" class="settings-input" placeholder="รหัสผ่าน (Password)" />
+              <input type="password" id="link-account-password" class="settings-input"
+                placeholder="รหัสผ่าน (Password)" />
               <button id="btn-link-account" class="btn-primary settings-btn"
-                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">⚔️ Bind Account / ยืนยันการผูกบัญชี</button>
+                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">⚔️
+                Bind Account / ยืนยันการผูกบัญชี</button>
               <div id="link-account-status" class="settings-bind-status"></div>
             </div>
           </div>

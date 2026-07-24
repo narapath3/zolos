@@ -8,7 +8,7 @@
 (() => {
     const h = location.hostname;
     if (h === 'localhost' || h === '127.0.0.1' || h === '') return;
-    const noop = () => {};
+    const noop = () => { };
     console.log = noop;
     console.info = noop;
     console.debug = noop;
@@ -46,6 +46,7 @@ import { SoundManager } from './engine/SoundManager.js';
 import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
 import { GameUI } from './ui/GameUI.js';
 import { AuthUI } from './ui/AuthUI.js';
+import { loadingOverlay } from './ui/LoadingOverlay.js';
 import { AdminUI } from './ui/AdminUI.js';
 import { announcementSystem } from './ui/AnnouncementSystem.js';
 import { TutorialSystem } from './ui/TutorialSystem.js';
@@ -606,7 +607,7 @@ async function initGame(charData) {
     // Global Kill Streak Handler (Self & Others)
     window.onKillStreakReceived = (payload) => {
         if (!payload || !sceneManager) return;
-        
+
         // Only show if on the same map
         if (payload.mapId && payload.mapId !== sceneManager.currentMap) return;
 
@@ -637,10 +638,10 @@ async function initGame(charData) {
             if (data.name !== undefined) {
                 character.stats.name = data.name;
                 character.updateNameTag();
-                
+
                 // Update module-level username for presence state
                 username = data.name;
-                
+
                 // Update presence state immediately
                 try {
                     const { supabase, localDb, isOfflineMode } = await import('./network/SupabaseClient.js');
@@ -651,7 +652,7 @@ async function initGame(charData) {
                         // whole upsert fail (PGRST204), so the name never synced.
                         await supabase.from('profiles').upsert({ id: charData.user_id, username: data.name });
                     }
-                    
+
                     // Force presence update if function exists
                     if (typeof updatePresenceState === 'function') {
                         updatePresenceState({ username: data.name });
@@ -839,7 +840,7 @@ async function initGame(charData) {
                     const vol = Math.max(0, 1 - dist / 34); // fades out past ~34 units
                     if (vol > 0.02) {
                         soundManager.playWeaponAttack(p.wsc || 'sword', { volume: vol * 0.9 });
-                        
+
                         // Visual replication for special weapon classes (Mage lightning, Thief shadow slash, Acolyte holy orb)
                         if (particles) {
                             const target = rp.character.targetMonster;
@@ -903,6 +904,7 @@ async function initGame(charData) {
     }, 15000);
 
     // Load Inventory, Daily Quests, and Friends List from DB
+    loadingOverlay.setProgress(65, '🎒 Loading Inventory, Quests & Friends...');
     await gameUI.loadInventoryFromDB(charData.id);
     await gameUI.loadDailyQuestsFromDB(charData.id);
     await gameUI.loadFriendsFromDB(charData.id);
@@ -910,6 +912,7 @@ async function initGame(charData) {
     await gameUI.loadLoginStreakFromDB(charData.id); // daily reward — auto-opens if claimable
     window.stallManager.refresh(); // build the player market street
 
+    loadingOverlay.setProgress(85, '🐉 Spawning World Monsters & Realm Entities...');
     // Initial Monster Spawn
     monsters.spawnInitial(character.stats.level);
 
@@ -1202,26 +1205,18 @@ async function initGame(charData) {
 }
 
 async function showCharacterSelect(isGuest = false) {
+    loadingOverlay.show();
+    loadingOverlay.setProgress(15, '⚡ Initializing ZOLOS Realm & Account Data...');
     try {
         const char = await loadCharacter(userId);
         if (char) {
             char.isGuest = isGuest;
-            initGame(char);
+            await initGame(char);
         } else {
-            // loadCharacter resolved without a character. This should not happen
-            // (it either returns one or creates one), so treat it as a load
-            // failure rather than fabricating a level-1 character — starting the
-            // game with defaults lets auto-save overwrite the real DB row.
             showCharacterLoadError();
         }
     } catch (e) {
         console.error("Failed to load character:", e);
-        // CRITICAL: never fall through to a fresh level-1 character here. A
-        // transient read failure (network/RLS/timeout) used to start the game
-        // with default stats, and auto-save then wrote level 1 back over the
-        // player's real character (saveCharacterByUserId updates by user_id),
-        // permanently resetting accounts. Abort to a retry screen instead so
-        // nothing is ever saved on top of unknown existing data.
         showCharacterLoadError();
     }
 }
@@ -1774,7 +1769,7 @@ window.worldBossManager = {
             z: p.z || 0,
         };
         bossRewardClaimed = false;
-        
+
         // Only show bar if the player is actually on the boss map.
         const onBossMap = sceneManager && sceneManager.currentMap === bossState.mapId;
         if (onBossMap) {
@@ -1793,7 +1788,7 @@ window.worldBossManager = {
         if (!p || !bossState) return;
         bossState.hp = p.hp;
         bossState.maxHp = p.maxHp;
-        
+
         const onBossMap = sceneManager && sceneManager.currentMap === bossState.mapId;
         if (onBossMap) {
             this._showBar(); // Show if they just entered the map
