@@ -25,6 +25,7 @@ dist-ssr
 
 .vercel
 .worktrees/
+.superpowers/
 .env*
 
 # Ignore Supabase/Zolos authentication & session tokens
