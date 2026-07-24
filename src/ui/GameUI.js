@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { migrateLegacyCards } from '../cards/CardMigration.js';
@@ -1783,11 +1783,14 @@ export class GameUI {
     if (!ch || !ch.equippedCards) return;
     const card = this.inventory.find(i => i.item_name === cardName && i.item_type === 'card');
     if (!card) return;
-    const cardId = getCard(cardName)?.id;
-    if (!cardId) return;
+    const catalogCard = getCard(cardName);
+    const cardId = catalogCard?.id;
+    if (!cardId || !cardFitsSlot(cardId, slotId)) return;
     const changed = [];
 
-    if (Object.entries(ch.equippedCards).some(([slot, id]) => slot !== slotId && id === cardId)) return;
+    // Compare catalog IDs, not display aliases: aliases such as Andre Card and
+    // Willow Card still represent one card and may occupy only one socket.
+    if (Object.entries(ch.equippedCards).some(([slot, id]) => slot !== slotId && getCard(id)?.id === cardId)) return;
     // Displace whatever card currently sits in the target slot.
     const prev = ch.equippedCards[slotId];
     if (prev && prev !== cardId) {
@@ -1822,6 +1825,46 @@ export class GameUI {
     for (const it of items) {
       try { await updateInventoryItemStats(this.characterId, it.item_name, it.stats || {}); } catch (e) { /* ignore */ }
     }
+  }
+
+  async requestCardFusion(cardId, requestId = (crypto.randomUUID?.() || `fusion_${Date.now()}_${Math.random().toString(36).slice(2)}`)) {
+    try {
+      return await requestCardFusion(cardId, requestId);
+    } catch (error) {
+      if (!error.cardFusionPublished) {
+        this.onCardFusionError({ requestId, message: error.message || 'หลอมการ์ดไม่สำเร็จ' });
+      }
+      return null;
+    }
+  }
+
+  onCardFusionResult(result) {
+    const card = getCard(result?.cardId);
+    if (!card || !this.character?.cardState || !Number.isInteger(result.owned)
+      || !Number.isInteger(result.stars) || !Number.isInteger(result.pity)) return false;
+    this.character.cardState[result.cardId] = {
+      owned: result.owned,
+      stars: result.stars,
+      pity: result.pity,
+    };
+    const inventoryCard = this.inventory.find(item => item?.item_type === 'card' && getCard(item.item_name)?.id === result.cardId);
+    if (inventoryCard) {
+      inventoryCard.quantity = result.owned;
+      inventoryCard.stats = {
+        ...(inventoryCard.stats || {}),
+        card_id: result.cardId,
+        card_stars: result.stars,
+        card_pity: result.pity,
+      };
+    }
+    this._afterCardChange(`หลอม ${card.itemName} สำเร็จ ★${result.stars}`);
+    return true;
+  }
+
+  onCardFusionError(error) {
+    const message = error?.message || 'หลอมการ์ดไม่สำเร็จ';
+    this.addCombatLog(`❌ ${message}`, 'warning');
+    this._equipToast(message, false);
   }
 
   // Shared refresh after any card change: recompute stats, redraw doll + HUD.

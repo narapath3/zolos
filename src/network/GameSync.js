@@ -1,6 +1,8 @@
 // Game Sync — Save/Load character data to Supabase + Realtime via Socket.io
 import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName, saveActiveSession } from './SupabaseClient.js';
 import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
+import { getCard } from '../cards/CardCatalog.js';
+import { fuseCard } from '../cards/CardProgression.js';
 export { getDeterministicGuestName, isPlaceholderName };
 
 let autoSaveInterval = null;
@@ -9,6 +11,8 @@ let presenceUpdateInterval = null;
 let mockPlayers = [];
 let socketListenersAttached = false;
 let chatCallback = null;
+let cardFusionSocket = null;
+const pendingCardFusions = new Map();
 
 // Track active player info for presence updating
 let currentUserId = null;
@@ -797,6 +801,8 @@ function updateLocalLeaderboard(char) {
 // ============ Inventory ============
 export async function loadInventory(characterId) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        const fusionSnapshot = localDb.get(`card_fusion_${characterId}`);
+        if (Array.isArray(fusionSnapshot?.inventory)) return fusionSnapshot.inventory;
         return localDb.get(`inventory_${characterId}`) || [];
     }
 
@@ -1016,6 +1022,103 @@ export async function updateInventoryItemStats(characterId, itemName, stats) {
     } catch (e) {
         console.error(`[Zolos] ❌ updateInventoryItemStats threw for characterId=${characterId}, itemName=${itemName}:`, e.message);
     }
+}
+
+function isCommittedFusionResult(result) {
+    return Boolean(
+        result && getCard(result.cardId)?.id === result.cardId
+        && Number.isInteger(result.owned) && result.owned >= 0
+        && Number.isInteger(result.stars) && result.stars >= 1 && result.stars <= 5
+        && Number.isInteger(result.pity) && result.pity >= 0
+        && typeof result.requestId === 'string',
+    );
+}
+
+function publishCardFusionResult(result) {
+    if (isCommittedFusionResult(result)) window.gameUI?.onCardFusionResult?.(result);
+}
+
+function publishCardFusionError(error) {
+    if (error && typeof error.requestId === 'string') window.gameUI?.onCardFusionError?.(error);
+}
+
+function attachCardFusionListeners(socket) {
+    if (!socket || cardFusionSocket === socket) return;
+    cardFusionSocket = socket;
+    socket.on('card_fusion_result', (result) => {
+        const pending = pendingCardFusions.get(result?.requestId);
+        if (!pending || !isCommittedFusionResult(result)) return;
+        pendingCardFusions.delete(result.requestId);
+        clearTimeout(pending.timeout);
+        publishCardFusionResult(result);
+        pending.resolve(result);
+    });
+    socket.on('card_fusion_error', (error) => {
+        const pending = pendingCardFusions.get(error?.requestId);
+        if (!pending) return;
+        pendingCardFusions.delete(error.requestId);
+        clearTimeout(pending.timeout);
+        publishCardFusionError(error);
+        const failure = new Error(error.message || 'หลอมการ์ดไม่สำเร็จ');
+        failure.cardFusionPublished = true;
+        pending.reject(failure);
+    });
+}
+
+function offlineFusionContext() {
+    const gameUI = window.gameUI;
+    const characterId = gameUI?.characterId || gameUI?.character?.id;
+    if (!gameUI?.character?.cardState || !characterId) throw new Error('ไม่พบข้อมูลการ์ดของตัวละคร');
+    return { gameUI, characterId };
+}
+
+function buildOfflineFusionInventory(inventory, cardId, row) {
+    return (inventory || []).map((item) => {
+        if (item?.item_type !== 'card' || getCard(item.item_name)?.id !== cardId) return item;
+        return {
+            ...item,
+            quantity: row.owned,
+            stats: { ...(item.stats || {}), card_id: cardId, card_stars: row.stars, card_pity: row.pity },
+        };
+    });
+}
+
+async function requestOfflineCardFusion(cardId, requestId) {
+    const { gameUI, characterId } = offlineFusionContext();
+    const nextCardState = fuseCard(structuredClone(gameUI.character.cardState), cardId);
+    const row = nextCardState[cardId];
+    const nextInventory = buildOfflineFusionInventory(structuredClone(gameUI.inventory || []), cardId, row);
+    const result = { cardId, owned: row.owned, stars: row.stars, pity: row.pity, requestId };
+
+    // One snapshot contains the complete next state and is written before UI
+    // notification, so a storage failure cannot spend duplicates in memory.
+    localDb.set(`card_fusion_${characterId}`, { cardState: nextCardState, inventory: nextInventory });
+    publishCardFusionResult(result);
+    return result;
+}
+
+export async function requestCardFusion(cardId, requestId) {
+    const card = typeof cardId === 'string' ? getCard(cardId) : null;
+    if (!card || card.id !== cardId) throw new Error('ไม่พบการ์ดที่ต้องการหลอม');
+    if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) {
+        throw new Error('รหัสคำขอหลอมการ์ดไม่ถูกต้อง');
+    }
+
+    if (isOfflineMode || !isSocketMode()) return requestOfflineCardFusion(cardId, requestId);
+
+    const socket = getSocket();
+    if (!socket?.connected) throw new Error('การเชื่อมต่อหลุด กรุณาลองใหม่อีกครั้ง');
+    attachCardFusionListeners(socket);
+    if (pendingCardFusions.has(requestId)) throw new Error('คำขอหลอมการ์ดนี้กำลังดำเนินการอยู่');
+
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingCardFusions.delete(requestId);
+            reject(new Error('การหลอมการ์ดหมดเวลา กรุณาลองใหม่อีกครั้ง'));
+        }, 20_000);
+        pendingCardFusions.set(requestId, { resolve, reject, timeout });
+        socket.emit('card_fuse', { cardId, requestId });
+    });
 }
 
 // ============ Leaderboard ============

@@ -1,3 +1,5 @@
+import { getCard } from '../src/cards/CardCatalog.js';
+
 const DEFAULT_ORIGINS = new Set([
     'http://localhost:3000',
     'http://localhost:5173',
@@ -27,6 +29,40 @@ const EQUIPMENT_FIELDS = new Set(['weapon', 'hat', 'glasses', 'shield', 'armor']
 const COLOR_FIELDS = new Set(['body_color', 'hair_color', 'pants_color']);
 const BOOLEAN_FIELDS = new Set(['sound_enabled', 'fps_enabled']);
 const GRAPHICS_QUALITIES = new Set(['low', 'medium', 'high', 'ultra', 'auto']);
+const CARD_SOCKET_SLOTS = new Set([
+    'weapon', 'shield', 'hat', 'glasses', 'head', 'body', 'garment',
+    'ring', 'wrist', 'pants', 'feet', 'accessory',
+]);
+
+function cardCategoryForSocket(slot) {
+    if (slot === 'weapon') return 'weapon';
+    if (slot === 'shield') return 'shield';
+    if (slot === 'ring' || slot === 'wrist' || slot === 'accessory') return 'accessory';
+    return 'armor';
+}
+
+function sanitizeAppearance(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const appearance = { ...value };
+    if (!Object.hasOwn(appearance, 'cards')) return appearance;
+    if (!appearance.cards || typeof appearance.cards !== 'object' || Array.isArray(appearance.cards)) return null;
+
+    const cards = {};
+    const claimedCardIds = new Set();
+    for (const [slot, rawCardId] of Object.entries(appearance.cards)) {
+        if (!CARD_SOCKET_SLOTS.has(slot)) return null;
+        if (rawCardId == null || rawCardId === '') {
+            cards[slot] = null;
+            continue;
+        }
+        const card = getCard(rawCardId);
+        if (!card || card.slot !== cardCategoryForSocket(slot) || claimedCardIds.has(card.id)) return null;
+        claimedCardIds.add(card.id);
+        cards[slot] = card.id;
+    }
+    appearance.cards = cards;
+    return appearance;
+}
 
 export function clearSocketMappingIfCurrent(userSocketMap, userId, socketId) {
     if (userSocketMap?.get(userId) !== socketId) return false;
@@ -82,6 +118,9 @@ export function sanitizeSaveUpdates(updates, previousUpdates = null, elapsedMs =
             sanitized[key] = value;
         } else if (key === 'graphics_quality' && GRAPHICS_QUALITIES.has(value)) {
             sanitized.graphics_quality = value;
+        } else if (key === 'appearance') {
+            const appearance = sanitizeAppearance(value);
+            if (appearance !== null) sanitized.appearance = appearance;
         }
     }
     return sanitized;

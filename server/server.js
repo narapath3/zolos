@@ -20,6 +20,8 @@ import {
     resolveTrustedMap,
     sanitizeSaveUpdates,
 } from './securityPolicy.js';
+import { getCard } from '../src/cards/CardCatalog.js';
+import { FUSION_COSTS } from '../src/cards/CardProgression.js';
 
 // ============ Configuration ============
 const PORT = parseInt(process.env.PORT) || 3001;
@@ -100,6 +102,16 @@ const DUEL_CHALLENGE_TTL_MS = 60 * 1000;
 // check at `join` is worthless if any later event can just claim another id.
 function trustedSender(socket) {
     return onlinePlayers.get(socket.id) || null;
+}
+
+function fusionErrorMessage(error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (message.includes('not enough duplicate')) return 'การ์ดซ้ำไม่เพียงพอสำหรับการหลอม';
+    if (message.includes('maximum') || message.includes('cannot')) return 'การ์ดนี้ไม่สามารถหลอมได้';
+    if (message.includes('concurrently')) return 'ข้อมูลการ์ดเปลี่ยนแปลงแล้ว กรุณาลองใหม่';
+    if (message.includes('idempotency')) return 'รหัสคำขอหลอมการ์ดไม่ถูกต้อง';
+    if (message.includes('not found')) return 'ไม่พบข้อมูลการ์ดของตัวละคร';
+    return 'หลอมการ์ดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
 }
 
 // PlayerInfo shape:
@@ -500,6 +512,78 @@ io.on('connection', (socket) => {
             const trusted = { ...data, _ownerUserId: player.userId };
             player.lastSaveData = trusted;
             pendingSaves.set(player.userId, trusted);
+        }
+    });
+
+    // Fusion is a server-authoritative transaction. The browser supplies only
+    // a canonical card id and an idempotency key; owner, character, stars and
+    // duplicate cost are all resolved from server-trusted state.
+    socket.on('card_fuse', async (payload) => {
+        const { cardId, requestId } = payload || {};
+        const player = trustedSender(socket);
+        const reject = (message) => socket.emit('card_fusion_error', {
+            cardId: typeof cardId === 'string' ? cardId : null,
+            requestId: typeof requestId === 'string' ? requestId : null,
+            message,
+        });
+
+        if (!player?.verified || !player.characterId || !supabase) {
+            reject('ไม่สามารถยืนยันตัวละครเพื่อหลอมการ์ดได้');
+            return;
+        }
+        if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) {
+            reject('รหัสคำขอหลอมการ์ดไม่ถูกต้อง');
+            return;
+        }
+
+        const card = typeof cardId === 'string' ? getCard(cardId) : null;
+        if (!card || card.id !== cardId) {
+            reject('ไม่พบการ์ดที่ต้องการหลอม');
+            return;
+        }
+
+        try {
+            const { data: row, error: rowError } = await supabase
+                .from('character_cards')
+                .select('owned, stars, pity')
+                .eq('character_id', player.characterId)
+                .eq('card_id', card.id)
+                .maybeSingle();
+            if (rowError || !row) throw new Error('ไม่พบข้อมูลการ์ดของตัวละคร');
+
+            const stars = Number(row.stars);
+            const cost = FUSION_COSTS[stars];
+            if (!Number.isInteger(stars) || stars < 1 || stars >= FUSION_COSTS.length || !Number.isInteger(cost) || cost <= 0) {
+                throw new Error('การ์ดนี้ไม่สามารถหลอมได้');
+            }
+
+            const { data: result, error } = await supabase.rpc('fuse_card', {
+                p_character_id: player.characterId,
+                p_card_id: card.id,
+                p_expected_stars: stars,
+                p_cost: cost,
+                p_idempotency_key: requestId,
+            });
+            if (error || !result || result.card_id !== card.id) {
+                throw error || new Error('ผลการหลอมการ์ดไม่ถูกต้อง');
+            }
+
+            const committed = {
+                cardId: result.card_id,
+                owned: Number(result.owned),
+                stars: Number(result.stars),
+                pity: Number(result.pity) || 0,
+                requestId,
+            };
+            if (!Number.isInteger(committed.owned) || !Number.isInteger(committed.stars) || committed.owned < 0 || committed.stars < 1 || committed.stars > 5) {
+                throw new Error('ผลการหลอมการ์ดไม่ถูกต้อง');
+            }
+
+            // RPC commits before this emit. A replay emits the same receipt.
+            socket.emit('card_fusion_result', committed);
+        } catch (error) {
+            console.error('[Server] card fusion failed:', error.message);
+            reject(fusionErrorMessage(error));
         }
     });
 

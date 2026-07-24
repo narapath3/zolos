@@ -68,6 +68,35 @@ test('save snapshots allow decreases used by combat and purchases', () => {
   );
 });
 
+test('save snapshots reject duplicate canonical card sockets instead of accepting aliases', () => {
+  const previous = {};
+  assert.deepEqual(
+    sanitizeSaveUpdates({
+      appearance: { cards: { weapon: 'Willow Card', body: 'willow' } },
+    }, previous),
+    {},
+  );
+});
+
+test('save snapshots migrate valid legacy card sockets to canonical IDs', () => {
+  const previous = {};
+  assert.deepEqual(
+    sanitizeSaveUpdates({
+      appearance: { cards: { weapon: 'Willow Card', body: null } },
+    }, previous),
+    { appearance: { cards: { weapon: 'willow', body: null } } },
+  );
+});
+
+test('save snapshots reject cards assigned to incompatible socket categories', () => {
+  assert.deepEqual(
+    sanitizeSaveUpdates({
+      appearance: { cards: { shield: 'willow' } },
+    }, {}),
+    {},
+  );
+});
+
 test('trusted map comes from the server player record', () => {
   assert.equal(resolveTrustedMap({ mapId: 'prontera_field' }), 'prontera_field');
 });
