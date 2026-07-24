@@ -1102,6 +1102,7 @@ class Monster {
         this.wanderTarget = null;
         this.wanderTimer = 0;
         this._localContributed = false; // fresh monster — no shared-damage credit yet
+        this._cardDeathResolved = false;
     }
 
     destroy() {
@@ -1294,6 +1295,19 @@ export class MonsterManager {
     }
 
     queueRespawn(monster) {
+        if (!monster._cardDeathResolved) {
+            monster._cardDeathResolved = true;
+            if (typeof this.onMonsterDeath === 'function') {
+                try {
+                    this.onMonsterDeath(monster, {
+                        eligible: monster._localContributed === true,
+                    });
+                } catch (error) {
+                    console.warn('[Zolos] card drop resolution error:', error);
+                }
+            }
+        }
+
         const isWater = monster.isWaterMonster;
         // Deterministic respawn timer based on spawn index
         const respawnDelay = RESPAWN_TIME + (monster.spawnIndex % 3);

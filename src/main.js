@@ -53,6 +53,8 @@ import { TutorialSystem } from './ui/TutorialSystem.js';
 import { GlobalAnnouncements } from './ui/GlobalAnnouncements.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
 import { applyWorldBossCardEffects } from './cards/CardEffects.js';
+import { resolveCardDrops } from './cards/CardDrops.js';
+import { getCard } from './cards/CardCatalog.js';
 import {
     loadCharacter,
     saveCharacter,
@@ -227,6 +229,35 @@ async function initGame(charData) {
     window.particles = particles; // exposed for the forge's craft-success burst
     soundManager = new SoundManager();
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
+    // Local monster deaths resolve here, after ordinary loot is awarded and
+    // before respawn. The manager guard advances pity once per monster life.
+    monsters.onMonsterDeath = (monster, { eligible } = {}) => {
+        if (!character || !monster?.type) return;
+
+        const previousCardState = character.cardState || {};
+        const result = resolveCardDrops({
+            source: { kind: 'monster', id: monster.type },
+            cardState: previousCardState,
+            eligible,
+            dropRatePct: character.getCardEffects?.().dropRatePct || 0,
+            random: Math.random,
+        });
+        character.cardState = result.cardState;
+
+        for (const cardId of result.drops) {
+            const card = getCard(cardId);
+            const reveal = {
+                sourceLabel: card?.source?.label || monster.data?.name || cardId,
+                isNew: (Number(previousCardState[cardId]?.owned) || 0) === 0,
+            };
+            if (typeof gameUI?.showCardDropReveal === 'function') {
+                gameUI.showCardDropReveal(cardId, reveal);
+            } else if (gameUI) {
+                gameUI.cardDropRevealQueue ??= [];
+                gameUI.cardDropRevealQueue.push({ cardId, ...reveal });
+            }
+        }
+    };
     // Aggro: when a monster reaches the player it swings back for real damage.
     monsters.onMonsterAttackPlayer = (mon) => {
         if (!character || !character.isAlive || !character.isAlive()) return;
