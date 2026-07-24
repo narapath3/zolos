@@ -52,6 +52,7 @@ import { announcementSystem } from './ui/AnnouncementSystem.js';
 import { TutorialSystem } from './ui/TutorialSystem.js';
 import { GlobalAnnouncements } from './ui/GlobalAnnouncements.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
+import { applyWorldBossCardEffects } from './cards/CardEffects.js';
 import {
     loadCharacter,
     saveCharacter,
@@ -231,8 +232,9 @@ async function initGame(charData) {
         if (!character || !character.isAlive || !character.isAlive()) return;
         if (window.bossEngaged || duelState) return; // boss/duel own their own combat
         const atk = (mon.data && mon.data.atk) || 10;
-        const dmg = atk + Math.floor(Math.random() * 3);
-        const actual = character.takeDamage(dmg);
+        const def = character.stats.def || 0;
+        const dmg = Math.max(1, atk - Math.floor(def * 0.3) + Math.floor(Math.random() * 3));
+        const actual = character.takeDamage(dmg, { preMitigated: true });
         if (particles) {
             const sp = worldToScreen(character.getPosition(), 1.6);
             particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
@@ -2022,6 +2024,10 @@ function updateBossCombat(dt) {
     const isCrit = Math.random() < 0.14;
     let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 6);
     if (isCrit) dmg = Math.floor(dmg * 1.95);
+    dmg = applyWorldBossCardEffects({
+        damage: dmg,
+        playerHpRatio: (Number(character.stats.hp) || 0) / (Number(character.stats.max_hp) || 1),
+    }, character.getCardEffects ? character.getCardEffects() : {});
 
     const dirX = dx / dist, dirZ = dz / dist;
     const bossBody = new THREE.Vector3(info.x, 3.2, info.z);

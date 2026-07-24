@@ -1950,15 +1950,24 @@ export class CharacterManager {
     // Every incoming player hit crosses this one boundary, including aggro,
     // world-boss, duel, and CombatSystem attacks.
     takeDamage(amount, options = {}) {
-        const dmgAmount = applyIncomingCardEffects(
-            { damage: Number(amount) || 0 },
-            this.getCardEffects(),
-        );
+        const rawDamage = Number(amount) || 0;
+        const effects = this.getCardEffects();
         const currentDef = Number(this.stats.def) || 0;
-
-        const actualDmg = options.ignoreDefense
-            ? Math.max(0, dmgAmount)
-            : Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
+        const reduce = (damage) => applyIncomingCardEffects({ damage }, effects);
+        let actualDmg;
+        if (options.preMitigated) {
+            // Legacy aggro arrives after main.js's first defense pass. Preserve
+            // its historical second pass, then layer card reduction on top.
+            const legacyDamage = options.ignoreDefense
+                ? Math.max(0, rawDamage)
+                : Math.max(1, rawDamage - Math.floor(currentDef * 0.3));
+            actualDmg = reduce(legacyDamage);
+        } else {
+            const reducedDamage = reduce(rawDamage);
+            actualDmg = options.ignoreDefense
+                ? Math.max(0, reducedDamage)
+                : Math.max(1, reducedDamage - Math.floor(currentDef * 0.3));
+        }
 
         // Step 4: Ensure hp is a number before subtracting
         const currentHp = Number(this.stats.hp);

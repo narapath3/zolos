@@ -130,6 +130,15 @@ export function resolveOutgoingCardEffects(context = {}, effects = createEffects
   };
 }
 
+export function applyWorldBossCardEffects(context = {}, effects = createEffects()) {
+  return resolveOutgoingCardEffects({
+    ...context,
+    isBoss: true,
+    targetHpRatio: 1,
+    targetHp: 0,
+  }, effects).damage;
+}
+
 export function applyIncomingCardEffects(context = {}, effects = createEffects()) {
   const damage = numberOrZero(context.damage);
   const reduction = cap(numberOrZero(effects.damageReduction), EFFECT_CAPS.damageReduction);
