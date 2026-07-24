@@ -28,6 +28,12 @@ const COLOR_FIELDS = new Set(['body_color', 'hair_color', 'pants_color']);
 const BOOLEAN_FIELDS = new Set(['sound_enabled', 'fps_enabled']);
 const GRAPHICS_QUALITIES = new Set(['low', 'medium', 'high', 'ultra', 'auto']);
 
+export function clearSocketMappingIfCurrent(userSocketMap, userId, socketId) {
+    if (userSocketMap?.get(userId) !== socketId) return false;
+    userSocketMap.delete(userId);
+    return true;
+}
+
 function boundedInteger(value, min, max) {
     const parsed = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return null;

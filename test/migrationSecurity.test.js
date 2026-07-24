@@ -100,7 +100,15 @@ test('card award RPC is service-role-only, row-locked, schema-qualified, and ide
   assert.match(fn, /SET search_path = ''/i);
   assert.match(fn, /FROM public\.character_cards[\s\S]*FOR UPDATE/i);
   assert.match(fn, /FROM public\.card_reward_requests/i);
+  assert.match(fn, /r\.character_id[\s\S]*r\.card_id[\s\S]*r\.expected_pity[\s\S]*r\.new_pity[\s\S]*r\.won[\s\S]*r\.result/i);
+  assert.match(fn, /v_receipt_character_id IS DISTINCT FROM p_character_id/i);
+  assert.match(fn, /v_receipt_card_id IS DISTINCT FROM p_card_id/i);
+  assert.match(fn, /v_receipt_expected_pity IS DISTINCT FROM p_expected_pity/i);
+  assert.match(fn, /v_receipt_new_pity IS DISTINCT FROM p_new_pity/i);
+  assert.match(fn, /v_receipt_won IS DISTINCT FROM p_won/i);
+  assert.match(fn, /RAISE EXCEPTION 'idempotency key reused with different award request'/i);
   assert.match(fn, /INSERT INTO public\.card_reward_requests/i);
+  assert.match(fn, /idempotency_key,\s*character_id,\s*card_id,\s*expected_pity,\s*new_pity,\s*won,\s*result/i);
   assert.match(fn, /UPDATE public\.character_cards/i);
   assert.match(fn, /p_expected_pity IS NULL/i);
   assert.match(fn, /p_new_pity IS NULL/i);
@@ -121,11 +129,61 @@ test('fusion RPC is atomic and private without adding fusion networking', async 
   assert.match(fn, /SET search_path = ''/i);
   assert.match(fn, /FROM public\.character_cards[\s\S]*FOR UPDATE/i);
   assert.match(fn, /FROM public\.card_fusion_requests/i);
+  assert.match(fn, /r\.character_id[\s\S]*r\.card_id[\s\S]*r\.expected_stars[\s\S]*r\.cost[\s\S]*r\.result/i);
+  assert.match(fn, /v_receipt_character_id IS DISTINCT FROM p_character_id/i);
+  assert.match(fn, /v_receipt_card_id IS DISTINCT FROM p_card_id/i);
+  assert.match(fn, /v_receipt_expected_stars IS DISTINCT FROM p_expected_stars/i);
+  assert.match(fn, /v_receipt_cost IS DISTINCT FROM p_cost/i);
+  assert.match(fn, /RAISE EXCEPTION 'idempotency key reused with different fusion request'/i);
   assert.match(fn, /INSERT INTO public\.card_fusion_requests/i);
+  assert.match(fn, /idempotency_key,\s*character_id,\s*card_id,\s*expected_stars,\s*cost,\s*result/i);
   assert.match(fn, /UPDATE public\.character_cards/i);
   assert.match(fn, /v_row\.owned - 1 < p_cost/i);
 
   const signature = 'public.fuse_card(uuid, text, smallint, integer, text)';
   assert.match(sql, new RegExp(`REVOKE EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} FROM PUBLIC, anon, authenticated`, 'i'));
   assert.match(sql, new RegExp(`GRANT EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} TO service_role`, 'i'));
+});
+
+test('receipt schema stores the full award and fusion request identity', async () => {
+  const sql = await readFile(cardCollectionUrl, 'utf8');
+  const rewardTable = sql.slice(
+    sql.indexOf('CREATE TABLE IF NOT EXISTS public.card_reward_requests'),
+    sql.indexOf('CREATE TABLE IF NOT EXISTS public.card_fusion_requests'),
+  );
+  const fusionTable = sql.slice(
+    sql.indexOf('CREATE TABLE IF NOT EXISTS public.card_fusion_requests'),
+    sql.indexOf('CREATE INDEX IF NOT EXISTS characters_user_id_idx'),
+  );
+
+  assert.match(rewardTable, /expected_pity integer NOT NULL/i);
+  assert.match(rewardTable, /new_pity integer NOT NULL/i);
+  assert.match(rewardTable, /won boolean NOT NULL/i);
+  assert.match(fusionTable, /expected_stars smallint NOT NULL/i);
+  assert.match(fusionTable, /cost integer NOT NULL/i);
+});
+
+test('receipt replay checks identity before returning or mutating card state', async () => {
+  const sql = await readFile(cardCollectionUrl, 'utf8');
+  for (const [name, mismatchMessage] of [
+    ['award_card_drop', 'idempotency key reused with different award request'],
+    ['fuse_card', 'idempotency key reused with different fusion request'],
+  ]) {
+    const fn = functionDefinition(sql, name);
+    const lock = fn.indexOf('pg_advisory_xact_lock');
+    const receiptRead = fn.indexOf('FROM public.card_');
+    const mismatch = fn.indexOf(mismatchMessage);
+    const replayReturn = fn.indexOf('RETURN v_result;', mismatch);
+    const cardMutation = fn.indexOf('UPDATE public.character_cards');
+
+    assert.ok(lock >= 0 && lock < receiptRead, `${name} must lock before reading its receipt`);
+    assert.ok(
+      receiptRead < mismatch && mismatch < replayReturn,
+      `${name} must reject a mismatched request before an exact replay can return`,
+    );
+    assert.ok(
+      replayReturn < cardMutation,
+      `${name} exact replay must return before card state can mutate again`,
+    );
+  }
 });

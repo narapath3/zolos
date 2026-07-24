@@ -79,6 +79,24 @@ export function mergeAuthoritativeCardRows(rows, { character, gameUI } = {}) {
   return merged;
 }
 
+export async function loadAndMergeAuthoritativeCards(
+  loadRows,
+  { character, gameUI, logger = console } = {},
+) {
+  try {
+    const rows = await loadRows();
+    if (!Array.isArray(rows)) return false;
+    mergeAuthoritativeCardRows(rows, { character, gameUI });
+    return true;
+  } catch (error) {
+    logger.warn?.(
+      '[Zolos] Failed to load authoritative card state; preserving local state:',
+      error?.message || error,
+    );
+    return false;
+  }
+}
+
 export function applyTrustedCardReward(payload, { character, gameUI } = {}) {
   const card = mergeRow(payload, { character, gameUI });
   if (!card) return false;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   applyTrustedCardReward,
+  loadAndMergeAuthoritativeCards,
   mergeAuthoritativeCardRows,
 } from '../../src/cards/CardRewards.js';
 
@@ -108,6 +109,31 @@ test('missing authoritative world-boss rows remove fabricated legacy ownership',
   assert.deepEqual(gameUI.inventory.map(item => item.item_name), ['Poring Card']);
 });
 
+test('failed authoritative load preserves existing card state and inventory', async () => {
+  const character = {
+    cardState: { valdris: { owned: 2, stars: 1, pity: 4 } },
+  };
+  const gameUI = {
+    inventory: [{
+      item_name: 'Valdris Card',
+      item_type: 'card',
+      quantity: 2,
+      stats: { card_id: 'valdris', card_stars: 1 },
+    }],
+  };
+  const beforeCharacter = structuredClone(character);
+  const beforeInventory = structuredClone(gameUI.inventory);
+
+  const loaded = await loadAndMergeAuthoritativeCards(
+    async () => { throw new Error('database unavailable'); },
+    { character, gameUI, logger: { warn() {} } },
+  );
+
+  assert.equal(loaded, false);
+  assert.deepEqual(character, beforeCharacter);
+  assert.deepEqual(gameUI.inventory, beforeInventory);
+});
+
 test('pity-only authoritative rows stay hidden from the owned-card gallery', () => {
   const character = { cardState: {} };
   const gameUI = { inventory: [], _renderInventory() {} };
@@ -137,7 +163,8 @@ test('online login reloads authoritative card rows after legacy inventory migrat
   const main = await readFile(new URL('../../src/main.js', import.meta.url), 'utf8');
   assert.match(sync, /export async function loadCharacterCards\(characterId\)/);
   const legacyLoad = main.indexOf('await gameUI.loadInventoryFromDB(charData.id)');
-  const authoritativeLoad = main.indexOf('await loadCharacterCards(charData.id)');
+  const authoritativeLoad = main.indexOf('await loadAndMergeAuthoritativeCards(');
   assert.ok(legacyLoad > 0 && authoritativeLoad > legacyLoad);
-  assert.match(main, /mergeAuthoritativeCardRows\(authoritativeCards,\s*\{\s*character,\s*gameUI\s*\}\)/);
+  assert.match(main, /\(\)\s*=>\s*loadCharacterCards\(charData\.id\)/);
+  assert.match(sync, /if \(error\)\s*throw error/);
 });

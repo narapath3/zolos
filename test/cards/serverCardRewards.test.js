@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   WORLD_BOSSES,
+  applyBossContribution,
   awardBossCardRewards,
   buildBossRanking,
   buildBossCardRewards,
@@ -39,7 +40,11 @@ test('meaningful contribution is at least one percent of boss HP', () => {
   assert.equal(rewards[1].isMvp, true, 'the highest-damage eligible contributor is MVP');
 });
 
-function createRewardHarness({ rpcError = null, random = () => 0 } = {}) {
+function createRewardHarness({
+  rpcError = null,
+  rpcResultCardId = null,
+  random = () => 0,
+} = {}) {
   const calls = [];
   const emitted = [];
   const cardRow = { owned: 0, stars: 1, pity: 0 };
@@ -67,7 +72,7 @@ function createRewardHarness({ rpcError = null, random = () => 0 } = {}) {
       if (rpcError) return { data: null, error: rpcError };
       return {
         data: {
-          card_id: args.p_card_id,
+          card_id: rpcResultCardId || args.p_card_id,
           owned: cardRow.owned + (args.p_won ? 1 : 0),
           stars: cardRow.stars,
           pity: args.p_new_pity,
@@ -101,6 +106,41 @@ function createRewardHarness({ rpcError = null, random = () => 0 } = {}) {
   const logger = { error() {} };
   return { calls, emitted, io, logger, onlinePlayers, random, supabase, userSocketMap };
 }
+
+test('character switching cannot mutate boss HP or the contribution ranking', () => {
+  const boss = {
+    active: true,
+    hp: 5000,
+    damage: new Map([['user-1', {
+      name: 'Original',
+      characterId: 'character-original',
+      dmg: 4000,
+    }]]),
+  };
+
+  const outcome = applyBossContribution({
+    boss,
+    player: {
+      userId: 'user-1',
+      username: 'Switched',
+      characterId: 'character-other',
+    },
+    damage: 5000,
+  });
+
+  assert.deepEqual(outcome, { accepted: false, defeated: false });
+  assert.equal(boss.hp, 5000, 'a rejected lethal hit must not strand an active boss at zero HP');
+  assert.deepEqual(buildBossRanking(boss.damage), [{
+    rank: 1,
+    userId: 'user-1',
+    characterId: 'character-original',
+    name: 'Original',
+    dmg: 4000,
+    gold: 3900,
+    exp: 2283,
+    item: 'Dragon Heart',
+  }]);
+});
 
 test('eligible MVP uses the server catalog/resolver and persists before a private emit', async () => {
   const harness = createRewardHarness();
@@ -178,6 +218,23 @@ test('database failure never emits a card award', async () => {
   assert.equal(result.emitted, 0);
   assert.equal(result.failed, 1);
   assert.equal(harness.emitted.length, 0);
+});
+
+test('RPC result for another card is rejected before it can be emitted', async () => {
+  const harness = createRewardHarness({ rpcResultCardId: 'ignarok' });
+
+  const result = await awardBossCardRewards({
+    ...harness,
+    boss: WORLD_BOSSES[0],
+    maxHp: 7000,
+    ranking: [{ userId: 'mvp-user', characterId: 'character-mvp', dmg: 7000 }],
+    rewardId: 'boss-spawn-wrong-card',
+  });
+
+  assert.equal(result.persisted, 0);
+  assert.equal(result.emitted, 0);
+  assert.equal(result.failed, 1);
+  assert.deepEqual(harness.emitted, []);
 });
 
 test('unverified, disconnected, and below-threshold contributors cannot roll', async () => {
@@ -266,8 +323,12 @@ test('map server binds an owned active character and awaits rewards at boss deat
   assert.match(source, /worldBoss\.boss\s*=\s*WORLD_BOSSES\[/);
   assert.match(source, /id:\s*worldBoss\.boss\?\.id/);
   assert.match(source, /playerInfo[\s\S]*characterId:\s*verifiedCharacter\?\.id\s*\|\|\s*null/);
-  assert.match(source, /worldBoss\.damage\.get\(player\.userId\)[\s\S]*characterId:\s*player\.characterId/);
+  assert.match(source, /applyBossContribution\(\{\s*boss:\s*worldBoss,\s*player,\s*damage:\s*dmg/);
   assert.match(source, /const ranking = buildBossRanking\(worldBoss\.damage\)/);
+  assert.match(
+    source,
+    /clearSocketMappingIfCurrent\(userSocketMap,\s*player\.userId,\s*socket\.id\)/,
+  );
 
   const awardIndex = source.indexOf('await awardBossCardRewards({');
   const deathEmitIndex = source.indexOf("io.emit('boss_dead'");

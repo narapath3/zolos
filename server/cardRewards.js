@@ -73,6 +73,37 @@ export function buildBossRanking(damage = new Map()) {
   });
 }
 
+export function applyBossContribution({ boss, player, damage } = {}) {
+  const amount = Number(damage);
+  if (
+    !boss?.active
+    || !boss.damage?.get
+    || !player?.userId
+    || !player.characterId
+    || !Number.isFinite(amount)
+    || amount <= 0
+  ) {
+    return { accepted: false, defeated: false };
+  }
+
+  const existing = boss.damage.get(player.userId);
+  if (existing && existing.characterId !== player.characterId) {
+    return { accepted: false, defeated: false };
+  }
+
+  const contribution = existing || {
+    name: player.username,
+    characterId: player.characterId,
+    dmg: 0,
+  };
+  contribution.name = player.username;
+  contribution.dmg += amount;
+  boss.damage.set(player.userId, contribution);
+  boss.hp = Math.max(0, (Number(boss.hp) || 0) - amount);
+
+  return { accepted: true, defeated: boss.hp <= 0 };
+}
+
 async function loadCardRow(supabase, characterId, cardId) {
   const { data, error } = await supabase
     .from('character_cards')
@@ -158,6 +189,9 @@ export async function awardBossCardRewards({
 
       const persisted = Array.isArray(data) ? data[0] : data;
       if (!persisted) throw new Error('award_card_drop returned no persisted state');
+      if (persisted.card_id !== card.id) {
+        throw new Error('award_card_drop returned a different card');
+      }
       outcomes.persisted++;
 
       if (persisted.won) {

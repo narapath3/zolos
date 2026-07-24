@@ -55,7 +55,10 @@ import { SKILLS, ITEMS } from './engine/GameData.js';
 import { applyWorldBossCardEffects } from './cards/CardEffects.js';
 import { resolveCardDrops } from './cards/CardDrops.js';
 import { getCard } from './cards/CardCatalog.js';
-import { applyTrustedCardReward, mergeAuthoritativeCardRows } from './cards/CardRewards.js';
+import {
+    applyTrustedCardReward,
+    loadAndMergeAuthoritativeCards,
+} from './cards/CardRewards.js';
 import {
     loadCharacter,
     saveCharacter,
@@ -941,8 +944,10 @@ async function initGame(charData) {
     // Load Inventory, Daily Quests, and Friends List from DB
     loadingOverlay.setProgress(65, '🎒 Loading Inventory, Quests & Friends...');
     await gameUI.loadInventoryFromDB(charData.id);
-    const authoritativeCards = await loadCharacterCards(charData.id);
-    mergeAuthoritativeCardRows(authoritativeCards, { character, gameUI });
+    await loadAndMergeAuthoritativeCards(
+        () => loadCharacterCards(charData.id),
+        { character, gameUI },
+    );
     await gameUI.loadDailyQuestsFromDB(charData.id);
     await gameUI.loadFriendsFromDB(charData.id);
     await gameUI.loadFishingAlmanacFromDB(charData.id);

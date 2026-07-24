@@ -8,11 +8,13 @@ import { randomUUID } from 'node:crypto';
 import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
 import {
+    applyBossContribution,
     awardBossCardRewards,
     buildBossRanking,
     WORLD_BOSSES,
 } from './cardRewards.js';
 import {
+    clearSocketMappingIfCurrent,
     isAllowedOrigin,
     normalizePresence,
     resolveTrustedMap,
@@ -729,18 +731,14 @@ io.on('connection', (socket) => {
         socket._bossWin.dmg += dmg;
         if (socket._bossWin.hits > 8 || socket._bossWin.dmg > 20000) return;
 
-        worldBoss.hp = Math.max(0, worldBoss.hp - dmg);
-        const rec = worldBoss.damage.get(player.userId) || {
-            name: player.username,
-            characterId: player.characterId,
-            dmg: 0,
-        };
-        if (rec.characterId !== player.characterId) return;
-        rec.name = player.username;
-        rec.dmg += dmg;
-        worldBoss.damage.set(player.userId, rec);
+        const contribution = applyBossContribution({
+            boss: worldBoss,
+            player,
+            damage: dmg,
+        });
+        if (!contribution.accepted) return;
 
-        if (worldBoss.hp <= 0) {
+        if (contribution.defeated) {
             await endWorldBoss(player.username);
         } else {
             const now = Date.now();
@@ -862,7 +860,7 @@ io.on('connection', (socket) => {
                 pendingSaves.delete(player.userId);
             }
 
-            userSocketMap.delete(player.userId);
+            clearSocketMappingIfCurrent(userSocketMap, player.userId, socket.id);
             onlinePlayers.delete(socket.id);
 
             // Broadcast updated player list

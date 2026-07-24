@@ -812,16 +812,13 @@ export async function loadInventory(characterId) {
 export async function loadCharacterCards(characterId) {
     if (isOfflineMode || !supabase || !characterId
         || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
-        return [];
+        return null;
     }
     const { data, error } = await supabase
         .from('character_cards')
         .select('card_id, owned, stars, pity')
         .eq('character_id', characterId);
-    if (error) {
-        console.warn('[Zolos] Failed to load authoritative card state:', error.message);
-        return [];
-    }
+    if (error) throw error;
     return data || [];
 }
 

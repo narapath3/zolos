@@ -2,11 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
+  clearSocketMappingIfCurrent,
   isAllowedOrigin,
   normalizePresence,
   resolveTrustedMap,
   sanitizeSaveUpdates,
 } from '../server/securityPolicy.js';
+
+test('late cleanup from an old socket preserves the replacement socket mapping', () => {
+  const sockets = new Map([['user-1', 'socket-new']]);
+
+  assert.equal(clearSocketMappingIfCurrent(sockets, 'user-1', 'socket-old'), false);
+  assert.equal(sockets.get('user-1'), 'socket-new');
+  assert.equal(clearSocketMappingIfCurrent(sockets, 'user-1', 'socket-new'), true);
+  assert.equal(sockets.has('user-1'), false);
+});
 
 test('save snapshots reject implausible progression increases', () => {
   const previous = { level: 10, exp: 1000, gold: 5000, zol: 5 };

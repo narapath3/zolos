@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS public.card_reward_requests (
   idempotency_key text PRIMARY KEY,
   character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
   card_id text NOT NULL,
+  expected_pity integer NOT NULL,
+  new_pity integer NOT NULL,
+  won boolean NOT NULL,
   result jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT pg_catalog.now()
 );
@@ -22,9 +25,22 @@ CREATE TABLE IF NOT EXISTS public.card_fusion_requests (
   idempotency_key text PRIMARY KEY,
   character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
   card_id text NOT NULL,
+  expected_stars smallint NOT NULL,
+  cost integer NOT NULL,
   result jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT pg_catalog.now()
 );
+
+-- A prior deployment may already have created the receipt tables without the
+-- request-identity columns. Existing rows intentionally remain NULL: they
+-- cannot be safely replayed because their original request is unknowable.
+ALTER TABLE public.card_reward_requests
+  ADD COLUMN IF NOT EXISTS expected_pity integer,
+  ADD COLUMN IF NOT EXISTS new_pity integer,
+  ADD COLUMN IF NOT EXISTS won boolean;
+ALTER TABLE public.card_fusion_requests
+  ADD COLUMN IF NOT EXISTS expected_stars smallint,
+  ADD COLUMN IF NOT EXISTS cost integer;
 
 CREATE INDEX IF NOT EXISTS characters_user_id_idx
   ON public.characters (user_id);
@@ -73,6 +89,11 @@ DECLARE
   v_row public.character_cards%ROWTYPE;
   v_result jsonb;
   v_is_new boolean;
+  v_receipt_character_id uuid;
+  v_receipt_card_id text;
+  v_receipt_expected_pity integer;
+  v_receipt_new_pity integer;
+  v_receipt_won boolean;
 BEGIN
   IF p_character_id IS NULL
     OR p_card_id IS NULL OR p_card_id = ''
@@ -90,11 +111,32 @@ BEGIN
     pg_catalog.hashtextextended(p_idempotency_key, 0)
   );
 
-  SELECT r.result
-  INTO v_result
+  SELECT
+    r.character_id,
+    r.card_id,
+    r.expected_pity,
+    r.new_pity,
+    r.won,
+    r.result
+  INTO
+    v_receipt_character_id,
+    v_receipt_card_id,
+    v_receipt_expected_pity,
+    v_receipt_new_pity,
+    v_receipt_won,
+    v_result
   FROM public.card_reward_requests AS r
   WHERE r.idempotency_key = p_idempotency_key;
   IF FOUND THEN
+    IF v_receipt_character_id IS DISTINCT FROM p_character_id
+      OR v_receipt_card_id IS DISTINCT FROM p_card_id
+      OR v_receipt_expected_pity IS DISTINCT FROM p_expected_pity
+      OR v_receipt_new_pity IS DISTINCT FROM p_new_pity
+      OR v_receipt_won IS DISTINCT FROM p_won
+    THEN
+      RAISE EXCEPTION 'idempotency key reused with different award request'
+        USING ERRCODE = '22023';
+    END IF;
     RETURN v_result;
   END IF;
 
@@ -138,9 +180,17 @@ BEGIN
   );
 
   INSERT INTO public.card_reward_requests (
-    idempotency_key, character_id, card_id, result
+    idempotency_key, character_id, card_id, expected_pity, new_pity, won, result
   )
-  VALUES (p_idempotency_key, p_character_id, p_card_id, v_result);
+  VALUES (
+    p_idempotency_key,
+    p_character_id,
+    p_card_id,
+    p_expected_pity,
+    p_new_pity,
+    p_won,
+    v_result
+  );
 
   RETURN v_result;
 END;
@@ -161,6 +211,10 @@ AS $$
 DECLARE
   v_row public.character_cards%ROWTYPE;
   v_result jsonb;
+  v_receipt_character_id uuid;
+  v_receipt_card_id text;
+  v_receipt_expected_stars smallint;
+  v_receipt_cost integer;
 BEGIN
   IF p_character_id IS NULL
     OR p_card_id IS NULL OR p_card_id = ''
@@ -177,11 +231,29 @@ BEGIN
     pg_catalog.hashtextextended(p_idempotency_key, 0)
   );
 
-  SELECT r.result
-  INTO v_result
+  SELECT
+    r.character_id,
+    r.card_id,
+    r.expected_stars,
+    r.cost,
+    r.result
+  INTO
+    v_receipt_character_id,
+    v_receipt_card_id,
+    v_receipt_expected_stars,
+    v_receipt_cost,
+    v_result
   FROM public.card_fusion_requests AS r
   WHERE r.idempotency_key = p_idempotency_key;
   IF FOUND THEN
+    IF v_receipt_character_id IS DISTINCT FROM p_character_id
+      OR v_receipt_card_id IS DISTINCT FROM p_card_id
+      OR v_receipt_expected_stars IS DISTINCT FROM p_expected_stars
+      OR v_receipt_cost IS DISTINCT FROM p_cost
+    THEN
+      RAISE EXCEPTION 'idempotency key reused with different fusion request'
+        USING ERRCODE = '22023';
+    END IF;
     RETURN v_result;
   END IF;
 
@@ -216,9 +288,16 @@ BEGIN
   );
 
   INSERT INTO public.card_fusion_requests (
-    idempotency_key, character_id, card_id, result
+    idempotency_key, character_id, card_id, expected_stars, cost, result
   )
-  VALUES (p_idempotency_key, p_character_id, p_card_id, v_result);
+  VALUES (
+    p_idempotency_key,
+    p_character_id,
+    p_card_id,
+    p_expected_stars,
+    p_cost,
+    v_result
+  );
 
   RETURN v_result;
 END;
