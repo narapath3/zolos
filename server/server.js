@@ -1,6 +1,7 @@
 // ============================================================
 // ZOLOS Map Server — Node.js + Socket.io (Railway.app)
 // Real-time WebSocket server for player synchronization
+// Redeploy marker: 2026-07-24 (force Railway rebuild after card-module crash fix)
 // ============================================================
 import express from 'express';
 import { createServer } from 'http';
