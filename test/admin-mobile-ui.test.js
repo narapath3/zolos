@@ -5,6 +5,10 @@ import fs from 'node:fs';
 const adminUrl = new URL('../src/ui/AdminUI.js', import.meta.url);
 const cssUrl = new URL('../src/styles/admin.css', import.meta.url);
 const adminSource = fs.readFileSync(adminUrl, 'utf8');
+const announcementSource = fs.readFileSync(
+  new URL('../src/ui/AdminAnnouncementPanel.js', import.meta.url),
+  'utf8'
+);
 
 test('admin shell exposes responsive hooks and imports its stylesheet', () => {
   assert.match(adminSource, /import ['"]\.\.\/styles\/admin\.css['"]/);
@@ -53,4 +57,31 @@ test('admin lists provide desktop tables and mobile cards', () => {
     adminCss,
     /@media\s*\(max-width:\s*720px\)[\s\S]*\.admin-mobile-list[\s\S]*display:\s*(?:grid|flex|block)/
   );
+});
+
+test('admin forms expose accessible mobile layout hooks', () => {
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  for (const className of [
+    'admin-announcement-panel',
+    'admin-announcement-fields',
+    'admin-announcement-actions',
+  ]) {
+    assert.match(announcementSource, new RegExp(className));
+  }
+
+  for (const className of [
+    'admin-edit-overlay',
+    'admin-edit-dialog',
+    'admin-edit-actions',
+  ]) {
+    assert.match(adminSource, new RegExp(className));
+  }
+
+  assert.match(
+    adminSource,
+    /setAttribute\(['"]aria-label['"],\s*['"]Close Admin Dashboard['"]\)/
+  );
+  assert.match(adminSource, /aria-selected/);
+  assert.match(adminCss, /\.admin-edit-dialog[\s\S]*overflow-y:\s*auto/);
 });

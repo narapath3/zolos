@@ -30,6 +30,7 @@ export class AdminAnnouncementPanel {
     // Create panel HTML
     const panel = document.createElement('div');
     panel.id = 'admin-announcement-panel';
+    panel.className = 'admin-announcement-panel';
     
     if (container) {
       // Integrated style
@@ -95,7 +96,7 @@ export class AdminAnnouncementPanel {
         ></textarea>
       </div>
 
-      <div style="display: flex; gap: 15px; margin-bottom: 12px;">
+      <div class="admin-announcement-fields" style="display: flex; gap: 15px; margin-bottom: 12px;">
         <div style="flex: 1;">
           <label style="display: block; font-size: 12px; margin-bottom: 5px; color: #FFBE0B;">TYPE:</label>
           <select 
@@ -165,7 +166,7 @@ export class AdminAnnouncementPanel {
         </select>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+      <div class="admin-announcement-actions" style="display: flex; gap: 10px; margin-bottom: 12px;">
         <button 
           id="admin-announce-btn"
           style="

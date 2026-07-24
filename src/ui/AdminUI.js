@@ -326,6 +326,7 @@ export class AdminUI {
 
         const closeBtn = document.createElement('button');
         closeBtn.innerText = '✕';
+        closeBtn.setAttribute('aria-label', 'Close Admin Dashboard');
         closeBtn.style.cssText = 'background: none; border: none; color: #ffd700; font-size: 24px; cursor: pointer; font-weight: bold;';
         closeBtn.onclick = () => this.toggle();
         header.appendChild(closeBtn);
@@ -365,6 +366,8 @@ export class AdminUI {
         const btn = document.createElement('button');
         btn.className = 'admin-tab';
         btn.innerText = text;
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', String(this.currentTab === tabId));
         btn.style.cssText = 'padding: 10px 20px; background: none; border: none; color: #aaa; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s;';
         if (this.currentTab === tabId) {
             btn.style.color = '#ffd700';
@@ -391,6 +394,7 @@ export class AdminUI {
                     (b.innerText.includes('Announcements') && this.currentTab === 'announcements');
                 b.style.color = isActive ? '#ffd700' : '#aaa';
                 b.style.borderBottomColor = isActive ? '#ffd700' : 'transparent';
+                b.setAttribute('aria-selected', String(isActive));
             }
         });
     }
@@ -646,6 +650,10 @@ export class AdminUI {
 
         const modal = document.createElement('div');
         modal.id = 'admin-edit-modal';
+        modal.className = 'admin-edit-overlay';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'admin-edit-title');
         modal.style.cssText = `
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center;
@@ -653,6 +661,7 @@ export class AdminUI {
         `;
 
         const content = document.createElement('div');
+        content.className = 'admin-edit-dialog';
         content.style.cssText = `
             background: rgba(20, 20, 30, 0.98); border: 2px solid #ffd700; border-radius: 10px;
             padding: 30px; width: 90%; max-width: 500px; color: white;
@@ -660,6 +669,7 @@ export class AdminUI {
         `;
 
         const title = document.createElement('h2');
+        title.id = 'admin-edit-title';
         title.innerText = `Edit Player: ${this.selectedUser.username}`;
         title.style.cssText = 'margin: 0 0 20px 0; color: #ffd700; font-size: 18px;';
         content.appendChild(title);
@@ -702,6 +712,7 @@ export class AdminUI {
         });
 
         const buttonGroup = document.createElement('div');
+        buttonGroup.className = 'admin-edit-actions';
         buttonGroup.style.cssText = 'display: flex; gap: 10px; margin-top: 25px;';
 
         const saveBtn = document.createElement('button');
