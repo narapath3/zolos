@@ -1,4 +1,5 @@
 import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount, getDeterministicGuestName, isPlaceholderName, sendPasswordResetEmail } from '../network/SupabaseClient.js';
+import { LoginCanvasBg } from '../engine/LoginCanvasBg.js';
 
 export class AuthUI {
     constructor(onAuthSuccess) {
@@ -10,6 +11,10 @@ export class AuthUI {
         this._isForgotPwMode = false;
         this._sessionData = null;
         this._selectedClass = 'novice';
+
+        // Animated Canvas Background Scene
+        this._bgCanvas = new LoginCanvasBg('auth-bg-canvas');
+        if (this._bgCanvas) this._bgCanvas.start();
 
         // BGM initialization
         this._bgm = new Audio('/src/login.mp3');
@@ -23,6 +28,7 @@ export class AuthUI {
         this._pingEl = null;
 
         this._setupButtons();
+        this._setup3DCardTilt();
         this._createParticles();
         this._subscribeOnlineCount();
         this._checkExistingSession();
@@ -516,6 +522,7 @@ export class AuthUI {
     }
 
     _subscribeOnlineCount() {
+        if (this._unsubOnlineCount) return;
         const el = document.getElementById('online-players-auth');
         if (!el) return;
         this._unsubOnlineCount = subscribeOnlineCount((count) => {
@@ -525,6 +532,7 @@ export class AuthUI {
 
     // ============ Real Server Latency Monitor ============
     _startPingMonitor() {
+        if (this._pingInterval) return;
         this._pingEl = document.getElementById('ro-server-ping');
         if (!this._pingEl) return;
 
@@ -688,7 +696,50 @@ export class AuthUI {
         }, fadeInterval);
     }
 
+    _setup3DCardTilt() {
+        const card = document.querySelector('.ro-ornate-card');
+        if (!card) return;
+
+        let bounds;
+
+        const rotateToMouse = (e) => {
+            if (!bounds) bounds = card.getBoundingClientRect();
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+            const leftX = mouseX - bounds.left;
+            const topY = mouseY - bounds.top;
+            const center = {
+                x: leftX - bounds.width / 2,
+                y: topY - bounds.height / 2
+            };
+            card.style.transform = `
+                perspective(1000px)
+                rotateX(${center.y / -25}deg)
+                rotateY(${center.x / 25}deg)
+                scale3d(1.02, 1.02, 1.02)
+            `;
+        };
+
+        const resetCard = () => {
+            bounds = null;
+            card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+            card.style.transition = 'transform 0.5s ease';
+        };
+
+        const onMouseEnter = () => {
+            bounds = card.getBoundingClientRect();
+            card.style.transition = 'none';
+        };
+
+        card.addEventListener('mouseenter', onMouseEnter);
+        card.addEventListener('mousemove', rotateToMouse);
+        card.addEventListener('mouseleave', resetCard);
+    }
+
     hide() {
+        if (this._bgCanvas) {
+            this._bgCanvas.stop();
+        }
         if (this._unsubOnlineCount) {
             this._unsubOnlineCount();
             this._unsubOnlineCount = null;
@@ -701,6 +752,10 @@ export class AuthUI {
 
     show() {
         this.screen.style.display = 'flex';
+        this._subscribeOnlineCount();
+        if (this._bgCanvas) {
+            this._bgCanvas.start();
+        }
         if (this._bgm) {
             this._bgm.volume = 0.3;
             this._bgmPlayed = false;

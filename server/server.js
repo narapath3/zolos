@@ -6,6 +6,12 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
+import {
+    isAllowedOrigin,
+    normalizePresence,
+    resolveTrustedMap,
+    sanitizeSaveUpdates,
+} from './securityPolicy.js';
 
 // ============ Configuration ============
 const PORT = parseInt(process.env.PORT) || 3001;
@@ -13,19 +19,8 @@ const HOST = '0.0.0.0';
 // Exact-origin allowlist. Accept BOTH env names — the deploy guide documents
 // CORS_ORIGIN (singular) while the code historically read CORS_ORIGINS, and
 // that mismatch meant a configured value was silently ignored.
-const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173,http://localhost:4173,https://zolos.online,https://www.zolos.online,https://zolos.vercel.app,https://zolos-multiplayer.vercel.app').split(',').map(s => s.trim()).filter(Boolean);
-// Base domains whose subdomains are all allowed. Covers the apex + www of the
-// live site and Vercel preview deploys (zolos-<hash>.vercel.app) without having
-// to enumerate every one. localhost stays open for dev.
-const CORS_ALLOWED_HOSTS = ['zolos.online', 'vercel.app', 'localhost', '127.0.0.1'];
-
-function isAllowedOrigin(origin) {
-    if (CORS_ORIGINS.includes(origin)) return true;
-    try {
-        const host = new URL(origin).hostname;
-        return CORS_ALLOWED_HOSTS.some(base => host === base || host.endsWith('.' + base));
-    } catch { return false; }
-}
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
 
 // Add wildcard support for easier debugging
 if (process.env.CORS_ALLOW_ALL === 'true') {
@@ -33,16 +28,15 @@ if (process.env.CORS_ALLOW_ALL === 'true') {
 }
 const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 
-// Supabase (Database-only, service role for server-side writes, with fallback configurations)
+// Supabase (database writes require a server-only service-role key)
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 let supabase = null;
 if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const isServiceRole = !!(process.env.SUPABASE_SERVICE_ROLE_KEY);
-    console.log(`[Server] ✅ Supabase connected (${isServiceRole ? 'service role' : 'anon/fallback key'})`);
+    console.log('[Server] ✅ Supabase connected (service role)');
 } else {
-    console.warn('[Server] ⚠️ No Supabase credentials — save-to-DB disabled');
+    console.warn('[Server] ⚠️ SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing — save-to-DB disabled');
 }
 
 // ============ Express + Socket.io Setup ============
@@ -55,7 +49,7 @@ const io = new Server(httpServer, {
             // Browsers always send one, so this can't be used to bypass the list.
             if (!origin) return callback(null, true);
             if (process.env.CORS_ALLOW_ALL === 'true') return callback(null, true);
-            if (isAllowedOrigin(origin)) return callback(null, true);
+            if (isAllowedOrigin(origin, CORS_ORIGINS)) return callback(null, true);
             console.warn(`[Server] 🚫 CORS rejected origin: ${origin}`);
             callback(new Error('Origin not allowed by CORS'));
         },
@@ -285,7 +279,9 @@ io.on('connection', (socket) => {
     socket.on('join', async (data) => {
         if (!data || !data.userId) return;
 
-        let { userId, username, level } = data;
+        let { userId } = data;
+        const normalizedPresence = normalizePresence(data);
+        let { username, level } = normalizedPresence;
 
         // AUTHENTICATE: verify the Supabase JWT so the client can't impersonate
         // another account by simply claiming its userId. On success, the
@@ -305,6 +301,19 @@ io.on('connection', (socket) => {
             userId = 'unverified_' + socket.id;
         }
 
+        let profile = null;
+        if (verified && supabase) {
+            const { data: verifiedProfile } = await supabase
+                .from('profiles')
+                .select('username, is_admin')
+                .eq('id', userId)
+                .maybeSingle();
+            profile = verifiedProfile;
+            if (profile?.username) {
+                username = profile.username;
+            }
+        }
+
         // Remove any existing connection for same userId (reconnect scenario)
         const existingSocketId = userSocketMap.get(userId);
         if (existingSocketId && existingSocketId !== socket.id) {
@@ -320,10 +329,11 @@ io.on('connection', (socket) => {
             username: username || 'Adventurer',
             level: level || 1,
             socketId: socket.id,
-            mapId: data.mapId || 'prontera_field',
+            mapId: normalizedPresence.mapId,
             joinedAt: Date.now(),
             lastSaveData: null,
             verified,
+            isAdmin: profile?.is_admin === true,
             ping: null, // round-trip latency in ms, measured via srv_ping/srv_pong
         };
 
@@ -332,14 +342,6 @@ io.on('connection', (socket) => {
 
         onlinePlayers.set(socket.id, playerInfo);
         userSocketMap.set(userId, socket.id);
-
-        // Admin status only for VERIFIED accounts (never trust the client).
-        playerInfo.isAdmin = false;
-        if (verified && supabase) {
-            supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle()
-                .then(({ data }) => { if (data && data.is_admin === true) playerInfo.isAdmin = true; })
-                .catch(() => { /* default non-admin */ });
-        }
 
         console.log(`[Server] ➕ Player joined: ${username} (${userId})${verified ? ' ✓' : ''} — Total: ${onlinePlayers.size}`);
 
@@ -356,7 +358,7 @@ io.on('connection', (socket) => {
         if (!payload) return;
         const self = trustedSender(socket);
         if (!self) return; // must be a joined player
-        const mapId = payload.mapId || self.mapId || 'prontera_field';
+        const mapId = resolveTrustedMap(self);
         // Remember the sender's latest position so friends can warp to them —
         // even across maps (positions are only relayed within a map room).
         if (typeof payload.x === 'number' && typeof payload.z === 'number') {
@@ -375,7 +377,7 @@ io.on('connection', (socket) => {
         if (!payload || typeof payload.monsterId !== 'string') return;
         const self = trustedSender(socket);
         if (!self) return;
-        const mapId = payload.mapId || self.mapId || 'prontera_field';
+        const mapId = resolveTrustedMap(self);
         const damage = Math.max(0, Math.min(1e7, Number(payload.damage) || 0));
         if (damage <= 0) return;
         socket.to(`map:${mapId}`).emit('monster_hit', { monsterId: payload.monsterId, damage });
@@ -388,7 +390,7 @@ io.on('connection', (socket) => {
         if (!payload || typeof payload.skillId !== 'string') return;
         const self = trustedSender(socket);
         if (!self) return;
-        const mapId = payload.mapId || self.mapId || 'prontera_field';
+        const mapId = resolveTrustedMap(self);
         const out = { skillId: payload.skillId, userId: self.userId };
         if (typeof payload.tx === 'number' && typeof payload.tz === 'number') { out.tx = payload.tx; out.tz = payload.tz; }
         socket.to(`map:${mapId}`).emit('skill_cast', out);
@@ -410,8 +412,7 @@ io.on('connection', (socket) => {
         const player = onlinePlayers.get(socket.id);
         if (!player) return; // must be a joined player
 
-        const mapId = payload.mapId || 'prontera_field';
-        const isSystem = payload.userId === 'system';
+        const mapId = resolveTrustedMap(player);
 
         let msg = payload.message.trim();
         if (!msg) return;
@@ -439,9 +440,9 @@ io.on('connection', (socket) => {
         // username; the system/market channel is forced to a FIXED label so a
         // client can't pick a custom name to impersonate an admin or player.
         const out = {
-            userId: isSystem ? 'system' : player.userId,
-            username: isSystem ? '📢 ระบบตลาด' : player.username,
-            level: isSystem ? 99 : player.level,
+            userId: player.userId,
+            username: player.username,
+            level: player.level,
             message: msg,
             mapId,
         };
@@ -454,12 +455,17 @@ io.on('connection', (socket) => {
         const player = onlinePlayers.get(socket.id);
         if (player) {
             const oldMapId = player.mapId;
-            if (data.level !== undefined) player.level = data.level;
-            if (data.username) player.username = data.username;
+            const normalized = normalizePresence({
+                username: data.username ?? player.username,
+                level: data.level ?? player.level,
+                mapId: data.mapId ?? player.mapId,
+            });
+            player.level = normalized.level;
+            player.username = normalized.username;
             
-            if (data.mapId && data.mapId !== oldMapId) {
+            if (normalized.mapId !== oldMapId) {
                 socket.leave(`map:${oldMapId}`);
-                player.mapId = data.mapId;
+                player.mapId = normalized.mapId;
                 socket.join(`map:${player.mapId}`);
                 broadcastPlayerList(oldMapId);
                 broadcastPlayerList(player.mapId);
@@ -958,7 +964,11 @@ async function saveCharacterToSupabase(saveData) {
         const ownerUserId = saveData._ownerUserId;
         if (!ownerUserId) return;
         const { data: owned, error: ownErr } = await supabase
-            .from('characters').select('id').eq('id', characterId).eq('user_id', ownerUserId).maybeSingle();
+            .from('characters')
+            .select('id, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, updated_at')
+            .eq('id', characterId)
+            .eq('user_id', ownerUserId)
+            .maybeSingle();
         if (ownErr || !owned) {
             console.warn(`[Server] 🚫 save_state ownership mismatch: char ${characterId} not owned by ${ownerUserId}`);
             return;
@@ -966,27 +976,14 @@ async function saveCharacterToSupabase(saveData) {
 
         // 1. Save character stats
         if (updates && Object.keys(updates).length > 0) {
-            const allowedFields = [
-                'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
-                'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map',
-                'weapon', 'hat', 'glasses', 'shield', 'armor', 'body_color', 'hair_color', 'pants_color', 'gender',
-                'sound_enabled', 'graphics_quality', 'fps_enabled'
-            ];
-            const filtered = {};
-            for (const key of Object.keys(updates)) {
-                if (allowedFields.includes(key)) {
-                    let val = updates[key];
-                    // Server-side stat clamping — aligned with the DB CHECK
-                    // constraints (level<=300, gold<=500M) so a cheat-range save
-                    // is capped here and never bounces the whole write.
-                    if (key === 'level') val = Math.max(1, Math.min(300, parseInt(val) || 1));
-                    if (key === 'gold') val = Math.max(0, Math.min(500000000, parseInt(val) || 0));
-                    if (key === 'zol') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
-                    if (key === 'exp') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
-                    if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
-                    if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
-                    filtered[key] = val;
-                }
+            const previousUpdatedAt = Date.parse(owned.updated_at || '');
+            const elapsedMs = Number.isFinite(previousUpdatedAt)
+                ? Math.max(1000, Date.now() - previousUpdatedAt)
+                : SAVE_INTERVAL_MS;
+            const filtered = sanitizeSaveUpdates(updates, owned, elapsedMs);
+            const rejectedFields = Object.keys(updates).filter(key => !(key in filtered));
+            if (rejectedFields.length > 0) {
+                console.warn(`[Server] 🚫 Rejected unsafe save fields for ${characterId}: ${rejectedFields.join(', ')}`);
             }
             if (Object.keys(filtered).length > 0) {
                 filtered.updated_at = new Date().toISOString();
