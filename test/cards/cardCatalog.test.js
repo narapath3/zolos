@@ -31,7 +31,7 @@ test('every card has a complete valid record and lookup', () => {
     assert.ok(validRarities.has(card.rarity));
     assert.ok(validSlots.has(card.slot));
     assert.match(card.collectionNo, /^[CRELM]-\d{2}$/);
-    assert.match(card.art, /^\/assets\/cards\/[a-z0-9_]+\.webp$/);
+    assert.match(card.art, /^\/assets\/cards\/[a-z0-9_]+\.png$/);
     assert.equal(CARD_BY_ID.get(card.id), card);
     assert.equal(CARD_BY_ITEM_NAME.get(card.itemName), card);
     assert.equal(getCard(card.id), card);
