@@ -13,7 +13,8 @@
 - Do not include or modify ignored `.env` or token files.
 - Preserve the user's staged login-screen changes.
 - Do not move the entire game simulation server-side in this change.
-- Reject progression/economy fields from `save_state`.
+- Preserve progression saves while rejecting malformed values and implausible
+  per-save increases.
 - Normal socket broadcasts use only the server-trusted map and identity.
 - Database persistence requires `SUPABASE_SERVICE_ROLE_KEY`.
 - SQL must be idempotent and contain no destructive user cleanup.
@@ -28,7 +29,7 @@
 - Modify: `package.json`
 
 **Interfaces:**
-- Produces: `sanitizeSaveUpdates(updates)`, `resolveTrustedMap(player)`, `normalizePresence(input)`, `isAllowedOrigin(origin, configuredOrigins)`.
+- Produces: `sanitizeSaveUpdates(updates, previousUpdates)`, `resolveTrustedMap(player)`, `normalizePresence(input)`, `isAllowedOrigin(origin, configuredOrigins)`.
 - Consumes: plain JavaScript values only; no Socket.IO or Supabase dependencies.
 
 - [ ] **Step 1: Add the test command**
@@ -53,11 +54,20 @@ import {
   isAllowedOrigin,
 } from '../server/securityPolicy.js';
 
-test('save snapshots reject progression and economy fields', () => {
-  assert.deepEqual(
-    sanitizeSaveUpdates({ level: 300, exp: 99, gold: 500000000, zol: 99, atk: 999, def: 999, total_kills: 10 }),
-    {},
-  );
+test('save snapshots reject implausible progression increases', () => {
+  const previous = { level: 10, exp: 1000, gold: 5000, zol: 5 };
+  assert.deepEqual(sanitizeSaveUpdates(
+    { level: 300, exp: 99999999, gold: 500000000, zol: 999999 },
+    previous,
+  ), {});
+});
+
+test('save snapshots preserve legitimate progression', () => {
+  const previous = { level: 10, exp: 1000, gold: 5000, zol: 5 };
+  assert.deepEqual(sanitizeSaveUpdates(
+    { level: 11, exp: 2500, gold: 7500, zol: 6 },
+    previous,
+  ), { level: 11, exp: 2500, gold: 7500, zol: 6 });
 });
 
 test('save snapshots preserve safe appearance and device fields', () => {
@@ -114,9 +124,11 @@ const DEFAULT_ORIGINS = new Set([
   'https://zolos-multiplayer.vercel.app',
 ]);
 
-export function sanitizeSaveUpdates(updates) {
+export function sanitizeSaveUpdates(updates, previousUpdates = null) {
   if (!updates || typeof updates !== 'object' || Array.isArray(updates)) return {};
-  return Object.fromEntries(Object.entries(updates).filter(([key]) => SAFE_SAVE_FIELDS.has(key)));
+  // Implement allowlists, integer normalization, absolute bounds, and
+  // conservative per-save increase limits. The first snapshot is bounded but
+  // establishes the server baseline.
 }
 
 export function resolveTrustedMap(player) {
@@ -189,7 +201,8 @@ In `server/server.js`:
 - normalize join and presence display fields;
 - route `pos`, `monster_hit`, `skill_cast`, and `chat` with `resolveTrustedMap(player)`;
 - remove the client-controlled system-message branch from normal chat;
-- call `sanitizeSaveUpdates(updates)` before database update;
+- call `sanitizeSaveUpdates(updates, player.lastAcceptedUpdates)` before database
+  update and retain the accepted values as the next baseline;
 - skip the update when the sanitized result is empty.
 
 - [ ] **Step 4: Verify GREEN**
@@ -340,7 +353,8 @@ Expected: no whitespace errors; ignored secret files remain untracked by Git.
 
 Confirm:
 
-- progression/economy fields cannot pass through `save_state`;
+- malformed or implausible progression/economy increases cannot pass through
+  `save_state`, while legitimate bounded changes remain saveable;
 - normal chat cannot claim system identity;
 - room routing uses server player state;
 - service-role fallback is removed;
@@ -349,4 +363,3 @@ Confirm:
 - Canvas absence is safe;
 - SQL has no destructive cleanup or secret identifiers;
 - unrelated user changes were preserved.
-

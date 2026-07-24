@@ -18,10 +18,10 @@ The implementation covers:
 - automated regression tests for the extracted security rules.
 
 Moving combat, rewards, inventory mutations, and the complete game simulation to
-a fully server-authoritative architecture is outside this change. The new save
-filter is a containment boundary: economy and progression fields cannot be
-written through `save_state`, while cosmetic and device-setting fields continue
-to save.
+a fully server-authoritative architecture is outside this change. To preserve the
+existing save path, progression fields continue through `save_state` only after
+server-side type, absolute-bound, and per-save delta validation. Suspicious
+snapshots are rejected and logged instead of silently replacing stored values.
 
 ## Server Security Design
 
@@ -29,18 +29,22 @@ to save.
 
 Create a small, dependency-free policy module used by the Socket.IO server and
 the test suite. It will expose an allowlist-based sanitizer for character
-updates. The snapshot path may persist only:
+updates. Cosmetic and device fields are accepted after type normalization:
 
 - `name`
-- `hp`, `max_hp`, `sp`, `max_sp`
 - `play_time`, `last_map`
 - `weapon`, `hat`, `glasses`, `shield`, `armor`
 - `body_color`, `hair_color`, `pants_color`, `gender`
 - `sound_enabled`, `graphics_quality`, `fps_enabled`
 
-It must reject progression and economy fields including `level`, `exp`, `atk`,
-`def`, `gold`, `zol`, and `total_kills`. Existing ownership verification remains
-mandatory.
+Progression fields (`level`, `exp`, `hp`, `max_hp`, `sp`, `max_sp`, `atk`,
+`def`, `gold`, `zol`, and `total_kills`) are accepted only when finite integers,
+inside the database absolute bounds, and inside conservative deltas from the
+last server-accepted snapshot for that socket. Decreases required by normal play
+(HP/SP spending and gold purchases) remain allowed. The first authenticated
+snapshot establishes a baseline but is still restricted by absolute bounds and
+database ownership verification. Guest or unverified sockets never reach the
+privileged database save path.
 
 ### Identity and room routing
 
@@ -105,7 +109,8 @@ destructive data cleanup.
 Use Node's built-in test runner to avoid adding a dependency. Tests import the
 dependency-free server policy module and verify:
 
-- progression/economy fields are removed from save updates;
+- malformed and implausibly large progression/economy deltas are rejected;
+- legitimate bounded progression updates remain accepted;
 - allowed cosmetic and setting fields survive;
 - client system-message claims are ignored;
 - broadcasts resolve to the trusted server map;
@@ -128,4 +133,3 @@ Completion requires all of:
 4. `git diff --check` reports no whitespace errors.
 5. A final diff review confirms no secret files, unrelated user changes, or
    destructive SQL were introduced.
-
