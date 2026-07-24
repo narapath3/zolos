@@ -14,14 +14,25 @@ function cardStats(row, card) {
 
 function canonicalizeSockets(cards) {
   const result = {};
+  const claimedCardIds = new Set();
   for (const [slot, value] of Object.entries(cards || {})) {
     if (!value) {
       result[slot] = null;
       continue;
     }
-    result[slot] = getCard(value)?.id || value;
+    const card = getCard(value);
+    if (card && claimedCardIds.has(card.id)) {
+      result[slot] = null;
+      continue;
+    }
+    result[slot] = card?.id || value;
+    if (card) claimedCardIds.add(card.id);
   }
   return result;
+}
+
+function isSocketed(equippedCards, cardId) {
+  return Object.values(equippedCards).includes(cardId);
 }
 
 export function migrateLegacyCards(inventory = [], cards = {}) {
@@ -41,7 +52,9 @@ export function migrateLegacyCards(inventory = [], cards = {}) {
     const stats = cardStats(row, card);
     const socketSlot = stats.slot || stats.equippedSlot;
     if (socketSlot && (stats.equipped === true || stats.equippedSlot)) {
-      if (!equippedCards[socketSlot]) equippedCards[socketSlot] = card.id;
+      if (!equippedCards[socketSlot] && !isSocketed(equippedCards, card.id)) {
+        equippedCards[socketSlot] = card.id;
+      }
     }
     const existing = canonicalRows.get(card.id);
     if (existing) {
@@ -62,6 +75,25 @@ export function migrateLegacyCards(inventory = [], cards = {}) {
     };
     canonicalRows.set(card.id, normalized);
     normalizedInventory.push(normalized);
+  }
+
+  const socketSlotsByCardId = new Map();
+  for (const [slot, id] of Object.entries(equippedCards)) {
+    const card = getCard(id);
+    if (card && !socketSlotsByCardId.has(card.id)) socketSlotsByCardId.set(card.id, slot);
+  }
+
+  for (const [id, row] of canonicalRows) {
+    const socketSlot = socketSlotsByCardId.get(id);
+    if (socketSlot) {
+      row.stats.equipped = true;
+      row.stats.slot = socketSlot;
+      if (row.stats.equippedSlot !== undefined) row.stats.equippedSlot = socketSlot;
+    } else {
+      row.stats.equipped = false;
+      delete row.stats.slot;
+      delete row.stats.equippedSlot;
+    }
   }
 
   for (const [id, row] of canonicalRows) {

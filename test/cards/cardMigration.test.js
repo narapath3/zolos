@@ -26,7 +26,7 @@ test('migration merges aliases without losing quantities and preserves non-card 
 
   assert.deepEqual(inventory, original);
   assert.deepEqual(result.inventory, [
-    { item_name: 'Willow Card', item_type: 'card', quantity: 7, stats: { card_stars: 2, card_id: 'willow', equippedSlot: 'weapon', custom: true } },
+    { item_name: 'Willow Card', item_type: 'card', quantity: 7, stats: { card_stars: 2, card_id: 'willow', equippedSlot: 'weapon', custom: true, equipped: true, slot: 'weapon' } },
     original[2],
   ]);
   assert.deepEqual(result.cardState, { willow: { owned: 7, stars: 2, pity: 0 } });
@@ -60,4 +60,23 @@ test('migration recognizes a saved canonical card_id when the item name is stale
 
   assert.equal(result.inventory[0].item_name, 'Poring Card');
   assert.deepEqual(result.cardState.poring, { owned: 3, stars: 1, pity: 0 });
+});
+
+test('merged rows persist the selected legacy socket for the next migration', () => {
+  const first = migrateLegacyCards([
+    { item_name: 'Willow Card', item_type: 'card', quantity: 1, stats: { equipped: false } },
+    { item_name: 'Andre Card', item_type: 'card', quantity: 1, stats: { equipped: true, slot: 'weapon' } },
+  ]);
+  const second = migrateLegacyCards(first.inventory, {});
+
+  assert.deepEqual(first.inventory[0].stats, {
+    card_id: 'willow', card_stars: 1, equipped: true, slot: 'weapon',
+  });
+  assert.deepEqual(second.equippedCards, { weapon: 'willow' });
+});
+
+test('duplicate canonical socket IDs keep the first supplied slot', () => {
+  const result = migrateLegacyCards([], { body: 'Poring Card', weapon: 'poring' });
+
+  assert.deepEqual(result.equippedCards, { body: 'poring', weapon: null });
 });
