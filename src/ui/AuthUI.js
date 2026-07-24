@@ -9,12 +9,14 @@ export class AuthUI {
         this._isRegisterMode = false;
         this._isForgotPwMode = false;
         this._sessionData = null;
+        this._selectedClass = 'novice';
 
         // BGM initialization
         this._bgm = new Audio('/src/login.mp3');
         this._bgm.loop = true;
         this._bgm.volume = 0.3;
         this._bgmPlayed = false;
+        this._bgmMuted = false;
         this._autoplayTrigger = null;
 
         this._setupButtons();
@@ -26,6 +28,8 @@ export class AuthUI {
 
     _setupButtons() {
         this._charnameEl = document.getElementById('auth-charname');
+        this._charnameWrapEl = document.getElementById('charname-wrap');
+        this._classSelectorEl = document.getElementById('auth-class-selector');
         this._loginBtn = document.getElementById('btn-login');
         this._registerBtn = document.getElementById('btn-register');
         this._startBtn = document.getElementById('btn-start-game');
@@ -33,19 +37,38 @@ export class AuthUI {
         this._formWrapperEl = document.getElementById('auth-form-wrapper');
         this._changeAccountBtn = document.getElementById('btn-change-account');
         this._forgotPwBtn = document.getElementById('btn-forgot-password');
+        this._bgmToggleBtn = document.getElementById('btn-auth-bgm');
+
+        // BGM Toggle
+        if (this._bgmToggleBtn) {
+            this._bgmToggleBtn.addEventListener('click', () => {
+                this._bgmMuted = !this._bgmMuted;
+                if (this._bgm) {
+                    this._bgm.muted = this._bgmMuted;
+                }
+                this._bgmToggleBtn.textContent = this._bgmMuted ? '🔇 BGM OFF' : '🎵 BGM ON';
+            });
+        }
+
+        // Starter Class Badges (Register Mode)
+        const classBadges = document.querySelectorAll('.class-badge');
+        classBadges.forEach(badge => {
+            badge.addEventListener('click', () => {
+                classBadges.forEach(b => b.classList.remove('active'));
+                badge.classList.add('active');
+                this._selectedClass = badge.getAttribute('data-class') || 'novice';
+            });
+        });
 
         // Gender selection (register mode only) — drives the character model
         this._genderRowEl = document.getElementById('auth-gender-row');
         this._genderMaleBtn = document.getElementById('auth-gender-male');
         this._genderFemaleBtn = document.getElementById('auth-gender-female');
         this._selectedGender = 'male';
+
         const styleGenderButtons = () => {
-            const sel = { border: '2px solid #4a90d9', background: 'rgba(74,144,217,0.25)' };
-            const unsel = { border: '2px solid transparent', background: 'rgba(255,255,255,0.08)' };
-            const m = this._selectedGender === 'male' ? sel : unsel;
-            const f = this._selectedGender === 'female' ? sel : unsel;
-            if (this._genderMaleBtn) Object.assign(this._genderMaleBtn.style, m);
-            if (this._genderFemaleBtn) Object.assign(this._genderFemaleBtn.style, f);
+            if (this._genderMaleBtn) this._genderMaleBtn.classList.toggle('active', this._selectedGender === 'male');
+            if (this._genderFemaleBtn) this._genderFemaleBtn.classList.toggle('active', this._selectedGender === 'female');
         };
         if (this._genderMaleBtn) this._genderMaleBtn.addEventListener('click', () => {
             this._selectedGender = 'male';
@@ -73,7 +96,7 @@ export class AuthUI {
                 this._splashEl.style.opacity = '0';
                 this._splashEl.style.transform = 'translateY(-20px)';
                 this._splashEl.style.transition = 'all 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
-                
+
                 setTimeout(() => {
                     this._splashEl.style.display = 'none';
                     this._formWrapperEl.style.display = 'block';
@@ -154,14 +177,15 @@ export class AuthUI {
         this._isForgotPwMode = mode === 'forgot';
 
         const usernameInput = document.getElementById('auth-username');
-        const passwordWrapper = document.getElementById('auth-password').parentElement;
+        const passwordWrapper = document.getElementById('auth-password').parentElement.parentElement;
 
         if (mode === 'forgot') {
-            this._charnameEl.style.display = 'none';
+            if (this._charnameWrapEl) this._charnameWrapEl.style.display = 'none';
+            if (this._classSelectorEl) this._classSelectorEl.style.display = 'none';
             if (this._genderRowEl) this._genderRowEl.style.display = 'none';
             passwordWrapper.style.display = 'none';
             usernameInput.placeholder = 'Enter your email';
-            
+
             this._loginBtn.textContent = '← Back to Login';
             this._registerBtn.style.display = 'none';
             this._forgotPwBtn.textContent = '🚀 Send Reset Link';
@@ -173,7 +197,7 @@ export class AuthUI {
             this._forgotPwBtn.style.width = '100%';
 
             this._setStatus('Enter your email to reset password', 'info');
-            
+
             const dividers = document.querySelectorAll('.auth-divider');
             const guestBtn = document.getElementById('btn-guest');
             dividers.forEach(el => el.style.display = 'none');
@@ -182,11 +206,12 @@ export class AuthUI {
             usernameInput.focus();
         } else {
             const isRegister = mode === 'register';
-            this._charnameEl.style.display = isRegister ? '' : 'none';
+            if (this._charnameWrapEl) this._charnameWrapEl.style.display = isRegister ? 'flex' : 'none';
+            if (this._classSelectorEl) this._classSelectorEl.style.display = isRegister ? 'flex' : 'none';
             if (this._genderRowEl) this._genderRowEl.style.display = isRegister ? 'flex' : 'none';
             passwordWrapper.style.display = 'flex';
             usernameInput.placeholder = 'Email or Username';
-            
+
             if (this._forgotPwBtn) {
                 this._forgotPwBtn.style.display = isRegister ? 'none' : 'block';
                 this._forgotPwBtn.textContent = 'Forgot Password?';
@@ -197,17 +222,17 @@ export class AuthUI {
                 this._forgotPwBtn.style.alignSelf = '';
                 this._forgotPwBtn.style.width = '';
             }
-            
+
             this._registerBtn.style.display = 'block';
-            
+
             const dividers = document.querySelectorAll('.auth-divider');
             const guestBtn = document.getElementById('btn-guest');
             dividers.forEach(el => el.style.display = '');
             if (guestBtn) guestBtn.style.display = '';
-            this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 Register';
-            this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ Login';
-            
-            this._setStatus(isRegister ? 'Choose your character name!' : '', 'info');
+            this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 REGISTER ACCOUNT';
+            this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ LOGIN TO REALM';
+
+            this._setStatus(isRegister ? 'Choose your character name & starter class!' : '', 'info');
             if (isRegister) this._charnameEl.focus();
         }
     }
@@ -260,7 +285,7 @@ export class AuthUI {
                     username,
                     isGuest: session.user.is_anonymous === true,
                 };
-                
+
                 const { isOfflineMode } = await import('../network/SupabaseClient.js');
                 if (isOfflineMode) {
                     this._setStatus('Found active session (OFFLINE MODE) for ' + username + '.', 'info');
@@ -383,7 +408,7 @@ export class AuthUI {
             const email = input.includes('@') ? input : `${input}@zolos.game`;
             const data = await signIn(email, password);
             const profile = await getProfile(data.user.id);
-            
+
             // Part 2.1: Robust nickname fallback
             let username = profile?.username;
             if (!username || isPlaceholderName(username)) {
@@ -457,7 +482,7 @@ export class AuthUI {
         this._setStatus('Starting as guest...', 'info');
         try {
             const data = await signInAnonymously();
-            
+
             // Part 2.1: Check profiles table for guest username fallback
             const profile = await getProfile(data.user.id);
             let username = profile?.username;

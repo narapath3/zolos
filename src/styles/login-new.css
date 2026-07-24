@@ -1495,3 +1495,264 @@
     font-size: 12px;
   }
 }
+
+/* ============================================================
+   RAGNAROK ONLINE (RO) FANTASY LOGIN OVERHAUL STYLES
+   ============================================================ */
+
+/* Top Server & BGM Control Bar */
+.ro-top-bar {
+  position: absolute;
+  top: 18px;
+  left: 24px;
+  right: 24px;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.ro-server-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(8, 14, 28, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(240, 192, 64, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f0c040;
+}
+
+.ro-server-crown {
+  font-size: 14px;
+  filter: drop-shadow(0 0 6px rgba(240, 192, 64, 0.8));
+}
+
+.ro-server-name {
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.ro-server-ping {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(64, 224, 128, 0.15);
+  color: #40e080;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  border: 1px solid rgba(64, 224, 128, 0.3);
+}
+
+.ping-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #40e080;
+  box-shadow: 0 0 8px #40e080;
+  animation: dotPulse 1.5s infinite;
+}
+
+.ro-bgm-btn {
+  background: rgba(8, 14, 28, 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(96, 160, 255, 0.3);
+  color: #60a0ff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.ro-bgm-btn:hover {
+  background: rgba(96, 160, 255, 0.25);
+  color: #ffffff;
+  border-color: rgba(96, 160, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(96, 160, 255, 0.4);
+}
+
+/* RO Ornate Gold Card & Corners */
+.ro-ornate-card {
+  border: 2px solid rgba(240, 192, 64, 0.4) !important;
+  box-shadow:
+    0 0 60px rgba(240, 192, 64, 0.15),
+    0 0 100px rgba(0, 0, 0, 0.9),
+    inset 0 0 30px rgba(240, 192, 64, 0.08) !important;
+  position: relative;
+}
+
+.ro-card-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #f0c040;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 0 4px rgba(240, 192, 64, 0.8));
+}
+
+.ro-card-corner.top-left {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: inherit;
+}
+
+.ro-card-corner.top-right {
+  top: -2px;
+  right: -2px;
+  border-left: none;
+  border-bottom: none;
+  border-top-right-radius: inherit;
+}
+
+.ro-card-corner.bottom-left {
+  bottom: -2px;
+  left: -2px;
+  border-right: none;
+  border-top: none;
+  border-bottom-left-radius: inherit;
+}
+
+.ro-card-corner.bottom-right {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+  border-bottom-right-radius: inherit;
+}
+
+/* Input Wrapper with Gold Icon */
+.ro-input-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ro-input-icon {
+  position: absolute;
+  left: 16px;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 0 4px rgba(240, 192, 64, 0.5));
+}
+
+.ro-input-wrap input {
+  padding-left: 48px !important;
+}
+
+/* RO Class Badge Grid (Registration Mode) */
+.auth-class-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  margin: 4px 0 8px;
+}
+
+.class-selector-label {
+  font-family: 'Kanit', sans-serif;
+  font-size: 13px;
+  color: #ffe89a;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.class-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.class-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.class-badge .badge-icon {
+  font-size: 20px;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  transition: transform 0.2s ease;
+}
+
+.class-badge .badge-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.class-badge:hover {
+  background: rgba(240, 192, 64, 0.12);
+  border-color: rgba(240, 192, 64, 0.4);
+  transform: translateY(-2px);
+}
+
+.class-badge:hover .badge-icon {
+  transform: scale(1.2);
+}
+
+.class-badge.active {
+  background: linear-gradient(135deg, rgba(240, 192, 64, 0.25), rgba(180, 120, 20, 0.35));
+  border: 2px solid #f0c040;
+  box-shadow: 0 0 16px rgba(240, 192, 64, 0.35);
+}
+
+.class-badge.active .badge-title {
+  color: #ffffff;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(240, 192, 64, 0.6);
+}
+
+/* Gender Buttons RO Style */
+.ro-gender-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  font-family: 'Kanit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+.ro-gender-btn:hover {
+  background: rgba(96, 160, 255, 0.2);
+  border-color: rgba(96, 160, 255, 0.5);
+}
+
+.ro-gender-btn.active {
+  border: 2px solid #60a0ff;
+  background: linear-gradient(135deg, rgba(96, 160, 255, 0.3), rgba(30, 80, 180, 0.4));
+  box-shadow: 0 0 14px rgba(96, 160, 255, 0.4);
+  font-weight: 700;
+}

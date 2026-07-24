@@ -28,7 +28,7 @@
 </head>
 
 <body>
-  <!-- Auth Screen -->
+  <!-- Auth Screen (Ragnarok Online Fantasy Gateway) -->
   <div id="auth-screen">
     <div class="auth-overlay-vignette"></div>
     <div id="auth-particles"></div>
@@ -38,8 +38,8 @@
     <div class="auth-lightbeam" style="animation-delay: -3s; opacity: 0.5;"></div>
     <div class="auth-lightbeam" style="animation-delay: -6s; opacity: 0.3; left: 30%;"></div>
 
-    <!-- Rune circle decorations -->
-    <svg class="rune-circle left" width="320" height="320" viewBox="0 0 320 320">
+    <!-- Transcendent Rune Circle Decorations -->
+    <svg class="rune-circle left" width="360" height="360" viewBox="0 0 320 320">
       <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(240,192,64,0.6)" stroke-width="1"
         stroke-dasharray="12 18" />
       <circle cx="160" cy="160" r="120" fill="none" stroke="rgba(96,160,255,0.5)" stroke-width="0.75"
@@ -49,7 +49,7 @@
       <polygon points="160,20 281,230 39,230" fill="none" stroke="rgba(160,96,255,0.25)" stroke-width="1" />
       <polygon points="160,300 39,90 281,90" fill="none" stroke="rgba(240,192,64,0.25)" stroke-width="1" />
     </svg>
-    <svg class="rune-circle right" width="320" height="320" viewBox="0 0 320 320">
+    <svg class="rune-circle right" width="360" height="360" viewBox="0 0 320 320">
       <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(96,160,255,0.6)" stroke-width="1"
         stroke-dasharray="12 18" />
       <circle cx="160" cy="160" r="120" fill="none" stroke="rgba(240,192,64,0.5)" stroke-width="0.75"
@@ -60,14 +60,31 @@
       <polygon points="160,300 39,90 281,90" fill="none" stroke="rgba(240,192,64,0.25)" stroke-width="1" />
     </svg>
 
-    <div class="auth-container">
+    <!-- Top Server Status & BGM Bar -->
+    <div class="ro-top-bar">
+      <div class="ro-server-chip">
+        <span class="ro-server-crown">👑</span>
+        <span class="ro-server-name">PRONTERA GATEWAY — THOR REALM</span>
+        <span class="ro-server-ping"><span class="ping-dot"></span>14ms</span>
+      </div>
+      <button id="btn-auth-bgm" class="ro-bgm-btn" title="Toggle Music">🎵 BGM ON</button>
+    </div>
+
+    <!-- Main RO Ornate Glass Card -->
+    <div class="auth-container ro-ornate-card">
+      <div class="ro-card-corner top-left"></div>
+      <div class="ro-card-corner top-right"></div>
+      <div class="ro-card-corner bottom-left"></div>
+      <div class="ro-card-corner bottom-right"></div>
+
       <div class="auth-logo">
         <div class="logo-aura"></div>
         <div class="logo-aura-outer"></div>
-        <img src="/src/assets/zolos_icon.png" alt="Zolos Icon" class="auth-icon-img" />
+        <img src="/assets/zolos_icon.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="Zolos Icon"
+          class="auth-icon-img" />
         <h1 class="game-title-new" data-text="ZOLOS">ZOLOS</h1>
-        <p class="game-subtitle">Idle RPG Online</p>
-        <p class="game-tagline">เข้าสู่โลกแห่งการผจญภัยในตำนาน</p>
+        <p class="game-subtitle">~ PROMISED REALM OF MIDGARD ~</p>
+        <p class="game-tagline">⚔️ ตำนานบทใหม่แห่ง Prontera & Geffen 🐉</p>
       </div>
 
       <!-- Start Game Splash -->
@@ -76,7 +93,7 @@
         <div id="auth-welcome" class="auth-welcome" style="display: none;">
           <div class="auth-welcome-avatar" id="auth-welcome-avatar">?</div>
           <div class="auth-welcome-txt">
-            <div class="auth-welcome-hi">ยินดีต้อนรับกลับ</div>
+            <div class="auth-welcome-hi">ยินดีต้อนรับกลับท่านนักผจญภัย</div>
             <div class="auth-welcome-name" id="auth-welcome-name">Adventurer</div>
           </div>
         </div>
@@ -93,36 +110,76 @@
         <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account /
           Logout</button>
         <div class="auth-form" id="login-form">
-          <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
+          <div class="ro-input-wrap">
+            <span class="ro-input-icon">👤</span>
+            <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
+          </div>
+
           <div style="display: flex; flex-direction: column;">
-            <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+            <div class="ro-input-wrap">
+              <span class="ro-input-icon">🔑</span>
+              <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+            </div>
             <button id="btn-forgot-password" class="btn-forgot-pw">Forgot Password?</button>
           </div>
-          <input type="text" id="auth-charname" placeholder="🎮 Character Name" autocomplete="off"
-            style="display: none;" />
-          <div id="auth-gender-row" style="display: none; gap: 10px;">
-            <button type="button" id="auth-gender-male"
-              style="flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #4a90d9; background: rgba(74,144,217,0.25); color: #fff; cursor: pointer; font-family: inherit; font-size: 14px;">👦
-              ชาย</button>
-            <button type="button" id="auth-gender-female"
-              style="flex: 1; padding: 10px; border-radius: 10px; border: 2px solid transparent; background: rgba(255,255,255,0.08); color: #fff; cursor: pointer; font-family: inherit; font-size: 14px;">👧
-              หญิง</button>
+
+          <div class="ro-input-wrap" id="charname-wrap" style="display: none;">
+            <span class="ro-input-icon">⚔️</span>
+            <input type="text" id="auth-charname" placeholder="🎮 Character Name (ชื่อตัวละคร)" autocomplete="off" />
           </div>
-          <button id="btn-login" class="btn-primary">⚔️ Login</button>
-          <button id="btn-register" class="btn-secondary">📜 Register</button>
-          <div class="auth-divider"><span>or</span></div>
-          <button id="btn-guest" class="btn-guest">🎮 Play as Guest</button>
+
+          <!-- RO Class Badge Selection (Register Mode) -->
+          <div id="auth-class-selector" class="auth-class-selector" style="display: none;">
+            <div class="class-selector-label">🛡️ เลือกสายอาชีพตั้งต้น (Starter Class):</div>
+            <div class="class-badges-grid">
+              <div class="class-badge active" data-class="novice">
+                <span class="badge-icon">🌱</span>
+                <span class="badge-title">Novice</span>
+              </div>
+              <div class="class-badge" data-class="swordman">
+                <span class="badge-icon">⚔️</span>
+                <span class="badge-title">Swordman</span>
+              </div>
+              <div class="class-badge" data-class="mage">
+                <span class="badge-icon">🔮</span>
+                <span class="badge-title">Mage</span>
+              </div>
+              <div class="class-badge" data-class="archer">
+                <span class="badge-icon">🏹</span>
+                <span class="badge-title">Archer</span>
+              </div>
+              <div class="class-badge" data-class="acolyte">
+                <span class="badge-icon">✨</span>
+                <span class="badge-title">Acolyte</span>
+              </div>
+              <div class="class-badge" data-class="thief">
+                <span class="badge-icon">🗡️</span>
+                <span class="badge-title">Thief</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gender selection (Register Mode) -->
+          <div id="auth-gender-row" style="display: none; gap: 10px;">
+            <button type="button" id="auth-gender-male" class="ro-gender-btn active">👦 ชาย (Male)</button>
+            <button type="button" id="auth-gender-female" class="ro-gender-btn">👧 หญิง (Female)</button>
+          </div>
+
+          <button id="btn-login" class="btn-primary">⚔️ LOGIN TO REALM</button>
+          <button id="btn-register" class="btn-secondary">📜 REGISTER ACCOUNT</button>
+          <div class="auth-divider"><span>OR ENTER DIRECTLY</span></div>
+          <button id="btn-guest" class="btn-guest">🎮 PLAY AS GUEST</button>
         </div>
       </div>
       <div class="auth-status" id="auth-status"></div>
       <div class="online-count">
         <span class="pulse-dot"></span>
-        <span id="online-players-auth">0</span> adventurers online
+        <span id="online-players-auth">0</span> Adventurers Online in Midgard
       </div>
 
       <!-- PWA install (shown only when installable) -->
       <button id="btn-install-pwa"
-        style="display: none; align-items: center; justify-content: center; gap: 8px; margin: 14px auto 0; padding: 11px 20px; border: 1px solid #7b4dff; border-radius: 24px; background: linear-gradient(135deg, #7b2ff7, #5a1fd6); color: #fff; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(90,31,214,.45);">
+        style="display: none; align-items: center; justify-content: center; gap: 8px; margin: 14px auto 0; padding: 11px 20px; border: 1px solid #ffd700; border-radius: 24px; background: linear-gradient(135deg, #7b2ff7, #5a1fd6); color: #fff; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(90,31,214,.45);">
         <span>📥</span><span>ติดตั้งเกม / Download App</span>
       </button>
       <div id="pwa-install-hint"
@@ -130,7 +187,6 @@
         📱 ติดตั้งบน iPhone/iPad: แตะปุ่ม <b>แชร์ ⬆️</b> ด้านล่าง แล้วเลือก <b>“Add to Home Screen”</b>
       </div>
     </div>
-
   </div>
 
   <!-- Game Screen -->
