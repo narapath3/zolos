@@ -415,6 +415,7 @@ export class AdminUI {
 
     _renderUserList() {
         const table = document.createElement('table');
+        table.className = 'admin-desktop-table';
         table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;';
         table.innerHTML = `
             <thead>
@@ -431,6 +432,9 @@ export class AdminUI {
         `;
 
         const tbody = table.querySelector('tbody');
+        const mobileList = document.createElement('div');
+        mobileList.className = 'admin-mobile-list';
+
         this.users.forEach((user, idx) => {
             const tr = document.createElement('tr');
             tr.style.cssText = `border-bottom: 1px solid #333; background: ${idx % 2 === 0 ? 'rgba(255, 215, 0, 0.02)' : 'transparent'}; transition: background 0.2s;`;
@@ -476,9 +480,43 @@ export class AdminUI {
             };
 
             tbody.appendChild(tr);
+
+            const card = document.createElement('article');
+            card.className = 'admin-card admin-player-card';
+            card.innerHTML = `
+                <div class="admin-card-heading">
+                    <span class="admin-card-kicker">Player</span>
+                    <strong>${user.username}</strong>
+                </div>
+                <div class="admin-stat-grid">
+                    <div><span>Level</span><strong>Lv.${user.level}</strong></div>
+                    <div><span>Gold</span><strong>${(user.gold || 0).toLocaleString()}</strong></div>
+                    <div><span>Kills</span><strong>${(user.total_kills || 0).toLocaleString()}</strong></div>
+                    <div><span>Play time</span><strong>${playTimeStr}</strong></div>
+                </div>
+                <div class="admin-action-grid">
+                    <button class="edit-btn admin-action admin-action-edit">Edit</button>
+                    <button class="give-btn admin-action admin-action-give">Give</button>
+                    <button class="reset-btn admin-action admin-action-reset">Reset</button>
+                    <button class="delete-btn admin-action admin-action-delete">Delete</button>
+                </div>
+            `;
+
+            card.querySelector('.edit-btn').onclick = () => this.openEditModal(user);
+            card.querySelector('.give-btn').onclick = () => {
+                const itemName = prompt(`Item name to give to ${user.username}:`, 'Sword');
+                if (itemName) {
+                    const qty = prompt('Quantity:', '1');
+                    if (qty) this.giveItem(user.id, itemName, parseInt(qty));
+                }
+            };
+            card.querySelector('.reset-btn').onclick = () => this.resetPlayer(user.id);
+            card.querySelector('.delete-btn').onclick = () => this.deletePlayer(user.id);
+            mobileList.appendChild(card);
         });
 
         this.content.appendChild(table);
+        this.content.appendChild(mobileList);
 
         if (this.users.length === 0) {
             this.content.innerHTML = '<div style="text-align:center; padding: 50px; color: #888;">No players found</div>';
@@ -487,6 +525,7 @@ export class AdminUI {
 
     _renderItemList() {
         const searchDiv = document.createElement('div');
+        searchDiv.className = 'admin-filter-bar';
         searchDiv.style.cssText = 'margin-bottom: 15px; display: flex; gap: 10px;';
 
         const searchInput = document.createElement('input');
@@ -503,6 +542,7 @@ export class AdminUI {
         this.content.appendChild(searchDiv);
 
         const table = document.createElement('table');
+        table.className = 'admin-desktop-table';
         table.style.cssText = 'width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;';
         table.innerHTML = `
             <thead>
@@ -519,9 +559,12 @@ export class AdminUI {
         `;
 
         const tbody = table.querySelector('tbody');
+        const mobileList = document.createElement('div');
+        mobileList.className = 'admin-mobile-list';
 
         const renderItems = () => {
             tbody.innerHTML = '';
+            mobileList.innerHTML = '';
             const searchTerm = searchInput.value.toLowerCase();
             const rarityTerm = rarityFilter.value;
 
@@ -533,6 +576,7 @@ export class AdminUI {
 
             if (filtered.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #888;">No items found</td></tr>';
+                mobileList.innerHTML = '<div class="admin-empty-state">No items found</div>';
                 return;
             }
 
@@ -559,6 +603,24 @@ export class AdminUI {
                     <td style="padding: 10px; font-size: 11px; color: #bbb;">${item.desc.substring(0, 50)}...</td>
                 `;
                 tbody.appendChild(tr);
+
+                const card = document.createElement('article');
+                card.className = 'admin-card admin-item-card';
+                card.innerHTML = `
+                    <div class="admin-item-heading">
+                        <span class="admin-item-icon" aria-hidden="true">${item.emoji}</span>
+                        <div>
+                            <strong>${item.name}</strong>
+                            <span style="color:${rarityColor}">${item.rarity}</span>
+                        </div>
+                        <strong class="admin-item-price">${item.price.toLocaleString()}</strong>
+                    </div>
+                    <div class="admin-item-meta">
+                        <span>${item.type}</span>
+                        <span>${item.desc}</span>
+                    </div>
+                `;
+                mobileList.appendChild(card);
             });
         };
 
@@ -566,6 +628,7 @@ export class AdminUI {
         rarityFilter.addEventListener('change', renderItems);
 
         this.content.appendChild(table);
+        this.content.appendChild(mobileList);
         renderItems();
     }
 

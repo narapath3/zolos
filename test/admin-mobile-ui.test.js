@@ -29,3 +29,28 @@ test('admin mobile shell fills the viewport without horizontal overflow', () => 
   assert.match(adminCss, /\.admin-tabs[\s\S]*overflow-x:\s*auto/);
   assert.match(adminCss, /env\(safe-area-inset-bottom/);
 });
+
+test('admin lists provide desktop tables and mobile cards', () => {
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  for (const className of [
+    'admin-desktop-table',
+    'admin-mobile-list',
+    'admin-card',
+    'admin-stat-grid',
+    'admin-action-grid',
+    'admin-filter-bar',
+  ]) {
+    assert.match(adminSource, new RegExp(className));
+  }
+
+  assert.match(adminCss, /\.admin-mobile-list\s*\{[\s\S]*display:\s*none/);
+  assert.match(
+    adminCss,
+    /@media\s*\(max-width:\s*720px\)[\s\S]*\.admin-desktop-table[\s\S]*display:\s*none/
+  );
+  assert.match(
+    adminCss,
+    /@media\s*\(max-width:\s*720px\)[\s\S]*\.admin-mobile-list[\s\S]*display:\s*(?:grid|flex|block)/
+  );
+});
