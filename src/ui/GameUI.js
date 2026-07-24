@@ -5424,12 +5424,19 @@ export class GameUI {
     const rows = listings.length ? listings.map(l => {
       const meta = ITEMS[l.item_name] || { emoji: '📦' };
       const rc = { epic: '#c774ff', legendary: '#ffcf4a', mythic: '#ff5a7a', rare: '#4aa3ff' }[meta.rarity] || '#c9d4df';
+      // Pets: show the custom name (each is its own separate listing, never merged).
+      const isPet = l.item_type === 'pet';
+      const petNm = (isPet && l.stats && l.stats.petName) ? l.stats.petName : null;
+      const petLv = (isPet && l.stats && l.stats.petLevel) ? l.stats.petLevel : null;
+      const disp = isPet
+        ? `${esc(l.item_name.replace(/ Pet$/, ''))}${petNm ? ` 「${esc(petNm)}」` : ''}${petLv ? ` Lv.${petLv}` : ''}`
+        : `${esc(l.item_name)} ×${l.quantity}`;
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;margin-bottom:8px;
           background:rgba(0,0,0,.3);border:1px solid ${rc}44;">
           <div style="font-size:22px;">${meta.emoji}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:800;color:${rc};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(l.item_name)} ×${l.quantity}</div>
+            <div style="font-weight:800;color:${rc};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${disp}</div>
             <div style="font-size:11px;color:#ffd97a;font-weight:700;">💰 ${Number(l.price).toLocaleString()} Zeny</div>
           </div>
           ${mine
@@ -6534,21 +6541,38 @@ export class GameUI {
       if (canceled) {
         // Add back to local inventory
         const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
-        const existing = this.inventory.find(i => i.item_name === listing.item_name);
-        if (existing) {
-          existing.quantity += listing.quantity;
+        if (listing.item_type === 'pet') {
+          // Return the pet as its own named instance (keep name/level, never merge).
+          let row = this.inventory.find(i => i.item_name === listing.item_name && i.item_type === 'pet');
+          if (!row) {
+            row = { item_name: listing.item_name, item_type: 'pet', emoji: itemRegistry.emoji || '🐾', desc: itemRegistry.desc || '', price: itemRegistry.price || 10, rarity: itemRegistry.rarity || 'common', quantity: 0, stats: { instances: [] } };
+            this.inventory.push(row);
+          }
+          this._ensurePetInstances(row);
+          const s = listing.stats || {};
+          row.stats.instances.push({ uid: this._newPetUid(), name: s.petName || null, level: s.petLevel || 1, xp: s.petXp || 0 });
+          row.quantity = row.stats.instances.length;
+          if (this.characterId) {
+            const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+            await setInventoryItemQuantity(this.characterId, listing.item_name, 'pet', row.quantity, row.stats);
+          }
         } else {
-          this.inventory.push({
-            item_name: listing.item_name,
-            item_type: listing.item_type,
-            emoji: itemRegistry.emoji || '📦',
-            desc: itemRegistry.desc || '',
-            price: itemRegistry.price || 10,
-            healHp: itemRegistry.healHp || 0,
-            restoreSp: itemRegistry.restoreSp || 0,
-            quantity: listing.quantity,
-            stats: listing.stats || {}
-          });
+          const existing = this.inventory.find(i => i.item_name === listing.item_name);
+          if (existing) {
+            existing.quantity += listing.quantity;
+          } else {
+            this.inventory.push({
+              item_name: listing.item_name,
+              item_type: listing.item_type,
+              emoji: itemRegistry.emoji || '📦',
+              desc: itemRegistry.desc || '',
+              price: itemRegistry.price || 10,
+              healHp: itemRegistry.healHp || 0,
+              restoreSp: itemRegistry.restoreSp || 0,
+              quantity: listing.quantity,
+              stats: listing.stats || {}
+            });
+          }
         }
 
         this.addCombatLog(`⚖️ ยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} สำเร็จ`, 'system');
