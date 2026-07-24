@@ -19,11 +19,15 @@ export class AuthUI {
         this._bgmMuted = false;
         this._autoplayTrigger = null;
 
+        this._pingInterval = null;
+        this._pingEl = null;
+
         this._setupButtons();
         this._createParticles();
         this._subscribeOnlineCount();
         this._checkExistingSession();
         this._setupBGMAutoplay();
+        this._startPingMonitor();
     }
 
     _setupButtons() {
@@ -519,6 +523,118 @@ export class AuthUI {
         });
     }
 
+    // ============ Real Server Latency Monitor ============
+    _startPingMonitor() {
+        this._pingEl = document.getElementById('ro-server-ping');
+        if (!this._pingEl) return;
+
+        // Measure immediately, then every 5 seconds
+        this._measurePing();
+        this._pingInterval = setInterval(() => this._measurePing(), 5000);
+    }
+
+    _stopPingMonitor() {
+        if (this._pingInterval) {
+            clearInterval(this._pingInterval);
+            this._pingInterval = null;
+        }
+    }
+
+    async _measurePing() {
+        if (!this._pingEl) return;
+        let ms = null;
+
+        // Strategy 1: Socket.io round-trip (most accurate for game server)
+        try {
+            const { getSocket, isSocketConnected } = await import('../network/SocketClient.js');
+            const socket = getSocket();
+            if (socket && isSocketConnected()) {
+                ms = await new Promise((resolve) => {
+                    const t0 = performance.now();
+                    const timeout = setTimeout(() => resolve(null), 3000);
+                    socket.volatile.emit('cli_pong', Date.now(), () => {
+                        clearTimeout(timeout);
+                        resolve(Math.round(performance.now() - t0));
+                    });
+                    // Alternative: listen for the next srv_ping as a round-trip proxy
+                    if (!socket._zolosPingCb) {
+                        socket._zolosPingCb = true;
+                        socket.on('srv_ping', (serverTs) => {
+                            socket.emit('cli_pong', serverTs);
+                        });
+                    }
+                });
+            }
+        } catch { /* socket not available, fall through */ }
+
+        // Strategy 2: HTTP fetch to Supabase REST endpoint
+        if (ms === null) {
+            try {
+                const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+                const supabaseUrl = (env.VITE_SUPABASE_URL || '').trim();
+                if (supabaseUrl && !supabaseUrl.includes('YOUR_PROJECT')) {
+                    const t0 = performance.now();
+                    await fetch(supabaseUrl + '/rest/v1/', {
+                        method: 'HEAD',
+                        mode: 'no-cors',
+                        cache: 'no-store',
+                    });
+                    ms = Math.round(performance.now() - t0);
+                }
+            } catch { /* offline or CORS blocked */ }
+        }
+
+        // Strategy 3: Socket URL HTTP ping
+        if (ms === null) {
+            try {
+                const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+                const socketUrl = (env.VITE_SOCKET_URL || env.VITE_SOCKET_SERVER_URL || '').trim();
+                if (socketUrl && socketUrl !== 'undefined') {
+                    const t0 = performance.now();
+                    await fetch(socketUrl + '/socket.io/?EIO=4&transport=polling', {
+                        method: 'GET',
+                        mode: 'no-cors',
+                        cache: 'no-store',
+                    });
+                    ms = Math.round(performance.now() - t0);
+                }
+            } catch { /* offline */ }
+        }
+
+        // Update the UI
+        this._updatePingDisplay(ms);
+    }
+
+    _updatePingDisplay(ms) {
+        if (!this._pingEl) return;
+
+        const dot = this._pingEl.querySelector('.ping-dot');
+
+        if (ms === null) {
+            this._pingEl.innerHTML = '<span class="ping-dot" style="background:#ff4444;box-shadow:0 0 8px #ff4444;"></span>OFFLINE';
+            this._pingEl.style.color = '#ff4444';
+            this._pingEl.style.background = 'rgba(255, 68, 68, 0.15)';
+            this._pingEl.style.borderColor = 'rgba(255, 68, 68, 0.3)';
+            return;
+        }
+
+        let color, bgColor, borderColor, label;
+        if (ms < 80) {
+            color = '#40e080'; bgColor = 'rgba(64, 224, 128, 0.15)'; borderColor = 'rgba(64, 224, 128, 0.3)'; label = 'EXCELLENT';
+        } else if (ms < 150) {
+            color = '#f0c040'; bgColor = 'rgba(240, 192, 64, 0.15)'; borderColor = 'rgba(240, 192, 64, 0.3)'; label = 'GOOD';
+        } else if (ms < 300) {
+            color = '#ff8040'; bgColor = 'rgba(255, 128, 64, 0.15)'; borderColor = 'rgba(255, 128, 64, 0.3)'; label = 'FAIR';
+        } else {
+            color = '#ff4444'; bgColor = 'rgba(255, 68, 68, 0.15)'; borderColor = 'rgba(255, 68, 68, 0.3)'; label = 'HIGH';
+        }
+
+        this._pingEl.innerHTML = `<span class="ping-dot" style="background:${color};box-shadow:0 0 8px ${color};"></span>${ms}ms`;
+        this._pingEl.style.color = color;
+        this._pingEl.style.background = bgColor;
+        this._pingEl.style.borderColor = borderColor;
+    }
+
     _setupBGMAutoplay() {
         const playAttempt = () => {
             if (this._bgmPlayed) return;
@@ -577,6 +693,7 @@ export class AuthUI {
             this._unsubOnlineCount();
             this._unsubOnlineCount = null;
         }
+        this._stopPingMonitor();
         this._removeAutoplayListeners();
         this._fadeOutBGM();
         this.screen.style.display = 'none';
@@ -589,5 +706,6 @@ export class AuthUI {
             this._bgmPlayed = false;
             this._setupBGMAutoplay();
         }
+        this._startPingMonitor();
     }
 }
