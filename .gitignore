@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
 
 .vercel
+.worktrees/
 .env*
 
 # Ignore Supabase/Zolos authentication & session tokens
