@@ -23,109 +23,12 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;500;600;700&family=Kanit:wght@300;400;500;600;700&display=swap"
     rel="stylesheet" />
-  <!-- Loading intro (critical inline CSS so it paints before the app scripts) -->
-  <style id="zolos-loader-css">
-    #zolos-loader{position:fixed;inset:0;z-index:2000000;display:flex;align-items:center;justify-content:center;
-      background:radial-gradient(circle at 50% 32%,#1a2a4e 0%,#0c1224 55%,#05070f 100%);
-      opacity:1;transition:opacity .7s ease;overflow:hidden;pointer-events:auto;
-      font-family:'Chakra Petch','Kanit',system-ui,-apple-system,sans-serif;color:#fff;}
-    #zolos-loader.zl-hide{opacity:0;pointer-events:none;}
-    /* While the intro is up, hide everything behind it — bulletproof against any
-       stacking-context/pointer-events quirks in the app screens. */
-    body.zl-loading #auth-screen, body.zl-loading #game-screen{visibility:hidden !important;}
-    #zolos-loader .zl-stars{position:absolute;inset:0;background-image:
-      radial-gradient(1.4px 1.4px at 20% 30%,rgba(255,255,255,.7),transparent),
-      radial-gradient(1.2px 1.2px at 70% 60%,rgba(180,210,255,.6),transparent),
-      radial-gradient(1.6px 1.6px at 40% 80%,rgba(255,225,150,.5),transparent),
-      radial-gradient(1.2px 1.2px at 85% 25%,rgba(255,255,255,.5),transparent),
-      radial-gradient(1.3px 1.3px at 55% 15%,rgba(180,210,255,.5),transparent);
-      background-repeat:repeat;background-size:520px 520px;animation:zlDrift 24s linear infinite;opacity:.6;}
-    #zolos-loader .zl-glow{position:absolute;width:520px;height:520px;border-radius:50%;
-      background:radial-gradient(circle,rgba(96,150,255,.22),transparent 62%);filter:blur(8px);animation:zlPulse 4s ease-in-out infinite;}
-    .zl-content{position:relative;text-align:center;padding:24px;max-width:440px;width:100%;}
-    .zl-icon{width:104px;height:104px;object-fit:contain;filter:drop-shadow(0 6px 24px rgba(96,150,255,.55));
-      animation:zlFloat 3.4s ease-in-out infinite;}
-    .zl-title{font-size:46px;font-weight:800;letter-spacing:6px;margin-top:8px;
-      background:linear-gradient(180deg,#ffe9a8,#f0c040 60%,#b8862a);-webkit-background-clip:text;background-clip:text;
-      -webkit-text-fill-color:transparent;text-shadow:0 2px 30px rgba(240,192,64,.35);}
-    .zl-sub{font-size:12px;letter-spacing:4px;color:#9fb4e0;text-transform:uppercase;margin-top:-2px;}
-    .zl-barwrap{margin:26px auto 12px;width:min(300px,72vw);height:8px;border-radius:6px;
-      background:rgba(255,255,255,.08);overflow:hidden;box-shadow:inset 0 0 6px rgba(0,0,0,.5);}
-    .zl-bar{height:100%;width:38%;border-radius:6px;
-      background:linear-gradient(90deg,rgba(96,150,255,0),#6aa0ff,#ffe08a,rgba(96,150,255,0));
-      animation:zlSlide 1.25s cubic-bezier(.5,0,.5,1) infinite;box-shadow:0 0 12px rgba(120,170,255,.7);}
-    .zl-status{font-size:13px;color:#cdd8f2;letter-spacing:.5px;min-height:18px;}
-    .zl-tip{font-size:12px;color:#8fa2c8;margin-top:18px;line-height:1.5;min-height:34px;
-      transition:opacity .3s ease;padding:0 10px;}
-    @keyframes zlSlide{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}
-    @keyframes zlFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-    @keyframes zlPulse{0%,100%{transform:scale(.92);opacity:.7}50%{transform:scale(1.05);opacity:1}}
-    @keyframes zlDrift{0%{background-position:0 0}100%{background-position:520px 520px}}
-    @media (max-width:480px){.zl-title{font-size:38px}.zl-icon{width:88px;height:88px}}
-  </style>
   <link rel="stylesheet" href="/src/styles/index.css" />
   <link rel="stylesheet" href="/src/styles/login-new.css" />
 </head>
 
 <body>
-  <!-- Loading intro (shown on boot and while the game world builds) -->
-  <div id="zolos-loader">
-    <div class="zl-stars"></div>
-    <div class="zl-glow"></div>
-    <div class="zl-content">
-      <img src="/src/assets/zolos_icon.png" alt="Zolos" class="zl-icon" onerror="this.style.display='none'" />
-      <div class="zl-title">ZOLOS</div>
-      <div class="zl-sub">Idle RPG Online</div>
-      <div class="zl-barwrap"><div class="zl-bar"></div></div>
-      <div class="zl-status" id="zl-status">กำลังเข้าสู่โลกแห่งการผจญภัย...</div>
-      <div class="zl-tip" id="zl-tip">💡 กำลังโหลด...</div>
-    </div>
-  </div>
-  <script>
-    (function () {
-      document.body.classList.add('zl-loading');
-      var tips = [
-        '💡 กดปุ่ม AUTO เพื่อให้ตัวละครล่ามอนสเตอร์อัตโนมัติ',
-        '🐾 ตั้งชื่อสัตว์เลี้ยงของคุณได้ในกระเป๋า แท็บ Pet',
-        '🃏 การ์ดหายากดรอปจากบอสโลก เอาไปใส่เพิ่มพลังอุปกรณ์',
-        '⚔️ ตีบวกไอเทม (+N) เพื่อเพิ่มพลังโจมตีและป้องกัน',
-        '🏪 เปิดร้านขายของให้ผู้เล่นอื่นได้ที่ตลาด',
-        '🎣 ตกปลาสะสมในสมุดภาพ รับรางวัลพิเศษเมื่อครบเซ็ต',
-        '🐉 ล่าบอสโลกร่วมกับเพื่อนเพื่อลุ้นของหายาก'
-      ];
-      var el = document.getElementById('zl-tip');
-      var i = Math.floor(Math.random() * tips.length);
-      if (el) {
-        el.textContent = tips[i];
-        setInterval(function () {
-          el.style.opacity = 0;
-          setTimeout(function () { i = (i + 1) % tips.length; el.textContent = tips[i]; el.style.opacity = 1; }, 300);
-        }, 3400);
-      }
-      // Reveal the auth screen after the intro has been seen — unless we're
-      // heading straight into the game (auto-login), which manages the loader.
-      var start = Date.now();
-      function bootHide() {
-        if (window.__enteringGame) return;
-        document.body.classList.remove('zl-loading');
-        var l = document.getElementById('zolos-loader');
-        if (l) l.classList.add('zl-hide');
-      }
-      window.addEventListener('load', function () {
-        setTimeout(bootHide, Math.max(0, 1700 - (Date.now() - start)));
-      });
-      // Safety net: never trap the player if something stalls (but keep the
-      // loader up through a slow world-load).
-      setTimeout(function () {
-        if (window.__enteringGame && !window.__loaderDone) return;
-        document.body.classList.remove('zl-loading');
-        var l = document.getElementById('zolos-loader');
-        if (l) l.classList.add('zl-hide');
-      }, 12000);
-    })();
-  </script>
-
-  <!-- Auth Screen -->
+  <!-- Auth Screen (Ragnarok Online Fantasy Gateway) -->
   <div id="auth-screen">
     <div class="auth-overlay-vignette"></div>
     <div id="auth-particles"></div>
@@ -133,26 +36,55 @@
     <!-- Cinematic light beams -->
     <div class="auth-lightbeam"></div>
     <div class="auth-lightbeam" style="animation-delay: -3s; opacity: 0.5;"></div>
+    <div class="auth-lightbeam" style="animation-delay: -6s; opacity: 0.3; left: 30%;"></div>
 
-    <!-- Rune circle decorations -->
-    <svg class="rune-circle left" width="260" height="260" viewBox="0 0 260 260">
-      <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(240,192,64,0.6)" stroke-width="1" stroke-dasharray="8 12"/>
-      <circle cx="130" cy="130" r="95" fill="none" stroke="rgba(96,160,255,0.4)" stroke-width="0.5" stroke-dasharray="4 8"/>
-      <circle cx="130" cy="130" r="70" fill="none" stroke="rgba(240,192,64,0.3)" stroke-width="0.5" stroke-dasharray="2 6"/>
+    <!-- Transcendent Rune Circle Decorations -->
+    <svg class="rune-circle left" width="360" height="360" viewBox="0 0 320 320">
+      <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(240,192,64,0.6)" stroke-width="1"
+        stroke-dasharray="12 18" />
+      <circle cx="160" cy="160" r="120" fill="none" stroke="rgba(96,160,255,0.5)" stroke-width="0.75"
+        stroke-dasharray="6 12" />
+      <circle cx="160" cy="160" r="90" fill="none" stroke="rgba(240,192,64,0.4)" stroke-width="0.5"
+        stroke-dasharray="3 8" />
+      <polygon points="160,20 281,230 39,230" fill="none" stroke="rgba(160,96,255,0.25)" stroke-width="1" />
+      <polygon points="160,300 39,90 281,90" fill="none" stroke="rgba(240,192,64,0.25)" stroke-width="1" />
     </svg>
-    <svg class="rune-circle right" width="260" height="260" viewBox="0 0 260 260">
-      <circle cx="130" cy="130" r="120" fill="none" stroke="rgba(96,160,255,0.6)" stroke-width="1" stroke-dasharray="8 12"/>
-      <circle cx="130" cy="130" r="95" fill="none" stroke="rgba(240,192,64,0.4)" stroke-width="0.5" stroke-dasharray="4 8"/>
-      <circle cx="130" cy="130" r="70" fill="none" stroke="rgba(96,160,255,0.3)" stroke-width="0.5" stroke-dasharray="2 6"/>
+    <svg class="rune-circle right" width="360" height="360" viewBox="0 0 320 320">
+      <circle cx="160" cy="160" r="150" fill="none" stroke="rgba(96,160,255,0.6)" stroke-width="1"
+        stroke-dasharray="12 18" />
+      <circle cx="160" cy="160" r="120" fill="none" stroke="rgba(240,192,64,0.5)" stroke-width="0.75"
+        stroke-dasharray="6 12" />
+      <circle cx="160" cy="160" r="90" fill="none" stroke="rgba(96,160,255,0.4)" stroke-width="0.5"
+        stroke-dasharray="3 8" />
+      <polygon points="160,20 281,230 39,230" fill="none" stroke="rgba(96,160,255,0.25)" stroke-width="1" />
+      <polygon points="160,300 39,90 281,90" fill="none" stroke="rgba(240,192,64,0.25)" stroke-width="1" />
     </svg>
 
-    <div class="auth-container">
+    <!-- Top Server Status & BGM Bar -->
+    <div class="ro-top-bar">
+      <div class="ro-server-chip">
+        <span class="ro-server-crown">👑</span>
+        <span class="ro-server-name">PRONTERA GATEWAY — THOR REALM</span>
+        <span class="ro-server-ping" id="ro-server-ping"><span class="ping-dot"></span>--ms</span>
+      </div>
+      <button id="btn-auth-bgm" class="ro-bgm-btn" title="Toggle Music">🎵 BGM ON</button>
+    </div>
+
+    <!-- Main RO Ornate Glass Card -->
+    <div class="auth-container ro-ornate-card">
+      <div class="ro-card-corner top-left"></div>
+      <div class="ro-card-corner top-right"></div>
+      <div class="ro-card-corner bottom-left"></div>
+      <div class="ro-card-corner bottom-right"></div>
+
       <div class="auth-logo">
         <div class="logo-aura"></div>
-        <img src="/src/assets/zolos_icon.png" alt="Zolos Icon" class="auth-icon-img" />
-        <h1 class="game-title-new">ZOLOS</h1>
-        <p class="game-subtitle">Idle RPG Online</p>
-        <p class="game-tagline">เข้าสู่โลกแห่งการผจญภัย</p>
+        <div class="logo-aura-outer"></div>
+        <img src="/assets/zolos_icon.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="Zolos Icon"
+          class="auth-icon-img" />
+        <h1 class="game-title-new" data-text="ZOLOS">ZOLOS</h1>
+        <p class="game-subtitle">~ PROMISED REALM OF MIDGARD ~</p>
+        <p class="game-tagline">⚔️ ตำนานบทใหม่แห่ง Prontera & Geffen 🐉</p>
       </div>
 
       <!-- Start Game Splash -->
@@ -161,7 +93,7 @@
         <div id="auth-welcome" class="auth-welcome" style="display: none;">
           <div class="auth-welcome-avatar" id="auth-welcome-avatar">?</div>
           <div class="auth-welcome-txt">
-            <div class="auth-welcome-hi">ยินดีต้อนรับกลับ</div>
+            <div class="auth-welcome-hi">ยินดีต้อนรับกลับท่านนักผจญภัย</div>
             <div class="auth-welcome-name" id="auth-welcome-name">Adventurer</div>
           </div>
         </div>
@@ -175,38 +107,79 @@
 
       <!-- Login Form (Initially Hidden) -->
       <div id="auth-form-wrapper" style="display: none;">
-        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account / Logout</button>
+        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account /
+          Logout</button>
         <div class="auth-form" id="login-form">
-          <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
+          <div class="ro-input-wrap">
+            <span class="ro-input-icon">👤</span>
+            <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
+          </div>
+
           <div style="display: flex; flex-direction: column;">
-            <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+            <div class="ro-input-wrap">
+              <span class="ro-input-icon">🔑</span>
+              <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
+            </div>
             <button id="btn-forgot-password" class="btn-forgot-pw">Forgot Password?</button>
           </div>
-          <input type="text" id="auth-charname" placeholder="🎮 Character Name" autocomplete="off"
-            style="display: none;" />
-          <div id="auth-gender-row" style="display: none; gap: 10px;">
-            <button type="button" id="auth-gender-male"
-              style="flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #4a90d9; background: rgba(74,144,217,0.25); color: #fff; cursor: pointer; font-family: inherit; font-size: 14px;">👦
-              ชาย</button>
-            <button type="button" id="auth-gender-female"
-              style="flex: 1; padding: 10px; border-radius: 10px; border: 2px solid transparent; background: rgba(255,255,255,0.08); color: #fff; cursor: pointer; font-family: inherit; font-size: 14px;">👧
-              หญิง</button>
+
+          <div class="ro-input-wrap" id="charname-wrap" style="display: none;">
+            <span class="ro-input-icon">⚔️</span>
+            <input type="text" id="auth-charname" placeholder="🎮 Character Name (ชื่อตัวละคร)" autocomplete="off" />
           </div>
-          <button id="btn-login" class="btn-primary">⚔️ Login</button>
-          <button id="btn-register" class="btn-secondary">📜 Register</button>
-          <div class="auth-divider"><span>or</span></div>
-          <button id="btn-guest" class="btn-guest">🎮 Play as Guest</button>
+
+          <!-- RO Class Badge Selection (Register Mode) -->
+          <div id="auth-class-selector" class="auth-class-selector" style="display: none;">
+            <div class="class-selector-label">🛡️ เลือกสายอาชีพตั้งต้น (Starter Class):</div>
+            <div class="class-badges-grid">
+              <div class="class-badge active" data-class="novice">
+                <span class="badge-icon">🌱</span>
+                <span class="badge-title">Novice</span>
+              </div>
+              <div class="class-badge" data-class="swordman">
+                <span class="badge-icon">⚔️</span>
+                <span class="badge-title">Swordman</span>
+              </div>
+              <div class="class-badge" data-class="mage">
+                <span class="badge-icon">🔮</span>
+                <span class="badge-title">Mage</span>
+              </div>
+              <div class="class-badge" data-class="archer">
+                <span class="badge-icon">🏹</span>
+                <span class="badge-title">Archer</span>
+              </div>
+              <div class="class-badge" data-class="acolyte">
+                <span class="badge-icon">✨</span>
+                <span class="badge-title">Acolyte</span>
+              </div>
+              <div class="class-badge" data-class="thief">
+                <span class="badge-icon">🗡️</span>
+                <span class="badge-title">Thief</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gender selection (Register Mode) -->
+          <div id="auth-gender-row" style="display: none; gap: 10px;">
+            <button type="button" id="auth-gender-male" class="ro-gender-btn active">👦 ชาย (Male)</button>
+            <button type="button" id="auth-gender-female" class="ro-gender-btn">👧 หญิง (Female)</button>
+          </div>
+
+          <button id="btn-login" class="btn-primary">⚔️ LOGIN TO REALM</button>
+          <button id="btn-register" class="btn-secondary">📜 REGISTER ACCOUNT</button>
+          <div class="auth-divider"><span>OR ENTER DIRECTLY</span></div>
+          <button id="btn-guest" class="btn-guest">🎮 PLAY AS GUEST</button>
         </div>
       </div>
       <div class="auth-status" id="auth-status"></div>
       <div class="online-count">
         <span class="pulse-dot"></span>
-        <span id="online-players-auth">0</span> adventurers online
+        <span id="online-players-auth">0</span> Adventurers Online in Midgard
       </div>
 
       <!-- PWA install (shown only when installable) -->
       <button id="btn-install-pwa"
-        style="display: none; align-items: center; justify-content: center; gap: 8px; margin: 14px auto 0; padding: 11px 20px; border: 1px solid #7b4dff; border-radius: 24px; background: linear-gradient(135deg, #7b2ff7, #5a1fd6); color: #fff; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(90,31,214,.45);">
+        style="display: none; align-items: center; justify-content: center; gap: 8px; margin: 14px auto 0; padding: 11px 20px; border: 1px solid #ffd700; border-radius: 24px; background: linear-gradient(135deg, #7b2ff7, #5a1fd6); color: #fff; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(90,31,214,.45);">
         <span>📥</span><span>ติดตั้งเกม / Download App</span>
       </button>
       <div id="pwa-install-hint"
@@ -214,7 +187,6 @@
         📱 ติดตั้งบน iPhone/iPad: แตะปุ่ม <b>แชร์ ⬆️</b> ด้านล่าง แล้วเลือก <b>“Add to Home Screen”</b>
       </div>
     </div>
-    
   </div>
 
   <!-- Game Screen -->
@@ -239,7 +211,7 @@
     </div>
 
     <!-- Respawn Shortcut Button -->
-<!-- <button id="btn-respawn-now" class="btn-respawn-now" style="display: none;">⚔️ Respawn Now</button> -->
+    <!-- <button id="btn-respawn-now" class="btn-respawn-now" style="display: none;">⚔️ Respawn Now</button> -->
 
 
     <!-- Top HUD -->
@@ -306,7 +278,8 @@
     <!-- Network Status Indicator -->
     <div id="network-status"
       style="position:fixed;top:4px;right:75px;background:rgba(0,0,0,0.55);color:#ff4444;font-family:monospace;font-size:11px;padding:2px 7px;border-radius:4px;z-index:9999;pointer-events:none;display:flex;align-items:center;gap:5px;">
-      <span style="width:6px;height:6px;border-radius:50%;background:#ff4444;display:inline-block;" id="network-dot"></span>
+      <span style="width:6px;height:6px;border-radius:50%;background:#ff4444;display:inline-block;"
+        id="network-dot"></span>
       <span id="network-text">OFFLINE</span>
     </div>
 
@@ -483,7 +456,7 @@
           <div class="market-search">
             <input type="text" id="market-search-input" placeholder="🔍 ค้นหาไอเทมตั้งขาย..." autocomplete="off">
           </div>
-          
+
           <div class="market-categories">
             <button class="market-cat-btn active" data-cat="all">ทั้งหมด</button>
             <button class="market-cat-btn" data-cat="weapon">อาวุธ</button>
@@ -578,18 +551,25 @@
                 <span id="shop-affordable" style="font-size: 11px; color: var(--text-dim);">ซื้อได้สูงสุด: 0</span>
               </div>
               <div style="display: flex; gap: 6px;">
-                <button id="btn-shop-qty-minus" class="btn-secondary" style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">−</button>
+                <button id="btn-shop-qty-minus" class="btn-secondary"
+                  style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">−</button>
                 <input type="number" id="shop-qty-input" min="1" value="1"
                   style="flex: 1; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: var(--font-pixel); text-align: center;">
-                <button id="btn-shop-qty-plus" class="btn-secondary" style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">+</button>
-                <button id="btn-shop-qty-max" class="btn-secondary" style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
+                <button id="btn-shop-qty-plus" class="btn-secondary"
+                  style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">+</button>
+                <button id="btn-shop-qty-max" class="btn-secondary"
+                  style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
               </div>
             </div>
 
-            <div class="detail-actions" style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="detail-actions"
+              style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
               <div class="price-info" style="display: flex; flex-direction: column;">
-                <span style="font-size: 10px; color: var(--text-dim);"><span id="shop-price-label">ราคา</span>ชิ้นละ: <span id="shop-detail-price-val">0</span> z</span>
-                <span class="detail-price" style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); white-space: nowrap;">รวมทั้งหมด: <span id="shop-total-price">0</span> z</span>
+                <span style="font-size: 10px; color: var(--text-dim);"><span id="shop-price-label">ราคา</span>ชิ้นละ:
+                  <span id="shop-detail-price-val">0</span> z</span>
+                <span class="detail-price"
+                  style="font-size: 13px; font-weight: bold; color: #ffdd44; font-family: var(--font-pixel); white-space: nowrap;">รวมทั้งหมด:
+                  <span id="shop-total-price">0</span> z</span>
               </div>
               <button id="btn-buy-npc-item" class="btn-use-item">ซื้อไอเทม</button>
             </div>
@@ -809,7 +789,8 @@
           <button id="btn-popup-duel" class="btn-secondary"
             style="margin-top: 8px; width: 100%; border-color: #e0483a; color: #ffb0a8;">⚔️ ท้าดวล PVP</button>
           <button id="btn-popup-warp" class="btn-secondary"
-            style="margin-top: 8px; width: 100%; border-color: #7a5cff; color: #c9b8ff; display: none;">🌀 วาปไปหา (Warp)</button>
+            style="margin-top: 8px; width: 100%; border-color: #7a5cff; color: #c9b8ff; display: none;">🌀 วาปไปหา
+            (Warp)</button>
         </div>
       </div>
     </div>
@@ -938,7 +919,8 @@
               <div class="settings-row">
                 <div class="settings-row-text">
                   <div class="settings-row-label">ปิดเอฟเฟกต์ภาพ</div>
-                  <div class="settings-row-sub">ปิดอนุภาคและเอฟเฟกต์ทั้งหมด (ระเบิด/ฮีล/ตัวเลขดาเมจ) เพื่อลดภาระเครื่อง</div>
+                  <div class="settings-row-sub">ปิดอนุภาคและเอฟเฟกต์ทั้งหมด (ระเบิด/ฮีล/ตัวเลขดาเมจ) เพื่อลดภาระเครื่อง
+                  </div>
                 </div>
                 <input type="checkbox" id="settings-hide-effects" class="settings-switch" />
               </div>
@@ -977,7 +959,8 @@
                 <span id="settings-auto-hp-label" class="settings-value">40%</span>
                 <input type="checkbox" id="settings-auto-hp" class="settings-switch" />
               </div>
-              <input type="range" id="settings-auto-hp-threshold" class="settings-slider" min="10" max="90" value="40" />
+              <input type="range" id="settings-auto-hp-threshold" class="settings-slider" min="10" max="90"
+                value="40" />
 
               <hr class="settings-divider" />
 
@@ -989,7 +972,8 @@
                 <span id="settings-auto-sp-label" class="settings-value">25%</span>
                 <input type="checkbox" id="settings-auto-sp" class="settings-switch" />
               </div>
-              <input type="range" id="settings-auto-sp-threshold" class="settings-slider" min="10" max="90" value="25" />
+              <input type="range" id="settings-auto-sp-threshold" class="settings-slider" min="10" max="90"
+                value="25" />
 
               <p class="settings-hint">
                 เกมจะใช้ขวดเล็กสุดที่พอฟื้นได้ก่อน และเว้นจังหวะระหว่างการใช้ราว 1.5 วินาที
@@ -1021,9 +1005,12 @@
             <!-- UI Layout -->
             <div class="settings-section">
               <div class="settings-section-title">🎨 UI Layout / ปรับแต่งตำแหน่ง UI</div>
-              <button id="btn-edit-layout" class="btn-primary settings-btn">🛠️ Edit Layout Mode (เปิดโหมดแก้ไข)</button>
-              <button id="btn-reset-layout" class="btn-secondary settings-btn">🔄 Reset to Default (คืนค่าเริ่มต้น)</button>
-              <p class="settings-hint" style="text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง แล้วกดปุ่มเดิมอีกครั้งเพื่อบันทึก</p>
+              <button id="btn-edit-layout" class="btn-primary settings-btn">🛠️ Edit Layout Mode
+                (เปิดโหมดแก้ไข)</button>
+              <button id="btn-reset-layout" class="btn-secondary settings-btn">🔄 Reset to Default
+                (คืนค่าเริ่มต้น)</button>
+              <p class="settings-hint" style="text-align: center;">* ลากส่วนต่างๆ ของหน้าจอเพื่อเปลี่ยนตำแหน่ง
+                แล้วกดปุ่มเดิมอีกครั้งเพื่อบันทึก</p>
             </div>
 
             <!-- Guest Account Linking Section -->
@@ -1033,9 +1020,11 @@
                 ผูกบัญชี Guest ด้วย Email และ Password เพื่อป้องกันตัวละครหายและเข้าสู่ระบบจากเครื่องอื่นได้
               </p>
               <input type="email" id="link-account-email" class="settings-input" placeholder="อีเมล (Email)" />
-              <input type="password" id="link-account-password" class="settings-input" placeholder="รหัสผ่าน (Password)" />
+              <input type="password" id="link-account-password" class="settings-input"
+                placeholder="รหัสผ่าน (Password)" />
               <button id="btn-link-account" class="btn-primary settings-btn"
-                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">⚔️ Bind Account / ยืนยันการผูกบัญชี</button>
+                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">⚔️
+                Bind Account / ยืนยันการผูกบัญชี</button>
               <div id="link-account-status" class="settings-bind-status"></div>
             </div>
           </div>
