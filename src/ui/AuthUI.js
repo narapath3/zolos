@@ -596,7 +596,7 @@ export class AuthUI {
         if (ms === null) {
             try {
                 const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
-                const socketUrl = (env.VITE_SOCKET_URL || env.VITE_SOCKET_SERVER_URL || '').trim();
+                const socketUrl = (env.VITE_SOCKET_URL || 'https://zolos-server-production.up.railway.app').trim();
                 if (socketUrl && socketUrl !== 'undefined') {
                     const t0 = performance.now();
                     await fetch(socketUrl + '/socket.io/?EIO=4&transport=polling', {
