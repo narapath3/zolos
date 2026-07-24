@@ -4,8 +4,14 @@
 // ============================================================
 import express from 'express';
 import { createServer } from 'http';
+import { randomUUID } from 'node:crypto';
 import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
+import {
+    awardBossCardRewards,
+    buildBossRanking,
+    WORLD_BOSSES,
+} from './cardRewards.js';
 import {
     isAllowedOrigin,
     normalizePresence,
@@ -123,18 +129,10 @@ const CHAT_DUP_MS = 3000;
 // A giant boss spawns on a rotating set of outlying maps, never in the main
 // city. Everyone shares one HP pool; each hit is relayed to the server which
 // tracks per-player damage. When the boss dies the server ranks contributors
-// and broadcasts rewards (applied client-side, then persisted via normal
-// auto-save). If it isn't killed within BOSS_FIGHT_MS it flees and reschedules.
+// and broadcasts the unchanged gold/EXP ranking. Card rolls and persistence
+// are completed server-side before a private card_reward event is emitted.
 const BOSS_INTERVAL_MS = parseInt(process.env.BOSS_INTERVAL_MS) || 12 * 60 * 1000; // spawn every 12 min
 const BOSS_FIGHT_MS = parseInt(process.env.BOSS_FIGHT_MS) || 6 * 60 * 1000;        // 6 min to kill
-const BOSS_NAMES = [
-    'Valdris จอมมารเพลิง',
-    'Ignarok ราชันมังกร',
-    'Golem แห่งหุบเหวลึก',
-    'Morgath ผู้กลืนวิญญาณ',
-    'Kaltharu อสูรน้ำแข็ง',
-    'Zul\'garoth เทพสังหาร',
-];
 // Keep world bosses away from Prontera, the main hub. Each selected centre is
 // clear of portals and major map landmarks so the oversized boss has room.
 const BOSS_SPAWN_LOCATIONS = [
@@ -145,7 +143,8 @@ const BOSS_SPAWN_LOCATIONS = [
 ];
 const worldBoss = {
     active: false,
-    name: '',
+    boss: null,
+    rewardId: null,
     hp: 0,
     maxHp: 0,
     mapId: null,
@@ -161,7 +160,8 @@ const worldBoss = {
 function bossPublicState() {
     return {
         active: worldBoss.active,
-        name: worldBoss.name,
+        id: worldBoss.boss?.id || null,
+        name: worldBoss.boss?.name || '',
         hp: worldBoss.hp,
         maxHp: worldBoss.maxHp,
         mapId: worldBoss.mapId,
@@ -177,7 +177,8 @@ function spawnWorldBoss() {
     // HP scales with population so it's always a few minutes of teamwork.
     const maxHp = Math.min(45000, 7000 + online * 3500);
     worldBoss.active = true;
-    worldBoss.name = BOSS_NAMES[Math.floor(Math.random() * BOSS_NAMES.length)];
+    worldBoss.boss = WORLD_BOSSES[Math.floor(Math.random() * WORLD_BOSSES.length)];
+    worldBoss.rewardId = randomUUID();
     worldBoss.maxHp = maxHp;
     worldBoss.hp = maxHp;
     worldBoss.mapId = location.mapId;
@@ -188,7 +189,8 @@ function spawnWorldBoss() {
     worldBoss.damage = new Map();
     worldBoss._lastHpBcast = 0;
     io.emit('boss_spawn', {
-        name: worldBoss.name,
+        id: worldBoss.boss.id,
+        name: worldBoss.boss.name,
         hp: worldBoss.hp,
         maxHp: worldBoss.maxHp,
         mapId: worldBoss.mapId,
@@ -196,52 +198,51 @@ function spawnWorldBoss() {
         x: worldBoss.x,
         z: worldBoss.z,
     });
-    console.log(`[Server] 👹 World Boss spawned: ${worldBoss.name} at ${worldBoss.mapName} (${maxHp} HP, ${online} online)`);
+    console.log(`[Server] 👹 World Boss spawned: ${worldBoss.boss.name} at ${worldBoss.mapName} (${maxHp} HP, ${online} online)`);
 }
 
-function computeBossRanking() {
-    const entries = [...worldBoss.damage.entries()]
-        .map(([userId, v]) => ({ userId, name: v.name, dmg: Math.round(v.dmg) }))
-        .filter(e => e.dmg > 0)
-        .sort((a, b) => b.dmg - a.dmg);
-    return entries.map((e, i) => {
-        const rank = i + 1;
-        // Everyone earns gold/exp scaled by contribution; podium gets bonuses + items.
-        let gold = 400 + Math.floor(e.dmg / 8);
-        let exp = 150 + Math.floor(e.dmg / 12);
-        let item = null;
-        if (rank === 1) { gold += 3000; exp += 1800; item = 'Dragon Heart'; }
-        else if (rank === 2) { gold += 1800; exp += 1100; item = 'Mythril Shard'; }
-        else if (rank === 3) { gold += 1100; exp += 700; item = 'Mythril Shard'; }
-        else if (rank <= 10) { gold += 500; exp += 300; }
-        return { rank, userId: e.userId, name: e.name, dmg: e.dmg, gold, exp, item };
-    });
-}
-
-function endWorldBoss(killerName) {
-    const ranking = computeBossRanking();
-    const name = worldBoss.name;
+async function endWorldBoss(killerName) {
+    const ranking = buildBossRanking(worldBoss.damage);
+    const boss = worldBoss.boss;
+    const rewardId = worldBoss.rewardId;
+    const maxHp = worldBoss.maxHp;
+    const name = boss.name;
     worldBoss.active = false;
     worldBoss.hp = 0;
     worldBoss.spawnAt = Date.now() + BOSS_INTERVAL_MS;
     worldBoss.damage = new Map();
+
+    await awardBossCardRewards({
+        supabase,
+        io,
+        userSocketMap,
+        onlinePlayers,
+        boss,
+        maxHp,
+        ranking,
+        rewardId,
+    });
+
+    const publicRanking = ranking.map(({ characterId: _characterId, ...row }) => row);
     io.emit('boss_dead', {
+        id: boss.id,
         name,
         mapId: worldBoss.mapId,
         mapName: worldBoss.mapName,
         killerName: killerName || (ranking[0] && ranking[0].name) || 'นักผจญภัย',
-        ranking,
+        ranking: publicRanking,
     });
     console.log(`[Server] 💀 World Boss defeated: ${name} — ${ranking.length} contributors (killer: ${killerName})`);
 }
 
 function fleeWorldBoss() {
-    const name = worldBoss.name;
+    const boss = worldBoss.boss;
+    const name = boss?.name || '';
     worldBoss.active = false;
     worldBoss.hp = 0;
     worldBoss.spawnAt = Date.now() + BOSS_INTERVAL_MS;
     worldBoss.damage = new Map();
-    io.emit('boss_flee', { name, mapId: worldBoss.mapId, mapName: worldBoss.mapName });
+    io.emit('boss_flee', { id: boss?.id || null, name, mapId: worldBoss.mapId, mapName: worldBoss.mapName });
     console.log(`[Server] 🌫️ World Boss fled (survived): ${name}`);
 }
 
@@ -302,6 +303,7 @@ io.on('connection', (socket) => {
         }
 
         let profile = null;
+        let verifiedCharacter = null;
         if (verified && supabase) {
             const { data: verifiedProfile } = await supabase
                 .from('profiles')
@@ -311,6 +313,15 @@ io.on('connection', (socket) => {
             profile = verifiedProfile;
             if (profile?.username) {
                 username = profile.username;
+            }
+            if (data.characterId) {
+                const { data: ownedCharacter } = await supabase
+                    .from('characters')
+                    .select('id')
+                    .eq('id', data.characterId)
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                verifiedCharacter = ownedCharacter;
             }
         }
 
@@ -333,6 +344,7 @@ io.on('connection', (socket) => {
             joinedAt: Date.now(),
             lastSaveData: null,
             verified,
+            characterId: verifiedCharacter?.id || null,
             isAdmin: profile?.is_admin === true,
             ping: null, // round-trip latency in ms, measured via srv_ping/srv_pong
         };
@@ -701,7 +713,7 @@ io.on('connection', (socket) => {
     // ============ WORLD BOSS ============
     // Client reports damage it dealt; server owns the shared HP pool and the
     // per-player damage tally. Per-hit damage is clamped as light anti-cheat.
-    socket.on('boss_hit', (payload) => {
+    socket.on('boss_hit', async (payload) => {
         if (!worldBoss.active || worldBoss.hp <= 0 || !payload) return;
                 const player = onlinePlayers.get(socket.id);
         if (!player || player.mapId !== worldBoss.mapId) return;
@@ -718,13 +730,18 @@ io.on('connection', (socket) => {
         if (socket._bossWin.hits > 8 || socket._bossWin.dmg > 20000) return;
 
         worldBoss.hp = Math.max(0, worldBoss.hp - dmg);
-        const rec = worldBoss.damage.get(player.userId) || { name: player.username, dmg: 0 };
+        const rec = worldBoss.damage.get(player.userId) || {
+            name: player.username,
+            characterId: player.characterId,
+            dmg: 0,
+        };
+        if (rec.characterId !== player.characterId) return;
         rec.name = player.username;
         rec.dmg += dmg;
         worldBoss.damage.set(player.userId, rec);
 
         if (worldBoss.hp <= 0) {
-            endWorldBoss(player.username);
+            await endWorldBoss(player.username);
         } else {
             const now = Date.now();
             if (now - worldBoss._lastHpBcast > 220) {

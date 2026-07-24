@@ -4,6 +4,14 @@ import { readFile } from 'node:fs/promises';
 
 const migrationUrl = new URL('../migrations/20260724_security_hardening.sql', import.meta.url);
 const followupUrl = new URL('../migrations/20260724_security_hardening_followup.sql', import.meta.url);
+const cardCollectionUrl = new URL('../migrations/20260724_card_collection.sql', import.meta.url);
+
+function functionDefinition(sql, name) {
+  const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
+  assert.notEqual(start, -1, `missing ${name}`);
+  const next = sql.indexOf('CREATE OR REPLACE FUNCTION public.', start + 1);
+  return sql.slice(start, next === -1 ? sql.length : next);
+}
 
 test('security migration is non-destructive and contains no account identifiers', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
@@ -68,4 +76,56 @@ test('follow-up migration removes duplicate policies introduced by hardening', a
   ]) {
     assert.match(sql, new RegExp(`DROP POLICY IF EXISTS ${policy}`, 'i'));
   }
+});
+
+test('card collection exposes read-own rows only and indexes the policy ownership lookup', async () => {
+  const sql = await readFile(cardCollectionUrl, 'utf8');
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.character_cards\s*\(/i);
+  assert.match(sql, /ALTER TABLE public\.character_cards ENABLE ROW LEVEL SECURITY/i);
+  assert.match(
+    sql,
+    /CREATE POLICY character_cards_read_own[\s\S]*FOR SELECT TO authenticated[\s\S]*c\.user_id\s*=\s*\(SELECT auth\.uid\(\)\)/i,
+  );
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS characters_user_id_idx\s+ON public\.characters \(user_id\)/i);
+  assert.match(sql, /GRANT SELECT ON public\.character_cards TO authenticated/i);
+  assert.match(sql, /REVOKE INSERT, UPDATE, DELETE ON public\.character_cards FROM anon, authenticated/i);
+  assert.doesNotMatch(sql, /CREATE POLICY[\s\S]{0,120}FOR (?:INSERT|UPDATE|DELETE|ALL)/i);
+});
+
+test('card award RPC is service-role-only, row-locked, schema-qualified, and idempotent', async () => {
+  const sql = await readFile(cardCollectionUrl, 'utf8');
+  const fn = functionDefinition(sql, 'award_card_drop');
+
+  assert.match(fn, /SECURITY DEFINER/i);
+  assert.match(fn, /SET search_path = ''/i);
+  assert.match(fn, /FROM public\.character_cards[\s\S]*FOR UPDATE/i);
+  assert.match(fn, /FROM public\.card_reward_requests/i);
+  assert.match(fn, /INSERT INTO public\.card_reward_requests/i);
+  assert.match(fn, /UPDATE public\.character_cards/i);
+  assert.match(fn, /p_expected_pity IS NULL/i);
+  assert.match(fn, /p_new_pity IS NULL/i);
+  assert.match(fn, /p_won IS NULL/i);
+  assert.doesNotMatch(fn, /(?<!public\.)\b(?:character_cards|card_reward_requests|characters)\b\s+(?:AS\s+)?[a-z_]/i);
+
+  const signature = 'public.award_card_drop(uuid, text, integer, integer, boolean, text)';
+  assert.match(sql, new RegExp(`REVOKE EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} FROM PUBLIC, anon, authenticated`, 'i'));
+  assert.match(sql, new RegExp(`GRANT EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} TO service_role`, 'i'));
+  assert.doesNotMatch(sql, /GRANT EXECUTE ON FUNCTION public\.award_card_drop[^;]*TO (?:anon|authenticated)/i);
+});
+
+test('fusion RPC is atomic and private without adding fusion networking', async () => {
+  const sql = await readFile(cardCollectionUrl, 'utf8');
+  const fn = functionDefinition(sql, 'fuse_card');
+
+  assert.match(fn, /SECURITY DEFINER/i);
+  assert.match(fn, /SET search_path = ''/i);
+  assert.match(fn, /FROM public\.character_cards[\s\S]*FOR UPDATE/i);
+  assert.match(fn, /FROM public\.card_fusion_requests/i);
+  assert.match(fn, /INSERT INTO public\.card_fusion_requests/i);
+  assert.match(fn, /UPDATE public\.character_cards/i);
+  assert.match(fn, /v_row\.owned - 1 < p_cost/i);
+
+  const signature = 'public.fuse_card(uuid, text, smallint, integer, text)';
+  assert.match(sql, new RegExp(`REVOKE EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} FROM PUBLIC, anon, authenticated`, 'i'));
+  assert.match(sql, new RegExp(`GRANT EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} TO service_role`, 'i'));
 });

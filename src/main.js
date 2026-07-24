@@ -55,10 +55,12 @@ import { SKILLS, ITEMS } from './engine/GameData.js';
 import { applyWorldBossCardEffects } from './cards/CardEffects.js';
 import { resolveCardDrops } from './cards/CardDrops.js';
 import { getCard } from './cards/CardCatalog.js';
+import { applyTrustedCardReward, mergeAuthoritativeCardRows } from './cards/CardRewards.js';
 import {
     loadCharacter,
     saveCharacter,
     loadInventory,
+    loadCharacterCards,
     joinPresence,
     leavePresence,
     startAutoSave,
@@ -913,7 +915,8 @@ async function initGame(charData) {
                 }
             }
         },
-        sceneManager.currentMap
+        sceneManager.currentMap,
+        charData.id
     );
 
     // Start auto-save
@@ -938,6 +941,8 @@ async function initGame(charData) {
     // Load Inventory, Daily Quests, and Friends List from DB
     loadingOverlay.setProgress(65, '🎒 Loading Inventory, Quests & Friends...');
     await gameUI.loadInventoryFromDB(charData.id);
+    const authoritativeCards = await loadCharacterCards(charData.id);
+    mergeAuthoritativeCardRows(authoritativeCards, { character, gameUI });
     await gameUI.loadDailyQuestsFromDB(charData.id);
     await gameUI.loadFriendsFromDB(charData.id);
     await gameUI.loadFishingAlmanacFromDB(charData.id);
@@ -1776,6 +1781,7 @@ window.worldBossManager = {
         if (p.active) {
             bossState = {
                 active: true,
+                id: p.id || null,
                 name: p.name,
                 hp: p.hp,
                 maxHp: p.maxHp,
@@ -1798,6 +1804,7 @@ window.worldBossManager = {
         const mapName = p.mapName || p.mapId || 'ดินแดนรอบนอก';
         bossState = {
             active: true,
+            id: p.id || null,
             name: p.name,
             hp: p.hp,
             maxHp: p.maxHp,
@@ -1894,17 +1901,6 @@ window.worldBossManager = {
             gameUI.updateHUD(character.stats);
         }
 
-        // Card drops — every participant rolls the card table (client-side, %
-        // based by rarity). Usually 0–1 cards; legendaries are a rare thrill.
-        try {
-            const cards = [];
-            for (const cardName of cards) {
-                const meta = ITEMS[cardName];
-                if (!meta || !gameUI) continue;
-                gameUI.addItem({ name: cardName, type: 'card', emoji: meta.emoji, rarity: meta.rarity, price: meta.price, desc: meta.desc });
-                gameUI.addCombatLog(`🃏 การ์ดดรอป! ได้รับ ${meta.emoji} ${cardName} [${(meta.rarity || 'common').toUpperCase()}]`, 'levelup');
-            }
-        } catch (e) { console.warn('[Zolos] card drop error:', e); }
     },
 
     _showBar() {
@@ -1958,6 +1954,12 @@ window.worldBossManager = {
         card.querySelector('.bs-close').onclick = () => { box.style.display = 'none'; };
         box.style.display = 'flex';
         setTimeout(() => { if (box.style.display === 'flex') box.style.display = 'none'; }, 12000);
+    },
+};
+
+window.cardRewardManager = {
+    onReward(payload) {
+        applyTrustedCardReward(payload, { character, gameUI });
     },
 };
 

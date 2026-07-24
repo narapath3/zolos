@@ -809,6 +809,22 @@ export async function loadInventory(characterId) {
     return data || [];
 }
 
+export async function loadCharacterCards(characterId) {
+    if (isOfflineMode || !supabase || !characterId
+        || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        return [];
+    }
+    const { data, error } = await supabase
+        .from('character_cards')
+        .select('card_id, owned, stars, pity')
+        .eq('character_id', characterId);
+    if (error) {
+        console.warn('[Zolos] Failed to load authoritative card state:', error.message);
+        return [];
+    }
+    return data || [];
+}
+
 /**
  * Save (or adjust quantity of) an inventory item in Supabase.
  *
@@ -1058,7 +1074,7 @@ export async function fetchLeaderboard(category = 'level') {
 }
 
 // ============ Realtime Presence & Broadcast (Socket.io) ============
-export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback, currentMapId = 'prontera') {
+export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback, currentMapId = 'prontera', characterId = null) {
     onlinePlayersCallback = onPlayersUpdate;
     chatCallback = onChatCallback;
     socketListenersAttached = false;
@@ -1226,6 +1242,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('boss_hp', (payload) => window.worldBossManager?.onHp?.(payload));
             socket.on('boss_dead', (payload) => window.worldBossManager?.onDead?.(payload));
             socket.on('boss_flee', (payload) => window.worldBossManager?.onFlee?.(payload));
+            socket.on('card_reward', (payload) => window.cardRewardManager?.onReward?.(payload));
 
             // Shared monster HP — a teammate hit a monster; drain our copy too.
             socket.on('monster_hit', (payload) => {
@@ -1245,7 +1262,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         // have no token and stay unverified (can't impersonate a real account).
         let accessToken = null;
         try { accessToken = (await supabase?.auth?.getSession())?.data?.session?.access_token || null; } catch (e) { /* guest */ }
-        socket.emit('join', { userId, username, level, mapId: currentMapId, accessToken });
+        socket.emit('join', { userId, username, level, mapId: currentMapId, characterId, accessToken });
         console.log('[Zolos] ✅ Emitted join event to Map Server');
         return;
     }
