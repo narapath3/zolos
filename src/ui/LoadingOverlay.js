@@ -69,7 +69,7 @@ export class LoadingOverlay {
                     <div class="loading-crest-wrap">
                         <div class="crest-glow-ring"></div>
                         <div class="crest-particle-aura"></div>
-                        <img src="/src/assets/zolos_icon.png" alt="ZOLOS Emblem" class="loading-crest-img" />
+                        <img src="/assets/zolos_icon.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="ZOLOS Emblem" class="loading-crest-img" />
                     </div>
 
                     <!-- Title & Tagline -->
