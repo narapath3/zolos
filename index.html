@@ -23,11 +23,108 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;500;600;700&family=Kanit:wght@300;400;500;600;700&display=swap"
     rel="stylesheet" />
+  <!-- Loading intro (critical inline CSS so it paints before the app scripts) -->
+  <style id="zolos-loader-css">
+    #zolos-loader{position:fixed;inset:0;z-index:2000000;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 50% 32%,#1a2a4e 0%,#0c1224 55%,#05070f 100%);
+      opacity:1;transition:opacity .7s ease;overflow:hidden;pointer-events:auto;
+      font-family:'Chakra Petch','Kanit',system-ui,-apple-system,sans-serif;color:#fff;}
+    #zolos-loader.zl-hide{opacity:0;pointer-events:none;}
+    /* While the intro is up, hide everything behind it — bulletproof against any
+       stacking-context/pointer-events quirks in the app screens. */
+    body.zl-loading #auth-screen, body.zl-loading #game-screen{visibility:hidden !important;}
+    #zolos-loader .zl-stars{position:absolute;inset:0;background-image:
+      radial-gradient(1.4px 1.4px at 20% 30%,rgba(255,255,255,.7),transparent),
+      radial-gradient(1.2px 1.2px at 70% 60%,rgba(180,210,255,.6),transparent),
+      radial-gradient(1.6px 1.6px at 40% 80%,rgba(255,225,150,.5),transparent),
+      radial-gradient(1.2px 1.2px at 85% 25%,rgba(255,255,255,.5),transparent),
+      radial-gradient(1.3px 1.3px at 55% 15%,rgba(180,210,255,.5),transparent);
+      background-repeat:repeat;background-size:520px 520px;animation:zlDrift 24s linear infinite;opacity:.6;}
+    #zolos-loader .zl-glow{position:absolute;width:520px;height:520px;border-radius:50%;
+      background:radial-gradient(circle,rgba(96,150,255,.22),transparent 62%);filter:blur(8px);animation:zlPulse 4s ease-in-out infinite;}
+    .zl-content{position:relative;text-align:center;padding:24px;max-width:440px;width:100%;}
+    .zl-icon{width:104px;height:104px;object-fit:contain;filter:drop-shadow(0 6px 24px rgba(96,150,255,.55));
+      animation:zlFloat 3.4s ease-in-out infinite;}
+    .zl-title{font-size:46px;font-weight:800;letter-spacing:6px;margin-top:8px;
+      background:linear-gradient(180deg,#ffe9a8,#f0c040 60%,#b8862a);-webkit-background-clip:text;background-clip:text;
+      -webkit-text-fill-color:transparent;text-shadow:0 2px 30px rgba(240,192,64,.35);}
+    .zl-sub{font-size:12px;letter-spacing:4px;color:#9fb4e0;text-transform:uppercase;margin-top:-2px;}
+    .zl-barwrap{margin:26px auto 12px;width:min(300px,72vw);height:8px;border-radius:6px;
+      background:rgba(255,255,255,.08);overflow:hidden;box-shadow:inset 0 0 6px rgba(0,0,0,.5);}
+    .zl-bar{height:100%;width:38%;border-radius:6px;
+      background:linear-gradient(90deg,rgba(96,150,255,0),#6aa0ff,#ffe08a,rgba(96,150,255,0));
+      animation:zlSlide 1.25s cubic-bezier(.5,0,.5,1) infinite;box-shadow:0 0 12px rgba(120,170,255,.7);}
+    .zl-status{font-size:13px;color:#cdd8f2;letter-spacing:.5px;min-height:18px;}
+    .zl-tip{font-size:12px;color:#8fa2c8;margin-top:18px;line-height:1.5;min-height:34px;
+      transition:opacity .3s ease;padding:0 10px;}
+    @keyframes zlSlide{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}
+    @keyframes zlFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+    @keyframes zlPulse{0%,100%{transform:scale(.92);opacity:.7}50%{transform:scale(1.05);opacity:1}}
+    @keyframes zlDrift{0%{background-position:0 0}100%{background-position:520px 520px}}
+    @media (max-width:480px){.zl-title{font-size:38px}.zl-icon{width:88px;height:88px}}
+  </style>
   <link rel="stylesheet" href="/src/styles/index.css" />
   <link rel="stylesheet" href="/src/styles/login-new.css" />
 </head>
 
 <body>
+  <!-- Loading intro (shown on boot and while the game world builds) -->
+  <div id="zolos-loader">
+    <div class="zl-stars"></div>
+    <div class="zl-glow"></div>
+    <div class="zl-content">
+      <img src="/src/assets/zolos_icon.png" alt="Zolos" class="zl-icon" onerror="this.style.display='none'" />
+      <div class="zl-title">ZOLOS</div>
+      <div class="zl-sub">Idle RPG Online</div>
+      <div class="zl-barwrap"><div class="zl-bar"></div></div>
+      <div class="zl-status" id="zl-status">กำลังเข้าสู่โลกแห่งการผจญภัย...</div>
+      <div class="zl-tip" id="zl-tip">💡 กำลังโหลด...</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      document.body.classList.add('zl-loading');
+      var tips = [
+        '💡 กดปุ่ม AUTO เพื่อให้ตัวละครล่ามอนสเตอร์อัตโนมัติ',
+        '🐾 ตั้งชื่อสัตว์เลี้ยงของคุณได้ในกระเป๋า แท็บ Pet',
+        '🃏 การ์ดหายากดรอปจากบอสโลก เอาไปใส่เพิ่มพลังอุปกรณ์',
+        '⚔️ ตีบวกไอเทม (+N) เพื่อเพิ่มพลังโจมตีและป้องกัน',
+        '🏪 เปิดร้านขายของให้ผู้เล่นอื่นได้ที่ตลาด',
+        '🎣 ตกปลาสะสมในสมุดภาพ รับรางวัลพิเศษเมื่อครบเซ็ต',
+        '🐉 ล่าบอสโลกร่วมกับเพื่อนเพื่อลุ้นของหายาก'
+      ];
+      var el = document.getElementById('zl-tip');
+      var i = Math.floor(Math.random() * tips.length);
+      if (el) {
+        el.textContent = tips[i];
+        setInterval(function () {
+          el.style.opacity = 0;
+          setTimeout(function () { i = (i + 1) % tips.length; el.textContent = tips[i]; el.style.opacity = 1; }, 300);
+        }, 3400);
+      }
+      // Reveal the auth screen after the intro has been seen — unless we're
+      // heading straight into the game (auto-login), which manages the loader.
+      var start = Date.now();
+      function bootHide() {
+        if (window.__enteringGame) return;
+        document.body.classList.remove('zl-loading');
+        var l = document.getElementById('zolos-loader');
+        if (l) l.classList.add('zl-hide');
+      }
+      window.addEventListener('load', function () {
+        setTimeout(bootHide, Math.max(0, 1700 - (Date.now() - start)));
+      });
+      // Safety net: never trap the player if something stalls (but keep the
+      // loader up through a slow world-load).
+      setTimeout(function () {
+        if (window.__enteringGame && !window.__loaderDone) return;
+        document.body.classList.remove('zl-loading');
+        var l = document.getElementById('zolos-loader');
+        if (l) l.classList.add('zl-hide');
+      }, 12000);
+    })();
+  </script>
+
   <!-- Auth Screen -->
   <div id="auth-screen">
     <div class="auth-overlay-vignette"></div>
