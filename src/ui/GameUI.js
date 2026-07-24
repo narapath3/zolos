@@ -1207,6 +1207,14 @@ export class GameUI {
       this.equipSlotFilter = null;
     }
 
+    // The Card tab is a premium collectible-card gallery, not plain slots.
+    grid.classList.toggle('card-gallery-mode', this.currentTab === 'card');
+    if (this.currentTab === 'card') {
+      this._renderCardGallery(grid);
+      this._updateDetailBox();
+      return;
+    }
+
     // Filter based on tab. Pets and cards each live in their own tab, so
     // they're kept out of All / Equip and never mixed in with gear or materials.
     let filtered = this.inventory.filter(i => i.item_type !== 'pet' && i.item_type !== 'card');
@@ -1299,6 +1307,87 @@ export class GameUI {
     }
 
     this._updateDetailBox();
+  }
+
+  _ensureCardGalleryStyles() {
+    if (document.getElementById('tcg-styles')) return;
+    const st = document.createElement('style');
+    st.id = 'tcg-styles';
+    st.textContent = `
+    #inventory-grid.card-gallery-mode{display:grid !important;grid-template-columns:repeat(3,1fr) !important;
+      gap:12px !important;padding:6px 4px 4px !important;background:transparent !important;}
+    @media (max-width:380px){#inventory-grid.card-gallery-mode{grid-template-columns:repeat(2,1fr) !important;}}
+    .tcg-empty{grid-column:1/-1;text-align:center;color:#8b97ba;font-size:12px;padding:26px 8px;line-height:1.6;}
+    .tcg-card{position:relative;aspect-ratio:5/7;border-radius:12px;cursor:pointer;overflow:hidden;
+      padding:2px;transition:transform .16s ease,box-shadow .16s ease;isolation:isolate;
+      background:linear-gradient(150deg,var(--tcg-a),var(--tcg-b) 45%,#0a0d17 78%);
+      box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 1px var(--tcg-edge) inset;}
+    .tcg-card:hover{transform:translateY(-4px) scale(1.03);box-shadow:0 12px 26px rgba(0,0,0,.6),0 0 20px var(--tcg-glow);}
+    .tcg-card.selected{transform:translateY(-3px) scale(1.03);box-shadow:0 0 0 2px #fff8,0 0 22px var(--tcg-glow);}
+    .tcg-card.rc-common{--tcg-a:#3a4152;--tcg-b:#20242e;--tcg-edge:rgba(184,192,204,.55);--tcg-glow:rgba(184,192,204,.35);--tcg-txt:#d9dfe8;}
+    .tcg-card.rc-rare{--tcg-a:#1e3a63;--tcg-b:#122036;--tcg-edge:rgba(90,169,255,.7);--tcg-glow:rgba(90,169,255,.5);--tcg-txt:#a9d2ff;}
+    .tcg-card.rc-epic{--tcg-a:#3a2160;--tcg-b:#1e1330;--tcg-edge:rgba(192,123,255,.75);--tcg-glow:rgba(192,123,255,.55);--tcg-txt:#dcc0ff;}
+    .tcg-card.rc-legendary{--tcg-a:#5a3f12;--tcg-b:#2e2008;--tcg-edge:rgba(255,180,58,.85);--tcg-glow:rgba(255,180,58,.6);--tcg-txt:#ffdd93;}
+    .tcg-inner{position:relative;height:100%;border-radius:10px;padding:7px 6px;display:flex;flex-direction:column;
+      background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,.15));border:1px solid rgba(255,255,255,.08);}
+    .tcg-head{display:flex;align-items:center;justify-content:space-between;gap:4px;}
+    .tcg-name{font-size:9.5px;font-weight:800;color:var(--tcg-txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      letter-spacing:.2px;text-shadow:0 1px 2px #000;}
+    .tcg-gem{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:radial-gradient(circle at 35% 30%,#fff,var(--tcg-edge) 60%,#000);
+      box-shadow:0 0 6px var(--tcg-glow);}
+    .tcg-art{position:relative;flex:1;margin:5px 0;border-radius:8px;display:flex;align-items:center;justify-content:center;
+      background:radial-gradient(circle at 50% 45%,var(--tcg-glow),rgba(0,0,0,.35) 70%);border:1px solid rgba(255,255,255,.06);
+      overflow:hidden;}
+    .tcg-emoji{font-size:34px;line-height:1;filter:drop-shadow(0 3px 5px rgba(0,0,0,.6));z-index:1;}
+    .tcg-band{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:7px;font-weight:900;letter-spacing:1.5px;
+      padding:2px 0;color:#0a0d17;background:var(--tcg-edge);text-transform:uppercase;}
+    .tcg-ability{font-size:8px;line-height:1.25;color:#cdd6ee;text-align:center;min-height:20px;
+      display:flex;align-items:center;justify-content:center;padding:0 1px;}
+    .tcg-qty{position:absolute;top:5px;right:6px;z-index:3;font-size:9px;font-weight:900;color:#fff;
+      background:rgba(0,0,0,.6);border-radius:6px;padding:1px 5px;box-shadow:0 1px 3px #000;}
+    /* Holographic foil sheen for epic + legendary */
+    .tcg-card.rc-epic .tcg-inner::after,.tcg-card.rc-legendary .tcg-inner::after{content:'';position:absolute;inset:0;
+      border-radius:10px;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.28) 45%,
+      rgba(255,255,255,.05) 55%,transparent 70%);background-size:250% 250%;animation:tcgFoil 3.6s linear infinite;mix-blend-mode:screen;}
+    .tcg-card.rc-legendary{animation:tcgPulse 2.6s ease-in-out infinite;}
+    @keyframes tcgFoil{0%{background-position:150% 0}100%{background-position:-150% 0}}
+    @keyframes tcgPulse{0%,100%{box-shadow:0 4px 14px rgba(0,0,0,.5),0 0 0 1px var(--tcg-edge) inset,0 0 8px var(--tcg-glow);}
+      50%{box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 0 1px var(--tcg-edge) inset,0 0 22px var(--tcg-glow);}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  // Render the Card tab as a gallery of premium collectible cards.
+  _renderCardGallery(grid) {
+    this._ensureCardGalleryStyles();
+    const cards = (this.inventory || []).filter(i => i.item_type === 'card');
+    if (!cards.length) {
+      grid.innerHTML = '<div class="tcg-empty">🃏 ยังไม่มีการ์ด<br>ล่าบอสโลกเพื่อลุ้นการ์ดหายากมาสะสม!</div>';
+      return;
+    }
+    const RTXT = { common: 'COMMON', rare: 'RARE', epic: 'EPIC', legendary: 'LEGENDARY' };
+    for (const item of cards) {
+      const it = ITEMS[item.item_name] || {};
+      const rar = item.rarity || it.rarity || 'common';
+      const el = document.createElement('div');
+      el.className = `tcg-card rc-${rar}${this.selectedItemName === item.item_name ? ' selected' : ''}`;
+      const name = item.item_name.replace(/ Card$/, '');
+      el.innerHTML = `
+        ${item.quantity > 1 ? `<span class="tcg-qty">x${item.quantity}</span>` : ''}
+        <div class="tcg-inner">
+          <div class="tcg-head"><span class="tcg-name">${name}</span><span class="tcg-gem"></span></div>
+          <div class="tcg-art"><span class="tcg-emoji">${item.emoji || it.emoji || '🃏'}</span>
+            <div class="tcg-band">${RTXT[rar] || rar}</div></div>
+          <div class="tcg-ability">${it.desc || ''}</div>
+        </div>`;
+      el.addEventListener('click', () => {
+        this.selectedItemName = item.item_name;
+        grid.querySelectorAll('.tcg-card').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        this._updateDetailBox();
+      });
+      grid.appendChild(el);
+    }
   }
 
   // Lazily create the paper-doll container (above the inventory grid) and its

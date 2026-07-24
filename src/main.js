@@ -1228,6 +1228,9 @@ async function showCharacterSelect(isGuest = false) {
 // auto-save can run) and offers a manual retry. Reloading re-attempts the load
 // from scratch; it never writes to the DB.
 function showCharacterLoadError() {
+    // Never leave the loading intro covering the error screen.
+    const introOv = document.getElementById('intro-loading-overlay');
+    if (introOv) introOv.style.display = 'none';
     const authScreen = document.getElementById('auth-screen');
     if (authScreen) authScreen.style.display = 'block';
     const gameScreen = document.getElementById('game-screen');
