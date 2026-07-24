@@ -2,7 +2,7 @@
 -- Browser clients may read their own rows but cannot mutate card progression.
 
 CREATE TABLE IF NOT EXISTS public.character_cards (
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id text NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
   card_id text NOT NULL,
   owned integer NOT NULL DEFAULT 0 CHECK (owned >= 0),
   stars smallint NOT NULL DEFAULT 1 CHECK (stars BETWEEN 1 AND 5),
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.character_cards (
 
 CREATE TABLE IF NOT EXISTS public.card_reward_requests (
   idempotency_key text PRIMARY KEY,
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id text NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
   card_id text NOT NULL,
   expected_pity integer NOT NULL,
   new_pity integer NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.card_reward_requests (
 
 CREATE TABLE IF NOT EXISTS public.card_fusion_requests (
   idempotency_key text PRIMARY KEY,
-  character_id uuid NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+  character_id text NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
   card_id text NOT NULL,
   expected_stars smallint NOT NULL,
   cost integer NOT NULL,
@@ -73,7 +73,7 @@ REVOKE ALL ON public.card_reward_requests FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.card_fusion_requests FROM PUBLIC, anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.award_card_drop(
-  p_character_id uuid,
+  p_character_id text,
   p_card_id text,
   p_expected_pity integer,
   p_new_pity integer,
@@ -89,7 +89,7 @@ DECLARE
   v_row public.character_cards%ROWTYPE;
   v_result jsonb;
   v_is_new boolean;
-  v_receipt_character_id uuid;
+  v_receipt_character_id text;
   v_receipt_card_id text;
   v_receipt_expected_pity integer;
   v_receipt_new_pity integer;
@@ -197,7 +197,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.fuse_card(
-  p_character_id uuid,
+  p_character_id text,
   p_card_id text,
   p_expected_stars smallint,
   p_cost integer,
@@ -211,7 +211,7 @@ AS $$
 DECLARE
   v_row public.character_cards%ROWTYPE;
   v_result jsonb;
-  v_receipt_character_id uuid;
+  v_receipt_character_id text;
   v_receipt_card_id text;
   v_receipt_expected_stars smallint;
   v_receipt_cost integer;
@@ -303,7 +303,7 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.award_card_drop(uuid, text, integer, integer, boolean, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.award_card_drop(uuid, text, integer, integer, boolean, text) TO service_role;
-REVOKE EXECUTE ON FUNCTION public.fuse_card(uuid, text, smallint, integer, text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.fuse_card(uuid, text, smallint, integer, text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.award_card_drop(text, text, integer, integer, boolean, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.award_card_drop(text, text, integer, integer, boolean, text) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.fuse_card(text, text, smallint, integer, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.fuse_card(text, text, smallint, integer, text) TO service_role;
