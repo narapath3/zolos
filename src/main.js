@@ -1018,6 +1018,9 @@ async function initGame(charData) {
     // Background simulation loop (keeps the whole game running when tab is hidden)
     startBackgroundHeartbeat();
 
+    // Complete intro loading screen with 100% progress chime & portal warp transition
+    await loadingOverlay.completeAndHide();
+
     // Input listeners — Shift key for sprinting
     window.addEventListener('keydown', (e) => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isShiftPressed = true;
