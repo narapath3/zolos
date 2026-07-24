@@ -1,5 +1,6 @@
 import { supabase, isOfflineMode, localDb } from '../network/SupabaseClient.js';
 import { saveInventoryItem, saveCharacter } from '../network/GameSync.js';
+import '../styles/admin.css';
 
 export class AdminUI {
     constructor() {
@@ -297,6 +298,7 @@ export class AdminUI {
     _createUI() {
         this.container = document.createElement('div');
         this.container.id = 'admin-panel';
+        this.container.className = 'admin-panel';
         this.container.style.cssText = `
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 900px; max-height: 700px; background: rgba(20, 20, 30, 0.98);
@@ -308,6 +310,7 @@ export class AdminUI {
         `;
 
         const header = document.createElement('div');
+        header.className = 'admin-header';
         header.style.cssText = 'padding: 15px; background: linear-gradient(90deg, #333 0%, #444 100%); border-bottom: 2px solid #ffd700; display: flex; justify-content: space-between; align-items: center;';
 
         const titleContainer = document.createElement('div');
@@ -328,6 +331,7 @@ export class AdminUI {
         header.appendChild(closeBtn);
 
         const tabs = document.createElement('div');
+        tabs.className = 'admin-tabs';
         tabs.style.cssText = 'display: flex; background: #222; padding: 5px 10px; border-bottom: 1px solid #444;';
 
         const userTab = this._createTabBtn('👥 Players', 'users');
@@ -338,6 +342,7 @@ export class AdminUI {
         tabs.appendChild(announcementTab);
 
         this.content = document.createElement('div');
+        this.content.className = 'admin-content';
         this.content.style.cssText = 'flex: 1; overflow-y: auto; padding: 20px; background: rgba(10, 10, 20, 0.5);';
 
         this.container.appendChild(header);
@@ -358,6 +363,7 @@ export class AdminUI {
 
     _createTabBtn(text, tabId) {
         const btn = document.createElement('button');
+        btn.className = 'admin-tab';
         btn.innerText = text;
         btn.style.cssText = 'padding: 10px 20px; background: none; border: none; color: #aaa; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s;';
         if (this.currentTab === tabId) {

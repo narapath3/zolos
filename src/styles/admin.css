@@ -1,0 +1,109 @@
+.admin-panel,
+.admin-panel *,
+.admin-edit-overlay,
+.admin-edit-overlay * {
+  box-sizing: border-box;
+}
+
+.admin-panel {
+  width: min(900px, calc(100vw - 32px)) !important;
+  max-height: min(700px, calc(100dvh - 32px)) !important;
+}
+
+.admin-header {
+  flex: 0 0 auto;
+}
+
+.admin-tabs {
+  flex: 0 0 auto;
+}
+
+.admin-tab {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.admin-content {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.admin-panel button:focus-visible,
+.admin-panel input:focus-visible,
+.admin-panel select:focus-visible,
+.admin-panel textarea:focus-visible,
+.admin-edit-overlay button:focus-visible,
+.admin-edit-overlay input:focus-visible {
+  outline: 2px solid #ffed4e;
+  outline-offset: 2px;
+}
+
+.admin-panel button:active,
+.admin-edit-overlay button:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 720px) {
+  .admin-panel {
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    transform: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0) !important;
+  }
+
+  .admin-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding:
+      max(12px, env(safe-area-inset-top, 0))
+      max(12px, env(safe-area-inset-right, 0))
+      12px
+      max(12px, env(safe-area-inset-left, 0)) !important;
+  }
+
+  .admin-header h2 {
+    font-size: 18px !important;
+    text-wrap: balance;
+  }
+
+  .admin-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    gap: 4px;
+    padding: 4px 8px !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-tab {
+    flex: 0 0 auto;
+    padding: 10px 14px !important;
+  }
+
+  .admin-content {
+    padding: 12px !important;
+    overflow-x: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-panel *,
+  .admin-edit-overlay * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
