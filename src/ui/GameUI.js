@@ -2117,7 +2117,9 @@ export class GameUI {
       const n = Math.max(1, item.quantity || 1);
       const arr = [];
       for (let k = 0; k < n; k++) {
-        arr.push({ uid: this._newPetUid(), name: null, level: item.stats.petLevel || 1, xp: item.stats.petXp || 0 });
+        // A legacy/market-delivered pet may carry a single petName in stats —
+        // keep it on the first instance so a bought named pet isn't anonymised.
+        arr.push({ uid: this._newPetUid(), name: k === 0 ? (item.stats.petName || null) : null, level: item.stats.petLevel || 1, xp: item.stats.petXp || 0 });
       }
       if (item.stats.equipped === true) item.stats.equippedUid = arr[0].uid;
       item.stats.instances = arr;
@@ -2300,7 +2302,12 @@ export class GameUI {
           <button class="pi-btn pi-equip">${isEq ? '🔙 เก็บกลับ' : '🐾 เรียกออกมา'}</button>
         </div>
         <button class="pi-btn pi-sell" style="width:100%;margin-top:8px;background:#c88f1a;color:#fff;">💰 ขายให้ NPC (${this._petSellPrice(item, inst).toLocaleString()} z)</button>
-        <div class="pi-hint">ตั้งชื่อแล้วกดปิด — คนอื่นจะเห็นชื่อน้องของคุณ</div>
+        <div class="pi-market" style="display:flex;gap:6px;margin-top:8px;">
+          <input id="pi-price" type="number" min="1" placeholder="ราคาตั้งขาย (z)"
+            style="flex:1;padding:9px;background:rgba(0,0,0,.3);border:1px solid rgba(180,150,255,.35);border-radius:10px;color:#fff;text-align:center;font-family:var(--font-pixel);" />
+          <button class="pi-btn pi-list" style="flex:0 0 auto;padding:0 14px;background:#3a7ad9;color:#fff;">🏪 ลงตลาด</button>
+        </div>
+        <div class="pi-hint">ตั้งชื่อก่อนลงตลาด — คนซื้อจะเห็นชื่อน้องของคุณ</div>
       </div>`;
     document.body.appendChild(ov);
     const nameInput = ov.querySelector('#pi-name');
@@ -2323,6 +2330,64 @@ export class GameUI {
       ov.remove();
       await this._sellPetInstanceNpc(uid);
     };
+    // List on the player market with the pet's name shown to buyers.
+    const listBtn = ov.querySelector('.pi-list');
+    if (listBtn) listBtn.onclick = async () => {
+      const price = parseInt(ov.querySelector('#pi-price').value);
+      if (isNaN(price) || price < 1) {
+        this._equipToast('กรอกราคาตั้งขายก่อน', false);
+        return;
+      }
+      await saveName();
+      ov.remove();
+      await this._listPetInstanceMarket(uid, price);
+    };
+  }
+
+  // List one pet instance on the player market, carrying its custom name so
+  // other players see exactly which named pet is for sale.
+  async _listPetInstanceMarket(uid, price) {
+    const found = this._findPetInstance(uid);
+    if (!found || !this.character || !this.characterId) return;
+    const { item, inst } = found;
+    if (this.character.equippedPetUid === uid) {
+      this._equipToast('เก็บน้องกลับกระเป๋าก่อนจึงจะลงตลาดได้', false);
+      return;
+    }
+    const stats = {
+      petName: inst.name || null,
+      petLevel: inst.level || 1,
+      petXp: inst.xp || 0,
+    };
+    try {
+      const listing = await listMarketItem(
+        this.characterId, this.character.stats.name,
+        item.item_name, 'pet', 1, price, stats,
+      );
+      if (!listing || listing._failed) throw new Error('list failed');
+
+      // Remove the sold instance from inventory.
+      const arr = item.stats.instances;
+      const idx = arr.findIndex(x => x.uid === uid);
+      if (idx >= 0) arr.splice(idx, 1);
+      item.quantity = arr.length;
+      const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+      await setInventoryItemQuantity(this.characterId, item.item_name, 'pet', item.quantity, item.stats);
+      if (item.quantity <= 0) {
+        const i = this.inventory.indexOf(item);
+        if (i >= 0) this.inventory.splice(i, 1);
+      }
+
+      const nm = this._petDisplayName(item, inst);
+      this.addCombatLog(`🏪 ตั้งขาย ${nm} ในตลาด ราคา ${price.toLocaleString()} Zeny แล้ว`, 'system');
+      this._equipToast(`ลงตลาดสำเร็จ: ${nm}`, true);
+      if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+      this._renderInventory();
+      if (this._renderMarket) this._renderMarket();
+    } catch (e) {
+      this.addCombatLog('❌ ตั้งขายในตลาดไม่สำเร็จ ลองใหม่อีกครั้ง', 'system');
+      this._equipToast('ลงตลาดไม่สำเร็จ', false);
+    }
   }
 
   // Level-scaled NPC sell price for one pet instance (mirrors _sellUnitPrice).
@@ -6189,10 +6254,16 @@ export class GameUI {
 
         // Step 8: Apply rarity class to market row
         const rarityClass = `rarity-${itemInfo.rarity || 'common'}`;
+        // For pets, show the seller's custom name so buyers see the exact pet.
+        const petNm = (listing.item_type === 'pet' && listing.stats && listing.stats.petName) ? listing.stats.petName : null;
+        const petLv = (listing.item_type === 'pet' && listing.stats && listing.stats.petLevel) ? listing.stats.petLevel : null;
+        const displayName = petNm
+          ? `${listing.item_name.replace(/ Pet$/, '')} 「${petNm}」${petLv ? ` Lv.${petLv}` : ''}`
+          : listing.item_name;
         row.innerHTML = `
           <div class="market-item-name-cell ${rarityClass}">
             <span>${itemInfo.emoji}</span>
-            <span class="market-item-name-text" title="${listing.item_name}">${listing.item_name}</span>
+            <span class="market-item-name-text" title="${displayName}">${displayName}</span>
           </div>
           <div class="market-item-qty-cell">x${listing.quantity}</div>
           <div class="market-item-price-cell">${listing.price}z</div>
@@ -6389,21 +6460,38 @@ export class GameUI {
         }
         // Add item to local inventory
         const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
-        const existing = this.inventory.find(i => i.item_name === listing.item_name);
-        if (existing) {
-          existing.quantity += listing.quantity;
+        if (listing.item_type === 'pet') {
+          // Receive the pet as its own named instance (keeps the seller's name).
+          let row = this.inventory.find(i => i.item_name === listing.item_name && i.item_type === 'pet');
+          if (!row) {
+            row = { item_name: listing.item_name, item_type: 'pet', emoji: itemRegistry.emoji || '🐾', desc: itemRegistry.desc || '', price: itemRegistry.price || 10, rarity: itemRegistry.rarity || 'common', quantity: 0, stats: { instances: [] } };
+            this.inventory.push(row);
+          }
+          this._ensurePetInstances(row);
+          const s = listing.stats || {};
+          row.stats.instances.push({ uid: this._newPetUid(), name: s.petName || null, level: s.petLevel || 1, xp: s.petXp || 0 });
+          row.quantity = row.stats.instances.length;
+          if (this.characterId) {
+            const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+            await setInventoryItemQuantity(this.characterId, listing.item_name, 'pet', row.quantity, row.stats);
+          }
         } else {
-          this.inventory.push({
-            item_name: listing.item_name,
-            item_type: listing.item_type,
-            emoji: itemRegistry.emoji || '📦',
-            desc: itemRegistry.desc || '',
-            price: itemRegistry.price || 10,
-            healHp: itemRegistry.healHp || 0,
-            restoreSp: itemRegistry.restoreSp || 0,
-            quantity: listing.quantity,
-            stats: listing.stats || {}
-          });
+          const existing = this.inventory.find(i => i.item_name === listing.item_name);
+          if (existing) {
+            existing.quantity += listing.quantity;
+          } else {
+            this.inventory.push({
+              item_name: listing.item_name,
+              item_type: listing.item_type,
+              emoji: itemRegistry.emoji || '📦',
+              desc: itemRegistry.desc || '',
+              price: itemRegistry.price || 10,
+              healHp: itemRegistry.healHp || 0,
+              restoreSp: itemRegistry.restoreSp || 0,
+              quantity: listing.quantity,
+              stats: listing.stats || {}
+            });
+          }
         }
 
         // Save character stats for gold sync
