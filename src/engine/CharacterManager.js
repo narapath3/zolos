@@ -2552,6 +2552,9 @@ export class CharacterManager {
         if (data.hat) this.setHat(data.hat);
         if (data.glasses) this.setGlasses(data.glasses);
         if (data.weapon) this.equipWeapon(data.weapon);
+        if (data.appearance && typeof data.appearance === 'object') {
+            this.applyAppearance(data.appearance);
+        }
 
         // Load game settings — check DB data first, then fallback to localStorage
         let localSettings = {};
