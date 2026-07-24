@@ -928,13 +928,11 @@ export async function setInventoryItemQuantity(characterId, itemName, itemType, 
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         const inv = localDb.get(`inventory_${characterId}`) || [];
         const existing = inv.find(i => i.item_name === itemName);
-        if (existing) {
-            if (qty <= 0) {
-                inv.splice(inv.indexOf(existing), 1);
-            } else {
+        if (qty <= 0) {
+            localDb.set(`inventory_${characterId}`, inv.filter(i => i.item_name !== itemName));
+        } else if (existing) {
                 existing.quantity = qty;
                 existing.stats = stats;
-            }
         } else if (qty > 0) {
             inv.push({
                 id: 'inv_' + Math.random().toString(36).substring(2, 10),
@@ -963,7 +961,9 @@ export async function setInventoryItemQuantity(characterId, itemName, itemType, 
         } else if (fetchError) {
             throw fetchError;
         } else if (qty <= 0) {
-            await supabase.from('inventory').delete().eq('id', existing.id);
+            await supabase.from('inventory').delete()
+                .eq('character_id', characterId)
+                .eq('item_name', itemName);
         } else {
             await supabase.from('inventory')
                 .update({ quantity: qty, stats })

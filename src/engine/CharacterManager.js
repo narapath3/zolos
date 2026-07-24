@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult } from './GameData.js';
 import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
+import { getCard } from '../cards/CardCatalog.js';
+import { normalizeCardState } from '../cards/CardProgression.js';
 
 // Walkable half-extent. The ground is a 70x70 plane centred at the origin
 // (see SceneManager._createGround), so keep the player just inside the ±35 edge
@@ -84,9 +86,10 @@ export class CharacterManager {
         this.equippedGear = { head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
         // Refine level (+N) of the item worn in each slot — scales its bonuses.
         this.equipRefine = { weapon: 0, shield: 0, head: 0, body: 0, garment: 0, ring: 0, wrist: 0, pants: 0, feet: 0, accessory: 0 };
-        // Card socketed into each slot (card item name or null). Cards add stat
+        // Card socketed into each slot (canonical card id or null). Cards add stat
         // bonuses + special effects (crit/damage%/lifesteal) via getCardTotal().
         this.equippedCards = { weapon: null, shield: null, hat: null, glasses: null, head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
+        this.cardState = {};
         // Back-compat alias: legacy code reads/writes a single `equippedArmor`.
         // Map it onto the body slot so old saves + call-sites keep working.
         Object.defineProperty(this, 'equippedArmor', {
@@ -219,9 +222,12 @@ export class CharacterManager {
     getCardTotal(field) {
         let sum = 0;
         for (const slot of Object.keys(this.equippedCards)) {
-            const name = this.equippedCards[slot];
-            const it = name && ITEMS[name];
-            if (it && it.card && it.card[field]) sum += it.card[field];
+            const cardId = this.equippedCards[slot];
+            const card = cardId && getCard(cardId);
+            const item = cardId && ITEMS[cardId];
+            if (card?.stats?.[field]) sum += card.stats[field];
+            else if (card?.effect?.type === field) sum += card.effect.value;
+            else if (item?.card?.[field]) sum += item.card[field];
         }
         return sum;
     }
@@ -232,9 +238,18 @@ export class CharacterManager {
     getLifestealPct() { return this.getCardTotal('lifestealPct'); }
 
     // Socket / remove a card in a slot. Returns true on success.
-    equipCard(slotId, cardName) {
+    equipCard(slotId, idOrName) {
         if (!(slotId in this.equippedCards)) return false;
-        this.equippedCards[slotId] = cardName || null;
+        if (!idOrName) {
+            this.equippedCards[slotId] = null;
+            return true;
+        }
+        const card = getCard(idOrName);
+        if (!card) return false;
+        for (const [slot, cardId] of Object.entries(this.equippedCards)) {
+            if (slot !== slotId && cardId === card.id) return false;
+        }
+        this.equippedCards[slotId] = card.id;
         return true;
     }
     unequipCard(slotId) {
@@ -2521,7 +2536,8 @@ export class CharacterManager {
             petLevel: this.petLevel || 1,           // so others see the right aura tier
             petName: this.petName || null,          // custom pet name others can see
             refine: { ...(this.equipRefine || {}) }, // +N per slot so profiles show refine
-            cards: { ...(this.equippedCards || {}) }, // socketed cards so profiles show them
+            cards: { ...(this.equippedCards || {}) }, // canonical socketed card IDs
+            cardState: normalizeCardState(this.cardState),
             job: this.stats ? (this.stats.job || null) : null,
             title: this.title
         };
@@ -2547,8 +2563,10 @@ export class CharacterManager {
             for (const k of Object.keys(this.equipRefine)) this.equipRefine[k] = app.refine[k] || 0;
         }
         if (app.cards && this.equippedCards) {
-            for (const k of Object.keys(this.equippedCards)) this.equippedCards[k] = app.cards[k] || null;
+            for (const k of Object.keys(this.equippedCards)) this.equippedCards[k] = null;
+            for (const [slot, idOrName] of Object.entries(app.cards)) this.equipCard(slot, idOrName);
         }
+        if (app.cardState !== undefined) this.cardState = normalizeCardState(app.cardState);
         if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
         if (app.pet !== undefined && app.pet !== this.equippedPet) {
             this.setPet(app.pet, app.petLevel || 1, 0, app.petName || null);

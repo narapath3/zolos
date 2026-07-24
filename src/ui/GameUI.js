@@ -2,6 +2,8 @@ import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNI
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
+import { migrateLegacyCards } from '../cards/CardMigration.js';
+import { getCard } from '../cards/CardCatalog.js';
 
 
 export class GameUI {
@@ -630,7 +632,30 @@ export class GameUI {
     this.characterId = characterId;
     try {
       const rawInv = await loadInventory(characterId);
-      this.inventory = rawInv.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
+      const migration = migrateLegacyCards(rawInv, this.character?.equippedCards);
+      const knownCards = rawInv.filter(row => row.item_type === 'card'
+        && (getCard(row.item_name) || getCard(row.stats?.card_id)));
+      const seenCardIds = new Set();
+      const needsMigration = knownCards.some((row) => {
+        const card = getCard(row.item_name) || getCard(row.stats?.card_id);
+        const duplicate = seenCardIds.has(card.id);
+        const stars = Math.min(5, Math.max(1, Math.floor(Number(row.stats?.card_stars) || 1)));
+        seenCardIds.add(card.id);
+        return duplicate || row.item_name !== card.itemName || row.stats?.card_id !== card.id
+          || row.stats?.card_stars !== stars;
+      });
+      if (needsMigration) {
+        for (const itemName of new Set(knownCards.map(row => row.item_name))) {
+          await setInventoryItemQuantity(characterId, itemName, 'card', 0);
+        }
+        for (const row of migration.inventory) {
+          if (row.item_type === 'card' && getCard(row.item_name)) {
+            await setInventoryItemQuantity(characterId, row.item_name, 'card', row.quantity, row.stats);
+          }
+        }
+      }
+      this.inventory = migration.inventory.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
+      if (this.character) this.character.cardState = migration.cardState;
 
       // --- Self-heal for the quantity-inflation bug ---
       // A prior bug re-added the whole stack on every save/equip, ballooning
@@ -735,12 +760,8 @@ export class GameUI {
       // equipped + a valid slot. Skips any whose slot no longer accepts it.
       if (this.character && this.character.equippedCards) {
         for (const s of Object.keys(this.character.equippedCards)) this.character.equippedCards[s] = null;
-        for (const it of this.inventory) {
-          if (it.item_type !== 'card' || !it.stats || it.stats.equipped !== true) continue;
-          const slot = it.stats.slot;
-          if (slot && this.character.equippedCards[slot] !== undefined && cardFitsSlot(it.item_name, slot)) {
-            this.character.equippedCards[slot] = it.item_name;
-          }
+        for (const [slot, cardId] of Object.entries(migration.equippedCards)) {
+          this.character.equipCard(slot, cardId);
         }
       }
 
@@ -1496,10 +1517,12 @@ export class GameUI {
       const filterCls = this.equipSlotFilter === slot.id ? ' active-filter' : '';
       const ic = filled && it ? (it.emoji || slot.icon) : slot.icon;
       // Card socket for this slot (shows the socketed card, or a ＋ to add one).
-      const cardName = (ch.equippedCards && ch.equippedCards[slot.id]) || null;
-      const cardIt = cardName ? ITEMS[cardName] : null;
-      const cardRar = cardIt && cardIt.rarity ? cardIt.rarity : 'common';
-      const socket = cardName
+      const cardId = (ch.equippedCards && ch.equippedCards[slot.id]) || null;
+      const card = cardId && getCard(cardId);
+      const cardName = card?.itemName || cardId;
+      const cardIt = card ? ITEMS[card.itemName] : null;
+      const cardRar = card?.rarity || 'common';
+      const socket = cardId
         ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardIt ? cardIt.emoji : '🃏'}</div>`
         : `<div class="eq-card-socket empty" data-cardslot="${slot.id}" title="ช่องการ์ด (ว่าง) — แตะเพื่อใส่การ์ด">＋</div>`;
       return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
@@ -1717,7 +1740,7 @@ export class GameUI {
       const it = ITEMS[i.item_name] || {};
       const rar = i.rarity || it.rarity || 'common';
       const col = RARITY_COLOR[rar] || '#b8c0cc';
-      const inThis = i.item_name === current;
+      const inThis = getCard(i.item_name)?.id === current;
       const inOther = !inThis && i.stats && i.stats.equipped === true;
       return `<div class="sp-row cp-row${inThis ? ' sp-eq' : ''}" data-name="${i.item_name}" style="border-left:3px solid ${col};">
         <span class="sp-ic">${i.emoji || '🃏'}</span>
@@ -1748,32 +1771,30 @@ export class GameUI {
       row.addEventListener('click', async () => {
         const name = row.getAttribute('data-name');
         if (name === '__none__') await this._unsocketCard(slotId);
-        else if (name !== current) await this._socketCard(slotId, name);
+        else if (getCard(name)?.id !== current) await this._socketCard(slotId, name);
         close();
       });
     });
   }
 
-  // Socket `cardName` into `slotId`: clears any card already there and moves the
-  // card out of any other slot it occupied. Persists + refreshes stats/doll.
+  // Socket `cardName` into `slotId`, retaining the one-card/one-socket rule.
   async _socketCard(slotId, cardName) {
     const ch = this.character;
     if (!ch || !ch.equippedCards) return;
     const card = this.inventory.find(i => i.item_name === cardName && i.item_type === 'card');
     if (!card) return;
+    const cardId = getCard(cardName)?.id;
+    if (!cardId) return;
     const changed = [];
 
-    // Free the card from a slot it's already in.
-    for (const s of Object.keys(ch.equippedCards)) {
-      if (ch.equippedCards[s] === cardName) ch.equippedCards[s] = null;
-    }
+    if (Object.entries(ch.equippedCards).some(([slot, id]) => slot !== slotId && id === cardId)) return;
     // Displace whatever card currently sits in the target slot.
     const prev = ch.equippedCards[slotId];
-    if (prev && prev !== cardName) {
-      const prevItem = this.inventory.find(i => i.item_name === prev);
+    if (prev && prev !== cardId) {
+      const prevItem = this.inventory.find(i => getCard(i.item_name)?.id === prev);
       if (prevItem && prevItem.stats) { prevItem.stats.equipped = false; delete prevItem.stats.slot; changed.push(prevItem); }
     }
-    ch.equippedCards[slotId] = cardName;
+    if (!ch.equipCard(slotId, cardId)) return;
     if (!card.stats) card.stats = {};
     card.stats.equipped = true;
     card.stats.slot = slotId;
@@ -1786,10 +1807,11 @@ export class GameUI {
   async _unsocketCard(slotId) {
     const ch = this.character;
     if (!ch || !ch.equippedCards) return;
-    const cardName = ch.equippedCards[slotId];
-    if (!cardName) return;
+    const cardId = ch.equippedCards[slotId];
+    if (!cardId) return;
     ch.equippedCards[slotId] = null;
-    const card = this.inventory.find(i => i.item_name === cardName);
+    const card = this.inventory.find(i => getCard(i.item_name)?.id === cardId);
+    const cardName = card?.item_name || cardId;
     if (card && card.stats) { card.stats.equipped = false; delete card.stats.slot; }
     if (card) await this._persistCardStats([card]);
     this._afterCardChange(`ถอดการ์ด ${card ? (card.emoji || '🃏') + ' ' + cardName : ''}`);
