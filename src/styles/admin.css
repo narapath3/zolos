@@ -102,6 +102,11 @@
     text-wrap: balance;
   }
 
+  .admin-header > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .admin-tabs {
     position: sticky;
     top: 0;

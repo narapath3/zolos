@@ -463,8 +463,8 @@ export class AdminUI {
                 </td>
             `;
 
-            tr.querySelector('.edit-btn').onclick = () => {
-                this.openEditModal(user);
+            tr.querySelector('.edit-btn').onclick = (event) => {
+                this.openEditModal(user, event.currentTarget);
             };
 
             tr.querySelector('.give-btn').onclick = () => {
@@ -506,7 +506,9 @@ export class AdminUI {
                 </div>
             `;
 
-            card.querySelector('.edit-btn').onclick = () => this.openEditModal(user);
+            card.querySelector('.edit-btn').onclick = (event) => {
+                this.openEditModal(user, event.currentTarget);
+            };
             card.querySelector('.give-btn').onclick = () => {
                 const itemName = prompt(`Item name to give to ${user.username}:`, 'Sword');
                 if (itemName) {
@@ -636,8 +638,9 @@ export class AdminUI {
         renderItems();
     }
 
-    openEditModal(user) {
+    openEditModal(user, triggerElement = null) {
         this.selectedUser = user;
+        this.editModalTrigger = triggerElement;
         this._createEditModal();
     }
 
@@ -682,6 +685,7 @@ export class AdminUI {
         ];
 
         const formData = {};
+        const formInputs = [];
         fields.forEach(field => {
             const group = document.createElement('div');
             group.style.cssText = 'margin-bottom: 15px;';
@@ -704,6 +708,7 @@ export class AdminUI {
             input.addEventListener('change', (e) => {
                 formData[field.key] = field.type === 'number' ? parseInt(e.target.value) || 0 : e.target.value;
             });
+            formInputs.push(input);
             group.appendChild(input);
             content.appendChild(group);
 
@@ -714,6 +719,39 @@ export class AdminUI {
         const buttonGroup = document.createElement('div');
         buttonGroup.className = 'admin-edit-actions';
         buttonGroup.style.cssText = 'display: flex; gap: 10px; margin-top: 25px;';
+
+        const closeModal = () => {
+            document.removeEventListener('keydown', handleModalKeydown);
+            modal.remove();
+            if (this.editModalTrigger?.isConnected) {
+                this.editModalTrigger.focus();
+            }
+            this.editModalTrigger = null;
+        };
+
+        const handleModalKeydown = (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeModal();
+                return;
+            }
+
+            if (event.key === 'Tab') {
+                const focusable = [...modal.querySelectorAll('input, button')].filter(
+                    (element) => !element.disabled
+                );
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
+        };
 
         const saveBtn = document.createElement('button');
         saveBtn.innerText = 'Save Changes';
@@ -726,7 +764,7 @@ export class AdminUI {
         saveBtn.onmouseout = () => saveBtn.style.background = '#2a8a4a';
         saveBtn.onclick = async () => {
             await this.updatePlayer(this.selectedUser.id, formData);
-            modal.remove();
+            closeModal();
             await this.refreshData();
         };
 
@@ -739,7 +777,7 @@ export class AdminUI {
         `;
         cancelBtn.onmouseover = () => cancelBtn.style.background = '#aa7a3a';
         cancelBtn.onmouseout = () => cancelBtn.style.background = '#8a5a2a';
-        cancelBtn.onclick = () => modal.remove();
+        cancelBtn.onclick = () => closeModal();
 
         buttonGroup.appendChild(saveBtn);
         buttonGroup.appendChild(cancelBtn);
@@ -747,10 +785,12 @@ export class AdminUI {
 
         modal.appendChild(content);
         document.body.appendChild(modal);
+        document.addEventListener('keydown', handleModalKeydown);
+        formInputs[0]?.focus();
 
         // Close modal when clicking outside
         modal.onclick = (e) => {
-            if (e.target === modal) modal.remove();
+            if (e.target === modal) closeModal();
         };
     }
 }

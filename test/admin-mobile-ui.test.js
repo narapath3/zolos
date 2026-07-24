@@ -85,3 +85,15 @@ test('admin forms expose accessible mobile layout hooks', () => {
   assert.match(adminSource, /aria-selected/);
   assert.match(adminCss, /\.admin-edit-dialog[\s\S]*overflow-y:\s*auto/);
 });
+
+test('mobile escape controls and edit dialog keyboard behavior are explicit', () => {
+  const adminCss = fs.readFileSync(cssUrl, 'utf8');
+
+  assert.match(
+    adminCss,
+    /\.admin-header\s*>\s*button[\s\S]*min-width:\s*44px[\s\S]*min-height:\s*44px/
+  );
+  assert.match(adminSource, /event\.key\s*===\s*['"]Escape['"]/);
+  assert.match(adminSource, /event\.key\s*===\s*['"]Tab['"]/);
+  assert.match(adminSource, /\.focus\(\)/);
+});
