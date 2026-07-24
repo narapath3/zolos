@@ -192,9 +192,36 @@ function spawnForgeBurst(pos, isCrit) {
 }
 
 // ============ Initialize Game ============
+// ===== Loading intro control =====
+function showGameLoader(status) {
+    window.__enteringGame = true;
+    document.body.classList.add('zl-loading');
+    const el = document.getElementById('zolos-loader');
+    if (el) { el.classList.remove('zl-hide'); el.style.display = 'flex'; }
+    const s = document.getElementById('zl-status');
+    if (s && status) s.textContent = status;
+}
+function setGameLoaderStatus(status) {
+    const s = document.getElementById('zl-status');
+    if (s && status) s.textContent = status;
+}
+function hideGameLoader() {
+    window.__loaderDone = true;
+    document.body.classList.remove('zl-loading');
+    const el = document.getElementById('zolos-loader');
+    if (el) el.classList.add('zl-hide');
+    // Fully remove after the fade so it never intercepts taps.
+    setTimeout(() => { if (el && el.parentNode) el.style.display = 'none'; }, 800);
+}
+window.showGameLoader = showGameLoader;
+window.hideGameLoader = hideGameLoader;
+
 async function initGame(charData) {
     const canvas = document.getElementById('game-canvas');
     if (!canvas) return;
+
+    // Loading intro covers the transition while the 3D world is built.
+    showGameLoader('กำลังสร้างโลกของคุณ...');
 
     // Show game screen, hide auth
     document.getElementById('auth-screen').style.display = 'none';
@@ -903,6 +930,7 @@ async function initGame(charData) {
     }, 15000);
 
     // Load Inventory, Daily Quests, and Friends List from DB
+    setGameLoaderStatus('กำลังโหลดข้อมูลตัวละคร...');
     await gameUI.loadInventoryFromDB(charData.id);
     await gameUI.loadDailyQuestsFromDB(charData.id);
     await gameUI.loadFriendsFromDB(charData.id);
@@ -1012,6 +1040,9 @@ async function initGame(charData) {
         window.__zolosLoopStarted = true;
         requestAnimationFrame(gameLoop);
     }
+    // World is ready — fade the loading intro out into the game after a couple
+    // of frames so the first frame is already painted behind it.
+    requestAnimationFrame(() => requestAnimationFrame(() => hideGameLoader()));
     // Background simulation loop (keeps the whole game running when tab is hidden)
     startBackgroundHeartbeat();
 
@@ -1230,6 +1261,9 @@ async function showCharacterSelect(isGuest = false) {
 // auto-save can run) and offers a manual retry. Reloading re-attempts the load
 // from scratch; it never writes to the DB.
 function showCharacterLoadError() {
+    // Never leave the loading intro covering the error screen.
+    window.__enteringGame = false;
+    if (window.hideGameLoader) window.hideGameLoader();
     const authScreen = document.getElementById('auth-screen');
     if (authScreen) authScreen.style.display = 'block';
     const gameScreen = document.getElementById('game-screen');
