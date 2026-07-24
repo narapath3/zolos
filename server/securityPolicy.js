@@ -1,4 +1,4 @@
-import { getCard } from '../src/cards/CardCatalog.js';
+import { getCard } from './cards/CardCatalog.js';
 
 const DEFAULT_ORIGINS = new Set([
     'http://localhost:3000',

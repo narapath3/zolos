@@ -1,5 +1,5 @@
-import { resolveCardDrops } from '../src/cards/CardDrops.js';
-import { getCardsBySource } from '../src/cards/CardCatalog.js';
+import { resolveCardDrops } from './cards/CardDrops.js';
+import { getCardsBySource } from './cards/CardCatalog.js';
 
 export const WORLD_BOSSES = Object.freeze([
   Object.freeze({ id: 'valdris', name: 'Valdris จอมมารเพลิง' }),

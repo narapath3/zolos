@@ -20,8 +20,8 @@ import {
     resolveTrustedMap,
     sanitizeSaveUpdates,
 } from './securityPolicy.js';
-import { getCard } from '../src/cards/CardCatalog.js';
-import { FUSION_COSTS } from '../src/cards/CardProgression.js';
+import { getCard } from './cards/CardCatalog.js';
+import { FUSION_COSTS } from './cards/CardProgression.js';
 
 // ============ Configuration ============
 const PORT = parseInt(process.env.PORT) || 3001;
