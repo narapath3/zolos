@@ -1,0 +1,49 @@
+name: Deploy Map Server to Railway
+
+# Auto-deploys the Socket.io Map Server (server/) to Railway.
+#
+# One-time setup (do this once, in GitHub → Settings → Secrets and variables → Actions):
+#   1. In Railway: open the project → the map-server service →
+#      Settings → Tokens (or Account → Tokens) → create a token → copy it.
+#   2. In GitHub: New repository secret named  RAILWAY_TOKEN  → paste the token.
+#   3. (optional) New repository *variable* named RAILWAY_SERVICE with the
+#      exact service name shown in Railway (default below is "zolos-server").
+#
+# After that, every push that touches server/ deploys automatically, and you
+# can also run it manually from the Actions tab ("Run workflow").
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/railway-deploy.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy server/ to Railway
+        working-directory: server
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE || 'zolos-server' }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN secret is not set. See the setup notes at the top of this workflow."
+            exit 1
+          fi
+          echo "Deploying server/ to Railway service: $RAILWAY_SERVICE"
+          railway up --service "$RAILWAY_SERVICE" --ci
