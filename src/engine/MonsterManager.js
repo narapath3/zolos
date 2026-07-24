@@ -20,6 +20,12 @@ const MAX_WATER_MONSTERS = 4;
 const SPAWN_RANGE = 12;
 const RESPAWN_TIME = 3;
 
+export function resolveMonsterDamage(amount, defense = 0, { ignoreDefense = false } = {}) {
+    const incoming = Math.max(0, Number(amount) || 0);
+    if (ignoreDefense) return incoming;
+    return Math.max(1, incoming - Math.floor((Number(defense) || 0) * 0.3));
+}
+
 // Seeded PRNG (mulberry32) — ensures all clients spawn monsters at the same positions
 function createSeededRng(seed) {
     let s = seed | 0;
@@ -837,8 +843,8 @@ class Monster {
         this.scene.add(this.mesh);
     }
 
-    takeDamage(amount, isCritical = false) {
-        const actualDmg = Math.max(1, amount - Math.floor(this.data.def * 0.3));
+    takeDamage(amount, isCritical = false, options = {}) {
+        const actualDmg = resolveMonsterDamage(amount, this.data.def, options);
         this.hp = Math.max(0, this.hp - actualDmg);
         // Getting hit provokes it — chase the attacker for a while.
         this._aggroUntil = (this.animTimer || 0) + 8;

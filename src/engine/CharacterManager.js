@@ -1,11 +1,14 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult, getMonsterCombatMeta } from './GameData.js';
 import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 import { getCard } from '../cards/CardCatalog.js';
 import { normalizeCardState } from '../cards/CardProgression.js';
-import { aggregateCardEffects } from '../cards/CardEffects.js';
+import {
+    aggregateCardEffects, applyIncomingCardEffects, applyOnKillCardEffects,
+    resolveOutgoingCardEffects,
+} from '../cards/CardEffects.js';
 
 // Walkable half-extent. The ground is a 70x70 plane centred at the origin
 // (see SceneManager._createGround), so keep the player just inside the ±35 edge
@@ -1944,12 +1947,18 @@ export class CharacterManager {
         return leveledUp;
     }
 
-    // Take damage
-    takeDamage(amount) {
-        const dmgAmount = Number(amount) || 0;
+    // Every incoming player hit crosses this one boundary, including aggro,
+    // world-boss, duel, and CombatSystem attacks.
+    takeDamage(amount, options = {}) {
+        const dmgAmount = applyIncomingCardEffects(
+            { damage: Number(amount) || 0 },
+            this.getCardEffects(),
+        );
         const currentDef = Number(this.stats.def) || 0;
 
-        const actualDmg = Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
+        const actualDmg = options.ignoreDefense
+            ? Math.max(0, dmgAmount)
+            : Math.max(1, dmgAmount - Math.floor(currentDef * 0.3));
 
         // Step 4: Ensure hp is a number before subtracting
         const currentHp = Number(this.stats.hp);
@@ -1958,6 +1967,50 @@ export class CharacterManager {
         }
 
         this.stats.hp = Math.max(0, (Number(this.stats.hp) || 0) - actualDmg);
+        return actualDmg;
+    }
+
+    // Resolve every player-originated hit through catalog card effects. Combat
+    // and skills call this shared path so execute, lifesteal, and kill restores
+    // cannot drift apart.
+    applyCardDamage(target, damage, isCritical = false) {
+        if (!target || typeof target.takeDamage !== 'function') return 0;
+
+        const targetStats = target.data || target.stats || {};
+        const targetHp = Number(target.hp ?? targetStats.hp) || 0;
+        const targetMaxHp = Number(target.maxHp ?? targetStats.max_hp) || 1;
+        const metadata = getMonsterCombatMeta(target.type, target.data || {});
+        const effects = this.getCardEffects();
+        const outcome = resolveOutgoingCardEffects({
+            damage,
+            isBoss: metadata.isBoss,
+            family: metadata.family,
+            playerHpRatio: (Number(this.stats.hp) || 0) / (Number(this.stats.max_hp) || 1),
+            targetHpRatio: targetHp / targetMaxHp,
+            targetHp,
+        }, effects);
+        const options = { ignoreDefense: outcome.execute };
+        const actualDmg = target.data
+            ? target.takeDamage(outcome.damage, isCritical, options)
+            : target.takeDamage(outcome.damage, options);
+
+        if (effects.lifestealPct > 0) {
+            const healed = Math.max(1, Math.floor(actualDmg * effects.lifestealPct));
+            this.stats.hp = Math.min(this.stats.max_hp, (Number(this.stats.hp) || 0) + healed);
+        }
+
+        const targetDied = target.data ? !target.alive : !target.isAlive?.();
+        if (targetDied && (effects.onKillRestore.hp > 0 || effects.onKillRestore.sp > 0)) {
+            const restored = applyOnKillCardEffects({
+                hp: this.stats.hp,
+                maxHp: this.stats.max_hp,
+                sp: this.stats.sp,
+                maxSp: this.stats.max_sp,
+            }, effects);
+            this.stats.hp = restored.hp;
+            this.stats.sp = restored.sp;
+        }
+
         return actualDmg;
     }
 
@@ -2354,7 +2407,7 @@ export class CharacterManager {
             }
 
             const finalDmg = roll(this.stats.atk * skill.damageMultiplier, 0.1);
-            const actualDmg = currentTarget.takeDamage(finalDmg);
+            const actualDmg = this.applyCardDamage(currentTarget, finalDmg);
 
             if (window.duelState && currentTarget.stats) {
                 import('../network/GameSync.js').then(({ sendDuelHit }) => {
@@ -2397,7 +2450,7 @@ export class CharacterManager {
                 if (opponent && opponent.character && opponent.character.isAlive()
                     && opponent.mesh.position.distanceTo(this.mesh.position) <= radius) {
                     const finalDmg = roll(dmgBase, 0.2);
-                    const actualDmg = opponent.character.takeDamage(finalDmg);
+                    const actualDmg = this.applyCardDamage(opponent.character, finalDmg);
                     hits++;
                     import('../network/GameSync.js').then(({ sendDuelHit }) => {
                         sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
@@ -2408,7 +2461,7 @@ export class CharacterManager {
                 monsterManager.monsters.forEach(m => {
                     if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
                         const finalDmg = roll(dmgBase, 0.2);
-                        const actualDmg = m.takeDamage(finalDmg);
+                        const actualDmg = this.applyCardDamage(m, finalDmg);
                         hits++;
                         if (effectCallback) effectCallback(skillId, m, actualDmg);
                     }

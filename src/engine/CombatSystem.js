@@ -1,11 +1,6 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
 import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS } from './GameData.js';
-import {
-    applyIncomingCardEffects,
-    applyOnKillCardEffects,
-    applyOutgoingCardEffects,
-} from '../cards/CardEffects.js';
 
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
@@ -314,28 +309,9 @@ export class CombatSystem {
         const charAtk = isNaN(this.character.stats.atk) ? 10 : this.character.stats.atk;
         let baseDmg = charAtk + Math.floor(Math.random() * 5);
         if (isCritical) baseDmg = Math.floor(baseDmg * 1.8);
-        const playerStats = this.character.stats || {};
-        const maxHp = Number(playerStats.max_hp) || 1;
-        const maxMonsterHp = Number(monster.maxHp) || 1;
-        baseDmg = applyOutgoingCardEffects({
-            damage: baseDmg,
-            isBoss: monster.isBoss === true || monster.data?.isBoss === true,
-            family: monster.data?.family,
-            playerHpRatio: (Number(playerStats.hp) || 0) / maxHp,
-            targetHpRatio: (Number(monster.hp) || 0) / maxMonsterHp,
-            targetHp: monster.hp,
-        }, cardEffects || { damagePct: this.character.getDamagePct?.() || 0 });
-
-        const actualDmg = monster.takeDamage(baseDmg, isCritical);
-
-        // Lifesteal: heal a fraction of damage dealt (legendary card ability).
-        const leech = cardEffects?.lifestealPct
-            ?? (this.character.getLifestealPct ? this.character.getLifestealPct() : 0);
-        if (leech > 0 && this.character.stats) {
-            const s = this.character.stats;
-            const healed = Math.max(1, Math.floor(actualDmg * leech));
-            s.hp = Math.min(s.max_hp, (Number(s.hp) || 0) + healed);
-        }
+        const actualDmg = this.character.applyCardDamage
+            ? this.character.applyCardDamage(monster, baseDmg, isCritical)
+            : monster.takeDamage(baseDmg, isCritical);
 
         // Shared HP: mark that WE damaged this monster (so we still get loot even
         // if a teammate lands the final blow) and relay the hit so everyone's
@@ -362,10 +338,7 @@ export class CombatSystem {
             if (dist < 4.0) {
                 const monsterAtk = (monster.data && !isNaN(monster.data.atk)) ? monster.data.atk : 5;
                 const incomingDamage = monsterAtk + Math.floor(Math.random() * 3);
-                const monsterDmg = this.character.takeDamage(applyIncomingCardEffects(
-                    { damage: incomingDamage },
-                    cardEffects || {},
-                ));
+                const monsterDmg = this.character.takeDamage(incomingDamage);
                 this.onEvent({
                     type: 'monsterAttack',
                     damage: monsterDmg,
@@ -377,17 +350,6 @@ export class CombatSystem {
 
         // Monster killed?
         if (!monster.alive) {
-            const restore = cardEffects?.onKillRestore;
-            if (restore && (restore.hp > 0 || restore.sp > 0)) {
-                const restored = applyOnKillCardEffects({
-                    hp: this.character.stats.hp,
-                    maxHp: this.character.stats.max_hp,
-                    sp: this.character.stats.sp,
-                    maxSp: this.character.stats.max_sp,
-                }, cardEffects);
-                this.character.stats.hp = restored.hp;
-                this.character.stats.sp = restored.sp;
-            }
             this._onMonsterKilled(monster);
         }
 

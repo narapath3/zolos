@@ -107,6 +107,10 @@ export function aggregateCardEffects({ equippedCards = {}, cardState = {} } = {}
 }
 
 export function applyOutgoingCardEffects(context = {}, effects = createEffects()) {
+  return resolveOutgoingCardEffects(context, effects).damage;
+}
+
+export function resolveOutgoingCardEffects(context = {}, effects = createEffects()) {
   const damage = numberOrZero(context.damage);
   let bonus = numberOrZero(effects.damagePct);
   if (context.isBoss) bonus += numberOrZero(effects.bossDamagePct);
@@ -120,7 +124,10 @@ export function applyOutgoingCardEffects(context = {}, effects = createEffects()
     && numberOrZero(effects.executePct) > 0
     && numberOrZero(context.targetHpRatio) <= numberOrZero(effects.executePct)
     && numberOrZero(context.targetHp) > 0;
-  return canExecute ? Math.max(boostedDamage, numberOrZero(context.targetHp)) : boostedDamage;
+  return {
+    damage: canExecute ? Math.max(boostedDamage, numberOrZero(context.targetHp)) : boostedDamage,
+    execute: canExecute,
+  };
 }
 
 export function applyIncomingCardEffects(context = {}, effects = createEffects()) {

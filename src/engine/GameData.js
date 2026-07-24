@@ -1642,7 +1642,38 @@ export function pickRandomWaterMonster(playerLevel) {
     return table[0].type;
 }
 
+// Combat-facing metadata is centralized so each spawned record has a stable
+// family and map-boss status without making card effects depend on display data.
+const MONSTER_COMBAT_META = Object.freeze({
+    poring: { family: 'slime' }, lunatic: { family: 'beast' }, fabre: { family: 'insect' },
+    rocker: { family: 'insect' }, willow: { family: 'plant' }, poporing: { family: 'slime' },
+    drops: { family: 'slime' }, deviruchi: { family: 'demon' }, ghostring: { family: 'undead', isBoss: true, isElite: true },
+    horn: { family: 'beast' }, savage: { family: 'beast' }, boa: { family: 'beast' },
+    spore: { family: 'plant' }, bigfoot: { family: 'beast' }, nine_tail: { family: 'beast' },
+    skeleton: { family: 'undead' }, zombie: { family: 'undead' }, archer_skeleton: { family: 'undead' },
+    raydric: { family: 'undead' }, hunter_fly: { family: 'insect' }, dullahan: { family: 'undead', isBoss: true, isElite: true },
+    golem: { family: 'construct' }, stone_golem: { family: 'construct' }, harpy: { family: 'beast' },
+    gargoyle: { family: 'construct' }, iron_golem: { family: 'construct' }, storm_dragon: { family: 'dragon', isBoss: true, isElite: true },
+    dragon_egg: { family: 'dragon' }, sea_dragon: { family: 'dragon' }, leib_olmai: { family: 'beast' },
+    dark_illusion: { family: 'undead' }, abyss_knight: { family: 'undead', isBoss: true, isElite: true },
+    shrimp: { family: 'aquatic' }, clam: { family: 'aquatic' }, fish: { family: 'aquatic' },
+    crab: { family: 'aquatic' }, marina: { family: 'aquatic' },
+});
+
+export function getMonsterCombatMeta(type, data = {}) {
+    const metadata = MONSTER_COMBAT_META[type] || {};
+    return {
+        family: data.family || metadata.family || 'unknown',
+        isBoss: data.isBoss === true || metadata.isBoss === true,
+        isElite: data.isElite === true || metadata.isElite === true,
+    };
+}
+
 // All monsters combined (for lookup)
 export function getAllMonsters() {
-    return { ...MONSTERS, ...PAYON_MONSTERS, ...GLAST_MONSTERS, ...MJOLNIR_MONSTERS, ...ABYSS_MONSTERS, ...WATER_MONSTERS };
+    const records = { ...MONSTERS, ...PAYON_MONSTERS, ...GLAST_MONSTERS, ...MJOLNIR_MONSTERS, ...ABYSS_MONSTERS, ...WATER_MONSTERS };
+    return Object.fromEntries(Object.entries(records).map(([type, data]) => [
+        type,
+        { ...data, ...getMonsterCombatMeta(type, data) },
+    ]));
 }

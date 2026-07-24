@@ -231,8 +231,7 @@ async function initGame(charData) {
         if (!character || !character.isAlive || !character.isAlive()) return;
         if (window.bossEngaged || duelState) return; // boss/duel own their own combat
         const atk = (mon.data && mon.data.atk) || 10;
-        const def = character.stats.def || 0;
-        const dmg = Math.max(1, atk - Math.floor(def * 0.3) + Math.floor(Math.random() * 3));
+        const dmg = atk + Math.floor(Math.random() * 3);
         const actual = character.takeDamage(dmg);
         if (particles) {
             const sp = worldToScreen(character.getPosition(), 1.6);
