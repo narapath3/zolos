@@ -5,6 +5,7 @@ import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 import { getCard } from '../cards/CardCatalog.js';
 import { normalizeCardState } from '../cards/CardProgression.js';
+import { aggregateCardEffects } from '../cards/CardEffects.js';
 
 // Walkable half-extent. The ground is a 70x70 plane centred at the origin
 // (see SceneManager._createGround), so keep the player just inside the ±35 edge
@@ -216,26 +217,26 @@ export class CharacterManager {
     }
 
     // ===== Cards =====
-    // Sum a `card` bonus field across every socketed card. Core fields
-    // (atkBonus/defBonus/hpBonus/spBonus) fold into the stat getters below;
-    // special fields (critBonus/dmgPct/lifestealPct) are read by CombatSystem.
+    // Cards resolve from catalog data, canonical socket IDs, and star state in
+    // one place so stat and combat paths use identical scaled effects.
+    getCardEffects() {
+        return aggregateCardEffects({
+            equippedCards: this.equippedCards,
+            cardState: this.cardState,
+        });
+    }
+
     getCardTotal(field) {
-        let sum = 0;
-        for (const slot of Object.keys(this.equippedCards)) {
-            const cardId = this.equippedCards[slot];
-            const card = cardId && getCard(cardId);
-            const item = cardId && ITEMS[cardId];
-            if (card?.stats?.[field]) sum += card.stats[field];
-            else if (card?.effect?.type === field) sum += card.effect.value;
-            else if (item?.card?.[field]) sum += item.card[field];
-        }
-        return sum;
+        const effects = this.getCardEffects();
+        if (Object.hasOwn(effects.stats, field)) return effects.stats[field];
+        if (field === 'dmgPct') return effects.damagePct;
+        return Number(effects[field]) || 0;
     }
 
     // Combat hooks (used by CombatSystem._resolveDamage).
-    getCritChanceBonus() { return this.getCardTotal('critBonus'); }
-    getDamagePct() { return this.getCardTotal('dmgPct'); }
-    getLifestealPct() { return this.getCardTotal('lifestealPct'); }
+    getCritChanceBonus() { return this.getCardEffects().critBonus; }
+    getDamagePct() { return this.getCardEffects().damagePct; }
+    getLifestealPct() { return this.getCardEffects().lifestealPct; }
 
     // Socket / remove a card in a slot. Returns true on success.
     equipCard(slotId, idOrName) {

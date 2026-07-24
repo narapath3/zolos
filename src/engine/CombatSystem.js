@@ -1,6 +1,11 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
 import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS } from './GameData.js';
+import {
+    applyIncomingCardEffects,
+    applyOnKillCardEffects,
+    applyOutgoingCardEffects,
+} from '../cards/CardEffects.js';
 
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
@@ -300,20 +305,32 @@ export class CombatSystem {
 
         // Player attacks monster. Card sockets can raise crit chance and add a
         // flat damage multiplier on top of the base 10%.
-        const critBonus = this.character.getCritChanceBonus ? this.character.getCritChanceBonus() : 0;
+        const cardEffects = this.character.getCardEffects ? this.character.getCardEffects() : null;
+        const critBonus = cardEffects?.critBonus
+            ?? (this.character.getCritChanceBonus ? this.character.getCritChanceBonus() : 0);
         const isCritical = Math.random() < (0.1 + critBonus);
 
         // Ensure stats are numbers
         const charAtk = isNaN(this.character.stats.atk) ? 10 : this.character.stats.atk;
         let baseDmg = charAtk + Math.floor(Math.random() * 5);
         if (isCritical) baseDmg = Math.floor(baseDmg * 1.8);
-        const dmgPct = this.character.getDamagePct ? this.character.getDamagePct() : 0;
-        if (dmgPct > 0) baseDmg = Math.floor(baseDmg * (1 + dmgPct));
+        const playerStats = this.character.stats || {};
+        const maxHp = Number(playerStats.max_hp) || 1;
+        const maxMonsterHp = Number(monster.maxHp) || 1;
+        baseDmg = applyOutgoingCardEffects({
+            damage: baseDmg,
+            isBoss: monster.isBoss === true || monster.data?.isBoss === true,
+            family: monster.data?.family,
+            playerHpRatio: (Number(playerStats.hp) || 0) / maxHp,
+            targetHpRatio: (Number(monster.hp) || 0) / maxMonsterHp,
+            targetHp: monster.hp,
+        }, cardEffects || { damagePct: this.character.getDamagePct?.() || 0 });
 
         const actualDmg = monster.takeDamage(baseDmg, isCritical);
 
         // Lifesteal: heal a fraction of damage dealt (legendary card ability).
-        const leech = this.character.getLifestealPct ? this.character.getLifestealPct() : 0;
+        const leech = cardEffects?.lifestealPct
+            ?? (this.character.getLifestealPct ? this.character.getLifestealPct() : 0);
         if (leech > 0 && this.character.stats) {
             const s = this.character.stats;
             const healed = Math.max(1, Math.floor(actualDmg * leech));
@@ -344,7 +361,11 @@ export class CombatSystem {
             // Monsters have a limited counter-attack range (usually melee or slightly more)
             if (dist < 4.0) {
                 const monsterAtk = (monster.data && !isNaN(monster.data.atk)) ? monster.data.atk : 5;
-                const monsterDmg = this.character.takeDamage(monsterAtk + Math.floor(Math.random() * 3));
+                const incomingDamage = monsterAtk + Math.floor(Math.random() * 3);
+                const monsterDmg = this.character.takeDamage(applyIncomingCardEffects(
+                    { damage: incomingDamage },
+                    cardEffects || {},
+                ));
                 this.onEvent({
                     type: 'monsterAttack',
                     damage: monsterDmg,
@@ -356,6 +377,17 @@ export class CombatSystem {
 
         // Monster killed?
         if (!monster.alive) {
+            const restore = cardEffects?.onKillRestore;
+            if (restore && (restore.hp > 0 || restore.sp > 0)) {
+                const restored = applyOnKillCardEffects({
+                    hp: this.character.stats.hp,
+                    maxHp: this.character.stats.max_hp,
+                    sp: this.character.stats.sp,
+                    maxSp: this.character.stats.max_sp,
+                }, cardEffects);
+                this.character.stats.hp = restored.hp;
+                this.character.stats.sp = restored.sp;
+            }
             this._onMonsterKilled(monster);
         }
 
