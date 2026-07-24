@@ -2553,7 +2553,7 @@ export class CharacterManager {
         if (data.glasses) this.setGlasses(data.glasses);
         if (data.weapon) this.equipWeapon(data.weapon);
         if (data.appearance && typeof data.appearance === 'object') {
-            this.applyAppearance(data.appearance);
+            this.restoreCardAppearance(data.appearance);
         }
 
         // Load game settings — check DB data first, then fallback to localStorage
@@ -2609,6 +2609,19 @@ export class CharacterManager {
         };
     }
 
+    restoreCardAppearance(appearance) {
+        if (!appearance || typeof appearance !== 'object') return;
+        if (appearance.cards && this.equippedCards) {
+            for (const slot of Object.keys(this.equippedCards)) this.equippedCards[slot] = null;
+            for (const [slot, idOrName] of Object.entries(appearance.cards)) {
+                this.equipCard(slot, idOrName);
+            }
+        }
+        if (appearance.cardState !== undefined) {
+            this.cardState = normalizeCardState(appearance.cardState);
+        }
+    }
+
     applyAppearance(app) {
         if (!app) return;
         if (app.gender !== undefined && app.gender !== this.gender) this.setGender(app.gender);
@@ -2628,11 +2641,7 @@ export class CharacterManager {
         if (app.refine && this.equipRefine) {
             for (const k of Object.keys(this.equipRefine)) this.equipRefine[k] = app.refine[k] || 0;
         }
-        if (app.cards && this.equippedCards) {
-            for (const k of Object.keys(this.equippedCards)) this.equippedCards[k] = null;
-            for (const [slot, idOrName] of Object.entries(app.cards)) this.equipCard(slot, idOrName);
-        }
-        if (app.cardState !== undefined) this.cardState = normalizeCardState(app.cardState);
+        this.restoreCardAppearance(app);
         if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
         if (app.pet !== undefined && app.pet !== this.equippedPet) {
             this.setPet(app.pet, app.petLevel || 1, 0, app.petName || null);
