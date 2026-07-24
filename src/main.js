@@ -51,7 +51,7 @@ import { AdminUI } from './ui/AdminUI.js';
 import { announcementSystem } from './ui/AnnouncementSystem.js';
 import { TutorialSystem } from './ui/TutorialSystem.js';
 import { GlobalAnnouncements } from './ui/GlobalAnnouncements.js';
-import { SKILLS, ITEMS, rollBossCards } from './engine/GameData.js';
+import { SKILLS, ITEMS } from './engine/GameData.js';
 import {
     loadCharacter,
     saveCharacter,
@@ -1865,7 +1865,7 @@ window.worldBossManager = {
         // Card drops — every participant rolls the card table (client-side, %
         // based by rarity). Usually 0–1 cards; legendaries are a rare thrill.
         try {
-            const cards = rollBossCards();
+            const cards = [];
             for (const cardName of cards) {
                 const meta = ITEMS[cardName];
                 if (!meta || !gameUI) continue;
