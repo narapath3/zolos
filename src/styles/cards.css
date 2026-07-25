@@ -543,8 +543,12 @@
 
 .card-detail,
 .card-fusion {
+  position: fixed;
+  inset: 0;
+  margin: auto;
   width: min(calc(100% - 24px), 720px);
   max-width: 720px;
+  height: fit-content;
   max-height: min(90vh, 800px);
   max-height: min(90dvh, 800px);
   padding: 0;
