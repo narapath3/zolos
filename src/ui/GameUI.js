@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -60,6 +60,7 @@ export class GameUI {
     this._setupAutoBot();
     this._setupTargetIndicator();
     this._setupTradePanel();
+    this._setupCardTradePanel();
     this._setupMobileControls();
     this._setupDailyQuests();
     this._setupNetworkStatus();
@@ -1373,7 +1374,7 @@ export class GameUI {
           return !this.character?.equippedCards?.[slotId];
         },
         onFuse: cardId => this.requestCardFusion(cardId),
-        onSell: cardId => this._sellCardToMarket(cardId),
+        onSell: cardId => this._openCardTrade(cardId),
         onRareDrop: (card) => {
           window.globalAnnouncements?.addAnnouncement?.({
             type: 'rare-drop',
@@ -1399,33 +1400,46 @@ export class GameUI {
     if (this.currentTab === 'card' || mycardOpen) this.cardAlbum.render();
   }
 
-  // Sell a card to other players via the P2P market. Cards can ONLY be traded
-  // between players here — they are excluded from the NPC sell shop.
-  _sellCardToMarket(cardId) {
+  // Cards are traded ONLY player-to-player through a dedicated P2P modal —
+  // never through the market or the NPC shop. Open that modal with this card
+  // preselected; the seller then enters the recipient's UID and a price
+  // (0 = free) and a live trade popup is delivered to the recipient.
+  _openCardTrade(cardId) {
     const card = getCard(cardId);
     if (!card) return;
-    // The card row must have at least one spare copy to list. A socketed card
+    // The card row must have at least one spare copy to send. A socketed card
     // keeps its whole stack in one row (quantity stays intact) but reserves the
     // single copy that is actually socketed — see _sellableQty.
     const row = (this.inventory || []).find(i =>
       i.item_type === 'card' && getCard(i.item_name)?.id === cardId && (i.quantity || 0) >= 1);
     if (!row || this._sellableQty(row) < 1) {
-      this.addCombatLog('❌ ไม่มีการ์ดใบนี้เหลือให้ตั้งขาย (การ์ดที่ใส่ในช่องอยู่ต้องถอดก่อน หรือมีเพียงใบเดียว)', 'warning');
+      this.addCombatLog('❌ ไม่มีการ์ดใบนี้เหลือให้โอน (การ์ดที่ใส่ในช่องอยู่ต้องถอดก่อน หรือมีเพียงใบเดียว)', 'warning');
       return;
     }
-    // Open the player market on the Sell tab with this card preselected.
-    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
-    const mp = document.getElementById('market-panel');
-    if (mp) mp.style.display = 'block';
+    this._cardTradeItem = row;
+
+    const sellable = this._sellableQty(row);
+    const iconEl = document.getElementById('card-trade-icon');
+    if (iconEl) iconEl.innerHTML = this._itemIconHtml(row);
+    const nameEl = document.getElementById('card-trade-name');
+    if (nameEl) nameEl.textContent = card.displayName || card.itemName || row.item_name;
+    const ownedEl = document.getElementById('card-trade-owned');
+    if (ownedEl) ownedEl.textContent = `ส่งได้สูงสุด: ${sellable} ใบ`;
+
+    const uidInput = document.getElementById('card-trade-uid-input');
+    if (uidInput) uidInput.value = '';
+    const qtyInput = document.getElementById('card-trade-qty-input');
+    if (qtyInput) { qtyInput.value = 1; qtyInput.max = sellable; }
+    const priceInput = document.getElementById('card-trade-price-input');
+    if (priceInput) priceInput.value = 0;
+    const statusEl = document.getElementById('card-trade-status');
+    if (statusEl) statusEl.textContent = '';
+    const waiting = document.getElementById('card-trade-waiting');
+    if (waiting) waiting.style.display = 'none';
+
+    const modal = document.getElementById('card-trade-modal');
+    if (modal) modal.style.display = 'flex';
     this.updateMobileControlsVisibility();
-    // Switch to the Sell tab FIRST: the tab click handler clears
-    // selectedMarketItem, so the preselection must be applied AFTER the switch.
-    const sellTab = document.querySelector('.market-tab[data-tab="sell"]');
-    if (sellTab) sellTab.click(); else { this.marketTab = 'sell'; this._renderMarket(); }
-    this.selectedMarketItem = row;
-    this._renderMarketSellInventory();
-    this._updateMarketSellForm();
-    this.addCombatLog(`💰 ตั้งขายการ์ด "${card.displayName || card.itemName}" — กำหนดราคาแล้วกดตั้งขายได้เลย`, 'system');
   }
 
   showCardDropReveal(cardId, context = {}) {
@@ -6518,11 +6532,11 @@ export class GameUI {
     if (!grid) return;
     grid.innerHTML = '';
 
-    // Show every item with at least one listable copy (pets are listed
-    // per-instance from the pet popup so their custom names carry to the
-    // market). A socketed card still lists its spare copies — _sellableQty
-    // reserves only the single socketed one.
-    const sellable = this.inventory.filter(item => item.item_type !== 'pet' && this._sellableQty(item) >= 1);
+    // Show every item with at least one listable copy. Pets are listed
+    // per-instance from the pet popup; cards are excluded entirely — they are
+    // traded only player-to-player via the dedicated card P2P modal (My Card).
+    const sellable = this.inventory.filter(item =>
+      item.item_type !== 'pet' && item.item_type !== 'card' && this._sellableQty(item) >= 1);
 
     if (sellable.length === 0) {
       grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
@@ -8196,6 +8210,102 @@ export class GameUI {
     }
   }
 
+  // ============ Card P2P Trade (send a card to a player by UID) ============
+  _setupCardTradePanel() {
+    this._cardTradeItem = null;
+
+    const closeCardTrade = () => {
+      const modal = document.getElementById('card-trade-modal');
+      if (modal) modal.style.display = 'none';
+      const waiting = document.getElementById('card-trade-waiting');
+      if (waiting) waiting.style.display = 'none';
+      this._cardTradeItem = null;
+      this.updateMobileControlsVisibility();
+    };
+
+    document.getElementById('btn-close-card-trade')?.addEventListener('click', closeCardTrade);
+    document.getElementById('card-trade-overlay')?.addEventListener('click', closeCardTrade);
+
+    // Cancel while waiting: tell the recipient the offer is withdrawn.
+    document.getElementById('btn-cancel-card-trade')?.addEventListener('click', async () => {
+      if (this.tradeTimeout) { clearTimeout(this.tradeTimeout); this.tradeTimeout = null; }
+      if (this.tradeTarget && this.characterId) {
+        const req = {
+          senderUserId: this.characterId,
+          targetUserId: this.tradeTarget.userId,
+          senderName: this.character?.stats?.name || 'Player',
+        };
+        try { await sendTradeCancelPacket(this.characterId, this.tradeTarget.userId, req); } catch (e) { /* ignore */ }
+      }
+      this.tradeTarget = null;
+      this.tradeSelectedItem = null;
+      closeCardTrade();
+    });
+
+    document.getElementById('btn-send-card-trade')?.addEventListener('click', () => this._sendCardTrade());
+  }
+
+  async _sendCardTrade() {
+    const item = this._cardTradeItem;
+    const statusEl = document.getElementById('card-trade-status');
+    const setStatus = (msg, color) => {
+      if (statusEl) { statusEl.textContent = msg; statusEl.style.color = color || 'var(--text-dim)'; }
+    };
+    if (!item || !this.characterId) { setStatus('❌ ไม่ได้เลือกการ์ด', '#ff8f8f'); return; }
+
+    const uid = (document.getElementById('card-trade-uid-input')?.value || '').trim();
+    const maxQty = this._sellableQty(item);
+    const qty = Math.min(Math.max(1, parseInt(document.getElementById('card-trade-qty-input')?.value) || 1), maxQty);
+    const price = Math.max(0, parseInt(document.getElementById('card-trade-price-input')?.value) || 0);
+
+    if (!uid) { setStatus('❌ กรุณากรอก UID ผู้รับ', '#ff8f8f'); return; }
+    if (maxQty < 1) { setStatus('❌ ไม่มีการ์ดใบนี้เหลือให้ส่ง', '#ff8f8f'); return; }
+
+    // Guard against sending to yourself.
+    const myUid = this.characterId.split('_').pop().substring(0, 8).toUpperCase();
+    if (uid.toUpperCase() === myUid) { setStatus('❌ ส่งการ์ดให้ตัวเองไม่ได้', '#ff8f8f'); return; }
+
+    setStatus('⌛ กำลังค้นหาผู้รับ...', 'var(--text-dim)');
+    const target = await resolveCharacterByUid(uid);
+    if (!target || !target.userId) { setStatus('❌ ไม่พบผู้เล่นที่มี UID นี้', '#ff8f8f'); return; }
+
+    // The recipient must be online — the trade popup is delivered in real time.
+    const online = (this.onlinePlayers || []).some(p => p.userId === target.userId);
+    if (!online) { setStatus(`❌ ผู้รับ (${target.username || uid}) ต้องออนไลน์อยู่จึงจะรับการ์ดได้`, '#ff8f8f'); return; }
+
+    // Never carry the sender's socket state onto the recipient's fresh copy.
+    const catalog = getCard(item.item_name);
+    const cleanStats = { card_id: catalog?.id || item.stats?.card_id };
+    if (item.stats && item.stats.card_stars) cleanStats.card_stars = item.stats.card_stars;
+
+    this.tradeTarget = { userId: target.userId, username: target.username };
+    this.tradeSelectedItem = item;
+
+    const waiting = document.getElementById('card-trade-waiting');
+    if (waiting) waiting.style.display = 'flex';
+
+    try {
+      const myName = this.character?.stats?.name || 'Player';
+      await sendTradeRequestPacket(
+        this.characterId, myName, target.userId, target.username || 'Player',
+        item.item_name, 'card', qty, price, cleanStats
+      );
+
+      this.tradeTimeout = setTimeout(() => {
+        if (waiting && waiting.style.display !== 'none') {
+          waiting.style.display = 'none';
+          this.addCombatLog('⏱️ คำขอเทรดการ์ดหมดเวลา ไม่มีการตอบรับ', 'warning');
+          this.tradeTarget = null;
+          this.tradeSelectedItem = null;
+        }
+      }, 30000);
+    } catch (err) {
+      console.error('[CardTrade] Request Error:', err);
+      if (waiting) waiting.style.display = 'none';
+      setStatus('❌ ส่งคำขอไม่สำเร็จ ลองใหม่อีกครั้ง', '#ff8f8f');
+    }
+  }
+
   openTradePanel(remotePlayer) {
     if (!remotePlayer) return;
 
@@ -8349,10 +8459,18 @@ export class GameUI {
     if (senderName) senderName.textContent = payload.senderName || 'Anonymous';
     if (senderLevel) senderLevel.style.display = 'none';
 
-    const meta = ITEMS[payload.itemName] || {};
-    if (itemIcon) itemIcon.textContent = meta.emoji || '📦';
+    // Cards carry no ITEMS entry — resolve their art/rarity from the catalog
+    // so the recipient sees the real card, not a generic 📦.
+    const cardCatalog = payload.itemType === 'card' ? getCard(payload.itemName) : null;
+    const meta = cardCatalog
+      ? { emoji: null, rarity: cardCatalog.rarity }
+      : (ITEMS[payload.itemName] || {});
+    if (itemIcon) {
+      if (cardCatalog) itemIcon.innerHTML = this._itemIconHtml({ item_type: 'card', item_name: payload.itemName });
+      else itemIcon.textContent = meta.emoji || '📦';
+    }
     if (itemName) {
-      itemName.textContent = payload.itemName;
+      itemName.textContent = cardCatalog ? (cardCatalog.displayName || payload.itemName) : payload.itemName;
       itemName.className = 'detail-name ' + `color-${meta.rarity || 'common'}`;
     }
     if (itemQty) itemQty.textContent = `จำนวน: x${payload.quantity}`;
@@ -8421,6 +8539,8 @@ export class GameUI {
 
       // Re-load inventory to force refresh
       await this.loadInventoryFromDB(this.characterId);
+      // A received card must show up in the album/collection immediately.
+      if (req.itemType === 'card' && this.cardAlbum) this.cardAlbum.render();
 
       // Deduct gold from character stats locally so HUD renders correctly immediately
       if (this.character && this.character.stats) {
@@ -8475,9 +8595,14 @@ export class GameUI {
     const waitOverlay = document.getElementById('trade-waiting-overlay');
     if (waitOverlay) waitOverlay.style.display = 'none';
 
-    // Close trade panel
+    // Close both trade panels (generic item trade + card P2P trade).
     const panel = document.getElementById('trade-panel');
     if (panel) panel.style.display = 'none';
+    const cardModal = document.getElementById('card-trade-modal');
+    if (cardModal) cardModal.style.display = 'none';
+    const cardWaiting = document.getElementById('card-trade-waiting');
+    if (cardWaiting) cardWaiting.style.display = 'none';
+    this.updateMobileControlsVisibility();
 
     const req = payload.requestPayload;
     if (payload.accepted) {
@@ -8492,13 +8617,20 @@ export class GameUI {
           req.price
         );
 
-        // Deduct from local inventory
-        const localItem = this.inventory.find(i => i.item_name === req.itemName);
-        if (localItem) {
-          localItem.quantity -= req.quantity;
-          if (localItem.quantity <= 0) {
-            const idx = this.inventory.indexOf(localItem);
-            this.inventory.splice(idx, 1);
+        if (req.itemType === 'card') {
+          // Rebuild inventory + card collection state from the DB so the album
+          // and duplicate/fusion counts reflect the card that just left.
+          await this.loadInventoryFromDB(this.characterId);
+          if (this.cardAlbum) this.cardAlbum.render();
+        } else {
+          // Deduct from local inventory
+          const localItem = this.inventory.find(i => i.item_name === req.itemName);
+          if (localItem) {
+            localItem.quantity -= req.quantity;
+            if (localItem.quantity <= 0) {
+              const idx = this.inventory.indexOf(localItem);
+              this.inventory.splice(idx, 1);
+            }
           }
         }
 

@@ -1151,6 +1151,64 @@
       </div>
     </div>
 
+    <!-- Card P2P Trade Modal (send a card straight to a player by UID) -->
+    <div id="card-trade-modal" class="modal-popup" style="display: none;">
+      <div class="popup-overlay" id="card-trade-overlay"></div>
+      <div class="popup-content trade-panel-content" style="position: relative;">
+        <!-- Wait Overlay -->
+        <div id="card-trade-waiting"
+          style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8, 12, 24, 0.95); color: #fff; z-index: 10; flex-direction: column; justify-content: center; align-items: center; border-radius: 8px; padding: 20px; text-align: center;">
+          <div class="loader-spinner"
+            style="border: 4px solid rgba(255,255,255,0.1); border-left-color: var(--primary); border-radius: 50%; width: 36px; height: 36px; animation: spin 1s linear infinite; margin-bottom: 15px;">
+          </div>
+          <div
+            style="font-size: 11px; font-family: var(--font-pixel); color: var(--primary); margin-bottom: 15px; line-height: 1.5;">
+            กำลังส่งคำขอเทรด รอผู้รับกดตอบรับ...</div>
+          <button id="btn-cancel-card-trade" class="btn-secondary"
+            style="padding: 6px 16px; font-size: 11px; border-radius: 4px;">ยกเลิก (Cancel)</button>
+        </div>
+
+        <div class="popup-header">
+          <span class="popup-title">🃏 โอน / ขายการ์ด (P2P)</span>
+          <button class="popup-close" id="btn-close-card-trade">✕</button>
+        </div>
+        <div class="popup-body">
+          <div class="trade-selected-item-row"
+            style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: var(--radius-sm); margin-bottom: 14px;">
+            <span id="card-trade-icon" class="detail-icon" style="font-size: 24px;">🃏</span>
+            <div class="detail-info-block" style="text-align: left;">
+              <div id="card-trade-name" class="detail-name"
+                style="font-weight: bold; color: var(--primary); font-family: var(--font-pixel); font-size: 11px;">Card
+              </div>
+              <div id="card-trade-owned" class="detail-type" style="color: var(--text-dim);">ขายได้: 0</div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 10px;">
+            <label for="card-trade-uid-input">UID ผู้รับ:</label>
+            <input type="text" id="card-trade-uid-input" placeholder="กรอก UID ผู้รับ เช่น A1B2C3D4"
+              autocomplete="off" spellcheck="false" style="text-transform: uppercase; width: 100%;">
+          </div>
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label for="card-trade-qty-input">จำนวน:</label>
+              <input type="number" id="card-trade-qty-input" min="1" value="1">
+            </div>
+            <div class="form-group flex-2">
+              <label for="card-trade-price-input">ราคา (Zeny):</label>
+              <input type="number" id="card-trade-price-input" min="0" value="0" placeholder="0 = โอนฟรี">
+            </div>
+          </div>
+          <p id="card-trade-status" style="font-size: 10.5px; color: var(--text-dim); min-height: 14px; margin: 6px 0 0;">
+          </p>
+          <button id="btn-send-card-trade" class="btn-primary" style="width: 100%; margin-top: 8px;">🤝 ส่งคำขอเทรด
+            (Send Request)</button>
+          <p style="font-size: 10px; color: var(--text-dim); margin-top: 8px; text-align: center; line-height: 1.5;">
+            ผู้รับต้องออนไลน์อยู่ · จะมีป๊อปอัพเด้งให้ผู้รับกดยอมรับ · ตั้งราคา 0 = โอนฟรี</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Friend Request Confirmation Modal -->
     <div id="friend-confirm-modal" class="modal-popup" style="display: none;">
       <div class="popup-overlay" id="friend-confirm-overlay"></div>

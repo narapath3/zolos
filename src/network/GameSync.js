@@ -150,6 +150,33 @@ export async function fetchPublicCharacter(userId) {
     }
 }
 
+// Resolve a player-facing UID (the 8-char code shown as "UID: #XXXXXXXX",
+// derived from characters.id → 'char_' + suffix) back to that character's
+// routing identity. Used by the card P2P trade so a sender can target a
+// recipient by UID. Returns { characterId, userId, username } or null.
+export async function resolveCharacterByUid(uid) {
+    if (isOfflineMode || !supabase || !uid) return null;
+    const clean = String(uid).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!clean) return null;
+    const charId = 'char_' + clean;
+    try {
+        const { data, error } = await supabase
+            .from('characters')
+            .select('id, user_id, name')
+            .eq('id', charId)
+            .maybeSingle();
+        if (error) {
+            console.error('[Zolos] resolveCharacterByUid error:', error.message);
+            return null;
+        }
+        if (!data) return null;
+        return { characterId: data.id, userId: data.user_id, username: data.name };
+    } catch (e) {
+        console.error('[Zolos] resolveCharacterByUid error:', e);
+        return null;
+    }
+}
+
 export async function createCharacter(userId) {
     let name = getDeterministicGuestName(userId);
     let gender = 'male';
