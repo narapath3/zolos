@@ -55,11 +55,15 @@ export function migrateLegacyCards(inventory = [], cards = {}) {
   const normalizedInventory = [];
   const cardState = {};
   const equippedCards = canonicalizeSockets(cards);
+  const equipmentRows = [];
 
   for (const row of Array.isArray(inventory) ? inventory : []) {
     const card = row?.item_type === 'card' && (getCard(row.item_name) || getCard(row.stats?.card_id));
     if (!card) {
       normalizedInventory.push(row);
+      if (['weapon', 'shield', 'armor', 'hat', 'glasses', 'head', 'body', 'garment', 'ring', 'wrist', 'pants', 'feet', 'accessory'].includes(row?.item_type)) {
+        equipmentRows.push(row);
+      }
       continue;
     }
 
@@ -94,6 +98,28 @@ export function migrateLegacyCards(inventory = [], cards = {}) {
     };
     canonicalRows.set(card.id, normalized);
     normalizedInventory.push(normalized);
+  }
+
+  // RECOVERY: If an equipment item has a stats.cards array (from the detail-box flow),
+  // ensure those cards are marked as equipped in the canonical equippedCards map.
+  for (const eq of equipmentRows) {
+    if (eq.stats && eq.stats.equipped && Array.isArray(eq.stats.cards)) {
+      const slot = eq.stats.slot || eq.stats.equippedSlot;
+      if (slot && equippedCards[slot]) {
+        eq.stats.cards.forEach((cardName, idx) => {
+          const card = getCard(cardName);
+          if (card && !isSocketed(equippedCards, card.id)) {
+            const slotArray = equippedCards[slot];
+            if (slotArray[idx] === null) {
+              slotArray[idx] = card.id;
+            } else {
+              const emptyIdx = slotArray.indexOf(null);
+              if (emptyIdx !== -1) slotArray[emptyIdx] = card.id;
+            }
+          }
+        });
+      }
+    }
   }
 
   const socketSlotsByCardId = new Map();

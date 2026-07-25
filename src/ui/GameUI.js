@@ -917,6 +917,8 @@ export class GameUI {
     if (!this.characterId || !this.inventory) return;
     // Fold live pet growth into its item's stats so it's saved with the batch.
     this._syncPetItemStats();
+    // Fold live card sockets into card-row stats so they're saved with the batch.
+    this._syncCardItemStats();
     const { setInventoryItemQuantity } = await import('../network/GameSync.js');
 
     // Flush ALL items (not just equipped ones) so that items bought but never
@@ -2467,6 +2469,35 @@ export class GameUI {
     found.item.stats.equipped = true;
     found.item.stats.equippedUid = c.equippedPetUid;
     return found.item;
+  }
+
+  /**
+   * Sync live character equippedCards back to the card items in inventory.
+   * This ensures the "equipped" and "slot" flags in inventory row stats
+   * match the live paper-doll, which is critical for persistence.
+   */
+  _syncCardItemStats() {
+    const c = this.character;
+    if (!c || !c.equippedCards) return;
+
+    // Reset all cards to unequipped first
+    this.inventory.forEach(it => {
+      if (it.item_type === 'card' && it.stats) {
+        it.stats.equipped = false;
+        delete it.stats.slot;
+      }
+    });
+
+    // Mark currently equipped cards
+    for (const [slot, cardId] of Object.entries(c.equippedCards)) {
+      if (!cardId) continue;
+      const card = this.inventory.find(it => it.item_type === 'card' && getCard(it.item_name)?.id === cardId);
+      if (card) {
+        if (!card.stats) card.stats = {};
+        card.stats.equipped = true;
+        card.stats.slot = slot;
+      }
+    }
   }
 
   // Persist the active pet's progress immediately (called on level-up).
@@ -9796,6 +9827,15 @@ export class GameUI {
       
       this._renderInventory();
       this._updateDetailBox();
+      
+      // BRIDGE: Also update the character's canonical equippedCards so it's persisted in the appearance blob
+      if (this.character && this.character.equipCard) {
+        const slot = targetItem.stats.slot || targetItem.stats.equippedSlot;
+        if (slot) {
+          this.character.equipCard(slot, cardItem.item_name);
+        }
+      }
+
       this.updateStats(this.character.stats);
       
       // Persist card socket state + inventory stats to Supabase
@@ -9839,6 +9879,15 @@ export class GameUI {
       
       this._renderInventory();
       this._updateDetailBox();
+
+      // BRIDGE: Also update the character's canonical equippedCards
+      if (this.character && this.character.unequipCard) {
+        const slot = targetItem.stats.slot || targetItem.stats.equippedSlot;
+        if (slot && this.character.equippedCards[slot] === getCard(cardName)?.id) {
+          this.character.unequipCard(slot);
+        }
+      }
+
       this.updateStats(this.character.stats);
       
       // Persist card socket state + inventory stats to Supabase
