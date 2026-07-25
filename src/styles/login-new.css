@@ -188,7 +188,7 @@
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: clamp(28px, 5vw, 48px);
+  padding: clamp(18px, 3.5vw, 36px);
   background: linear-gradient(165deg, rgba(8, 12, 28, 0.92), rgba(4, 8, 18, 0.96));
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
@@ -205,12 +205,13 @@
   min-height: fit-content;
   overflow-y: auto;
   overflow-x: hidden;
-  margin: auto auto 12px;
+  margin: 12px auto 12px;
   animation: authCardEnter 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 @keyframes authCardEnter {
@@ -264,7 +265,7 @@
 
 /* ---- Logo Section ---- */
 .auth-logo {
-  margin-bottom: clamp(16px, 3vw, 28px);
+  margin-bottom: clamp(10px, 2vw, 20px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -302,9 +303,9 @@
 
 /* Logo icon */
 .auth-icon-img {
-  width: clamp(64px, 20vw, 140px);
-  height: clamp(64px, 20vw, 140px);
-  margin-bottom: clamp(6px, 1.5vw, 10px);
+  width: clamp(56px, 16vw, 110px);
+  height: clamp(56px, 16vw, 110px);
+  margin-bottom: clamp(4px, 1vw, 8px);
   filter: drop-shadow(0 8px 24px rgba(240, 192, 64, 0.3));
   animation: logoHover 5s ease-in-out infinite;
   position: relative;
@@ -356,9 +357,9 @@
 
 .game-tagline {
   font-family: 'Kanit', sans-serif;
-  font-size: clamp(12px, 2.5vw, 16px);
+  font-size: clamp(11px, 2.2vw, 14px);
   color: rgba(255, 255, 255, 0.6);
-  margin-bottom: clamp(14px, 3vw, 24px);
+  margin-bottom: clamp(8px, 2vw, 16px);
   font-style: italic;
 }
 
@@ -366,7 +367,7 @@
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 2.5vw, 14px);
+  gap: clamp(8px, 2vw, 12px);
 }
 
 .auth-form input {
@@ -530,7 +531,7 @@
     inset 0 2px 4px rgba(255, 255, 255, 0.5);
   -webkit-text-stroke: clamp(1px, 0.3vw, 1.5px) #7a3d00;
   text-shadow: 0 2px 0 rgba(122, 61, 0, 0.4);
-  margin: clamp(18px, 4vw, 30px) 0;
+  margin: clamp(12px, 3vw, 22px) 0;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
   width: 100%;
@@ -585,7 +586,7 @@
   color: rgba(255, 255, 255, 0.25);
   font-size: clamp(10px, 2.2vw, 12px);
   font-family: var(--font-main);
-  margin: clamp(8px, 2.5vw, 16px) 0;
+  margin: clamp(6px, 2vw, 12px) 0;
   text-transform: uppercase;
   letter-spacing: 3px;
 }
@@ -642,9 +643,19 @@
   border-color: rgba(96, 160, 255, 0.4);
 }
 
+/* ---- Auth Form Wrapper (scrollable inner area for register) ---- */
+#auth-form-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* ---- Status Message ---- */
 .auth-status {
-  margin-top: clamp(10px, 2.5vw, 16px);
+  margin-top: clamp(8px, 2vw, 14px);
   font-size: 14px;
   font-weight: 600;
   color: var(--accent-deep);
@@ -655,7 +666,7 @@
 
 /* ---- Online Count ---- */
 .online-count {
-  margin-top: clamp(10px, 2.5vw, 18px);
+  margin-top: clamp(6px, 1.5vw, 12px);
   font-size: clamp(11px, 3vw, 14px);
   color: #ffffff;
   font-weight: 600;
@@ -1866,9 +1877,9 @@
 .auth-class-selector {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   text-align: left;
-  margin: 4px 0 8px;
+  margin: 2px 0 6px;
 }
 
 .class-selector-label {
@@ -1890,7 +1901,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 4px;
+  padding: 6px 4px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
