@@ -63,10 +63,22 @@ body {
   background: var(--bg-dark);
   color: var(--text);
   overflow: hidden;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  /* Use dvh (dynamic viewport height) to account for mobile address bars */
+  min-height: 100dvh;
   cursor: url('/assets/cute_cursor_32.png'), auto;
   text-rendering: optimizeLegibility;
+}
+
+.game-viewport {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg-dark);
 }
 
 button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup-tab, .online-tab, .wiki-tab, .lb-tab {
@@ -3963,6 +3975,8 @@ button, a, .hud-btn, .inv-slot, .shop-slot, .btn-primary, .btn-secondary, .popup
   /* HUD (HP/SP/EXP) — leave space for minimap */
   #hud-top {
     right: 90px;
+    top: calc(10px + env(safe-area-inset-top));
+    left: calc(10px + env(safe-area-inset-left));
   }
 
   /* Combat log above bottom bar, chat panel, and currency widget */

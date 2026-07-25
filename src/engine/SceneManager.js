@@ -3928,11 +3928,19 @@ export class SceneManager {
 
     // ============ Core Methods ============
     _onResize() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
+        // Use clientWidth/Height of the canvas parent to ensure we fill the container
+        // correctly, especially on mobile where innerHeight can be unreliable.
+        const container = this.canvas.parentElement;
+        const w = container ? container.clientWidth : window.innerWidth;
+        const h = container ? container.clientHeight : window.innerHeight;
+        
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(w, h);
+        
+        // Ensure the canvas style also matches to prevent any scaling issues
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
     }
 
     getDelta() {
