@@ -246,8 +246,8 @@ export class GameUI {
 
   _setupPanels() {
     // Panel toggle buttons
-    document.getElementById('btn-stats').addEventListener('click', () => this._togglePanel('stats-panel'));
     document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
+    document.getElementById('btn-mycard')?.addEventListener('click', () => this._openMyCard());
 
 
 
@@ -352,6 +352,17 @@ export class GameUI {
     if (almanac) almanac.style.display = 'none';
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     this.updateMobileControlsVisibility();
+  }
+
+  // My Card: dedicated card-collection storage (separate from the Bag).
+  // Opens the panel and mounts the shared card album into its grid.
+  _openMyCard() {
+    this._togglePanel('mycard-panel');
+    const panel = document.getElementById('mycard-panel');
+    if (panel && panel.style.display !== 'none') {
+      const grid = document.getElementById('mycard-grid');
+      if (grid) this._mountCardAlbum(grid);
+    }
   }
 
   updateMobileControlsVisibility() {
@@ -1362,6 +1373,7 @@ export class GameUI {
           return !this.character?.equippedCards?.[slotId];
         },
         onFuse: cardId => this.requestCardFusion(cardId),
+        onSell: cardId => this._sellCardToMarket(cardId),
         onRareDrop: (card) => {
           window.globalAnnouncements?.addAnnouncement?.({
             type: 'rare-drop',
@@ -1382,7 +1394,34 @@ export class GameUI {
   }
 
   refreshCardAlbum() {
-    if (this.cardAlbum && this.currentTab === 'card') this.cardAlbum.render();
+    if (!this.cardAlbum) return;
+    const mycardOpen = document.getElementById('mycard-panel')?.style.display !== 'none';
+    if (this.currentTab === 'card' || mycardOpen) this.cardAlbum.render();
+  }
+
+  // Sell a card to other players via the P2P market. Cards can ONLY be traded
+  // between players here — they are excluded from the NPC sell shop.
+  _sellCardToMarket(cardId) {
+    const card = getCard(cardId);
+    if (!card) return;
+    // A card must exist as an unsocketed inventory row to be listed.
+    const row = (this.inventory || []).find(i =>
+      i.item_type === 'card' && getCard(i.item_name)?.id === cardId && (i.quantity || 0) >= 1);
+    if (!row) {
+      this.addCombatLog('❌ ไม่มีการ์ดใบนี้ในกระเป๋าให้ตั้งขาย (การ์ดที่เชื่อม/สวมไว้ต้องถอดก่อน)', 'warning');
+      return;
+    }
+    // Open the player market on the Sell tab with this card preselected.
+    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+    const mp = document.getElementById('market-panel');
+    if (mp) mp.style.display = 'block';
+    this.updateMobileControlsVisibility();
+    this.selectedMarketItem = row;
+    const sellTab = document.querySelector('.market-tab[data-tab="sell"]');
+    if (sellTab) sellTab.click(); else this._renderMarket();
+    this._renderMarketSellInventory();
+    this._updateMarketSellForm();
+    this.addCombatLog(`💰 ตั้งขายการ์ด "${card.displayName || card.itemName}" — กำหนดราคาแล้วกดตั้งขายได้เลย`, 'system');
   }
 
   showCardDropReveal(cardId, context = {}) {
@@ -6014,7 +6053,9 @@ export class GameUI {
 
     // Show only non-equipped sellable items. Pets are excluded — they're sold
     // per-instance from the pet popup so each named pet is handled individually.
-    const sellableItems = this.inventory.filter(i => !this._isItemEquipped(i) && i.item_type !== 'pet');
+    // Cards are excluded — they can only be traded to other players via the
+    // P2P market (My Card → ตั้งขายให้ผู้เล่น), never sold to the NPC shop.
+    const sellableItems = this.inventory.filter(i => !this._isItemEquipped(i) && i.item_type !== 'pet' && i.item_type !== 'card');
 
     sellableItems.forEach(item => {
       const slot = document.createElement('div');

@@ -328,13 +328,13 @@
 
     <!-- Bottom HUD -->
     <div id="hud-bottom">
-      <button class="hud-btn" id="btn-stats" title="Stats">
-        <span>📊</span>
-        <small>Stats</small>
-      </button>
       <button class="hud-btn" id="btn-inventory" title="Inventory">
         <span>🎒</span>
         <small>Bag</small>
+      </button>
+      <button class="hud-btn" id="btn-mycard" title="My Card">
+        <span>🃏</span>
+        <small>My Card</small>
       </button>
       <button class="hud-btn" id="btn-warp" title="Warp Map">
         <span>🌀</span>
@@ -413,7 +413,6 @@
           <button class="inv-tab" data-tab="etc">Etc</button>
           <button class="inv-tab" data-tab="fish">🐟 Fish</button>
           <button class="inv-tab" data-tab="pet">🐾 Pet</button>
-          <button class="inv-tab" data-tab="card">🃏 Card</button>
         </div>
 
         <div class="inventory-grid" id="inventory-grid"></div>
@@ -436,6 +435,18 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- My Card Panel (card collection + trade) -->
+    <div id="mycard-panel" class="side-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>🃏 My Card</h3>
+        <button class="panel-close" data-close="mycard-panel">✕</button>
+      </div>
+      <div class="panel-body">
+        <p class="mycard-hint">คลิกการ์ดเพื่อดูรายละเอียด · เชื่อม/หลอมรวม · หรือ <b>ตั้งขายให้ผู้เล่นอื่น</b> (ขายให้ NPC ไม่ได้)</p>
+        <div id="mycard-grid"></div>
       </div>
     </div>
 

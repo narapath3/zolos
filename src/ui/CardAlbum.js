@@ -422,6 +422,15 @@ export class CardAlbum {
             ${stars >= 5 ? 'Five-star maximum' : fusion.canFuse ? `Preview ${fusion.cost}-duplicate fusion` : `Need ${Math.max(0, fusion.cost - duplicates)} more duplicate${Math.max(0, fusion.cost - duplicates) === 1 ? '' : 's'}`}
           </button>
         </section>
+
+        ${this.options.onSell ? `
+        <section class="card-detail__trade">
+          <button type="button" class="card-detail__sell" data-card-id="${escapeHtml(card.id)}">
+            💰 ตั้งขายให้ผู้เล่นอื่น
+          </button>
+          <p class="card-detail__trade-note">ซื้อขายกันได้เฉพาะในตลาดผู้เล่น · ขายให้ NPC ไม่ได้</p>
+        </section>
+        ` : ''}
       `}
       <p class="card-detail__status" aria-live="polite"></p>
     `;
@@ -431,6 +440,9 @@ export class CardAlbum {
     });
     content.querySelector('.card-fusion__open')?.addEventListener('click', event => {
       this._openFusionConfirmation(card, event.currentTarget);
+    });
+    content.querySelector('.card-detail__sell')?.addEventListener('click', () => {
+      this.options.onSell?.(card.id);
     });
   }
 
