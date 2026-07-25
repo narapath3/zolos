@@ -698,8 +698,10 @@ export class PlayerProfileModal {
       }
     }
 
-    // Initialize 3D character preview
-    this._init3DPreview(appearance);
+    // Initialize 3D character preview (pass the real name + level so the
+    // floating tag above the avatar matches the profile — not the default
+    // "Guest Lv.1" placeholder baked into a fresh CharacterManager).
+    this._init3DPreview(appearance, dbData?.name || player.username, level);
 
     // Animate bars after a short delay — scale each relative to this hero's
     // top attribute so the bars read as a distribution at any level.
@@ -768,9 +770,18 @@ export class PlayerProfileModal {
     }
   }
 
-  _init3DPreview(appearance) {
+  _init3DPreview(appearance, displayName, displayLevel) {
     const canvas = document.getElementById('player-profile-canvas');
     if (!canvas) return;
+
+    // Sets the floating name tag on the preview character to the real player's
+    // name + level (instead of the CharacterManager default "Guest Lv.1").
+    const applyNameTag = (char) => {
+      if (!char) return;
+      if (displayName) char.stats.name = displayName;
+      if (displayLevel) char.stats.level = displayLevel;
+      char.updateNameTag();
+    };
 
     // Reuse existing JobPreview if the canvas is the same — avoids
     // destroying and recreating the entire WebGL renderer, scene, and
@@ -781,6 +792,7 @@ export class PlayerProfileModal {
       // Just update the appearance — no need to rebuild the renderer
       if (this.jobPreview.char) {
         this.jobPreview.char.applyAppearance(appearance);
+        applyNameTag(this.jobPreview.char);
         const ringColor = { swordsman: 0xff6a6a, mage: 0xb080ff, archer: 0x7be08a, priest: 0xffe98a }[appearance.job] || 0xffd24a;
         if (this.jobPreview.ring) {
           this.jobPreview.ring.material.color.setHex(ringColor);
@@ -800,7 +812,8 @@ export class PlayerProfileModal {
     // Apply full appearance to the character
     if (this.jobPreview.char) {
       this.jobPreview.char.applyAppearance(appearance);
-      
+      applyNameTag(this.jobPreview.char);
+
       // Update ring color based on job (match JobPreview logic)
       const ringColor = { swordsman: 0xff6a6a, mage: 0xb080ff, archer: 0x7be08a, priest: 0xffe98a }[appearance.job] || 0xffd24a;
       if (this.jobPreview.ring) {
