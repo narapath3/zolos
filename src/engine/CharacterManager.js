@@ -137,7 +137,7 @@ export class CharacterManager {
 
         Object.defineProperty(this.stats, 'atk', {
             get: () => {
-                const bonus = this.getWeaponAtkBonus(this.equippedWeapon) + this.getCardTotal('atkBonus');
+                const bonus = this.getWeaponAtkBonus(this.equippedWeapon) + this.getCardTotal('atkBonus') + this._gearTotal('atkBonus');
                 const base = isNaN(this.stats._baseAtk) ? 10 : this.stats._baseAtk;
                 return Math.floor((base + bonus) * this._jobMod('atk') * (1 + this.getBuffPct('atk')));
             },
@@ -219,24 +219,53 @@ export class CharacterManager {
         return bonus;
     }
 
-    // Sum a bonus field (defBonus/hpBonus/spBonus) across every equipped gear
+    // Sum a bonus field (atkBonus/defBonus/hpBonus/spBonus) across every equipped gear
     // piece — the whole paper-doll contributes, each scaled by its refine level.
     _gearTotal(field) {
         let sum = 0;
         const inv = window.gameInventory || [];
+        
+        // 1. Base equipment bonuses
         for (const slot of Object.keys(this.equippedGear)) {
             const name = this.equippedGear[slot];
             if (name && ITEMS[name]) {
                 sum += Math.round((ITEMS[name][field] || 0) * getRefineMult(this.equipRefine[slot] || 0));
-                // Add card bonuses
+                
+                // 2. Legacy/New card bonuses stored on the item itself
                 const item = inv.find(i => i.item_name === name && i.stats && i.stats.equipped && i.stats.slot === slot);
                 if (item && item.stats && item.stats.cards) {
                     item.stats.cards.forEach(cardName => {
-                        if (ITEMS[cardName]) sum += ITEMS[cardName][field] || 0;
+                        const cardData = ITEMS[cardName];
+                        if (cardData) sum += cardData[field] || 0;
                     });
                 }
             }
         }
+
+        // 3. Weapon-specific bonuses (since it's not in equippedGear)
+        if (this.equippedWeapon && ITEMS[this.equippedWeapon]) {
+            // Weapon cards
+            const weaponItem = inv.find(i => i.item_name === this.equippedWeapon && i.stats && i.stats.equipped);
+            if (weaponItem && weaponItem.stats && weaponItem.stats.cards) {
+                weaponItem.stats.cards.forEach(cardName => {
+                    const cardData = ITEMS[cardName];
+                    if (cardData) sum += cardData[field] || 0;
+                });
+            }
+        }
+
+        // 4. Shield-specific bonuses (since it's not in equippedGear)
+        if (this.equippedShield && ITEMS[this.equippedShield]) {
+            // Shield cards
+            const shieldItem = inv.find(i => i.item_name === this.equippedShield && i.stats && i.stats.equipped);
+            if (shieldItem && shieldItem.stats && shieldItem.stats.cards) {
+                shieldItem.stats.cards.forEach(cardName => {
+                    const cardData = ITEMS[cardName];
+                    if (cardData) sum += cardData[field] || 0;
+                });
+            }
+        }
+
         return sum;
     }
 
