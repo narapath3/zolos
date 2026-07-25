@@ -8,12 +8,16 @@
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: #03060e;
   z-index: 1000;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   perspective: 1000px;
+  padding-top: max(12px, 4vh);
+  padding-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ---- Fullscreen Dynamic RO Background Image ---- */
@@ -195,16 +199,17 @@
     0 40px 100px rgba(0, 0, 0, 0.8),
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     inset 0 0 60px rgba(60, 100, 200, 0.04);
-  width: min(90vw, 460px);
-  max-width: 90vw;
+  width: min(92vw, 460px);
+  max-width: 92vw;
   max-height: min(92vh, 820px);
   min-height: fit-content;
   overflow-y: auto;
-  margin: auto;
+  overflow-x: hidden;
+  margin: auto auto 12px;
   animation: authCardEnter 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -895,6 +900,26 @@
     width: 3px;
     height: 3px;
   }
+
+  .ro-top-bar {
+    top: 6px;
+    left: 6px;
+    right: 6px;
+  }
+
+  .ro-server-chip {
+    font-size: 8px;
+    padding: 4px 8px;
+  }
+
+  .ro-server-name {
+    display: none;
+  }
+
+  .ro-bgm-btn {
+    font-size: 9px;
+    padding: 4px 8px;
+  }
 }
 
 /* Small phones: iPhone 12 mini, Galaxy S20 */
@@ -974,6 +999,111 @@
     gap: 5px;
     margin-top: 12px;
   }
+
+  .ro-top-bar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .ro-server-chip {
+    font-size: 9px;
+    padding: 5px 10px;
+  }
+
+  .ro-server-name {
+    display: none;
+  }
+
+  .ro-bgm-btn {
+    font-size: 10px;
+    padding: 5px 10px;
+  }
+}
+
+/* Medium phones / Small tablets portrait (481px – 768px portrait) */
+@media (min-width: 481px) and (max-width: 768px) and (orientation: portrait) {
+  #auth-screen {
+    align-items: flex-start;
+    padding-top: 16px;
+  }
+
+  .auth-container {
+    margin: 0 auto;
+    padding: clamp(16px, 3vw, 28px);
+    width: min(88vw, 400px);
+    max-width: 88vw;
+    border-radius: 22px;
+    max-height: 90vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(56px, 14vw, 100px);
+    height: clamp(56px, 14vw, 100px);
+  }
+
+  .game-title-new {
+    font-size: clamp(24px, 6vw, 40px);
+  }
+
+  .game-subtitle {
+    font-size: clamp(9px, 2vw, 12px);
+  }
+
+  .game-tagline {
+    font-size: clamp(11px, 2vw, 13px);
+  }
+
+  .auth-form {
+    gap: 8px;
+  }
+
+  .auth-form input {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-guest {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .btn-start-game {
+    font-size: 16px;
+    padding: 11px 18px;
+  }
+
+  .class-badges-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .class-badge {
+    padding: 6px 4px;
+  }
+
+  .ro-top-bar {
+    top: 8px;
+    left: 10px;
+    right: 10px;
+  }
+
+  .ro-server-chip {
+    font-size: 9px;
+    padding: 5px 10px;
+  }
+
+  .ro-bgm-btn {
+    font-size: 10px;
+    padding: 5px 10px;
+  }
+
+  .online-count {
+    font-size: 11px;
+    padding: 6px 12px;
+  }
 }
 
 /* Landscape phones */
@@ -1050,6 +1180,22 @@
   .auth-status {
     margin-top: 6px;
   }
+
+  .ro-top-bar {
+    top: 6px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .ro-server-chip {
+    font-size: 9px;
+    padding: 5px 10px;
+  }
+
+  .ro-bgm-btn {
+    font-size: 9px;
+    padding: 5px 10px;
+  }
 }
 
 /* Very small landscape phones */
@@ -1095,6 +1241,26 @@
     font-size: 13px;
     padding: 7px 12px;
     margin: 5px 0;
+  }
+
+  .ro-top-bar {
+    top: 4px;
+    left: 4px;
+    right: 4px;
+  }
+
+  .ro-server-chip {
+    font-size: 8px;
+    padding: 3px 6px;
+  }
+
+  .ro-server-name {
+    display: none;
+  }
+
+  .ro-bgm-btn {
+    font-size: 8px;
+    padding: 3px 6px;
   }
 }
 
@@ -1542,9 +1708,9 @@
 /* Top Server & BGM Control Bar */
 .ro-top-bar {
   position: absolute;
-  top: 18px;
-  left: 24px;
-  right: 24px;
+  top: 12px;
+  left: 12px;
+  right: 12px;
   z-index: 10;
   display: flex;
   justify-content: space-between;
@@ -1794,4 +1960,336 @@
   background: linear-gradient(135deg, rgba(96, 160, 255, 0.3), rgba(30, 80, 180, 0.4));
   box-shadow: 0 0 14px rgba(96, 160, 255, 0.4);
   font-weight: 700;
+}
+
+/* ============================================================
+   RESPONSIVE — Tablet Portrait (768px – 1024px)
+   ============================================================ */
+@media (min-width: 481px) and (max-width: 1024px) and (orientation: portrait) {
+  #auth-screen {
+    align-items: flex-start;
+    padding-top: 24px;
+  }
+
+  .auth-container {
+    width: min(80vw, 420px);
+    max-width: 80vw;
+    padding: clamp(20px, 3vw, 32px);
+    border-radius: 24px;
+    max-height: 88vh;
+    margin: 0 auto;
+  }
+
+  .auth-icon-img {
+    width: clamp(60px, 16vw, 110px);
+    height: clamp(60px, 16vw, 110px);
+  }
+
+  .game-title-new {
+    font-size: clamp(26px, 5.5vw, 44px);
+  }
+
+  .game-subtitle {
+    font-size: clamp(10px, 2.2vw, 14px);
+  }
+
+  .game-tagline {
+    font-size: clamp(12px, 2.2vw, 15px);
+  }
+
+  .auth-form input {
+    padding: 11px 16px;
+    font-size: 14px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-guest {
+    padding: 12px 18px;
+    font-size: 14px;
+  }
+
+  .btn-start-game {
+    font-size: 18px;
+    padding: 13px 22px;
+  }
+
+  .class-badges-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .class-badge {
+    padding: 6px 4px;
+  }
+
+  .ro-server-chip {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+
+  .ro-bgm-btn {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+
+  .online-count {
+    font-size: 12px;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — Tablet Landscape (769px – 1200px)
+   ============================================================ */
+@media (min-width: 769px) and (max-width: 1200px) and (orientation: landscape) {
+  #auth-screen {
+    align-items: center;
+    padding-top: 0;
+  }
+
+  .auth-container {
+    width: min(60vw, 440px);
+    max-width: 60vw;
+    padding: clamp(16px, 2.5vw, 28px);
+    border-radius: 20px;
+    max-height: 86vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(56px, 10vw, 100px);
+    height: clamp(56px, 10vw, 100px);
+  }
+
+  .game-title-new {
+    font-size: clamp(22px, 3.5vw, 38px);
+  }
+
+  .game-subtitle {
+    font-size: clamp(9px, 1.5vw, 12px);
+  }
+
+  .game-tagline {
+    font-size: clamp(11px, 1.8vw, 14px);
+  }
+
+  .auth-form input {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-guest {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .btn-start-game {
+    font-size: 16px;
+    padding: 10px 18px;
+  }
+
+  .ro-top-bar {
+    top: 10px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .ro-server-chip {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+
+  .ro-bgm-btn {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — Desktop / Large Screens (>1200px)
+   ============================================================ */
+@media (min-width: 1201px) {
+  .auth-container {
+    width: min(40vw, 460px);
+    max-width: 460px;
+    padding: clamp(24px, 3vw, 40px);
+    border-radius: clamp(24px, 3vw, 36px);
+    max-height: 85vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(72px, 8vw, 130px);
+    height: clamp(72px, 8vw, 130px);
+  }
+
+  .game-title-new {
+    font-size: clamp(32px, 5vw, 52px);
+  }
+
+  .game-subtitle {
+    font-size: clamp(11px, 1.8vw, 15px);
+  }
+
+  .game-tagline {
+    font-size: clamp(13px, 2vw, 16px);
+  }
+
+  .auth-form input {
+    padding: 13px 18px;
+    font-size: 15px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-guest {
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+
+  .btn-start-game {
+    font-size: 20px;
+    padding: 16px 28px;
+  }
+
+  .ro-top-bar {
+    top: 20px;
+    left: 32px;
+    right: 32px;
+  }
+
+  .ro-server-chip {
+    font-size: 12px;
+    padding: 8px 16px;
+  }
+
+  .ro-bgm-btn {
+    font-size: 12px;
+    padding: 8px 16px;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — Very Small Screens / Ultra-Narrow (<320px)
+   ============================================================ */
+@media (max-width: 319px) {
+  .auth-container {
+    min-width: auto;
+    margin: 6px;
+    padding: 12px;
+    width: 96vw;
+    max-width: 96vw;
+    border-radius: 16px;
+    max-height: 94vh;
+  }
+
+  .auth-icon-img {
+    width: 56px;
+    height: 56px;
+  }
+
+  .game-title-new {
+    font-size: 20px;
+    letter-spacing: 1px;
+  }
+
+  .game-subtitle {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+
+  .game-tagline {
+    font-size: 10px;
+    margin-bottom: 8px;
+  }
+
+  .auth-form {
+    gap: 6px;
+  }
+
+  .auth-form input {
+    padding: 8px 10px;
+    font-size: 11px;
+    border-radius: 10px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-guest {
+    padding: 8px 10px;
+    font-size: 11px;
+    border-radius: 10px;
+  }
+
+  .btn-start-game {
+    font-size: 14px;
+    padding: 10px 14px;
+    max-width: 220px;
+  }
+
+  .class-badges-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  .class-badge {
+    padding: 5px 2px;
+  }
+
+  .class-badge .badge-icon {
+    font-size: 16px;
+  }
+
+  .class-badge .badge-title {
+    font-size: 9px;
+  }
+
+  .ro-top-bar {
+    top: 6px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .ro-server-chip {
+    font-size: 8px;
+    padding: 4px 8px;
+  }
+
+  .ro-bgm-btn {
+    font-size: 8px;
+    padding: 4px 8px;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE — Foldable / Large Portrait (1025px – 1400px portrait)
+   ============================================================ */
+@media (min-width: 1025px) and (max-width: 1400px) and (orientation: portrait) {
+  #auth-screen {
+    align-items: center;
+    padding-top: 0;
+  }
+
+  .auth-container {
+    width: min(45vw, 440px);
+    max-width: 45vw;
+    padding: clamp(24px, 3vw, 36px);
+    border-radius: 28px;
+    max-height: 85vh;
+  }
+
+  .auth-icon-img {
+    width: clamp(68px, 10vw, 120px);
+    height: clamp(68px, 10vw, 120px);
+  }
+
+  .game-title-new {
+    font-size: clamp(30px, 5vw, 48px);
+  }
+
+  .ro-top-bar {
+    top: 16px;
+    left: 28px;
+    right: 28px;
+  }
 }
