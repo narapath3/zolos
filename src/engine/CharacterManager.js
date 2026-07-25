@@ -1,6 +1,6 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult, getMonsterCombatMeta } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult, getMonsterCombatMeta, getJobTierInfo } from './GameData.js';
 import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 import { getCard } from '../cards/CardCatalog.js';
@@ -196,13 +196,13 @@ export class CharacterManager {
     _gearTotal(field) {
         let sum = 0;
         const inv = window.gameInventory || [];
-        
+
         // 1. Base equipment bonuses
         for (const slot of Object.keys(this.equippedGear)) {
             const name = this.equippedGear[slot];
             if (name && ITEMS[name]) {
                 sum += Math.round((ITEMS[name][field] || 0) * getRefineMult(this.equipRefine[slot] || 0));
-                
+
                 // 2. Legacy/New card bonuses stored on the item itself
                 const item = inv.find(i => i.item_name === name && i.stats && i.stats.equipped && i.stats.slot === slot);
                 if (item && item.stats && item.stats.cards) {
@@ -569,22 +569,22 @@ export class CharacterManager {
     // glow so they read as "special" in the hero's hand.
     _buildGenericWeapon(itemName) {
         const SPECS = {
-            'Novice Cutter':   { kind: 'dagger',     blade: 0xb8bcc8, guard: 0x8a6a3a, len: 0.6 },
-            'Silver Dagger':   { kind: 'dagger',     blade: 0xe6e8f2, guard: 0xc0c0c8, len: 0.66, glow: 0x99aaff, glowI: 0.35 },
-            'Katana':          { kind: 'katana',     blade: 0xe2e6ec, guard: 0x2a2a2a, len: 1.15 },
-            'Heavy Warhammer': { kind: 'hammer',     head: 0x70727a, handle: 0x5a3a1a },
-            'Mage Staff':      { kind: 'staff',      shaft: 0x7a4a24, gem: 0x46c8ff, glow: 0x46c8ff, glowI: 0.7 },
-            'Crossbow':        { kind: 'crossbow',   wood: 0x6a4a2a, metal: 0x9098a0 },
-            'Great Bow':       { kind: 'bow',        wood: 0x5a3a1a, scale: 1.25 },
-            'Excalibur':       { kind: 'greatsword', blade: 0xfff2c0, guard: 0xffd23a, len: 1.3, gem: 0x66ccff, glow: 0xffcc33, glowI: 0.95 },
-            'Rudra Bow':       { kind: 'bow',        wood: 0xd8bc6a, scale: 1.3, glow: 0x86ff9a, glowI: 0.85 },
-            'Ragnarok Blade':  { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
+            'Novice Cutter': { kind: 'dagger', blade: 0xb8bcc8, guard: 0x8a6a3a, len: 0.6 },
+            'Silver Dagger': { kind: 'dagger', blade: 0xe6e8f2, guard: 0xc0c0c8, len: 0.66, glow: 0x99aaff, glowI: 0.35 },
+            'Katana': { kind: 'katana', blade: 0xe2e6ec, guard: 0x2a2a2a, len: 1.15 },
+            'Heavy Warhammer': { kind: 'hammer', head: 0x70727a, handle: 0x5a3a1a },
+            'Mage Staff': { kind: 'staff', shaft: 0x7a4a24, gem: 0x46c8ff, glow: 0x46c8ff, glowI: 0.7 },
+            'Crossbow': { kind: 'crossbow', wood: 0x6a4a2a, metal: 0x9098a0 },
+            'Great Bow': { kind: 'bow', wood: 0x5a3a1a, scale: 1.25 },
+            'Excalibur': { kind: 'greatsword', blade: 0xfff2c0, guard: 0xffd23a, len: 1.3, gem: 0x66ccff, glow: 0xffcc33, glowI: 0.95 },
+            'Rudra Bow': { kind: 'bow', wood: 0xd8bc6a, scale: 1.3, glow: 0x86ff9a, glowI: 0.85 },
+            'Ragnarok Blade': { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
             // ---- Forged weapons (Weapon Smith crafts) ----
-            'Ember Fang':      { kind: 'greatsword', blade: 0xff8a3a, guard: 0x6a2a10, len: 1.25, gem: 0xff3300, glow: 0xff5a1a, glowI: 1.05 },
-            'Frost Cleaver':   { kind: 'katana',     blade: 0xd0f4ff, guard: 0x2a5a7a, len: 1.2, glow: 0x66ddff, glowI: 1.05 },
-            'Stormcaller Bow': { kind: 'bow',        wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
-            'Soulreaper':      { kind: 'dagger',     blade: 0xc9a6ff, guard: 0x3a1a5a, len: 0.72, gem: 0xaa33ff, glow: 0xaa66ff, glowI: 1.1 },
-            'Godslayer':       { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
+            'Ember Fang': { kind: 'greatsword', blade: 0xff8a3a, guard: 0x6a2a10, len: 1.25, gem: 0xff3300, glow: 0xff5a1a, glowI: 1.05 },
+            'Frost Cleaver': { kind: 'katana', blade: 0xd0f4ff, guard: 0x2a5a7a, len: 1.2, glow: 0x66ddff, glowI: 1.05 },
+            'Stormcaller Bow': { kind: 'bow', wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
+            'Soulreaper': { kind: 'dagger', blade: 0xc9a6ff, guard: 0x3a1a5a, len: 0.72, gem: 0xaa33ff, glow: 0xaa66ff, glowI: 1.1 },
+            'Godslayer': { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
         };
         let spec = SPECS[itemName];
         if (!spec) {
@@ -600,16 +600,16 @@ export class CharacterManager {
             else spec = { kind: 'sword', blade: 0xc0c0d0, guard: 0xffd040, len: 1.0 };
         }
         switch (spec.kind) {
-            case 'dagger':     return this._wpBlade({ ...spec, len: spec.len || 0.6, width: 0.07 });
+            case 'dagger': return this._wpBlade({ ...spec, len: spec.len || 0.6, width: 0.07 });
             case 'greatsword': return this._wpBlade({ ...spec, width: 0.15 });
-            case 'katana':     return this._wpKatana(spec);
-            case 'hammer':     return this._wpHammer(spec);
-            case 'staff':      return this._wpStaff(spec);
-            case 'bow':        return this._wpBow(spec);
-            case 'crossbow':   return this._wpCrossbow(spec);
-            case 'gun':        return this._wpGun(spec);
+            case 'katana': return this._wpKatana(spec);
+            case 'hammer': return this._wpHammer(spec);
+            case 'staff': return this._wpStaff(spec);
+            case 'bow': return this._wpBow(spec);
+            case 'crossbow': return this._wpCrossbow(spec);
+            case 'gun': return this._wpGun(spec);
             case 'sword':
-            default:           return this._wpBlade({ ...spec, width: spec.width || 0.09 });
+            default: return this._wpBlade({ ...spec, width: spec.width || 0.09 });
         }
     }
 
@@ -1652,31 +1652,47 @@ export class CharacterManager {
         }
 
         const meta = this.title ? CharacterManager.TITLE_META[this.title] : null;
+        const tierInfo = getJobTierInfo(this.stats.job, this.stats.level);
+
         const canvas = document.createElement('canvas');
         canvas.width = 320;
-        canvas.height = meta ? 100 : 64;
+        const hasMeta = !!meta;
+        canvas.height = hasMeta ? 120 : 84;
+
         const ctx = canvas.getContext('2d');
-        const nameY = meta ? 78 : 40;
-        const stripY = meta ? 54 : 16;
+        const nameY = hasMeta ? 102 : 70;
+        const stripY = hasMeta ? 78 : 46;
 
         // Shadow/Background behind the name line
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         ctx.fillRect(0, stripY, 320, 32);
 
-        // Glowing title line (above the name)
+        // Achievement title line (above name)
         if (meta) {
-            ctx.font = 'bold 26px Arial';
+            ctx.font = 'bold 24px Arial';
             ctx.textAlign = 'center';
             ctx.shadowColor = meta.glow;
-            ctx.shadowBlur = 16;
+            ctx.shadowBlur = 12;
             const grad = ctx.createLinearGradient(60, 0, 260, 0);
             grad.addColorStop(0, '#ffe9a0');
             grad.addColorStop(0.5, meta.color);
             grad.addColorStop(1, '#ffe9a0');
             ctx.fillStyle = grad;
-            // Double-pass for a stronger halo
-            ctx.fillText(meta.text, 160, 34);
-            ctx.fillText(meta.text, 160, 34);
+            ctx.fillText(meta.text, 160, 28);
+            ctx.fillText(meta.text, 160, 28);
+            ctx.shadowBlur = 0;
+        }
+
+        // Job Tier Title line
+        if (tierInfo) {
+            ctx.font = 'bold 22px Arial';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = tierInfo.glow;
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = tierInfo.color;
+            const tierText = `T${tierInfo.tier} ${tierInfo.name}`;
+            ctx.fillText(tierText, 160, hasMeta ? 64 : 32);
+            ctx.fillText(tierText, 160, hasMeta ? 64 : 32);
             ctx.shadowBlur = 0;
         }
 
@@ -1689,8 +1705,8 @@ export class CharacterManager {
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.nameSprite = new THREE.Sprite(spriteMat);
-        this.nameSprite.position.y = meta ? 2.85 : 2.7;
-        this.nameSprite.scale.set(2.5, meta ? 0.78 : 0.5, 1);
+        this.nameSprite.position.y = hasMeta ? 2.95 : 2.8;
+        this.nameSprite.scale.set(2.5, hasMeta ? 0.94 : 0.66, 1);
         this.mesh.add(this.nameSprite);
     }
 
@@ -1742,7 +1758,7 @@ export class CharacterManager {
         grad.addColorStop(0, color1);
         grad.addColorStop(1, color2);
         ctx.fillStyle = grad;
-        
+
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 6;
         ctx.strokeText(msg, 256, 64);
@@ -1751,7 +1767,7 @@ export class CharacterManager {
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.streakSprite = new THREE.Sprite(spriteMat);
-        
+
         // Position it higher than name and chat
         this.streakSprite.position.y = 3.5;
         this.streakSprite.scale.set(4.5, 1.12, 1);

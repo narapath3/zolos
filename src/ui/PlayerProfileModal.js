@@ -2,7 +2,7 @@
 // Shows player stats, skills, and equipment with premium styling
 
 import { JobPreview } from '../engine/JobPreview.js';
-import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats, RARITY_COLOR } from '../engine/GameData.js';
+import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats, RARITY_COLOR, getJobTierInfo } from '../engine/GameData.js';
 import { getCard } from '../cards/CardCatalog.js';
 
 export class PlayerProfileModal {
@@ -541,7 +541,7 @@ export class PlayerProfileModal {
           <div class="profile-info">
             <div class="profile-name">${dbData?.name || player.username}</div>
             <div class="profile-sub">
-              Lv.${level} • ${jobInfo.emoji} ${jobInfo.name}
+              Lv.${level} • ${jobInfo.emoji} ${jobInfo.name} • <span class="profile-tier-badge" style="color: ${getJobTierInfo(job, level).color}; text-shadow: 0 0 5px ${getJobTierInfo(job, level).glow}; font-weight: bold;">T${getJobTierInfo(job, level).tier} ${getJobTierInfo(job, level).name}</span>
             </div>
             <div class="status-badge ${isOffline ? 'status-offline' : 'status-online'}">
               ${isOffline ? '⚫ OFFLINE' : '🟢 ONLINE'}
@@ -844,7 +844,11 @@ export class PlayerProfileModal {
 
     // Update level/job subtitle
     const subEl = card.querySelector('.profile-sub');
-    if (subEl) subEl.textContent = `Lv.${level} \u2022 ${jobInfo.emoji} ${jobInfo.name}`;
+    if (subEl) {
+      const job = appearance?.job || dbData?.job || player.job || 'Novice';
+      const tierInfo = getJobTierInfo(job, level);
+      subEl.innerHTML = `Lv.${level} \u2022 ${jobInfo.emoji} ${jobInfo.name} \u2022 <span class="profile-tier-badge" style="color: ${tierInfo.color}; text-shadow: 0 0 5px ${tierInfo.glow}; font-weight: bold;">T${tierInfo.tier} ${tierInfo.name}</span>`;
+    }
 
     // Update status badge
     const badgeEl = card.querySelector('.status-badge');

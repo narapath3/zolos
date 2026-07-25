@@ -1533,11 +1533,11 @@ export function petModelOf(itemName) {
 // a special forged weapon with high ATK and a signature on-hit effect.
 // `base` is consumed (qty 1); every material qty is consumed too.
 export const FORGE_RECIPES = [
-    { result: 'Ember Fang',      base: 'Sword',         materials: [{ name: 'Fire Element Stone', qty: 1 }, { name: 'Iron Ore', qty: 5 }],        gold: 2000 },
-    { result: 'Frost Cleaver',   base: 'Katana',        materials: [{ name: 'Crystal Blue', qty: 3 }, { name: 'Elunium Stone', qty: 2 }],         gold: 8000 },
-    { result: 'Stormcaller Bow', base: 'Bow',           materials: [{ name: 'Wind Element Stone', qty: 2 }, { name: 'Nine Tail Fur', qty: 3 }],   gold: 8000 },
-    { result: 'Soulreaper',      base: 'Silver Dagger', materials: [{ name: 'Ghostly Essence', qty: 2 }, { name: 'Devil Horn', qty: 2 }],         gold: 20000 },
-    { result: 'Godslayer',       base: 'Excalibur',     materials: [{ name: 'Dragon Heart', qty: 3 }, { name: 'Pure Emperium', qty: 1 }],         gold: 60000 },
+    { result: 'Ember Fang', base: 'Sword', materials: [{ name: 'Fire Element Stone', qty: 1 }, { name: 'Iron Ore', qty: 5 }], gold: 2000 },
+    { result: 'Frost Cleaver', base: 'Katana', materials: [{ name: 'Crystal Blue', qty: 3 }, { name: 'Elunium Stone', qty: 2 }], gold: 8000 },
+    { result: 'Stormcaller Bow', base: 'Bow', materials: [{ name: 'Wind Element Stone', qty: 2 }, { name: 'Nine Tail Fur', qty: 3 }], gold: 8000 },
+    { result: 'Soulreaper', base: 'Silver Dagger', materials: [{ name: 'Ghostly Essence', qty: 2 }, { name: 'Devil Horn', qty: 2 }], gold: 20000 },
+    { result: 'Godslayer', base: 'Excalibur', materials: [{ name: 'Dragon Heart', qty: 3 }, { name: 'Pure Emperium', qty: 1 }], gold: 60000 },
 ];
 
 // ============ EXP TABLE ============
@@ -1684,4 +1684,92 @@ export function getAllMonsters() {
         type,
         { ...data, ...getMonsterCombatMeta(type, data) },
     ]));
+}
+
+// ============ TIER SYSTEMS ============
+export const TIERS = {
+    global: [
+        { min: 1, max: 10, name: 'Beginner', color: '#94a3b8', glow: 'rgba(148,163,184,0.3)' },
+        { min: 11, max: 20, name: 'Apprentice', color: '#4ade80', glow: 'rgba(74,222,128,0.4)' },
+        { min: 21, max: 30, name: 'Bronze', color: '#d97706', glow: 'rgba(217,119,6,0.4)' },
+        { min: 31, max: 40, name: 'Iron', color: '#cbd5e1', glow: 'rgba(203,213,225,0.4)' },
+        { min: 41, max: 50, name: 'Steel', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
+        { min: 51, max: 60, name: 'Knight', color: '#2563eb', glow: 'rgba(37,99,235,0.5)' },
+        { min: 61, max: 70, name: 'Elite', color: '#a855f7', glow: 'rgba(168,85,247,0.6)' },
+        { min: 71, max: 80, name: 'Royal', color: '#ec4899', glow: 'rgba(236,72,153,0.7)' },
+        { min: 81, max: 90, name: 'Dragon', color: '#f97316', glow: 'rgba(249,115,22,0.8)' },
+        { min: 91, max: 100, name: 'Ancient', color: '#eab308', glow: 'rgba(234,179,8,0.8)' },
+        { min: 101, max: 110, name: 'Celestial', color: '#a5f3fc', glow: 'rgba(6,182,212,0.9)' },
+        { min: 111, max: 120, name: 'Mythic', color: '#f43f5e', glow: 'rgba(244,63,94,1.0)' },
+    ],
+    swordsman: [
+        { min: 1, max: 10, name: 'นักดาบฝึกหัด', color: '#94a3b8', glow: 'rgba(148,163,184,0.3)' },
+        { min: 11, max: 20, name: 'นักรบฝึกฝน', color: '#4ade80', glow: 'rgba(74,222,128,0.4)' },
+        { min: 21, max: 30, name: 'นักรบทองแดง', color: '#d97706', glow: 'rgba(217,119,6,0.4)' },
+        { min: 31, max: 40, name: 'นักรบเหล็ก', color: '#cbd5e1', glow: 'rgba(203,213,225,0.4)' },
+        { min: 41, max: 50, name: 'นักรบเหล็กกล้า', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
+        { min: 51, max: 60, name: 'อัศวินแห่งราชอาณาจักร', color: '#2563eb', glow: 'rgba(37,99,235,0.5)' },
+        { min: 61, max: 70, name: 'อัศวินชั้นยอด', color: '#a855f7', glow: 'rgba(168,85,247,0.6)' },
+        { min: 71, max: 80, name: 'ราชันนักรบ', color: '#ec4899', glow: 'rgba(236,72,153,0.7)' },
+        { min: 81, max: 90, name: 'ผู้ล่ามังกร', color: '#f97316', glow: 'rgba(249,115,22,0.8)' },
+        { min: 91, max: 100, name: 'นักรบโบราณ', color: '#eab308', glow: 'rgba(234,179,8,0.8)' },
+        { min: 101, max: 110, name: 'ดาบแห่งสวรรค์', color: '#a5f3fc', glow: 'rgba(6,182,212,0.9)' },
+        { min: 111, max: 120, name: 'ผู้พิชิตตำนาน', color: '#f43f5e', glow: 'rgba(244,63,94,1.0)' },
+    ],
+    mage: [
+        { min: 1, max: 10, name: 'ผู้ฝึกเวท', color: '#94a3b8', glow: 'rgba(148,163,184,0.3)' },
+        { min: 11, max: 20, name: 'ศิษย์เวทมนตร์', color: '#4ade80', glow: 'rgba(74,222,128,0.4)' },
+        { min: 21, max: 30, name: 'นักเวททองแดง', color: '#d97706', glow: 'rgba(217,119,6,0.4)' },
+        { min: 31, max: 40, name: 'นักเวทเหล็ก', color: '#cbd5e1', glow: 'rgba(203,213,225,0.4)' },
+        { min: 41, max: 50, name: 'นักเวทอาคม', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
+        { min: 51, max: 60, name: 'จอมเวทย์', color: '#2563eb', glow: 'rgba(37,99,235,0.5)' },
+        { min: 61, max: 70, name: 'มหาจอมเวทย์', color: '#a855f7', glow: 'rgba(168,85,247,0.6)' },
+        { min: 71, max: 80, name: 'จอมเวทย์ราชัน', color: '#ec4899', glow: 'rgba(236,72,153,0.7)' },
+        { min: 81, max: 90, name: 'ผู้ใช้เวทมังกร', color: '#f97316', glow: 'rgba(249,115,22,0.8)' },
+        { min: 91, max: 100, name: 'จอมเวทโบราณ', color: '#eab308', glow: 'rgba(234,179,8,0.8)' },
+        { min: 101, max: 110, name: 'มหาเวทสวรรค์', color: '#a5f3fc', glow: 'rgba(6,182,212,0.9)' },
+        { min: 111, max: 120, name: 'จอมเวทนิรันดร์', color: '#f43f5e', glow: 'rgba(244,63,94,1.0)' },
+    ],
+    archer: [
+        { min: 1, max: 10, name: 'นักยิงฝึกหัด', color: '#94a3b8', glow: 'rgba(148,163,184,0.3)' },
+        { min: 11, max: 20, name: 'นักล่าฝึกฝน', color: '#4ade80', glow: 'rgba(74,222,128,0.4)' },
+        { min: 21, max: 30, name: 'นักธนูทองแดง', color: '#d97706', glow: 'rgba(217,119,6,0.4)' },
+        { min: 31, max: 40, name: 'นักธนูเหล็ก', color: '#cbd5e1', glow: 'rgba(203,213,225,0.4)' },
+        { min: 41, max: 50, name: 'นักธนูเหล็กกล้า', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
+        { min: 51, max: 60, name: 'นักล่าชั้นสูง', color: '#2563eb', glow: 'rgba(37,99,235,0.5)' },
+        { min: 61, max: 70, name: 'นักแม่นธนู', color: '#a855f7', glow: 'rgba(168,85,247,0.6)' },
+        { min: 71, max: 80, name: 'นักธนูราชัน', color: '#ec4899', glow: 'rgba(236,72,153,0.7)' },
+        { min: 81, max: 90, name: 'นักล่ามังกร', color: '#f97316', glow: 'rgba(249,115,22,0.8)' },
+        { min: 91, max: 100, name: 'นักธนูโบราณ', color: '#eab308', glow: 'rgba(234,179,8,0.8)' },
+        { min: 101, max: 110, name: 'ธนูแห่งสวรรค์', color: '#a5f3fc', glow: 'rgba(6,182,212,0.9)' },
+        { min: 111, max: 120, name: 'ผู้พิทักษ์ตำนาน', color: '#f43f5e', glow: 'rgba(244,63,94,1.0)' },
+    ],
+    priest: [
+        { min: 1, max: 10, name: 'ผู้ศรัทธาฝึกหัด', color: '#94a3b8', glow: 'rgba(148,163,184,0.3)' },
+        { min: 11, max: 20, name: 'นักบวชฝึกฝน', color: '#4ade80', glow: 'rgba(74,222,128,0.4)' },
+        { min: 21, max: 30, name: 'นักบวชทองแดง', color: '#d97706', glow: 'rgba(217,119,6,0.4)' },
+        { min: 31, max: 40, name: 'นักบวชเหล็ก', color: '#cbd5e1', glow: 'rgba(203,213,225,0.4)' },
+        { min: 41, max: 50, name: 'นักบวชศักดิ์สิทธิ์', color: '#38bdf8', glow: 'rgba(56,189,248,0.5)' },
+        { min: 51, max: 60, name: 'ผู้รักษาแห่งแสง', color: '#2563eb', glow: 'rgba(37,99,235,0.5)' },
+        { min: 61, max: 70, name: 'มหานักบวช', color: '#a855f7', glow: 'rgba(168,85,247,0.6)' },
+        { min: 71, max: 80, name: 'พระราชันแห่งแสง', color: '#ec4899', glow: 'rgba(236,72,153,0.7)' },
+        { min: 81, max: 90, name: 'นักบุญมังกร', color: '#f97316', glow: 'rgba(249,115,22,0.8)' },
+        { min: 91, max: 100, name: 'ผู้พิทักษ์โบราณ', color: '#eab308', glow: 'rgba(234,179,8,0.8)' },
+        { min: 101, max: 110, name: 'เทวทูตแห่งสวรรค์', color: '#a5f3fc', glow: 'rgba(6,182,212,0.9)' },
+        { min: 111, max: 120, name: 'ผู้ถือครองแสงนิรันดร์', color: '#f43f5e', glow: 'rgba(244,63,94,1.0)' },
+    ]
+};
+
+export function getJobTierInfo(jobId, level = 1) {
+    const normalised = (jobId && typeof jobId === 'string') ? jobId.toLowerCase() : 'novice';
+    const tierList = TIERS[normalised] || TIERS.global;
+    const lv = Math.max(1, Math.floor(level) || 1);
+    const tierIdx = Math.min(11, Math.max(0, Math.floor((lv - 1) / 10)));
+    const tier = tierList[tierIdx] || tierList[0];
+    return {
+        tier: tierIdx + 1,
+        name: tier.name,
+        color: tier.color,
+        glow: tier.glow
+    };
 }
