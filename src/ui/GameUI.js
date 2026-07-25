@@ -1544,30 +1544,33 @@ export class GameUI {
     });
   }
 
-  // Handles clicking a card socket: open/shows details, or redirect to card page.
+  // Handles clicking a card socket: if empty → open card picker to socket;
+  // if filled → show card details in the album panel.
   _handleSocketClick(slotId, socketIdx) {
     if (!this.character) return;
     const cardsArr = (this.character.equippedCards && this.character.equippedCards[slotId]) || [];
     const cardId = cardsArr[socketIdx] || null;
 
-    // Close the profile editor modal if open
+    if (!cardId) {
+      // Empty socket → open the card picker so the player can socket a card.
+      this._openCardPicker(slotId, socketIdx);
+      return;
+    }
+
+    // Filled socket → close profile modal if open, open album, show details.
     const profileModal = document.getElementById('profile-editor-modal');
     if (profileModal && profileModal.style.display !== 'none') {
       profileModal.style.display = 'none';
       this.updateMobileControlsVisibility();
     }
 
-    // Always open the card album panel (หน้าสวมใส่การ์ด)
     const panel = document.getElementById('mycard-panel');
     if (panel && panel.style.display === 'none') {
       this._openMyCard();
     }
 
-    // If a card is equipped, view its details instantly
-    if (cardId) {
-      if (this.cardAlbum) {
-        this.cardAlbum._openDetail(cardId);
-      }
+    if (this.cardAlbum) {
+      this.cardAlbum._openDetail(cardId);
     }
   }
 
