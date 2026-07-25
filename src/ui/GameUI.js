@@ -1785,7 +1785,7 @@ export class GameUI {
     if (!slot) return;
     const category = cardCategoryForSlot(slotId);
     const current = this.character.equippedCards ? this.character.equippedCards[slotId] : null;
-    
+
     // Fix Issue 2: Filter out cards already equipped in other slots.
     // Also handle quantity: if quantity is 1 and it's in this slot, it's fine.
     // If it's in another slot, it shouldn't show up.
@@ -4710,8 +4710,16 @@ export class GameUI {
     const btn = document.getElementById('btn-logout');
     if (btn) {
       btn.addEventListener('click', () => {
+        // Disable immediately to prevent double-tap
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
         // Direct logout without confirm() to avoid blocking on mobile WebViews
-        callback();
+        Promise.resolve(callback()).catch(err => {
+          console.error('Logout callback error:', err);
+          // Force reload as last resort
+          window.location.reload();
+        });
       });
     }
   }
@@ -9759,8 +9767,8 @@ export class GameUI {
     if (!cardData || !cardData.cardSlot) return;
 
     // Filter equipped items that match the card's required slot type
-    const targets = this.inventory.filter(i => 
-      i.stats && i.stats.equipped === true && 
+    const targets = this.inventory.filter(i =>
+      i.stats && i.stats.equipped === true &&
       (i.item_type === cardData.cardSlot || (cardData.cardSlot === 'accessory' && (i.item_type === 'ring' || i.item_type === 'wrist' || i.item_type === 'accessory')))
     );
 
@@ -9772,16 +9780,16 @@ export class GameUI {
     let html = `<div style="padding:10px;color:white">
       <div style="margin-bottom:10px;font-weight:bold;color:var(--secondary)">เลือกอุปกรณ์ที่จะใส่การ์ด ${cardItem.emoji} ${cardItem.item_name}:</div>
       <div style="display:grid;gap:8px">`;
-    
+
     targets.forEach(t => {
       const cards = (t.stats && t.stats.cards) || [];
       const maxSockets = 4;
       html += `<div class="socket-target-row" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" data-item="${t.item_name}">
         <div>${t.emoji} ${t.item_name} <span style="font-size:12px;color:var(--text-dim)">(${cards.length}/${maxSockets} sockets)</span></div>
-        <div style="display:flex;gap:3px">${Array.from({length:maxSockets}).map((_,i) => `<div style="width:6px;height:6px;border-radius:50%;background:${i < cards.length ? '#ffd700' : 'rgba(255,255,255,0.2)'}"></div>`).join('')}</div>
+        <div style="display:flex;gap:3px">${Array.from({ length: maxSockets }).map((_, i) => `<div style="width:6px;height:6px;border-radius:50%;background:${i < cards.length ? '#ffd700' : 'rgba(255,255,255,0.2)'}"></div>`).join('')}</div>
       </div>`;
     });
-    
+
     html += `</div></div>`;
 
     const modal = document.createElement('div');
@@ -9813,37 +9821,37 @@ export class GameUI {
 
   async _socketCardToItem(targetItem, cardItem) {
     if (!this.characterId || !targetItem || !cardItem) return;
-    
+
     if (!targetItem.stats) targetItem.stats = {};
     if (!targetItem.stats.cards) targetItem.stats.cards = [];
-    
+
     if (targetItem.stats.cards.length >= 4) {
       this.addCombatLog(`❌ อุปกรณ์นี้มีรูเต็มแล้ว (สูงสุด 4)`, 'system');
       return;
     }
 
     targetItem.stats.cards.push(cardItem.item_name);
-    
+
     try {
       // Save the target item's new stats
       await updateInventoryItemStats(this.characterId, targetItem.item_name, targetItem.stats);
-      
+
       // Consume one card
       cardItem.quantity--;
       await saveInventoryItem(this.characterId, cardItem.item_name, cardItem.item_type, -1);
-      
+
       if (cardItem.quantity <= 0) {
         const idx = this.inventory.findIndex(i => i.item_name === cardItem.item_name && i.item_type === 'card');
         if (idx !== -1) this.inventory.splice(idx, 1);
         this.selectedItemName = null;
       }
-      
+
       this.addCombatLog(`✅ ใส่การ์ด ${cardItem.item_name} ลงใน ${targetItem.item_name} สำเร็จ!`, 'levelup');
       if (this.soundManager) this.soundManager.playLevelUpSound();
-      
+
       this._renderInventory();
       this._updateDetailBox();
-      
+
       // BRIDGE: Also update the character's canonical equippedCards so it's persisted in the appearance blob
       if (this.character && this.character.equipCard) {
         const slot = targetItem.stats.slot || targetItem.stats.equippedSlot;
@@ -9853,7 +9861,7 @@ export class GameUI {
       }
 
       this.updateStats(this.character.stats);
-      
+
       // Persist card socket state + inventory stats to Supabase
       if (this.characterId && this.character?.saveStatsToDatabase) {
         try { await this.character.saveStatsToDatabase(); }
@@ -9867,20 +9875,20 @@ export class GameUI {
 
   async _removeCardFromItem(targetItem, cardIdx) {
     if (!this.characterId || !targetItem || !targetItem.stats || !targetItem.stats.cards) return;
-    
+
     const cardName = targetItem.stats.cards[cardIdx];
     if (!cardName) return;
 
     // Remove from item stats
     targetItem.stats.cards.splice(cardIdx, 1);
-    
+
     try {
       // Save the target item's new stats
       await updateInventoryItemStats(this.characterId, targetItem.item_name, targetItem.stats);
-      
+
       // Return card to inventory
       await saveInventoryItem(this.characterId, cardName, 'card', 1);
-      
+
       // Update local inventory array
       const existingCard = this.inventory.find(i => i.item_name === cardName && i.item_type === 'card');
       if (existingCard) {
@@ -9890,9 +9898,9 @@ export class GameUI {
         // For simplicity, let's assume it's either there or we'll just re-render and it will appear next time
         this.addCombatLog(`⚠️ ถอดการ์ดสำเร็จ แต่กรุณาเปิดกระเป๋าใหม่เพื่อดูการ์ดที่ได้รับคืน`, 'system');
       }
-      
+
       this.addCombatLog(`✅ ถอดการ์ด ${cardName} ออกจาก ${targetItem.item_name} แล้ว!`, 'system');
-      
+
       this._renderInventory();
       this._updateDetailBox();
 
@@ -9905,7 +9913,7 @@ export class GameUI {
       }
 
       this.updateStats(this.character.stats);
-      
+
       // Persist card socket state + inventory stats to Supabase
       if (this.characterId && this.character?.saveStatsToDatabase) {
         try { await this.character.saveStatsToDatabase(); }

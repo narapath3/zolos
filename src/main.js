@@ -1011,63 +1011,72 @@ async function initGame(charData) {
 
     // Setup Logout Button
     gameUI.setupLogoutButton(async () => {
-        // Save final state before logout
-        if (character && charData.id) {
-            gameUI.addCombatLog('💾 กำลังบันทึกข้อมูลตัวละคร...', 'system');
-            const saveData = character.getSaveData();
-            try {
-                const { saveCharacter, saveCharacterByUserId, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
-                if (charData.user_id) {
-                    await saveCharacterByUserId(charData.user_id, saveData.updates);
-                } else {
-                    await saveCharacter(charData.id, saveData.updates);
-                }
-                if (gameUI.dailyQuestsState) {
-                    await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
-                }
-                await saveFriendsList(charData.id, gameUI.friends);
-                // Flush inventory to DB before logout to ensure all equipped state is saved
-                await gameUI._flushInventoryToDB();
-                gameUI.addCombatLog('✅ บันทึกข้อมูลสำเร็จ', 'system');
-            } catch (e) {
-                console.error('Final state save error:', e);
-            }
-        }
+        // Safety net: force-reload after 5s no matter what, in case any await
+        // below hangs (e.g. Supabase signOut on flaky connections).
+        const reloadTimer = setTimeout(() => { window.location.reload(); }, 5000);
 
-        // 1. Stop game loop
-        isGameStarted = false;
-
-        // 2. Stop auto-save
-        stopAutoSave();
-
-        // 3. Leave multiplayer presence
-        if (userId) {
-            try { leavePresence(userId); } catch (e) { console.error('Leave presence error:', e); }
-        }
-
-        // 4. Remove remote player meshes
-        for (const [id, rp] of remotePlayersMap.entries()) {
-            if (rp.mesh) sceneManager.scene.remove(rp.mesh);
-        }
-        remotePlayersMap.clear();
-
-        // 5. Sign out from Supabase
         try {
-            const { clearActiveSession, supabase } = await import('./network/SupabaseClient.js');
-            clearActiveSession();
-            if (supabase) await supabase.auth.signOut();
-        } catch (e) {
-            console.error('Logout Supabase error:', e);
-        }
+            // Save final state before logout
+            if (character && charData.id) {
+                gameUI.addCombatLog('💾 กำลังบันทึกข้อมูลตัวละคร...', 'system');
+                const saveData = character.getSaveData();
+                try {
+                    const { saveCharacter, saveCharacterByUserId, saveDailyQuests, saveFriendsList } = await import('./network/GameSync.js');
+                    if (charData.user_id) {
+                        await saveCharacterByUserId(charData.user_id, saveData.updates);
+                    } else {
+                        await saveCharacter(charData.id, saveData.updates);
+                    }
+                    if (gameUI.dailyQuestsState) {
+                        await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
+                    }
+                    await saveFriendsList(charData.id, gameUI.friends);
+                    // Flush inventory to DB before logout to ensure all equipped state is saved
+                    await gameUI._flushInventoryToDB();
+                    gameUI.addCombatLog('✅ บันทึกข้อมูลสำเร็จ', 'system');
+                } catch (e) {
+                    console.error('Final state save error:', e);
+                }
+            }
 
-        // 6. Full page reload for a clean slate.
-        // Re-entering the game without reloading leaks the previous session:
-        // the old requestAnimationFrame chain keeps running (each re-login adds
-        // another parallel loop → severe stutter), a new WebGL renderer is
-        // created on the same canvas each time, and window/canvas/UI event
-        // listeners get bound again (double skill casts, double saves).
-        // Reloading guarantees all of it is torn down.
-        window.location.reload();
+            // 1. Stop game loop
+            isGameStarted = false;
+
+            // 2. Stop auto-save
+            stopAutoSave();
+
+            // 3. Leave multiplayer presence
+            if (userId) {
+                try { leavePresence(userId); } catch (e) { console.error('Leave presence error:', e); }
+            }
+
+            // 4. Remove remote player meshes
+            for (const [id, rp] of remotePlayersMap.entries()) {
+                if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+            }
+            remotePlayersMap.clear();
+
+            // 5. Sign out from Supabase
+            try {
+                const { clearActiveSession, supabase } = await import('./network/SupabaseClient.js');
+                clearActiveSession();
+                if (supabase) await supabase.auth.signOut();
+            } catch (e) {
+                console.error('Logout Supabase error:', e);
+            }
+        } catch (e) {
+            console.error('Logout error:', e);
+        } finally {
+            clearTimeout(reloadTimer);
+            // 6. Full page reload for a clean slate.
+            // Re-entering the game without reloading leaks the previous session:
+            // the old requestAnimationFrame chain keeps running (each re-login adds
+            // another parallel loop → severe stutter), a new WebGL renderer is
+            // created on the same canvas each time, and window/canvas/UI event
+            // listeners get bound again (double skill casts, double saves).
+            // Reloading guarantees all of it is torn down.
+            window.location.reload();
+        }
     });
 
     // Setup HUD & Initial Stats
