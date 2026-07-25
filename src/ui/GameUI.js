@@ -1785,14 +1785,31 @@ export class GameUI {
 
     const rows = cards.map(i => {
       const it = ITEMS[i.item_name] || {};
+      const catalogCard = getCard(i.item_name);
       const rar = i.rarity || it.rarity || 'common';
       const col = RARITY_COLOR[rar] || '#b8c0cc';
-      const inThis = getCard(i.item_name)?.id === current;
+      const inThis = catalogCard?.id === current;
       const inOther = !inThis && i.stats && i.stats.equipped === true;
-      return `<div class="sp-row cp-row${inThis ? ' sp-eq' : ''}" data-name="${i.item_name}" style="border-left:3px solid ${col};">
-        <span class="sp-ic">${i.emoji || '🃏'}</span>
-        <span class="sp-nm"><b style="color:${col}">${i.item_name}</b><br><span style="font-size:11px;color:#9fb0e0;">${it.desc || ''}</span></span>
-        <span class="sp-tag">${inThis ? '✅ ใส่อยู่' : inOther ? '↪ ช่องอื่น' : ''}</span>
+      // Emoji fallback: inventory emoji → catalog displayName first letter → 🃏
+      const cardEmoji = it.emoji || catalogCard?.displayName?.charAt(0) || '🃏';
+
+      // Build stat bonus summary from catalog card stats
+      const bonuses = [];
+      const cStats = catalogCard?.stats || {};
+      if (cStats.atkBonus) bonuses.push(`ATK+${cStats.atkBonus}`);
+      if (cStats.defBonus) bonuses.push(`DEF+${cStats.defBonus}`);
+      if (cStats.hpBonus) bonuses.push(`HP+${cStats.hpBonus}`);
+      if (cStats.spBonus) bonuses.push(`SP+${cStats.spBonus}`);
+      const bonusStr = bonuses.length ? bonuses.join(' · ') : (it.desc || catalogCard?.abilityName || '');
+
+      return `<div class="sp-row cp-row${inThis ? ' sp-eq' : ''}" data-name="${i.item_name}" style="display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent;border-left:3px solid ${col};transition:background .12s,border-color .12s;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid ${col};font-size:16px;flex-shrink:0">${cardEmoji}</span>
+        <span style="flex:1;color:#e6ecff;font-size:13.5px;line-height:1.3;">
+          <b style="color:${col}">${i.item_name}</b>
+          <span style="font-size:10px;color:#8b97ba;margin-left:4px">(${rar})</span>
+          <br><span style="font-size:11px;color:#9fb0e0">${bonusStr}</span>
+        </span>
+        <span style="font-size:11px;color:#8b97ba">${inThis ? '✅ ใส่อยู่' : inOther ? '↪ ช่องอื่น' : 'x' + (i.quantity || 1)}</span>
       </div>`;
     }).join('');
 
@@ -1804,8 +1821,9 @@ export class GameUI {
           <div id="cp-close" style="cursor:pointer;color:#9fb0e0;font-size:20px;line-height:1;padding:2px 6px;">✕</div>
         </div>
         <div style="font-size:11px;color:#8b97ba;margin-bottom:10px;">ใส่ได้เฉพาะการ์ดประเภท "${catLabel}"</div>
-        <div class="sp-row sp-none" data-name="__none__" style="opacity:${current ? 1 : .5};">
-          <span class="sp-ic">🚫</span><span class="sp-nm">ถอดการ์ดออก</span><span class="sp-tag"></span>
+        <div class="sp-row sp-none" data-name="__none__" style="display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;cursor:pointer;background:rgba(200,70,70,.12);margin-bottom:6px;opacity:${current ? 1 : .5};">
+          <span style="font-size:20px;width:32px;text-align:center">🚫</span>
+          <span style="flex:1;color:#e6ecff;font-size:13.5px">ถอดการ์ดออก</span>
         </div>
         ${cards.length ? rows : '<div style="color:#8b97ba;text-align:center;padding:16px 4px;font-size:13px;">ยังไม่มีการ์ดประเภทนี้ — ล่าบอสโลกเพื่อลุ้นการ์ดดรอป!</div>'}
       </div>`;
