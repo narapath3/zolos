@@ -8305,7 +8305,7 @@ export class GameUI {
     if (this.onlinePlayers && this.onlinePlayers.length) {
       for (const p of this.onlinePlayers) {
         if (p.username && p.username.toLowerCase().startsWith(q) && p.userId !== this.characterId) {
-          results.push({ username: p.username, level: p.level || 1, userId: p.userId, online: true });
+          results.push({ username: p.username, level: p.level || 1, userId: p.userId, characterId: p.characterId || null, online: true });
         }
         if (results.length >= 5) break;
       }

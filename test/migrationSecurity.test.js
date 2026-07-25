@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const migrationUrl = new URL('../migrations/20260724_security_hardening.sql', import.meta.url);
 const followupUrl = new URL('../migrations/20260724_security_hardening_followup.sql', import.meta.url);
 const cardCollectionUrl = new URL('../migrations/20260724_card_collection.sql', import.meta.url);
+const cardMailboxUrl = new URL('../migrations/20260725_card_mailbox.sql', import.meta.url);
 
 function functionDefinition(sql, name) {
   const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
@@ -115,7 +116,7 @@ test('card award RPC is service-role-only, row-locked, schema-qualified, and ide
   assert.match(fn, /p_won IS NULL/i);
   assert.doesNotMatch(fn, /(?<!public\.)\b(?:character_cards|card_reward_requests|characters)\b\s+(?:AS\s+)?[a-z_]/i);
 
-  const signature = 'public.award_card_drop(uuid, text, integer, integer, boolean, text)';
+  const signature = 'public.award_card_drop(text, text, integer, integer, boolean, text)';
   assert.match(sql, new RegExp(`REVOKE EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} FROM PUBLIC, anon, authenticated`, 'i'));
   assert.match(sql, new RegExp(`GRANT EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} TO service_role`, 'i'));
   assert.doesNotMatch(sql, /GRANT EXECUTE ON FUNCTION public\.award_card_drop[^;]*TO (?:anon|authenticated)/i);
@@ -140,7 +141,7 @@ test('fusion RPC is atomic and private without adding fusion networking', async 
   assert.match(fn, /UPDATE public\.character_cards/i);
   assert.match(fn, /v_row\.owned - 1 < p_cost/i);
 
-  const signature = 'public.fuse_card(uuid, text, smallint, integer, text)';
+  const signature = 'public.fuse_card(text, text, smallint, integer, text)';
   assert.match(sql, new RegExp(`REVOKE EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} FROM PUBLIC, anon, authenticated`, 'i'));
   assert.match(sql, new RegExp(`GRANT EXECUTE ON FUNCTION ${signature.replace(/[()]/g, '\\$&')} TO service_role`, 'i'));
 });
@@ -185,5 +186,46 @@ test('receipt replay checks identity before returning or mutating card state', a
       replayReturn < cardMutation,
       `${name} exact replay must return before card state can mutate again`,
     );
+  }
+});
+
+test('card mailbox enables RLS and restricts read access to owner/recipient', async () => {
+  const sql = await readFile(cardMailboxUrl, 'utf8');
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.card_mailbox/i);
+  assert.match(sql, /ALTER TABLE public\.card_mailbox ENABLE ROW LEVEL SECURITY/i);
+  assert.match(
+    sql,
+    /CREATE POLICY card_mailbox_select_own[\s\S]*FOR SELECT USING\s*\(\s*recipient_user_id\s*=\s*auth\.uid\(\)\s+OR\s+sender_user_id\s*=\s*auth\.uid\(\)\s*\)/i,
+  );
+  assert.match(sql, /GRANT SELECT ON public\.card_mailbox TO authenticated/i);
+  assert.match(sql, /REVOKE INSERT, UPDATE, DELETE ON public\.card_mailbox FROM anon, authenticated/i);
+});
+
+test('mailbox RPCs are security-hardened, row-locked, and authenticated-only', async () => {
+  const sql = await readFile(cardMailboxUrl, 'utf8');
+
+  for (const name of ['send_card_mail', 'claim_card_mail', 'return_card_mail']) {
+    const fn = functionDefinition(sql, name);
+
+    assert.match(fn, /SECURITY DEFINER/i);
+    assert.match(fn, /SET search_path = ''/i);
+
+    // Assert that table references are qualified
+    const codeOnly = fn.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.doesNotMatch(codeOnly, /(?<!public\.)\b(?:card_mailbox|characters|inventory)\b/i);
+
+    if (name === 'claim_card_mail' || name === 'return_card_mail') {
+      assert.match(fn, /FROM public\.card_mailbox[\s\S]*FOR UPDATE/i);
+    }
+
+    const signatureSuffix = name === 'send_card_mail'
+      ? 'send_card_mail(text, text, text, integer, integer, jsonb)'
+      : name === 'claim_card_mail'
+        ? 'claim_card_mail(uuid)'
+        : 'return_card_mail(uuid)';
+
+    assert.match(sql, new RegExp(`REVOKE\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+public\\.${signatureSuffix.replace(/[()]/g, '\\$&')}\\s+FROM\\s+(?:anon,\\s*)?public`, 'i'));
+    assert.match(sql, new RegExp(`GRANT\\s+EXECUTE\\s+ON\\s+FUNCTION\\s+public\\.${signatureSuffix.replace(/[()]/g, '\\$&')}\\s+TO\\s+authenticated`, 'i'));
+    assert.doesNotMatch(sql, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${name}\\b[^;]*TO (?:anon|public)`, 'i'));
   }
 });

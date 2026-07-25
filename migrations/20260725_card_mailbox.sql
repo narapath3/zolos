@@ -37,6 +37,7 @@ CREATE POLICY card_mailbox_select_own ON public.card_mailbox
   FOR SELECT USING (recipient_user_id = auth.uid() OR sender_user_id = auth.uid());
 
 -- ------------------------------------------------------------
+-- ------------------------------------------------------------
 -- send_card_mail: escrow a card into the recipient's mailbox
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.send_card_mail(
@@ -49,12 +50,12 @@ CREATE OR REPLACE FUNCTION public.send_card_mail(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path = ''
 AS $function$
 DECLARE
-  v_sender    characters%ROWTYPE;
-  v_recipient characters%ROWTYPE;
-  v_inv       inventory%ROWTYPE;
+  v_sender    public.characters%ROWTYPE;
+  v_recipient public.characters%ROWTYPE;
+  v_inv       public.inventory%ROWTYPE;
   v_qty       integer := floor(p_quantity)::int;
   v_price     integer := GREATEST(0, floor(p_price)::int);
   v_mail_id   uuid;
@@ -66,12 +67,12 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'reason', 'bad_quantity');
   END IF;
 
-  SELECT * INTO v_sender FROM characters WHERE user_id = auth.uid() ORDER BY created_at LIMIT 1;
+  SELECT * INTO v_sender FROM public.characters WHERE user_id = auth.uid() ORDER BY created_at LIMIT 1;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'no_character');
   END IF;
 
-  SELECT * INTO v_recipient FROM characters WHERE id = p_recipient_char_id;
+  SELECT * INTO v_recipient FROM public.characters WHERE id = p_recipient_char_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'no_recipient');
   END IF;
@@ -80,7 +81,7 @@ BEGIN
   END IF;
 
   -- Sender must actually own enough copies to give away.
-  SELECT * INTO v_inv FROM inventory
+  SELECT * INTO v_inv FROM public.inventory
     WHERE character_id = v_sender.id AND item_name = p_item_name
     ORDER BY quantity DESC LIMIT 1;
   IF NOT FOUND OR v_inv.quantity < v_qty THEN
@@ -92,10 +93,10 @@ BEGIN
   END IF;
 
   -- Escrow: take the copies out of the sender's inventory now.
-  UPDATE inventory SET quantity = quantity - v_qty WHERE id = v_inv.id;
-  DELETE FROM inventory WHERE id = v_inv.id AND quantity <= 0;
+  UPDATE public.inventory SET quantity = quantity - v_qty WHERE id = v_inv.id;
+  DELETE FROM public.inventory WHERE id = v_inv.id AND quantity <= 0;
 
-  INSERT INTO card_mailbox (
+  INSERT INTO public.card_mailbox (
     sender_char_id, sender_user_id, sender_name,
     recipient_char_id, recipient_user_id,
     item_name, item_type, quantity, price, stats
@@ -116,22 +117,22 @@ CREATE OR REPLACE FUNCTION public.claim_card_mail(p_mail_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path = ''
 AS $function$
 DECLARE
-  v_mail      card_mailbox%ROWTYPE;
-  v_recipient characters%ROWTYPE;
+  v_mail      public.card_mailbox%ROWTYPE;
+  v_recipient public.characters%ROWTYPE;
 BEGIN
   IF auth.uid() IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'not_authed');
   END IF;
 
-  SELECT * INTO v_mail FROM card_mailbox WHERE id = p_mail_id FOR UPDATE;
+  SELECT * INTO v_mail FROM public.card_mailbox WHERE id = p_mail_id FOR UPDATE;
   IF NOT FOUND OR v_mail.status <> 'pending' THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'gone');
   END IF;
 
-  SELECT * INTO v_recipient FROM characters WHERE id = v_mail.recipient_char_id;
+  SELECT * INTO v_recipient FROM public.characters WHERE id = v_mail.recipient_char_id;
   IF NOT FOUND OR v_recipient.user_id <> auth.uid() THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'not_yours');
   END IF;
@@ -140,20 +141,20 @@ BEGIN
     IF v_recipient.gold < v_mail.price THEN
       RETURN jsonb_build_object('ok', false, 'reason', 'not_enough_gold');
     END IF;
-    UPDATE characters SET gold = gold - v_mail.price, updated_at = now() WHERE id = v_recipient.id;
-    UPDATE characters SET gold = LEAST(gold + v_mail.price, 500000000), updated_at = now()
+    UPDATE public.characters SET gold = gold - v_mail.price, updated_at = now() WHERE id = v_recipient.id;
+    UPDATE public.characters SET gold = LEAST(gold + v_mail.price, 500000000), updated_at = now()
       WHERE id = v_mail.sender_char_id;
   END IF;
 
   -- Deliver the card (merge with an existing stack, else insert).
-  UPDATE inventory SET quantity = quantity + v_mail.quantity
+  UPDATE public.inventory SET quantity = quantity + v_mail.quantity
     WHERE character_id = v_recipient.id AND item_name = v_mail.item_name;
   IF NOT FOUND THEN
-    INSERT INTO inventory (character_id, item_name, item_type, quantity, stats)
+    INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
     VALUES (v_recipient.id, v_mail.item_name, v_mail.item_type, v_mail.quantity, COALESCE(v_mail.stats, '{}'::jsonb));
   END IF;
 
-  UPDATE card_mailbox SET status = 'claimed', resolved_at = now() WHERE id = p_mail_id;
+  UPDATE public.card_mailbox SET status = 'claimed', resolved_at = now() WHERE id = p_mail_id;
 
   RETURN jsonb_build_object('ok', true,
     'item_name', v_mail.item_name, 'item_type', v_mail.item_type,
@@ -171,16 +172,16 @@ CREATE OR REPLACE FUNCTION public.return_card_mail(p_mail_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path = ''
 AS $function$
 DECLARE
-  v_mail card_mailbox%ROWTYPE;
+  v_mail public.card_mailbox%ROWTYPE;
 BEGIN
   IF auth.uid() IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'not_authed');
   END IF;
 
-  SELECT * INTO v_mail FROM card_mailbox WHERE id = p_mail_id FOR UPDATE;
+  SELECT * INTO v_mail FROM public.card_mailbox WHERE id = p_mail_id FOR UPDATE;
   IF NOT FOUND OR v_mail.status <> 'pending' THEN
     RETURN jsonb_build_object('ok', false, 'reason', 'gone');
   END IF;
@@ -189,14 +190,14 @@ BEGIN
   END IF;
 
   -- Give the escrowed copies back to the sender.
-  UPDATE inventory SET quantity = quantity + v_mail.quantity
+  UPDATE public.inventory SET quantity = quantity + v_mail.quantity
     WHERE character_id = v_mail.sender_char_id AND item_name = v_mail.item_name;
   IF NOT FOUND THEN
-    INSERT INTO inventory (character_id, item_name, item_type, quantity, stats)
+    INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
     VALUES (v_mail.sender_char_id, v_mail.item_name, v_mail.item_type, v_mail.quantity, COALESCE(v_mail.stats, '{}'::jsonb));
   END IF;
 
-  UPDATE card_mailbox SET status = 'returned', resolved_at = now() WHERE id = p_mail_id;
+  UPDATE public.card_mailbox SET status = 'returned', resolved_at = now() WHERE id = p_mail_id;
 
   RETURN jsonb_build_object('ok', true, 'item_name', v_mail.item_name, 'quantity', v_mail.quantity);
 END $function$;
@@ -209,3 +210,7 @@ REVOKE EXECUTE ON FUNCTION public.return_card_mail(uuid) FROM anon, public;
 GRANT EXECUTE ON FUNCTION public.send_card_mail(text, text, text, integer, integer, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_card_mail(uuid)  TO authenticated;
 GRANT EXECUTE ON FUNCTION public.return_card_mail(uuid) TO authenticated;
+
+-- Explicitly configure table permissions to limit to reads via client and edits through defined RPCs
+GRANT SELECT ON public.card_mailbox TO authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.card_mailbox FROM anon, authenticated;

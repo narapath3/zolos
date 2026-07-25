@@ -489,7 +489,7 @@ io.on('connection', (socket) => {
             });
             player.level = normalized.level;
             player.username = normalized.username;
-            
+
             if (normalized.mapId !== oldMapId) {
                 socket.leave(`map:${oldMapId}`);
                 player.mapId = normalized.mapId;
@@ -802,7 +802,7 @@ io.on('connection', (socket) => {
     // per-player damage tally. Per-hit damage is clamped as light anti-cheat.
     socket.on('boss_hit', async (payload) => {
         if (!worldBoss.active || worldBoss.hp <= 0 || !payload) return;
-                const player = onlinePlayers.get(socket.id);
+        const player = onlinePlayers.get(socket.id);
         if (!player || player.mapId !== worldBoss.mapId) return;
         const dmg = Math.max(0, Math.min(5000, Number(payload.damage) || 0));
         if (dmg <= 0) return;
@@ -882,12 +882,12 @@ io.on('connection', (socket) => {
     socket.on('player_dead', (payload) => {
         const player = onlinePlayers.get(socket.id);
         if (!player || !payload || !payload.monsterName) return;
-        
+
         // Only announce if player was above level 5
         if (player.level > 5) {
             const mapId = player.mapId || 'prontera_field';
             const message = `ผู้เล่น [${player.username}] ถูก [${payload.monsterName}] สังหาร!`;
-            
+
             io.to(`map:${mapId}`).emit('chat', {
                 userId: 'system',
                 username: '📢 แจ้งเตือน',
@@ -957,10 +957,10 @@ io.on('connection', (socket) => {
 // ============ Helpers ============
 function broadcastPlayerList(mapId) {
     if (!mapId) return;
-    
+
     const playersInMap = [];
     let globalCount = 0;
-    
+
     for (const [, info] of onlinePlayers) {
         globalCount++;
         if (info.mapId === mapId) {
@@ -969,11 +969,12 @@ function broadcastPlayerList(mapId) {
                 username: info.username,
                 level: info.level,
                 mapId: info.mapId,
-                ping: info.ping ?? null
+                ping: info.ping ?? null,
+                characterId: info.characterId || null
             });
         }
     }
-    
+
     // Send map-specific list to players in that map (used for rendering the
     // other heroes standing in the same city).
     io.to(`map:${mapId}`).emit('players_update', playersInMap);
@@ -986,7 +987,7 @@ function broadcastPlayerList(mapId) {
     // after players_update so it deterministically wins on the client.
     const allPlayers = [];
     for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null });
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null, characterId: info.characterId || null });
     }
     io.emit('players_global', allPlayers);
 }
@@ -1004,7 +1005,7 @@ setInterval(() => {
     // Push the freshly-measured pings out to everyone's Online panel.
     const allPlayers = [];
     for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null });
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null, characterId: info.characterId || null });
     }
     if (allPlayers.length) io.emit('players_global', allPlayers);
 }, 4000);
