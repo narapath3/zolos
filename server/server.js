@@ -362,6 +362,7 @@ io.on('connection', (socket) => {
             characterId: verifiedCharacter?.id || null,
             isAdmin: profile?.is_admin === true,
             ping: null, // round-trip latency in ms, measured via srv_ping/srv_pong
+            device: data.device || 'desktop',
         };
 
         // Join map-specific room
@@ -969,6 +970,7 @@ function broadcastPlayerList(mapId) {
                 username: info.username,
                 level: info.level,
                 mapId: info.mapId,
+                device: info.device || 'desktop',
                 ping: info.ping ?? null,
                 characterId: info.characterId || null
             });
@@ -987,7 +989,7 @@ function broadcastPlayerList(mapId) {
     // after players_update so it deterministically wins on the client.
     const allPlayers = [];
     for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null, characterId: info.characterId || null });
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, device: info.device || 'desktop', ping: info.ping ?? null, characterId: info.characterId || null });
     }
     io.emit('players_global', allPlayers);
 }
@@ -1005,7 +1007,7 @@ setInterval(() => {
     // Push the freshly-measured pings out to everyone's Online panel.
     const allPlayers = [];
     for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, ping: info.ping ?? null, characterId: info.characterId || null });
+        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, device: info.device || 'desktop', ping: info.ping ?? null, characterId: info.characterId || null });
     }
     if (allPlayers.length) io.emit('players_global', allPlayers);
 }, 4000);

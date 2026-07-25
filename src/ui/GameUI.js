@@ -2968,7 +2968,15 @@ export class GameUI {
     let html = `<div class="online-count-badge">${icon} ${onlineCount} online / ${totalCount} total</div>`;
 
     // mapId → short city label (players are now listed across all cities)
-    const CITY = { prontera: 'Prontera', prontera_field: 'Prontera', payon: 'Payon', glast_heim: 'Glast Heim', mjolnir: 'Mjolnir', abyss_lake: 'Abyss Lake' };
+    const MAP_NAMES_TH = {
+      prontera: 'เมืองประเทอร์รา',
+      prontera_field: 'ทุ่งประเทอร์รา',
+      payon: 'ป่าเปยอง',
+      glast_heim: 'ปราสาทกลาสท์ไฮม์',
+      mjolnir: 'เทือกเขาหมิโอลนีร์',
+      abyss_lake: 'ทะเลสาบห้วงลึก',
+      svarrga: 'สรวงสวรรค์'
+    };
 
     html += list.map(p => {
       const isFriend = friends.includes(p.username);
@@ -2977,9 +2985,20 @@ export class GameUI {
       const dotColor = p.isOffline ? '#666' : '#40e080';
       const nameColor = p.isOffline ? '#b0c0e0' : '#ffffff';
       const badgeStyle = p.isOffline ? 'background:rgba(0,0,0,0.5);color:#888;border-color:rgba(255,255,255,0.1);' : 'background:rgba(0,0,0,0.6);color:#ffffff;border-color:var(--primary-glow);';
+
+      const mapName = MAP_NAMES_TH[p.mapId] || p.mapId;
       const cityHtml = (!p.isOffline && p.mapId)
-        ? `<span class="player-city-tag" style="font-size:9px;color:#7fb0e0;background:rgba(60,110,180,0.18);border:1px solid rgba(120,170,230,0.3);border-radius:6px;padding:1px 6px;margin-left:4px;white-space:nowrap;">📍${CITY[p.mapId] || p.mapId}</span>`
+        ? `<span class="player-city-tag" style="font-size:9px;color:#7fb0e0;background:rgba(60,110,180,0.18);border:1px solid rgba(120,170,230,0.3);border-radius:6px;padding:1px 6px;margin-left:4px;white-space:nowrap;">📍${mapName}</span>`
         : '';
+
+      // Device Icon Map
+      const deviceIcons = {
+        desktop: '💻',
+        tablet: '📲',
+        mobile: '📱'
+      };
+      const deviceIcon = deviceIcons[p.device] || '💻';
+      const deviceHtml = `<span class="player-device-icon" style="margin-right:2px;" title="${p.device || 'desktop'}">${deviceIcon}</span>`;
 
       // Ping (ms): the server measures each socket's latency and includes it in
       // the roster (players_global), so it works for everyone, cross-map.
@@ -2992,6 +3011,7 @@ export class GameUI {
       return `
         <div class="player-row" data-username="${p.username}" data-user-id="${p.userId || ''}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
           <span class="online-dot" style="background-color:${dotColor}"></span>
+          ${deviceHtml}
           <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
           ${cityHtml}
           <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>

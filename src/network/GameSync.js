@@ -14,10 +14,22 @@ let chatCallback = null;
 let cardFusionSocket = null;
 const pendingCardFusions = new Map();
 
-// Track active player info for presence updating
 let currentUserId = null;
 let currentUsername = 'Adventurer';
 let currentLevel = 1;
+
+// ============ Device Detection ============
+export function getDeviceTypeFromUserAgent(ua) {
+    const isTablet = /iPad|PlayBook|Silk/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua));
+    if (isTablet) return 'tablet';
+    const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    if (isMobile) return 'mobile';
+    return 'desktop';
+}
+
+export function getDeviceType() {
+    return getDeviceTypeFromUserAgent(navigator?.userAgent || '');
+}
 
 // ============ Character CRUD ============
 export async function loadCharacter(userId) {
@@ -1470,7 +1482,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         // have no token and stay unverified (can't impersonate a real account).
         let accessToken = null;
         try { accessToken = (await supabase?.auth?.getSession())?.data?.session?.access_token || null; } catch (e) { /* guest */ }
-        socket.emit('join', { userId, username, level, mapId: currentMapId, characterId, accessToken });
+        socket.emit('join', { userId, username, level, mapId: currentMapId, characterId, accessToken, device: getDeviceType() });
         console.log('[Zolos] ✅ Emitted join event to Map Server');
         return;
     }
@@ -2351,8 +2363,11 @@ export function sendWarpRequest(targetUserId) {
 function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
     // Simulate real online players
     const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
+    const mapIds = ['prontera', 'payon', 'glast_heim', 'mjolnir', 'abyss_lake', 'svarrga'];
+    const devices = ['desktop', 'mobile', 'tablet'];
+
     mockPlayers = [
-        { userId: 'player_me', username, level }
+        { userId: 'player_me', username, level, device: getDeviceType(), mapId: 'prontera', ping: 12 }
     ];
 
     // Pick 2-4 random initial mock online players
@@ -2368,7 +2383,10 @@ function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onP
             y: 0,
             z: (Math.random() - 0.5) * 15,
             rY: Math.random() * Math.PI * 2,
-            state: 'idle'
+            state: 'idle',
+            device: devices[Math.floor(Math.random() * devices.length)],
+            mapId: mapIds[Math.floor(Math.random() * mapIds.length)],
+            ping: Math.floor(Math.random() * 150) + 15
         });
     }
 
@@ -2405,7 +2423,10 @@ function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onP
                 y: 0,
                 z: (Math.random() - 0.5) * 15,
                 rY: Math.random() * Math.PI * 2,
-                state: 'idle'
+                state: 'idle',
+                device: devices[Math.floor(Math.random() * devices.length)],
+                mapId: mapIds[Math.floor(Math.random() * mapIds.length)],
+                ping: Math.floor(Math.random() * 150) + 15
             };
             mockPlayers.push(newPlayer);
             if (onPlayersUpdate) onPlayersUpdate([...mockPlayers]);
