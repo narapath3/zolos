@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -61,6 +61,7 @@ export class GameUI {
     this._setupTargetIndicator();
     this._setupTradePanel();
     this._setupCardTradePanel();
+    this._setupMailbox();
     this._setupMobileControls();
     this._setupDailyQuests();
     this._setupNetworkStatus();
@@ -363,6 +364,7 @@ export class GameUI {
     if (panel && panel.style.display !== 'none') {
       const grid = document.getElementById('mycard-grid');
       if (grid) this._mountCardAlbum(grid);
+      this.refreshMailbox();
     }
   }
 
@@ -8269,41 +8271,195 @@ export class GameUI {
     const target = await resolveCharacterByUid(uid);
     if (!target || !target.userId) { setStatus('❌ ไม่พบผู้เล่นที่มี UID นี้', '#ff8f8f'); return; }
 
-    // The recipient must be online — the trade popup is delivered in real time.
-    const online = (this.onlinePlayers || []).some(p => p.userId === target.userId);
-    if (!online) { setStatus(`❌ ผู้รับ (${target.username || uid}) ต้องออนไลน์อยู่จึงจะรับการ์ดได้`, '#ff8f8f'); return; }
-
     // Never carry the sender's socket state onto the recipient's fresh copy.
     const catalog = getCard(item.item_name);
     const cleanStats = { card_id: catalog?.id || item.stats?.card_id };
     if (item.stats && item.stats.card_stars) cleanStats.card_stars = item.stats.card_stars;
 
-    this.tradeTarget = { userId: target.userId, username: target.username };
-    this.tradeSelectedItem = item;
+    // Online recipient → live trade popup (instant, accept/decline).
+    // Offline recipient → drop it in their mailbox (escrow, claim later).
+    const online = (this.onlinePlayers || []).some(p => p.userId === target.userId);
+    if (online) {
+      this.tradeTarget = { userId: target.userId, username: target.username };
+      this.tradeSelectedItem = item;
 
-    const waiting = document.getElementById('card-trade-waiting');
-    if (waiting) waiting.style.display = 'flex';
+      const waiting = document.getElementById('card-trade-waiting');
+      if (waiting) waiting.style.display = 'flex';
 
-    try {
-      const myName = this.character?.stats?.name || 'Player';
-      await sendTradeRequestPacket(
-        this.characterId, myName, target.userId, target.username || 'Player',
-        item.item_name, 'card', qty, price, cleanStats
-      );
+      try {
+        const myName = this.character?.stats?.name || 'Player';
+        await sendTradeRequestPacket(
+          this.characterId, myName, target.userId, target.username || 'Player',
+          item.item_name, 'card', qty, price, cleanStats
+        );
 
-      this.tradeTimeout = setTimeout(() => {
-        if (waiting && waiting.style.display !== 'none') {
-          waiting.style.display = 'none';
-          this.addCombatLog('⏱️ คำขอเทรดการ์ดหมดเวลา ไม่มีการตอบรับ', 'warning');
-          this.tradeTarget = null;
-          this.tradeSelectedItem = null;
-        }
-      }, 30000);
-    } catch (err) {
-      console.error('[CardTrade] Request Error:', err);
-      if (waiting) waiting.style.display = 'none';
-      setStatus('❌ ส่งคำขอไม่สำเร็จ ลองใหม่อีกครั้ง', '#ff8f8f');
+        this.tradeTimeout = setTimeout(() => {
+          if (waiting && waiting.style.display !== 'none') {
+            waiting.style.display = 'none';
+            this.addCombatLog('⏱️ คำขอเทรดการ์ดหมดเวลา ไม่มีการตอบรับ', 'warning');
+            this.tradeTarget = null;
+            this.tradeSelectedItem = null;
+          }
+        }, 30000);
+      } catch (err) {
+        console.error('[CardTrade] Request Error:', err);
+        if (waiting) waiting.style.display = 'none';
+        setStatus('❌ ส่งคำขอไม่สำเร็จ ลองใหม่อีกครั้ง', '#ff8f8f');
+      }
+      return;
     }
+
+    // Offline → mailbox delivery.
+    setStatus(`📬 ผู้รับ (${target.username || uid}) ออฟไลน์ กำลังส่งเข้ากล่องจดหมาย...`, 'var(--text-dim)');
+    const res = await sendCardMail(target.characterId, item.item_name, 'card', qty, price, cleanStats);
+    if (!res || !res.ok) {
+      const reason = res && res.reason;
+      const msg = reason === 'not_enough' ? '❌ การ์ดไม่พอสำหรับส่ง'
+        : reason === 'socketed_reserve' ? '❌ ต้องถอดการ์ดออกจากช่องก่อน (เหลือใบเดียว)'
+        : reason === 'self' ? '❌ ส่งการ์ดให้ตัวเองไม่ได้'
+        : reason === 'no_recipient' ? '❌ ไม่พบผู้รับ'
+        : '❌ ส่งเข้ากล่องจดหมายไม่สำเร็จ';
+      setStatus(msg, '#ff8f8f');
+      return;
+    }
+    // Escrow already removed the card server-side — refresh local truth.
+    await this.loadInventoryFromDB(this.characterId);
+    if (this.cardAlbum) this.cardAlbum.render();
+    this.addCombatLog(`📬 ส่งการ์ด ${item.item_name} x${qty} เข้ากล่องจดหมายของ ${target.username || uid} แล้ว${price > 0 ? ` (ราคา ${price} Zeny)` : ' (ฟรี)'}`, 'system');
+    const modal = document.getElementById('card-trade-modal');
+    if (modal) modal.style.display = 'none';
+    this._cardTradeItem = null;
+    this.updateMobileControlsVisibility();
+  }
+
+  // ============ Card Mailbox (offline delivery) ============
+  _setupMailbox() {
+    this._mailTab = 'inbox';
+    this._mail = [];
+
+    const closeMail = () => {
+      const modal = document.getElementById('mail-modal');
+      if (modal) modal.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    };
+    document.getElementById('btn-close-mail')?.addEventListener('click', closeMail);
+    document.getElementById('mail-overlay')?.addEventListener('click', closeMail);
+    document.getElementById('btn-open-mailbox')?.addEventListener('click', () => this.openMailbox());
+
+    document.querySelectorAll('.mail-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.mail-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this._mailTab = tab.getAttribute('data-mailtab');
+        this._renderMailList();
+      });
+    });
+  }
+
+  // Fetch pending mail and update the unread badge on the My Card button.
+  async refreshMailbox() {
+    this._mail = await fetchCardMail();
+    const inboxCount = (this._mail || []).filter(m => m.recipient_char_id === this.characterId).length;
+    const badge = document.getElementById('mailbox-badge');
+    if (badge) {
+      if (inboxCount > 0) { badge.style.display = 'block'; badge.textContent = inboxCount > 99 ? '99+' : String(inboxCount); }
+      else badge.style.display = 'none';
+    }
+    return this._mail;
+  }
+
+  async openMailbox() {
+    const modal = document.getElementById('mail-modal');
+    if (modal) modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+    const list = document.getElementById('mail-list');
+    if (list) list.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:24px;font-size:11px;">⌛ กำลังโหลด...</div>';
+    await this.refreshMailbox();
+    this._renderMailList();
+  }
+
+  _renderMailList() {
+    const list = document.getElementById('mail-list');
+    if (!list) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const inbox = this._mailTab === 'inbox';
+    const rows = (this._mail || []).filter(m =>
+      inbox ? m.recipient_char_id === this.characterId : m.sender_char_id === this.characterId);
+
+    if (rows.length === 0) {
+      list.innerHTML = `<div style="text-align:center;color:var(--text-dim);padding:28px 8px;font-size:11px;">${inbox ? 'ยังไม่มีการ์ดในกล่องจดหมาย' : 'ยังไม่มีการ์ดที่ส่งค้างอยู่'}</div>`;
+      return;
+    }
+
+    list.innerHTML = rows.map(m => {
+      const card = getCard(m.item_name);
+      const icon = this._itemIconHtml({ item_type: 'card', item_name: m.item_name });
+      const title = card ? (card.displayName || m.item_name) : m.item_name;
+      const priceLabel = m.price > 0
+        ? `<span style="color:#ffd97a;">${Number(m.price).toLocaleString()} Zeny</span>`
+        : `<span style="color:#40e080;">ฟรี</span>`;
+      const who = inbox
+        ? `จาก ${esc(m.sender_name)}`
+        : `ถึง UID ${esc(m.recipient_char_id.split('_').pop().substring(0, 8).toUpperCase())}`;
+      const actions = inbox
+        ? `<button class="btn-primary mail-claim" data-id="${m.id}" style="flex:1;font-size:11px;padding:6px;">${m.price > 0 ? '💰 ซื้อ/รับ' : '📥 รับ'}</button>
+           <button class="btn-secondary mail-reject" data-id="${m.id}" style="flex:1;font-size:11px;padding:6px;">ปฏิเสธ</button>`
+        : `<button class="btn-secondary mail-cancel" data-id="${m.id}" style="flex:1;font-size:11px;padding:6px;">↩️ ยกเลิก (คืนการ์ด)</button>`;
+      return `
+        <div style="display:flex;flex-direction:column;gap:6px;padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(120,140,200,.2);border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="detail-icon" style="font-size:24px;">${icon}</span>
+            <div style="flex:1;text-align:left;">
+              <div style="font-weight:bold;color:var(--primary);font-size:12px;">${esc(title)} x${m.quantity}</div>
+              <div style="font-size:10.5px;color:var(--text-dim);">${who} · ${priceLabel}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">${actions}</div>
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('.mail-claim').forEach(b => b.addEventListener('click', () => this._claimMail(b.getAttribute('data-id'))));
+    list.querySelectorAll('.mail-reject').forEach(b => b.addEventListener('click', () => this._returnMail(b.getAttribute('data-id'), 'reject')));
+    list.querySelectorAll('.mail-cancel').forEach(b => b.addEventListener('click', () => this._returnMail(b.getAttribute('data-id'), 'cancel')));
+  }
+
+  async _claimMail(mailId) {
+    if (!mailId) return;
+    const res = await claimCardMail(mailId);
+    if (!res || !res.ok) {
+      const reason = res && res.reason;
+      const msg = reason === 'not_enough_gold' ? '❌ Zeny ไม่พอสำหรับรับการ์ดใบนี้'
+        : reason === 'gone' ? '❌ จดหมายนี้ถูกจัดการไปแล้ว'
+          : '❌ รับการ์ดไม่สำเร็จ';
+      this.addCombatLog(msg, 'warning');
+      await this.refreshMailbox(); this._renderMailList();
+      return;
+    }
+    await this.loadInventoryFromDB(this.characterId);
+    if (this.cardAlbum) this.cardAlbum.render();
+    if (this.character && this.character.stats && Number.isFinite(res.recipient_gold)) {
+      this.character.stats.gold = res.recipient_gold;
+      this.updateHUD(this.character.stats);
+      this.updateStats(this.character.stats);
+    }
+    this.addCombatLog(`🤝 รับการ์ด ${res.item_name} x${res.quantity} จาก ${res.sender_name}${res.price > 0 ? ` (จ่าย ${res.price} Zeny)` : ' (ฟรี)'} แล้ว!`, 'loot');
+    await this.refreshMailbox(); this._renderMailList();
+  }
+
+  async _returnMail(mailId, mode) {
+    if (!mailId) return;
+    const res = await returnCardMail(mailId);
+    if (!res || !res.ok) {
+      this.addCombatLog('❌ ดำเนินการไม่สำเร็จ', 'warning');
+    } else if (mode === 'cancel') {
+      // Sender got the escrowed card back — refresh own inventory/album.
+      await this.loadInventoryFromDB(this.characterId);
+      if (this.cardAlbum) this.cardAlbum.render();
+      this.addCombatLog(`↩️ ยกเลิกและรับการ์ด ${res.item_name} x${res.quantity} คืนแล้ว`, 'system');
+    } else {
+      this.addCombatLog(`🚫 ปฏิเสธการ์ด ${res.item_name} x${res.quantity} (คืนให้ผู้ส่ง)`, 'system');
+    }
+    await this.refreshMailbox(); this._renderMailList();
   }
 
   openTradePanel(remotePlayer) {

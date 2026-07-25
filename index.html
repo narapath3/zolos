@@ -445,7 +445,11 @@
         <button class="panel-close" data-close="mycard-panel">✕</button>
       </div>
       <div class="panel-body">
-        <p class="mycard-hint">คลิกการ์ดเพื่อดูรายละเอียด · เชื่อม/หลอมรวม · หรือ <b>ตั้งขายให้ผู้เล่นอื่น</b> (ขายให้ NPC ไม่ได้)</p>
+        <button id="btn-open-mailbox" class="btn-secondary"
+          style="width:100%;margin-bottom:8px;border-color:#ffd24a;color:#ffd97a;position:relative;">📬 กล่องจดหมายการ์ด
+          (Mailbox)<span id="mailbox-badge"
+            style="display:none;position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff4d4d;color:#fff;font-size:10px;line-height:18px;text-align:center;font-weight:bold;"></span></button>
+        <p class="mycard-hint">คลิกการ์ดเพื่อดูรายละเอียด · เชื่อม/หลอมรวม · หรือ <b>โอน/ขายให้ผู้เล่นอื่น</b> (ขายให้ NPC ไม่ได้)</p>
         <div id="mycard-grid"></div>
       </div>
     </div>
@@ -1205,6 +1209,26 @@
             (Send Request)</button>
           <p style="font-size: 10px; color: var(--text-dim); margin-top: 8px; text-align: center; line-height: 1.5;">
             ผู้รับต้องออนไลน์อยู่ · จะมีป๊อปอัพเด้งให้ผู้รับกดยอมรับ · ตั้งราคา 0 = โอนฟรี</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card Mailbox Modal (offline P2P delivery) -->
+    <div id="mail-modal" class="modal-popup" style="display: none;">
+      <div class="popup-overlay" id="mail-overlay"></div>
+      <div class="popup-content trade-panel-content" style="position: relative;">
+        <div class="popup-header">
+          <span class="popup-title">📬 กล่องจดหมายการ์ด</span>
+          <button class="popup-close" id="btn-close-mail">✕</button>
+        </div>
+        <div class="popup-body">
+          <div style="display:flex;gap:6px;margin-bottom:10px;">
+            <button class="mail-tab btn-secondary active" data-mailtab="inbox"
+              style="flex:1;font-size:11px;">📥 กล่องเข้า</button>
+            <button class="mail-tab btn-secondary" data-mailtab="outbox"
+              style="flex:1;font-size:11px;">📤 ที่ส่งไป</button>
+          </div>
+          <div id="mail-list" style="max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
         </div>
       </div>
     </div>

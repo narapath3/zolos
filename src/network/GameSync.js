@@ -177,6 +177,58 @@ export async function resolveCharacterByUid(uid) {
     }
 }
 
+// ===== Card Mailbox (offline P2P card delivery via escrow) =====
+
+// Escrow a card into the recipient's mailbox. Returns the RPC result jsonb
+// ({ ok, reason?, mail_id?, recipient_name? }).
+export async function sendCardMail(recipientCharId, itemName, itemType, quantity, price, stats = {}) {
+    if (isOfflineMode || !supabase) return { ok: false, reason: 'offline' };
+    try {
+        const { data, error } = await supabase.rpc('send_card_mail', {
+            p_recipient_char_id: recipientCharId,
+            p_item_name: itemName,
+            p_item_type: itemType || 'card',
+            p_quantity: quantity,
+            p_price: price || 0,
+            p_stats: stats || {},
+        });
+        if (error) { console.error('[Mail] send error:', error.message); return { ok: false, reason: 'error' }; }
+        return data || { ok: false, reason: 'error' };
+    } catch (e) { console.error('[Mail] send error:', e); return { ok: false, reason: 'error' }; }
+}
+
+// All pending mail visible to me (RLS returns only rows I sent or received).
+export async function fetchCardMail() {
+    if (isOfflineMode || !supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('card_mailbox')
+            .select('*')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+        if (error) { console.error('[Mail] fetch error:', error.message); return []; }
+        return data || [];
+    } catch (e) { console.error('[Mail] fetch error:', e); return []; }
+}
+
+export async function claimCardMail(mailId) {
+    if (isOfflineMode || !supabase) return { ok: false, reason: 'offline' };
+    try {
+        const { data, error } = await supabase.rpc('claim_card_mail', { p_mail_id: mailId });
+        if (error) { console.error('[Mail] claim error:', error.message); return { ok: false, reason: 'error' }; }
+        return data || { ok: false, reason: 'error' };
+    } catch (e) { console.error('[Mail] claim error:', e); return { ok: false, reason: 'error' }; }
+}
+
+export async function returnCardMail(mailId) {
+    if (isOfflineMode || !supabase) return { ok: false, reason: 'offline' };
+    try {
+        const { data, error } = await supabase.rpc('return_card_mail', { p_mail_id: mailId });
+        if (error) { console.error('[Mail] return error:', error.message); return { ok: false, reason: 'error' }; }
+        return data || { ok: false, reason: 'error' };
+    } catch (e) { console.error('[Mail] return error:', e); return { ok: false, reason: 'error' }; }
+}
+
 export async function createCharacter(userId) {
     let name = getDeterministicGuestName(userId);
     let gender = 'male';

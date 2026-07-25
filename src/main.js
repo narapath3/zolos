@@ -952,6 +952,7 @@ async function initGame(charData) {
     await gameUI.loadFriendsFromDB(charData.id);
     await gameUI.loadFishingAlmanacFromDB(charData.id);
     await gameUI.loadLoginStreakFromDB(charData.id); // daily reward — auto-opens if claimable
+    gameUI.refreshMailbox?.().catch(() => { }); // show card-mailbox badge if anything is waiting
     window.stallManager.refresh(); // build the player market street
 
     loadingOverlay.setProgress(85, '🐉 Spawning World Monsters & Realm Entities...');
