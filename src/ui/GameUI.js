@@ -2050,7 +2050,38 @@ export class GameUI {
         + (socketed ? ` · <span style="color:#8fe0a8">กำลังใส่อยู่</span>` : ` · ไปที่แท็บ Equip แล้วแตะช่องการ์ด (🃏) บนอุปกรณ์เพื่อสวม`)
         + `</span>`;
     }
-    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + petHtml + cardHtml + droppedByHtml;
+
+    let socketHtml = '';
+    if (['weapon', 'armor', 'shield', 'ring', 'wrist', 'accessory'].includes(item.item_type) && item.stats) {
+      const cards = item.stats.cards || [];
+      const maxSockets = 4;
+      socketHtml = `<br/><br/><strong style="color:var(--secondary)">🕳️ Sockets / ช่องใส่การ์ด:</strong><br/>`;
+      socketHtml += `<div style="display:flex;flex-direction:column;gap:5px;margin-top:5px">`;
+      for (let i = 0; i < maxSockets; i++) {
+        const cardName = cards[i];
+        if (cardName) {
+          const cardData = ITEMS[cardName] || { emoji: '🃏' };
+          socketHtml += `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);padding:4px 8px;border-radius:4px;font-size:13px">
+            <div style="color:#ffd700">● ${cardData.emoji} ${cardName}</div>
+            <button class="btn-remove-card" data-idx="${i}" style="background:#ff4444;border:none;color:white;padding:2px 6px;border-radius:3px;font-size:11px;cursor:pointer">ถอด</button>
+          </div>`;
+        } else {
+          socketHtml += `<div style="color:var(--text-dim);font-size:13px;padding:2px 8px">○ Empty Slot (ว่าง)</div>`;
+        }
+      }
+      socketHtml += `</div>`;
+    }
+
+    document.getElementById('detail-desc').innerHTML = item.desc + durHtml + petHtml + cardHtml + socketHtml + droppedByHtml;
+
+    // Attach removal events
+    document.querySelectorAll('.btn-remove-card').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute('data-idx'));
+        this._removeCardFromItem(item, idx);
+      });
+    });
     document.getElementById('detail-price-val').textContent = item.price;
 
     const useBtn = document.getElementById('btn-use-item');
@@ -9708,6 +9739,43 @@ export class GameUI {
     } catch (err) {
       console.error('Socketing failed:', err);
       this.addCombatLog('❌ เกิดข้อผิดพลาดในการใส่การ์ด', 'system');
+    }
+  }
+
+  async _removeCardFromItem(targetItem, cardIdx) {
+    if (!this.characterId || !targetItem || !targetItem.stats || !targetItem.stats.cards) return;
+    
+    const cardName = targetItem.stats.cards[cardIdx];
+    if (!cardName) return;
+
+    // Remove from item stats
+    targetItem.stats.cards.splice(cardIdx, 1);
+    
+    try {
+      // Save the target item's new stats
+      await updateInventoryItemStats(this.characterId, targetItem.item_name, targetItem.stats);
+      
+      // Return card to inventory
+      await saveInventoryItem(this.characterId, cardName, 'card', 1);
+      
+      // Update local inventory array
+      const existingCard = this.inventory.find(i => i.item_name === cardName && i.item_type === 'card');
+      if (existingCard) {
+        existingCard.quantity++;
+      } else {
+        // If not in local inventory, we'd need to fetch it or just re-render after a full load
+        // For simplicity, let's assume it's either there or we'll just re-render and it will appear next time
+        this.addCombatLog(`⚠️ ถอดการ์ดสำเร็จ แต่กรุณาเปิดกระเป๋าใหม่เพื่อดูการ์ดที่ได้รับคืน`, 'system');
+      }
+      
+      this.addCombatLog(`✅ ถอดการ์ด ${cardName} ออกจาก ${targetItem.item_name} แล้ว!`, 'system');
+      
+      this._renderInventory();
+      this._updateDetailBox();
+      this.updateStats(this.character.stats);
+    } catch (err) {
+      console.error('Removal failed:', err);
+      this.addCombatLog('❌ เกิดข้อผิดพลาดในการถอดการ์ด', 'system');
     }
   }
 
