@@ -111,6 +111,10 @@ export class AuthUI {
                     this._splashEl.style.display = 'none';
                     this._formWrapperEl.style.display = 'block';
                     this._formWrapperEl.classList.add('fade-in');
+                    // Set default auth mode to login when showing form
+                    if (this._formWrapperEl) {
+                        this._formWrapperEl.setAttribute('data-auth-mode', 'login');
+                    }
                 }, 400);
             });
         }
@@ -122,6 +126,10 @@ export class AuthUI {
                 this._splashEl.style.display = 'none';
                 this._formWrapperEl.style.display = 'block';
                 this._formWrapperEl.classList.add('fade-in');
+                // Set auth mode to login when switching account
+                if (this._formWrapperEl) {
+                    this._formWrapperEl.setAttribute('data-auth-mode', 'login');
+                }
                 this._handleSignOut();
             });
         }
@@ -185,6 +193,11 @@ export class AuthUI {
         // mode can be: 'login', 'register', 'forgot'
         this._isRegisterMode = mode === 'register';
         this._isForgotPwMode = mode === 'forgot';
+
+        // Set data-auth-mode attribute on #auth-form-wrapper
+        if (this._formWrapperEl) {
+            this._formWrapperEl.setAttribute('data-auth-mode', mode);
+        }
 
         const usernameInput = document.getElementById('auth-username');
         const passwordWrapper = document.getElementById('auth-password').parentElement.parentElement;
@@ -327,6 +340,9 @@ export class AuthUI {
     }
 
     _showSessionMode(username) {
+        if (this._formWrapperEl) {
+            this._formWrapperEl.setAttribute('data-auth-mode', 'session');
+        }
         document.getElementById('auth-username').style.display = 'none';
         document.getElementById('auth-password').parentElement.style.display = 'none';
         if (this._charnameEl) this._charnameEl.style.display = 'none';
@@ -382,6 +398,9 @@ export class AuthUI {
 
         // Restore register button to default
         this._isRegisterMode = false;
+        if (this._formWrapperEl) {
+            this._formWrapperEl.setAttribute('data-auth-mode', 'login');
+        }
         this._loginBtn.textContent = '⚔️ Login';
         this._registerBtn.style.display = '';
         this._registerBtn.textContent = '📜 Register';
