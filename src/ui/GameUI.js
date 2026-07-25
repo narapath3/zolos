@@ -1630,6 +1630,13 @@ export class GameUI {
     if (!host._wired) {
       host._wired = true;
       host.addEventListener('click', (e) => {
+        // Card socket takes priority over the gear slot it sits inside.
+        const socket = e.target.closest('.eq-card-socket');
+        if (socket) {
+          e.stopPropagation();
+          this._openCardPicker(socket.getAttribute('data-cardslot'));
+          return;
+        }
         const c = e.target.closest('.eq-slot');
         if (c) this._openSlotPicker(c.getAttribute('data-slot'));
       });
