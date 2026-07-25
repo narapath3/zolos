@@ -87,14 +87,17 @@ export class PlayerProfileModal {
         display: flex;
         padding: 20px;
         gap: 24px;
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-height: 0;
       }
 
       .profile-left {
-        flex: 0 0 320px;
+        flex: 0 0 280px;
         display: flex;
         flex-direction: column;
         gap: 16px;
+        min-width: 0;
       }
 
       #player-profile-canvas {
@@ -141,10 +144,12 @@ export class PlayerProfileModal {
 
       .profile-right {
         flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         gap: 20px;
         overflow-y: auto;
+        overflow-x: hidden;
         padding-right: 8px;
       }
 
@@ -243,8 +248,8 @@ export class PlayerProfileModal {
         border-color: rgba(240, 192, 64, 0.2);
       }
 
-      .combat-label { font-size: 11px; color: rgba(255, 255, 255, 0.4); font-weight: 600; }
-      .combat-value { font-size: 14px; font-weight: 700; color: #fff; }
+      .combat-label { font-size: 11px; color: rgba(255, 255, 255, 0.4); font-weight: 600; white-space: nowrap; }
+      .combat-value { font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
       /* Skills */
       .skills-flex {
@@ -266,7 +271,7 @@ export class PlayerProfileModal {
       /* Equipment */
       .equip-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
         gap: 10px;
       }
 
@@ -274,7 +279,7 @@ export class PlayerProfileModal {
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.05);
         border-radius: 12px;
-        padding: 10px;
+        padding: 10px 6px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -282,6 +287,8 @@ export class PlayerProfileModal {
         gap: 6px;
         opacity: 0.5;
         transition: all 0.2s ease;
+        min-width: 0;
+        overflow: hidden;
       }
 
       .equip-item.filled {
@@ -293,13 +300,14 @@ export class PlayerProfileModal {
       .equip-emoji { font-size: 20px; }
       .equip-slot-label { font-size: 9px; text-transform: uppercase; color: rgba(255, 255, 255, 0.3); font-weight: 800; }
       .equip-name {
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 600;
         color: #fff;
         width: 100%;
-        white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+        line-height: 1.3;
       }
 
       .equip-item { position: relative; }
@@ -442,12 +450,12 @@ export class PlayerProfileModal {
         }
         .combat-box { padding: 8px 12px; }
         .equip-grid {
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
           gap: 8px;
         }
         .equip-item { padding: 8px 4px; }
         .equip-emoji { font-size: 18px; }
-        .equip-name { font-size: 10px; }
+        .equip-name { font-size: 9px; }
         .section-title { margin-bottom: 8px; }
       }
     `;
