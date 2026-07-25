@@ -442,6 +442,11 @@ export class CardAlbum {
       this._openFusionConfirmation(card, event.currentTarget);
     });
     content.querySelector('.card-detail__sell')?.addEventListener('click', () => {
+      // The detail is a modal <dialog> (showModal → top layer + backdrop).
+      // It MUST be closed before opening the market panel, otherwise its
+      // backdrop keeps swallowing every tap and the whole screen looks frozen.
+      const dialog = this.element?.querySelector('.card-detail');
+      this._closeDialog(dialog, false);
       this.options.onSell?.(card.id);
     });
   }
