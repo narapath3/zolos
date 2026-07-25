@@ -2060,13 +2060,34 @@ export class GameUI {
       for (let i = 0; i < maxSockets; i++) {
         const cardName = cards[i];
         if (cardName) {
-          const cardData = ITEMS[cardName] || { emoji: '🃏' };
-          socketHtml += `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);padding:4px 8px;border-radius:4px;font-size:13px">
-            <div style="color:#ffd700">● ${cardData.emoji} ${cardName}</div>
+          const cardData = ITEMS[cardName] || {};
+          const catalogCard = getCard(cardName);
+          const rar = cardData.rarity || catalogCard?.rarity || 'common';
+          const rarCol = RARITY_COLOR[rar] || '#b8c0cc';
+          const cardEmoji = cardData.emoji || catalogCard?.displayName?.charAt(0) || '🃏';
+          const bonusText = [];
+          if (cardData.card) {
+            if (cardData.card.atkBonus) bonusText.push(`ATK+${cardData.card.atkBonus}`);
+            if (cardData.card.defBonus) bonusText.push(`DEF+${cardData.card.defBonus}`);
+            if (cardData.card.hpBonus) bonusText.push(`HP+${cardData.card.hpBonus}`);
+            if (cardData.card.spBonus) bonusText.push(`SP+${cardData.card.spBonus}`);
+          }
+          const bonusStr = bonusText.length ? bonusText.join(' ') : (cardData.desc || '');
+          socketHtml += `<div class="eq-detail-socket filled" style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.05);padding:4px 8px;border-radius:4px;font-size:13px;border-left:3px solid ${rarCol};">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:rgba(255,255,255,0.08);border:1px solid ${rarCol};font-size:13px">${cardEmoji}</span>
+              <div style="line-height:1.3">
+                <span style="color:${rarCol};font-weight:600">${cardName}</span>
+                ${bonusStr ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">${bonusStr}</span>` : ''}
+              </div>
+            </div>
             <button class="btn-remove-card" data-idx="${i}" style="background:#ff4444;border:none;color:white;padding:2px 6px;border-radius:3px;font-size:11px;cursor:pointer">ถอด</button>
           </div>`;
         } else {
-          socketHtml += `<div style="color:var(--text-dim);font-size:13px;padding:2px 8px">○ Empty Slot (ว่าง)</div>`;
+          socketHtml += `<div class="eq-detail-socket empty-slot" data-target-item="${item.item_name}" data-socket-idx="${i}" style="display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;padding:4px 8px;cursor:pointer;border-radius:4px;border:1px dashed rgba(150,160,190,0.4);transition:background .15s,border-color .15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.borderColor='rgba(150,160,190,0.7)'" onmouseout="this.style.background='transparent';this.style.borderColor='rgba(150,160,190,0.4)'" title="แตะเพื่อเลือกการ์ดใส่">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:rgba(255,255,255,0.04);font-size:14px;color:#7c88a8">＋</span>
+            <span>Empty Slot (ว่าง) — คลิกเพื่อเลือกการ์ด</span>
+          </div>`;
         }
       }
       socketHtml += `</div>`;
@@ -2080,6 +2101,15 @@ export class GameUI {
         e.stopPropagation();
         const idx = parseInt(btn.getAttribute('data-idx'));
         this._removeCardFromItem(item, idx);
+      });
+    });
+    // Attach empty-socket click handlers to open the direct card picker
+    document.querySelectorAll('.eq-detail-socket.empty-slot').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const targetItemName = el.getAttribute('data-target-item');
+        const socketIdx = parseInt(el.getAttribute('data-socket-idx'));
+        this._openCardSocketDirectPicker(targetItemName, socketIdx);
       });
     });
     document.getElementById('detail-price-val').textContent = item.price;
@@ -9777,6 +9807,107 @@ export class GameUI {
       console.error('Removal failed:', err);
       this.addCombatLog('❌ เกิดข้อผิดพลาดในการถอดการ์ด', 'system');
     }
+  }
+
+  // Direct card-selection popup triggered from the "＋" button on an empty socket
+  // slot in the inventory detail box. Lists all cards in the player's inventory
+  // and sockets the selected card immediately into the target slot.
+  _openCardSocketDirectPicker(itemName, socketIndex) {
+    const targetItem = this.inventory.find(i => i.item_name === itemName);
+    if (!targetItem || !targetItem.stats) return;
+    if (!targetItem.stats.cards) targetItem.stats.cards = [];
+    if (targetItem.stats.cards.length >= 4) {
+      this.addCombatLog('❌ อุปกรณ์นี้มีรูเต็มแล้ว (สูงสุด 4)', 'system');
+      return;
+    }
+
+    // All cards available in the player's inventory
+    const availableCards = (this.inventory || []).filter(
+      i => i.item_type === 'card' && i.quantity >= 1 &&
+        !targetItem.stats.cards.includes(i.item_name)
+    );
+
+    let html = `<div style="padding:12px;color:white">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-weight:800;color:var(--secondary);font-size:14px">🃏 เลือกการ์ดใส่ ${targetItem.emoji} ${itemName}</div>
+        <div id="csp-close" style="cursor:pointer;color:#9fb0e0;font-size:18px;line-height:1;padding:2px 6px">✕</div>
+      </div>
+      <div style="font-size:11px;color:#8b97ba;margin-bottom:8px">การ์ดทั้งหมดในกระเป๋าของคุณ — คลิกเพื่อใส่ (${targetItem.stats.cards.length}/4 ช่องใช้แล้ว)</div>
+      <div style="display:flex;flex-direction:column;gap:4px;max-height:400px;overflow-y:auto">`;
+
+    if (availableCards.length === 0) {
+      html += `<div style="color:#8b97ba;text-align:center;padding:16px 4px;font-size:13px">ยังไม่มีการ์ดในกระเป๋า</div>`;
+    } else {
+      availableCards.forEach(cardItem => {
+        const it = ITEMS[cardItem.item_name] || {};
+        const catalogCard = getCard(cardItem.item_name);
+        const rar = it.rarity || catalogCard?.rarity || 'common';
+        const col = RARITY_COLOR[rar] || '#b8c0cc';
+        const cardEmoji = it.emoji || catalogCard?.displayName?.charAt(0) || '🃏';
+
+        // Build stat bonus summary
+        const bonuses = [];
+        if (it.card) {
+          if (it.card.atkBonus) bonuses.push(`ATK+${it.card.atkBonus}`);
+          if (it.card.defBonus) bonuses.push(`DEF+${it.card.defBonus}`);
+          if (it.card.hpBonus) bonuses.push(`HP+${it.card.hpBonus}`);
+          if (it.card.spBonus) bonuses.push(`SP+${it.card.spBonus}`);
+        }
+        const bonusStr = bonuses.length ? bonuses.join(' · ') : (it.desc || catalogCard?.abilityName || '');
+
+        html += `<div class="csp-card-row" data-card-name="${cardItem.item_name}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;border-left:3px solid ${col};background:rgba(255,255,255,0.04);transition:background .12s" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:5px;background:rgba(255,255,255,0.08);border:1px solid ${col};font-size:15px">${cardEmoji}</span>
+          <div style="flex:1;line-height:1.3">
+            <div style="font-size:13px"><b style="color:${col}">${cardItem.item_name}</b> <span style="font-size:10px;color:#8b97ba;margin-left:4px">(${rar})</span></div>
+            <div style="font-size:11px;color:var(--text-dim)">${bonusStr}</div>
+          </div>
+          <span style="font-size:11px;color:#8b97ba">x${cardItem.quantity}</span>
+        </div>`;
+      });
+    }
+
+    html += `</div></div>`;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-popup card-socket-direct-picker';
+    modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:320px;max-width:92vw;background:#1a1a2e;border:1px solid #4060c0;border-radius:10px;z-index:100000;box-shadow:0 0 24px rgba(0,0,0,.6);overflow:hidden';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+
+    // Close on outside click
+    const closeHandler = (e) => {
+      if (!modal.contains(e.target)) {
+        modal.remove();
+        document.removeEventListener('mousedown', closeHandler);
+        document.removeEventListener('touchstart', closeHandler);
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('mousedown', closeHandler);
+      document.addEventListener('touchstart', closeHandler);
+    }, 10);
+
+    // Close button
+    const closeBtn = modal.querySelector('#csp-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => {
+      modal.remove();
+      document.removeEventListener('mousedown', closeHandler);
+      document.removeEventListener('touchstart', closeHandler);
+    });
+
+    // Card row clicks
+    modal.querySelectorAll('.csp-card-row').forEach(row => {
+      row.addEventListener('click', async () => {
+        const cardName = row.getAttribute('data-card-name');
+        const cardItem = availableCards.find(i => i.item_name === cardName);
+        if (cardItem && targetItem) {
+          modal.remove();
+          document.removeEventListener('mousedown', closeHandler);
+          document.removeEventListener('touchstart', closeHandler);
+          await this._socketCardToItem(targetItem, cardItem);
+        }
+      });
+    });
   }
 
   _doWarp(targetMap) {
