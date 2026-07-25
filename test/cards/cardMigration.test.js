@@ -11,7 +11,7 @@ test('migration preserves quantities and socketed legacy cards and is idempotent
   const second = migrateLegacyCards(first.inventory, first.equippedCards);
   assert.deepEqual(second, first);
   assert.deepEqual(first.cardState.poring, { owned: 4, stars: 1, pity: 0 });
-  assert.equal(first.equippedCards.body, 'poring');
+  assert.deepEqual(first.equippedCards.body, ['poring', null, null, null, null]);
   assert.equal(first.inventory.reduce((sum, row) => sum + row.quantity, 0), 6);
 });
 
@@ -25,12 +25,26 @@ test('migration merges aliases without losing quantities and preserves non-card 
   const result = migrateLegacyCards(inventory, { weapon: 'Andre Card' });
 
   assert.deepEqual(inventory, original);
+  const expectedEquippedCards = {
+    weapon: ['willow', null, null, null, null],
+    shield: [null, null, null, null, null],
+    hat: [null, null, null, null, null],
+    glasses: [null, null, null, null, null],
+    head: [null, null, null, null, null],
+    body: [null, null, null, null, null],
+    garment: [null, null, null, null, null],
+    ring: [null, null, null, null, null],
+    wrist: [null, null, null, null, null],
+    pants: [null, null, null, null, null],
+    feet: [null, null, null, null, null],
+    accessory: [null, null, null, null, null]
+  };
   assert.deepEqual(result.inventory, [
     { item_name: 'Willow Card', item_type: 'card', quantity: 7, stats: { card_stars: 2, card_id: 'willow', equippedSlot: 'weapon', custom: true, equipped: true, slot: 'weapon' } },
     original[2],
   ]);
   assert.deepEqual(result.cardState, { willow: { owned: 7, stars: 2, pity: 0 } });
-  assert.deepEqual(result.equippedCards, { weapon: 'willow' });
+  assert.deepEqual(result.equippedCards, expectedEquippedCards);
 });
 
 test('migration canonicalizes id-valued sockets and leaves unknown cards intact', () => {
@@ -40,8 +54,8 @@ test('migration canonicalizes id-valued sockets and leaves unknown cards intact'
   ];
   const result = migrateLegacyCards(inventory, { body: 'poring', weapon: 'Retired Card' });
 
-  assert.equal(result.equippedCards.body, 'poring');
-  assert.equal(result.equippedCards.weapon, 'Retired Card');
+  assert.deepEqual(result.equippedCards.body, ['poring', null, null, null, null]);
+  assert.deepEqual(result.equippedCards.weapon, ['Retired Card', null, null, null, null]);
   assert.deepEqual(result.inventory[1], inventory[1]);
 });
 
@@ -50,7 +64,21 @@ test('migration restores canonical sockets recorded on legacy inventory rows', (
     { item_name: 'Andre Card', item_type: 'card', quantity: 1, stats: { equipped: true, slot: 'weapon' } },
   ]);
 
-  assert.deepEqual(result.equippedCards, { weapon: 'willow' });
+  const expectedEquippedCards = {
+    weapon: ['willow', null, null, null, null],
+    shield: [null, null, null, null, null],
+    hat: [null, null, null, null, null],
+    glasses: [null, null, null, null, null],
+    head: [null, null, null, null, null],
+    body: [null, null, null, null, null],
+    garment: [null, null, null, null, null],
+    ring: [null, null, null, null, null],
+    wrist: [null, null, null, null, null],
+    pants: [null, null, null, null, null],
+    feet: [null, null, null, null, null],
+    accessory: [null, null, null, null, null]
+  };
+  assert.deepEqual(result.equippedCards, expectedEquippedCards);
 });
 
 test('migration recognizes a saved canonical card_id when the item name is stale', () => {
@@ -72,11 +100,39 @@ test('merged rows persist the selected legacy socket for the next migration', ()
   assert.deepEqual(first.inventory[0].stats, {
     card_id: 'willow', card_stars: 1, equipped: true, slot: 'weapon',
   });
-  assert.deepEqual(second.equippedCards, { weapon: 'willow' });
+  const expectedEquippedCards = {
+    weapon: ['willow', null, null, null, null],
+    shield: [null, null, null, null, null],
+    hat: [null, null, null, null, null],
+    glasses: [null, null, null, null, null],
+    head: [null, null, null, null, null],
+    body: [null, null, null, null, null],
+    garment: [null, null, null, null, null],
+    ring: [null, null, null, null, null],
+    wrist: [null, null, null, null, null],
+    pants: [null, null, null, null, null],
+    feet: [null, null, null, null, null],
+    accessory: [null, null, null, null, null]
+  };
+  assert.deepEqual(second.equippedCards, expectedEquippedCards);
 });
 
 test('duplicate canonical socket IDs keep the first supplied slot', () => {
   const result = migrateLegacyCards([], { body: 'Poring Card', weapon: 'poring' });
 
-  assert.deepEqual(result.equippedCards, { body: 'poring', weapon: null });
+  const expectedEquippedCards = {
+    weapon: [null, null, null, null, null],
+    shield: [null, null, null, null, null],
+    hat: [null, null, null, null, null],
+    glasses: [null, null, null, null, null],
+    head: [null, null, null, null, null],
+    body: ['poring', null, null, null, null],
+    garment: [null, null, null, null, null],
+    ring: [null, null, null, null, null],
+    wrist: [null, null, null, null, null],
+    pants: [null, null, null, null, null],
+    feet: [null, null, null, null, null],
+    accessory: [null, null, null, null, null]
+  };
+  assert.deepEqual(result.equippedCards, expectedEquippedCards);
 });

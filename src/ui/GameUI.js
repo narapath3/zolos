@@ -1474,7 +1474,7 @@ export class GameUI {
       .equip-col{display:flex;flex-direction:column;gap:8px;}
       .equip-bottom{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:2px;}
       .eq-slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-        min-height:58px;padding:6px 4px;border-radius:10px;cursor:pointer;user-select:none;
+        min-height:68px;padding:6px 4px 18px;border-radius:10px;cursor:pointer;user-select:none;
         background:rgba(12,16,30,.6);border:1.5px solid rgba(120,140,200,.22);transition:transform .1s,border-color .15s,box-shadow .15s;}
       .eq-slot:hover{transform:translateY(-2px);border-color:rgba(150,180,255,.6);box-shadow:0 4px 14px rgba(60,90,190,.35);}
       .eq-slot.filled{background:rgba(30,40,72,.75);border-color:rgba(255,210,90,.55);}
@@ -1494,12 +1494,14 @@ export class GameUI {
       .equip-hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:10.5px;margin-top:2px;}
       .equip-hero-stats span b{color:#ffd98a;}
       .equip-doll-hint{grid-column:1/-1;font-size:10.5px;color:#8b97ba;text-align:center;margin-top:-2px;}
-      /* Card socket: a small gem-frame at the bottom-left of each gear slot. */
-      .eq-card-socket{position:absolute;left:3px;bottom:2px;width:20px;height:20px;border-radius:6px;
-        display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;cursor:pointer;
-        background:rgba(6,10,20,.85);border:1.5px solid rgba(150,160,190,.5);box-shadow:0 1px 3px rgba(0,0,0,.5);
-        transition:transform .1s,box-shadow .15s,border-color .15s;z-index:2;}
-      .eq-card-socket:hover{transform:scale(1.18);box-shadow:0 0 10px rgba(160,190,255,.7);}
+      /* Card sockets container */
+      .eq-card-sockets-container{position:absolute;bottom:3px;left:0;right:0;display:flex;justify-content:center;gap:3px;z-index:2;}
+      /* Card socket: small frames at the bottom of the slot */
+      .eq-card-socket{width:15px;height:15px;border-radius:4px;
+        display:flex;align-items:center;justify-content:center;font-size:9px;line-height:1;cursor:pointer;
+        background:rgba(6,10,20,.85);border:1px solid rgba(150,160,190,.5);box-shadow:0 1px 2px rgba(0,0,0,.5);
+        transition:transform .1s,box-shadow .15s,border-color .15s;}
+      .eq-card-socket:hover{transform:scale(1.22);box-shadow:0 0 8px rgba(160,190,255,.7);z-index:5;}
       .eq-card-socket.empty{color:#7c88a8;border-style:dashed;}
       .eq-card-socket.filled{background:radial-gradient(circle at 40% 30%,rgba(60,70,110,.9),rgba(10,14,28,.95));}
       .eq-card-socket.rc-common{border-color:#b8c0cc;}
@@ -1522,7 +1524,9 @@ export class GameUI {
       const socket = e.target.closest('.eq-card-socket');
       if (socket) {
         e.stopPropagation();
-        this._openCardPicker(socket.getAttribute('data-cardslot'));
+        const slot = socket.getAttribute('data-cardslot');
+        const idx = parseInt(socket.getAttribute('data-cardidx') || '0', 10);
+        this._openCardPicker(slot, idx);
         return;
       }
       const cell = e.target.closest('.eq-slot');
@@ -1562,22 +1566,27 @@ export class GameUI {
       const rarity = it && it.rarity ? it.rarity : '';
       const filterCls = this.equipSlotFilter === slot.id ? ' active-filter' : '';
       const ic = filled && it ? (it.emoji || slot.icon) : slot.icon;
-      // Card socket for this slot (shows the socketed card, or a ＋ to add one).
-      const cardId = (ch.equippedCards && ch.equippedCards[slot.id]) || null;
-      const card = cardId && getCard(cardId);
-      const cardName = card?.itemName || cardId;
-      const cardIt = card ? ITEMS[card.itemName] : null;
-      const cardRar = card?.rarity || 'common';
-      const socket = cardId
-        ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardIt ? cardIt.emoji : '🃏'}</div>`
-        : `<div class="eq-card-socket empty" data-cardslot="${slot.id}" title="ช่องการ์ด (ว่าง) — แตะเพื่อใส่การ์ด">＋</div>`;
+      // Card sockets for this slot (shows the socketed cards, or ＋ to add one).
+      const cardsArr = (ch.equippedCards && ch.equippedCards[slot.id]) || [null, null, null, null, null];
+      let socketsHtml = `<div class="eq-card-sockets-container">`;
+      for (let i = 0; i < 5; i++) {
+        const cardId = cardsArr[i] || null;
+        const card = cardId && getCard(cardId);
+        const cardName = card?.itemName || cardId;
+        const cardIt = card ? ITEMS[card.itemName] : null;
+        const cardRar = card?.rarity || 'common';
+        socketsHtml += cardId
+          ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" data-cardidx="${i}" title="${i + 1}. การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardIt ? cardIt.emoji : '🃏'}</div>`
+          : `<div class="eq-card-socket empty" data-cardslot="${slot.id}" data-cardidx="${i}" title="${i + 1}. ช่องการ์ด (ว่าง) — แตะเพื่อใส่การ์ด">＋</div>`;
+      }
+      socketsHtml += `</div>`;
       return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
         data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
         title="${filled ? name : slot.label + ' (ว่าง)'}">
         <div class="eq-slot-ic">${ic}</div>
         <div class="eq-slot-lb">${filled ? (this._refinePrefix(name) + this._short(name)) : slot.label}</div>
         ${filled ? '<div class="eq-slot-x">✕</div>' : ''}
-        ${socket}
+        ${socketsHtml}
       </div>`;
     };
     const bySlot = Object.fromEntries(EQUIP_SLOTS.map(s => [s.id, s]));
@@ -1766,12 +1775,13 @@ export class GameUI {
 
   // Popup list of cards that fit a slot's card socket (plus "remove"). Selecting
   // one sockets it live; stats + the paper-doll refresh instantly.
-  _openCardPicker(slotId) {
+  _openCardPicker(slotId, socketIdx = 0) {
     if (!this.character) return;
     const slot = EQUIP_SLOTS.find(s => s.id === slotId);
     if (!slot) return;
     const category = cardCategoryForSlot(slotId);
-    const current = this.character.equippedCards ? this.character.equippedCards[slotId] : null;
+    const cardsArr = (this.character.equippedCards && this.character.equippedCards[slotId]) || [];
+    const current = cardsArr[socketIdx] || null;
     const cards = (this.inventory || []).filter(i => i.item_type === 'card' && cardFitsSlot(i.item_name, slotId));
     const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[category] || category;
 
@@ -1799,7 +1809,7 @@ export class GameUI {
       <div class="sp-box" style="background:linear-gradient(160deg,#1b2340,#121627);border:1px solid rgba(130,160,230,.35);
         border-radius:16px;max-width:360px;width:100%;max-height:72vh;overflow:auto;padding:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <div style="font-weight:800;color:#fff;font-size:15px;">🃏 ช่องการ์ด · ${slot.icon} ${slot.label}</div>
+          <div style="font-weight:800;color:#fff;font-size:15px;">🃏 ช่องการ์ดที่ ${socketIdx + 1} · ${slot.icon} ${slot.label}</div>
           <div id="cp-close" style="cursor:pointer;color:#9fb0e0;font-size:20px;line-height:1;padding:2px 6px;">✕</div>
         </div>
         <div style="font-size:11px;color:#8b97ba;margin-bottom:10px;">ใส่ได้เฉพาะการ์ดประเภท "${catLabel}"</div>
@@ -1816,15 +1826,15 @@ export class GameUI {
     ov.querySelectorAll('.sp-row').forEach(row => {
       row.addEventListener('click', async () => {
         const name = row.getAttribute('data-name');
-        if (name === '__none__') await this._unsocketCard(slotId);
-        else if (getCard(name)?.id !== current) await this._socketCard(slotId, name);
+        if (name === '__none__') await this._unsocketCard(slotId, socketIdx);
+        else if (getCard(name)?.id !== current) await this._socketCard(slotId, socketIdx, name);
         close();
       });
     });
   }
 
   // Socket `cardName` into `slotId`, retaining the one-card/one-socket rule.
-  async _socketCard(slotId, cardName) {
+  async _socketCard(slotId, socketIdx, cardName) {
     const ch = this.character;
     if (!ch || !ch.equippedCards) return;
     const card = this.inventory.find(i => i.item_name === cardName && i.item_type === 'card');
@@ -1834,34 +1844,68 @@ export class GameUI {
     if (!cardId || !cardFitsSlot(cardId, slotId)) return;
     const changed = [];
 
-    // Compare catalog IDs, not display aliases: aliases such as Andre Card and
-    // Willow Card still represent one card and may occupy only one socket.
-    if (Object.entries(ch.equippedCards).some(([slot, id]) => slot !== slotId && getCard(id)?.id === cardId)) return;
-    // Displace whatever card currently sits in the target slot.
-    const prev = ch.equippedCards[slotId];
+    // Compare catalog IDs, not display aliases: check if card already socketed ANYWHERE else
+    let alreadyEquipped = false;
+    for (const [slot, value] of Object.entries(ch.equippedCards)) {
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          if ((slot !== slotId || i !== socketIdx) && getCard(value[i])?.id === cardId) {
+            alreadyEquipped = true;
+          }
+        }
+      } else {
+        if (slot !== slotId && getCard(value)?.id === cardId) {
+          alreadyEquipped = true;
+        }
+      }
+    }
+    if (alreadyEquipped) return;
+
+    // Displace whatever card currently sits in the target socket index.
+    const prev = Array.isArray(ch.equippedCards[slotId])
+      ? ch.equippedCards[slotId][socketIdx]
+      : ch.equippedCards[slotId];
     if (prev && prev !== cardId) {
       const prevItem = this.inventory.find(i => getCard(i.item_name)?.id === prev);
-      if (prevItem && prevItem.stats) { prevItem.stats.equipped = false; delete prevItem.stats.slot; changed.push(prevItem); }
+      if (prevItem && prevItem.stats) {
+        prevItem.stats.equipped = false;
+        delete prevItem.stats.slot;
+        delete prevItem.stats.socketIdx;
+        changed.push(prevItem);
+      }
     }
-    if (!ch.equipCard(slotId, cardId)) return;
+    if (!ch.equipCard(slotId, cardId, socketIdx)) return;
     if (!card.stats) card.stats = {};
     card.stats.equipped = true;
     card.stats.slot = slotId;
+    card.stats.socketIdx = socketIdx;
     changed.push(card);
 
     await this._persistCardStats(changed);
     this._afterCardChange(`ใส่การ์ด ${card.emoji || '🃏'} ${cardName}`);
   }
 
-  async _unsocketCard(slotId) {
+  async _unsocketCard(slotId, socketIdx) {
     const ch = this.character;
     if (!ch || !ch.equippedCards) return;
-    const cardId = ch.equippedCards[slotId];
+    const cardId = Array.isArray(ch.equippedCards[slotId])
+      ? ch.equippedCards[slotId][socketIdx]
+      : ch.equippedCards[slotId];
     if (!cardId) return;
-    ch.equippedCards[slotId] = null;
+
+    if (Array.isArray(ch.equippedCards[slotId])) {
+      ch.equippedCards[slotId][socketIdx] = null;
+    } else {
+      ch.equippedCards[slotId] = null;
+    }
+
     const card = this.inventory.find(i => getCard(i.item_name)?.id === cardId);
     const cardName = card?.item_name || cardId;
-    if (card && card.stats) { card.stats.equipped = false; delete card.stats.slot; }
+    if (card && card.stats) {
+      card.stats.equipped = false;
+      delete card.stats.slot;
+      delete card.stats.socketIdx;
+    }
     if (card) await this._persistCardStats([card]);
     this._afterCardChange(`ถอดการ์ด ${card ? (card.emoji || '🃏') + ' ' + cardName : ''}`);
   }

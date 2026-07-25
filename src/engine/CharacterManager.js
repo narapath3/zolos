@@ -92,7 +92,20 @@ export class CharacterManager {
         this.equipRefine = { weapon: 0, shield: 0, head: 0, body: 0, garment: 0, ring: 0, wrist: 0, pants: 0, feet: 0, accessory: 0 };
         // Card socketed into each slot (canonical card id or null). Cards add stat
         // bonuses + special effects (crit/damage%/lifesteal) via getCardTotal().
-        this.equippedCards = { weapon: null, shield: null, hat: null, glasses: null, head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
+        this.equippedCards = {
+            weapon: [null, null, null, null, null],
+            shield: [null, null, null, null, null],
+            hat: [null, null, null, null, null],
+            glasses: [null, null, null, null, null],
+            head: [null, null, null, null, null],
+            body: [null, null, null, null, null],
+            garment: [null, null, null, null, null],
+            ring: [null, null, null, null, null],
+            wrist: [null, null, null, null, null],
+            pants: [null, null, null, null, null],
+            feet: [null, null, null, null, null],
+            accessory: [null, null, null, null, null]
+        };
         this.cardState = {};
         // Back-compat alias: legacy code reads/writes a single `equippedArmor`.
         // Map it onto the body slot so old saves + call-sites keep working.
@@ -242,23 +255,44 @@ export class CharacterManager {
     getLifestealPct() { return this.getCardEffects().lifestealPct; }
 
     // Socket / remove a card in a slot. Returns true on success.
-    equipCard(slotId, idOrName) {
+    equipCard(slotId, idOrName, socketIdx = 0) {
         if (!(slotId in this.equippedCards)) return false;
         if (!idOrName) {
-            this.equippedCards[slotId] = null;
+            if (Array.isArray(this.equippedCards[slotId])) {
+                this.equippedCards[slotId][socketIdx] = null;
+            } else {
+                this.equippedCards[slotId] = null;
+            }
             return true;
         }
         const card = getCard(idOrName);
         if (!card) return false;
-        for (const [slot, cardId] of Object.entries(this.equippedCards)) {
-            if (slot !== slotId && cardId === card.id) return false;
+        // Deduplication: ensure this card ID is not equipped in ANY other socket/slot
+        for (const [slot, value] of Object.entries(this.equippedCards)) {
+            if (Array.isArray(value)) {
+                for (let i = 0; i < value.length; i++) {
+                    if ((slot !== slotId || i !== socketIdx) && value[i] === card.id) {
+                        return false; // Already equipped in another socket/slot
+                    }
+                }
+            } else {
+                if (slot !== slotId && value === card.id) return false;
+            }
         }
-        this.equippedCards[slotId] = card.id;
+        if (Array.isArray(this.equippedCards[slotId])) {
+            this.equippedCards[slotId][socketIdx] = card.id;
+        } else {
+            this.equippedCards[slotId] = card.id;
+        }
         return true;
     }
-    unequipCard(slotId) {
+    unequipCard(slotId, socketIdx = 0) {
         if (!(slotId in this.equippedCards)) return false;
-        this.equippedCards[slotId] = null;
+        if (Array.isArray(this.equippedCards[slotId])) {
+            this.equippedCards[slotId][socketIdx] = null;
+        } else {
+            this.equippedCards[slotId] = null;
+        }
         return true;
     }
 
@@ -528,22 +562,22 @@ export class CharacterManager {
     // glow so they read as "special" in the hero's hand.
     _buildGenericWeapon(itemName) {
         const SPECS = {
-            'Novice Cutter':   { kind: 'dagger',     blade: 0xb8bcc8, guard: 0x8a6a3a, len: 0.6 },
-            'Silver Dagger':   { kind: 'dagger',     blade: 0xe6e8f2, guard: 0xc0c0c8, len: 0.66, glow: 0x99aaff, glowI: 0.35 },
-            'Katana':          { kind: 'katana',     blade: 0xe2e6ec, guard: 0x2a2a2a, len: 1.15 },
-            'Heavy Warhammer': { kind: 'hammer',     head: 0x70727a, handle: 0x5a3a1a },
-            'Mage Staff':      { kind: 'staff',      shaft: 0x7a4a24, gem: 0x46c8ff, glow: 0x46c8ff, glowI: 0.7 },
-            'Crossbow':        { kind: 'crossbow',   wood: 0x6a4a2a, metal: 0x9098a0 },
-            'Great Bow':       { kind: 'bow',        wood: 0x5a3a1a, scale: 1.25 },
-            'Excalibur':       { kind: 'greatsword', blade: 0xfff2c0, guard: 0xffd23a, len: 1.3, gem: 0x66ccff, glow: 0xffcc33, glowI: 0.95 },
-            'Rudra Bow':       { kind: 'bow',        wood: 0xd8bc6a, scale: 1.3, glow: 0x86ff9a, glowI: 0.85 },
-            'Ragnarok Blade':  { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
+            'Novice Cutter': { kind: 'dagger', blade: 0xb8bcc8, guard: 0x8a6a3a, len: 0.6 },
+            'Silver Dagger': { kind: 'dagger', blade: 0xe6e8f2, guard: 0xc0c0c8, len: 0.66, glow: 0x99aaff, glowI: 0.35 },
+            'Katana': { kind: 'katana', blade: 0xe2e6ec, guard: 0x2a2a2a, len: 1.15 },
+            'Heavy Warhammer': { kind: 'hammer', head: 0x70727a, handle: 0x5a3a1a },
+            'Mage Staff': { kind: 'staff', shaft: 0x7a4a24, gem: 0x46c8ff, glow: 0x46c8ff, glowI: 0.7 },
+            'Crossbow': { kind: 'crossbow', wood: 0x6a4a2a, metal: 0x9098a0 },
+            'Great Bow': { kind: 'bow', wood: 0x5a3a1a, scale: 1.25 },
+            'Excalibur': { kind: 'greatsword', blade: 0xfff2c0, guard: 0xffd23a, len: 1.3, gem: 0x66ccff, glow: 0xffcc33, glowI: 0.95 },
+            'Rudra Bow': { kind: 'bow', wood: 0xd8bc6a, scale: 1.3, glow: 0x86ff9a, glowI: 0.85 },
+            'Ragnarok Blade': { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
             // ---- Forged weapons (Weapon Smith crafts) ----
-            'Ember Fang':      { kind: 'greatsword', blade: 0xff8a3a, guard: 0x6a2a10, len: 1.25, gem: 0xff3300, glow: 0xff5a1a, glowI: 1.05 },
-            'Frost Cleaver':   { kind: 'katana',     blade: 0xd0f4ff, guard: 0x2a5a7a, len: 1.2, glow: 0x66ddff, glowI: 1.05 },
-            'Stormcaller Bow': { kind: 'bow',        wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
-            'Soulreaper':      { kind: 'dagger',     blade: 0xc9a6ff, guard: 0x3a1a5a, len: 0.72, gem: 0xaa33ff, glow: 0xaa66ff, glowI: 1.1 },
-            'Godslayer':       { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
+            'Ember Fang': { kind: 'greatsword', blade: 0xff8a3a, guard: 0x6a2a10, len: 1.25, gem: 0xff3300, glow: 0xff5a1a, glowI: 1.05 },
+            'Frost Cleaver': { kind: 'katana', blade: 0xd0f4ff, guard: 0x2a5a7a, len: 1.2, glow: 0x66ddff, glowI: 1.05 },
+            'Stormcaller Bow': { kind: 'bow', wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
+            'Soulreaper': { kind: 'dagger', blade: 0xc9a6ff, guard: 0x3a1a5a, len: 0.72, gem: 0xaa33ff, glow: 0xaa66ff, glowI: 1.1 },
+            'Godslayer': { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
         };
         let spec = SPECS[itemName];
         if (!spec) {
@@ -559,16 +593,16 @@ export class CharacterManager {
             else spec = { kind: 'sword', blade: 0xc0c0d0, guard: 0xffd040, len: 1.0 };
         }
         switch (spec.kind) {
-            case 'dagger':     return this._wpBlade({ ...spec, len: spec.len || 0.6, width: 0.07 });
+            case 'dagger': return this._wpBlade({ ...spec, len: spec.len || 0.6, width: 0.07 });
             case 'greatsword': return this._wpBlade({ ...spec, width: 0.15 });
-            case 'katana':     return this._wpKatana(spec);
-            case 'hammer':     return this._wpHammer(spec);
-            case 'staff':      return this._wpStaff(spec);
-            case 'bow':        return this._wpBow(spec);
-            case 'crossbow':   return this._wpCrossbow(spec);
-            case 'gun':        return this._wpGun(spec);
+            case 'katana': return this._wpKatana(spec);
+            case 'hammer': return this._wpHammer(spec);
+            case 'staff': return this._wpStaff(spec);
+            case 'bow': return this._wpBow(spec);
+            case 'crossbow': return this._wpCrossbow(spec);
+            case 'gun': return this._wpGun(spec);
             case 'sword':
-            default:           return this._wpBlade({ ...spec, width: spec.width || 0.09 });
+            default: return this._wpBlade({ ...spec, width: spec.width || 0.09 });
         }
     }
 
@@ -1701,7 +1735,7 @@ export class CharacterManager {
         grad.addColorStop(0, color1);
         grad.addColorStop(1, color2);
         ctx.fillStyle = grad;
-        
+
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 6;
         ctx.strokeText(msg, 256, 64);
@@ -1710,7 +1744,7 @@ export class CharacterManager {
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         this.streakSprite = new THREE.Sprite(spriteMat);
-        
+
         // Position it higher than name and chat
         this.streakSprite.position.y = 3.5;
         this.streakSprite.scale.set(4.5, 1.12, 1);
@@ -2602,7 +2636,12 @@ export class CharacterManager {
             petLevel: this.petLevel || 1,           // so others see the right aura tier
             petName: this.petName || null,          // custom pet name others can see
             refine: { ...(this.equipRefine || {}) }, // +N per slot so profiles show refine
-            cards: { ...(this.equippedCards || {}) }, // canonical socketed card IDs
+            cards: Object.fromEntries(
+                Object.entries(this.equippedCards || {}).map(([slot, arr]) => [
+                    slot,
+                    Array.isArray(arr) ? [...arr] : arr
+                ])
+            ), // canonical socketed card IDs
             cardState: normalizeCardState(this.cardState),
             job: this.stats ? (this.stats.job || null) : null,
             title: this.title
@@ -2612,9 +2651,17 @@ export class CharacterManager {
     restoreCardAppearance(appearance) {
         if (!appearance || typeof appearance !== 'object') return;
         if (appearance.cards && this.equippedCards) {
-            for (const slot of Object.keys(this.equippedCards)) this.equippedCards[slot] = null;
-            for (const [slot, idOrName] of Object.entries(appearance.cards)) {
-                this.equipCard(slot, idOrName);
+            for (const slot of Object.keys(this.equippedCards)) {
+                this.equippedCards[slot] = [null, null, null, null, null];
+            }
+            for (const [slot, value] of Object.entries(appearance.cards)) {
+                if (Array.isArray(value)) {
+                    for (let i = 0; i < Math.min(5, value.length); i++) {
+                        if (value[i]) this.equipCard(slot, value[i], i);
+                    }
+                } else if (value) {
+                    this.equipCard(slot, value, 0);
+                }
             }
         }
         if (appearance.cardState !== undefined) {

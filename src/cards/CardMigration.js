@@ -12,27 +12,42 @@ function cardStats(row, card) {
   return stats;
 }
 
+const ALL_SLOTS = ['weapon', 'shield', 'hat', 'glasses', 'head', 'body', 'garment', 'ring', 'wrist', 'pants', 'feet', 'accessory'];
+
 function canonicalizeSockets(cards) {
   const result = {};
+  for (const slot of ALL_SLOTS) {
+    result[slot] = [null, null, null, null, null];
+  }
   const claimedCardIds = new Set();
   for (const [slot, value] of Object.entries(cards || {})) {
-    if (!value) {
-      result[slot] = null;
-      continue;
+    if (!value) continue;
+    const arr = Array.isArray(value) ? value : [value];
+    const normalized = [null, null, null, null, null];
+    for (let i = 0; i < Math.min(5, arr.length); i++) {
+      const val = arr[i];
+      if (!val) continue;
+      const card = getCard(val);
+      if (card && claimedCardIds.has(card.id)) {
+        continue;
+      }
+      normalized[i] = card?.id || val;
+      if (card) claimedCardIds.add(card.id);
     }
-    const card = getCard(value);
-    if (card && claimedCardIds.has(card.id)) {
-      result[slot] = null;
-      continue;
-    }
-    result[slot] = card?.id || value;
-    if (card) claimedCardIds.add(card.id);
+    result[slot] = normalized;
   }
   return result;
 }
 
 function isSocketed(equippedCards, cardId) {
-  return Object.values(equippedCards).includes(cardId);
+  for (const value of Object.values(equippedCards)) {
+    if (Array.isArray(value)) {
+      if (value.includes(cardId)) return true;
+    } else if (value === cardId) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function migrateLegacyCards(inventory = [], cards = {}) {
@@ -52,8 +67,12 @@ export function migrateLegacyCards(inventory = [], cards = {}) {
     const stats = cardStats(row, card);
     const socketSlot = stats.slot || stats.equippedSlot;
     if (socketSlot && (stats.equipped === true || stats.equippedSlot)) {
-      if (!equippedCards[socketSlot] && !isSocketed(equippedCards, card.id)) {
-        equippedCards[socketSlot] = card.id;
+      const slotArray = equippedCards[socketSlot];
+      if (slotArray && slotArray.indexOf(card.id) === -1 && !isSocketed(equippedCards, card.id)) {
+        const emptyIdx = slotArray.indexOf(null);
+        if (emptyIdx !== -1) {
+          slotArray[emptyIdx] = card.id;
+        }
       }
     }
     const existing = canonicalRows.get(card.id);
@@ -78,9 +97,18 @@ export function migrateLegacyCards(inventory = [], cards = {}) {
   }
 
   const socketSlotsByCardId = new Map();
-  for (const [slot, id] of Object.entries(equippedCards)) {
-    const card = getCard(id);
-    if (card && !socketSlotsByCardId.has(card.id)) socketSlotsByCardId.set(card.id, slot);
+  for (const [slot, value] of Object.entries(equippedCards)) {
+    if (Array.isArray(value)) {
+      for (const id of value) {
+        if (id) {
+          const card = getCard(id);
+          if (card && !socketSlotsByCardId.has(card.id)) socketSlotsByCardId.set(card.id, slot);
+        }
+      }
+    } else if (value) {
+      const card = getCard(value);
+      if (card && !socketSlotsByCardId.has(card.id)) socketSlotsByCardId.set(card.id, slot);
+    }
   }
 
   for (const [id, row] of canonicalRows) {

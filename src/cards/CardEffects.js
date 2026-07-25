@@ -90,7 +90,18 @@ export function aggregateCardEffects({ equippedCards = {}, cardState = {} } = {}
   const normalizedState = normalizeCardState(cardState);
   const seenCardIds = new Set();
 
-  for (const cardId of Object.values(equippedCards || {})) {
+  const cardIds = [];
+  for (const value of Object.values(equippedCards || {})) {
+    if (Array.isArray(value)) {
+      for (const val of value) {
+        if (val) cardIds.push(val);
+      }
+    } else if (value) {
+      cardIds.push(value);
+    }
+  }
+
+  for (const cardId of cardIds) {
     const card = cardId && getCard(cardId);
     if (!card || seenCardIds.has(card.id)) continue;
     seenCardIds.add(card.id);

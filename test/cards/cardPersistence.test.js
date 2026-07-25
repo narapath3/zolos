@@ -10,13 +10,13 @@ const CARD_SLOTS = [
 function createCharacterLoadHarness() {
   const character = Object.create(CharacterManager.prototype);
   character.stats = {};
-  character.equippedCards = Object.fromEntries(CARD_SLOTS.map(slot => [slot, null]));
+  character.equippedCards = Object.fromEntries(CARD_SLOTS.map(slot => [slot, [null, null, null, null, null]]));
   character.equippedGear = { head: 'Top Helm', body: 'Top Armor' };
   character.equippedShield = 'Top Shield';
   character.equipRefine = { weapon: 4, body: 3 };
   character.cardState = {};
   character.gameSettings = {};
-  character.mesh = { position: { set() {} } };
+  character.mesh = { position: { set() { } } };
   character.gender = 'male';
   character.bodyColor = 0;
   character.hairColor = 0;
@@ -34,9 +34,9 @@ function createCharacterLoadHarness() {
   character.equipWeapon = value => { character.equippedWeapon = value; };
   character.setPet = value => { character.equippedPet = value; };
   character.setTitle = value => { character.title = value; };
-  character.updateGearVisuals = () => {};
-  character._applyJobAppearance = () => {};
-  character.updateNameTag = () => {};
+  character.updateGearVisuals = () => { };
+  character._applyJobAppearance = () => { };
+  character.updateNameTag = () => { };
   return character;
 }
 
@@ -62,8 +62,8 @@ test('loadStats restores cards without letting conflicting appearance clobber lo
   assert.deepEqual(character.cardState, {
     poring: { owned: 3, stars: 2, pity: 47 },
   });
-  assert.equal(character.equippedCards.body, 'poring');
-  assert.equal(character.equippedCards.weapon, 'willow');
+  assert.deepEqual(character.equippedCards.body, ['poring', null, null, null, null]);
+  assert.deepEqual(character.equippedCards.weapon, ['willow', null, null, null, null]);
   assert.equal(character.stats.job, 'swordsman');
   assert.equal(character.gender, 'female');
   assert.equal(character.equippedWeapon, 'Top Sword');
