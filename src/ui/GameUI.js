@@ -783,8 +783,11 @@ export class GameUI {
       // equipped + a valid slot. Skips any whose slot no longer accepts it.
       if (this.character && this.character.equippedCards) {
         for (const s of Object.keys(this.character.equippedCards)) this.character.equippedCards[s] = null;
-        for (const [slot, cardId] of Object.entries(migration.equippedCards)) {
-          this.character.equipCard(slot, cardId);
+        // Fix Issue 1: CardMigration returns array-valued sockets [id, null, ...].
+        // CharacterManager expects scalar values. Extract the first card.
+        for (const [slot, value] of Object.entries(migration.equippedCards)) {
+          const cardId = Array.isArray(value) ? value.find(v => v !== null) : value;
+          if (cardId) this.character.equipCard(slot, cardId);
         }
       }
 
@@ -1782,7 +1785,18 @@ export class GameUI {
     if (!slot) return;
     const category = cardCategoryForSlot(slotId);
     const current = this.character.equippedCards ? this.character.equippedCards[slotId] : null;
-    const cards = (this.inventory || []).filter(i => i.item_type === 'card' && cardFitsSlot(i.item_name, slotId));
+    
+    // Fix Issue 2: Filter out cards already equipped in other slots.
+    // Also handle quantity: if quantity is 1 and it's in this slot, it's fine.
+    // If it's in another slot, it shouldn't show up.
+    const cards = (this.inventory || []).filter(i => {
+      if (i.item_type !== 'card' || !cardFitsSlot(i.item_name, slotId)) return false;
+      const catalogCard = getCard(i.item_name);
+      const inThis = catalogCard?.id === current;
+      const inOther = !inThis && i.stats && i.stats.equipped === true;
+      return inThis || !inOther;
+    });
+
     const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[category] || category;
 
     let ov = document.getElementById('card-picker-overlay');
@@ -1798,7 +1812,6 @@ export class GameUI {
       const rar = i.rarity || it.rarity || 'common';
       const col = RARITY_COLOR[rar] || '#b8c0cc';
       const inThis = catalogCard?.id === current;
-      const inOther = !inThis && i.stats && i.stats.equipped === true;
       // Emoji fallback: inventory emoji → catalog displayName first letter → 🃏
       const cardEmoji = it.emoji || catalogCard?.displayName?.charAt(0) || '🃏';
 
@@ -1818,7 +1831,7 @@ export class GameUI {
           <span style="font-size:10px;color:#8b97ba;margin-left:4px">(${rar})</span>
           <br><span style="font-size:11px;color:#9fb0e0">${bonusStr}</span>
         </span>
-        <span style="font-size:11px;color:#8b97ba">${inThis ? '✅ ใส่อยู่' : inOther ? '↪ ช่องอื่น' : 'x' + (i.quantity || 1)}</span>
+        <span style="font-size:11px;color:#8b97ba">${inThis ? '✅ ใส่อยู่' : 'x' + (i.quantity || 1)}</span>
       </div>`;
     }).join('');
 
@@ -1879,6 +1892,8 @@ export class GameUI {
 
     await this._persistCardStats(changed);
     this._afterCardChange(`ใส่การ์ด ${card.emoji || '🃏'} ${cardName}`);
+    // Fix Issue 2: Refresh the profile paper-doll instantly.
+    this._renderProfileEquipDoll();
   }
 
   async _unsocketCard(slotId) {
@@ -1892,6 +1907,8 @@ export class GameUI {
     if (card && card.stats) { card.stats.equipped = false; delete card.stats.slot; }
     if (card) await this._persistCardStats([card]);
     this._afterCardChange(`ถอดการ์ด ${card ? (card.emoji || '🃏') + ' ' + cardName : ''}`);
+    // Fix Issue 2: Refresh the profile paper-doll instantly.
+    this._renderProfileEquipDoll();
   }
 
   async _persistCardStats(items) {
