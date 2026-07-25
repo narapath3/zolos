@@ -28,6 +28,7 @@ export class AuthUI {
         this._pingEl = null;
 
         this._setupButtons();
+        this._bindEvents();
         this._setup3DCardTilt();
         this._createParticles();
         this._subscribeOnlineCount();
