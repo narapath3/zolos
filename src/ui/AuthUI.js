@@ -17,7 +17,7 @@ export class AuthUI {
         if (this._bgCanvas) this._bgCanvas.start();
 
         // BGM initialization
-        this._bgm = new Audio('/src/login.mp3');
+        this._bgm = new Audio('/assets/ZOLOSOnline.mp3');
         this._bgm.loop = true;
         this._bgm.volume = 0.3;
         this._bgmPlayed = false;
