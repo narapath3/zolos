@@ -1526,7 +1526,7 @@ export class GameUI {
         e.stopPropagation();
         const slot = socket.getAttribute('data-cardslot');
         const idx = parseInt(socket.getAttribute('data-cardidx') || '0', 10);
-        this._openCardPicker(slot, idx);
+        this._handleSocketClick(slot, idx);
         return;
       }
       const cell = e.target.closest('.eq-slot');
@@ -1542,6 +1542,33 @@ export class GameUI {
         this._renderInventory();
       }
     });
+  }
+
+  // Handles clicking a card socket: open/shows details, or redirect to card page.
+  _handleSocketClick(slotId, socketIdx) {
+    if (!this.character) return;
+    const cardsArr = (this.character.equippedCards && this.character.equippedCards[slotId]) || [];
+    const cardId = cardsArr[socketIdx] || null;
+
+    // Close the profile editor modal if open
+    const profileModal = document.getElementById('profile-editor-modal');
+    if (profileModal && profileModal.style.display !== 'none') {
+      profileModal.style.display = 'none';
+      this.updateMobileControlsVisibility();
+    }
+
+    // Always open the card album panel (หน้าสวมใส่การ์ด)
+    const panel = document.getElementById('mycard-panel');
+    if (panel && panel.style.display === 'none') {
+      this._openMyCard();
+    }
+
+    // If a card is equipped, view its details instantly
+    if (cardId) {
+      if (this.cardAlbum) {
+        this.cardAlbum._openDetail(cardId);
+      }
+    }
   }
 
   // The item currently worn in a paper-doll slot (or null).
@@ -1638,6 +1665,14 @@ export class GameUI {
     if (!host._wired) {
       host._wired = true;
       host.addEventListener('click', (e) => {
+        const socket = e.target.closest('.eq-card-socket');
+        if (socket) {
+          e.stopPropagation();
+          const slot = socket.getAttribute('data-cardslot');
+          const idx = parseInt(socket.getAttribute('data-cardidx') || '0', 10);
+          this._handleSocketClick(slot, idx);
+          return;
+        }
         const c = e.target.closest('.eq-slot');
         if (c) this._openSlotPicker(c.getAttribute('data-slot'));
       });
