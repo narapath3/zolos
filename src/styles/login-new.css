@@ -395,7 +395,7 @@
 
 /* ---- Data Auth Mode Targets ---- */
 [data-auth-mode="register"] .auth-logo {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 [data-auth-mode="register"] .auth-icon-img {
   display: none;
@@ -403,16 +403,41 @@
 [data-auth-mode="register"] .game-tagline {
   display: none;
 }
+[data-auth-mode="register"] .game-subtitle {
+  font-size: 8px;
+  letter-spacing: 2px;
+}
 [data-auth-mode="register"] .auth-form {
-  gap: 4px;
+  gap: 3px;
 }
 [data-auth-mode="register"] .auth-form input {
-  padding: 8px 12px;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 [data-auth-mode="register"] .btn-primary, 
 [data-auth-mode="register"] .btn-secondary, 
 [data-auth-mode="register"] .btn-guest {
-  padding: 8px 12px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+[data-auth-mode="register"] .class-badges-grid {
+  gap: 3px;
+}
+[data-auth-mode="register"] .class-badge {
+  padding: 3px 2px;
+}
+[data-auth-mode="register"] .ro-gender-btn {
+  padding: 5px 6px;
+  font-size: 11px;
+}
+[data-auth-mode="register"] .auth-status {
+  margin-top: 2px;
+  font-size: 11px;
+}
+[data-auth-mode="register"] .online-count {
+  margin-top: 2px;
+  padding: 4px 10px;
+  font-size: 11px;
 }
 
 /* ---- Footer Elements ---- */
@@ -496,6 +521,23 @@
   .btn-primary, .btn-secondary, .btn-guest { padding: 8px 12px; font-size: 11px; }
   .class-badge .badge-icon { font-size: 14px; }
   .class-badge .badge-title { font-size: 9px; }
+}
+
+/* Short screens (max-height: 600px) */
+@media (max-height: 600px) {
+  .auth-container { padding: 10px 16px; }
+  .auth-logo { margin-bottom: 2px; }
+  .auth-icon-img { display: none; }
+  .game-title-new { font-size: 18px; }
+  .game-subtitle, .game-tagline { display: none; }
+  .auth-form { gap: 4px; }
+  .auth-form input { padding: 6px 10px; font-size: 12px; }
+  .btn-primary, .btn-secondary, .btn-guest { padding: 8px 12px; font-size: 12px; }
+  .class-badges-grid { gap: 3px; }
+  .class-badge { padding: 3px 2px; }
+  .class-badge .badge-icon { font-size: 14px; }
+  .ro-gender-btn { padding: 5px 6px; font-size: 11px; }
+  .auth-status, .online-count { margin-top: 2px; font-size: 11px; }
 }
 
 /* Landscape phones (max-height: 500px) */

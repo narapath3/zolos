@@ -4693,9 +4693,8 @@ export class GameUI {
     const btn = document.getElementById('btn-logout');
     if (btn) {
       btn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to logout?')) {
-          callback();
-        }
+        // Direct logout without confirm() to avoid blocking on mobile WebViews
+        callback();
       });
     }
   }
