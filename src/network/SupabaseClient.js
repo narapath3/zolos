@@ -218,6 +218,16 @@ export async function sendPasswordResetEmail(email) {
   return { success: true, data };
 }
 
+export async function updatePassword(newPassword) {
+  if (isOfflineMode || !supabase) {
+    return { success: true, message: 'Password updated (Simulated)' };
+  }
+
+  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+  return { success: true, data };
+}
+
 // ============ Realtime Online Count (Auth Screen) ============
 export function subscribeOnlineCount(callback) {
   // Check if Socket.io is enabled. Ignore the stale VITE_SOCKET_SERVER_URL —

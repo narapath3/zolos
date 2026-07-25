@@ -3,7 +3,8 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="description"
     content="Zolos — Idle RPG Online inspired by Ragnarok Online with auto-farm, real-time multiplayer, and 3D graphics" />
   <meta name="google" content="notranslate" />
@@ -66,11 +67,23 @@
     <!-- Top Server Status & BGM Bar -->
     <div class="ro-top-bar">
       <div class="ro-server-chip">
-        <span class="ro-server-crown">👑</span>
+        <svg class="svg-icon crown-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ffd700"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />
+          <path d="M3 20h18" />
+        </svg>
         <span class="ro-server-name">PRONTERA GATEWAY — THOR REALM</span>
         <span class="ro-server-ping" id="ro-server-ping"><span class="ping-dot"></span>--ms</span>
       </div>
-      <button id="btn-auth-bgm" class="ro-bgm-btn" title="Toggle Music">🎵 BGM ON</button>
+      <button id="btn-auth-bgm" class="ro-bgm-btn" title="Toggle Music">
+        <svg class="svg-icon bgm-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+        <span>BGM ON</span>
+      </button>
     </div>
 
     <!-- Main RO Ornate Glass Card -->
@@ -87,7 +100,16 @@
           class="auth-icon-img" />
         <h1 class="game-title-new" data-text="ZOLOS">ZOLOS</h1>
         <p class="game-subtitle">~ PROMISED REALM OF MIDGARD ~</p>
-        <p class="game-tagline">⚔️ ตำนานบทใหม่แห่ง Prontera & Geffen 🐉</p>
+        <p class="game-tagline">
+          <svg class="svg-icon tagline-icon" viewBox="0 0 24 24" width="12" height="12" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+            <path d="M13 19l6 2 2-6-3-3-5 5z" />
+            <path d="M9.5 6.5L21 18v3h-3L6.5 9.5" />
+            <path d="M11 5L5 3 3 9l3 3 5-5z" />
+          </svg>
+          <span>ตำนานบทใหม่แห่ง Prontera & Geffen</span>
+        </p>
       </div>
 
       <!-- Start Game Splash -->
@@ -100,63 +122,136 @@
             <div class="auth-welcome-name" id="auth-welcome-name">Adventurer</div>
           </div>
         </div>
-        <button id="btn-start-game" class="btn-start-game">⚔️ START GAME</button>
+        <button id="btn-start-game" class="btn-start-game">
+          <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+            <path d="M13 19l6 2 2-6-3-3-5 5z" />
+            <path d="M9.5 6.5L21 18v3h-3L6.5 9.5" />
+            <path d="M11 5L5 3 3 9l3 3 5-5z" />
+          </svg>
+          <span>START GAME</span>
+        </button>
         <!-- Secondary actions (shown only with an active session) -->
         <div id="auth-splash-alt" class="auth-splash-alt" style="display: none;">
-          <button id="btn-splash-switch" class="btn-ghost-alt">🔄 เปลี่ยนบัญชี</button>
-          <button id="btn-splash-guest" class="btn-ghost-alt">🎮 เล่นเป็น Guest</button>
+          <button id="btn-splash-switch" class="btn-ghost-alt">
+            <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            <span>เปลี่ยนบัญชี</span>
+          </button>
+          <button id="btn-splash-guest" class="btn-ghost-alt">
+            <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <line x1="6" y1="12" x2="10" y2="12" />
+              <line x1="8" y1="10" x2="8" y2="14" />
+              <circle cx="15" cy="13" r="1" />
+              <circle cx="18" cy="11" r="1" />
+              <rect x="2" y="6" width="20" height="12" rx="6" />
+            </svg>
+            <span>เล่นเป็น Guest</span>
+          </button>
         </div>
       </div>
 
       <!-- Login Form (Initially Hidden) -->
       <div id="auth-form-wrapper" style="display: none;">
-        <button id="btn-change-account" class="btn-change-account" style="display: none;">🔄 Change Account /
-          Logout</button>
+        <button id="btn-change-account" class="btn-change-account" style="display: none;">
+          <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+          </svg>
+          <span>Change Account / Logout</span>
+        </button>
         <div class="auth-form" id="login-form">
           <div class="ro-input-wrap">
-            <span class="ro-input-icon">👤</span>
+            <span class="ro-input-icon">
+              <svg class="svg-icon input-svg" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </span>
             <input type="text" id="auth-username" placeholder="Email or Username" autocomplete="off" />
           </div>
 
           <div style="display: flex; flex-direction: column;">
             <div class="ro-input-wrap">
-              <span class="ro-input-icon">🔑</span>
+              <span class="ro-input-icon">
+                <svg class="svg-icon input-svg" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                  stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </span>
               <input type="password" id="auth-password" placeholder="Password" autocomplete="off" />
             </div>
             <button id="btn-forgot-password" class="btn-forgot-pw">Forgot Password?</button>
           </div>
 
           <div class="ro-input-wrap" id="charname-wrap" style="display: none;">
-            <span class="ro-input-icon">⚔️</span>
-            <input type="text" id="auth-charname" placeholder="🎮 Character Name (ชื่อตัวละคร)" autocomplete="off" />
+            <span class="ro-input-icon">
+              <svg class="svg-icon input-svg" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                stroke="currentColor" stroke-width="2">
+                <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+                <path d="M13 19l6 2 2-6-3-3-5 5z" />
+                <path d="M9.5 6.5L21 18v3h-3L6.5 9.5" />
+                <path d="M11 5L5 3 3 9l3 3 5-5z" />
+              </svg>
+            </span>
+            <input type="text" id="auth-charname" placeholder="Character Name (ชื่อตัวละคร)" autocomplete="off" />
           </div>
 
           <!-- RO Class Badge Selection (Register Mode) -->
           <div id="auth-class-selector" class="auth-class-selector" style="display: none;">
-            <div class="class-selector-label">🛡️ เลือกสายอาชีพตั้งต้น (Starter Class):</div>
+            <div class="class-selector-label">เลือกสายอาชีพตั้งต้น (Starter Class):</div>
             <div class="class-badges-grid">
               <div class="class-badge active" data-class="novice">
-                <span class="badge-icon">🌱</span>
+                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg></span>
                 <span class="badge-title">Novice</span>
               </div>
               <div class="class-badge" data-class="swordman">
-                <span class="badge-icon">⚔️</span>
+                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+                    <path d="M13 19l6 2 2-6-3-3-5 5z" />
+                    <path d="M9.5 6.5L21 18v3h-3L6.5 9.5" />
+                    <path d="M11 5L5 3 3 9l3 3 5-5z" />
+                  </svg></span>
                 <span class="badge-title">Swordman</span>
               </div>
               <div class="class-badge" data-class="mage">
-                <span class="badge-icon">🔮</span>
+                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <polygon
+                      points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg></span>
                 <span class="badge-title">Mage</span>
               </div>
               <div class="class-badge" data-class="archer">
-                <span class="badge-icon">🏹</span>
+                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 6v12M6 12h12" />
+                  </svg></span>
                 <span class="badge-title">Archer</span>
               </div>
               <div class="class-badge" data-class="acolyte">
-                <span class="badge-icon">✨</span>
+                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M12 2v20M2 12h20" />
+                  </svg></span>
                 <span class="badge-title">Acolyte</span>
               </div>
               <div class="class-badge" data-class="thief">
-                <span class="badge-icon">🗡️</span>
+                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <path d="M6 3h12l4 6-10 12L2 9z" />
+                  </svg></span>
                 <span class="badge-title">Thief</span>
               </div>
             </div>
@@ -164,14 +259,42 @@
 
           <!-- Gender selection (Register Mode) -->
           <div id="auth-gender-row" style="display: none; gap: 10px;">
-            <button type="button" id="auth-gender-male" class="ro-gender-btn active">👦 ชาย (Male)</button>
-            <button type="button" id="auth-gender-female" class="ro-gender-btn">👧 หญิง (Female)</button>
+            <button type="button" id="auth-gender-male" class="ro-gender-btn active">ชาย (Male)</button>
+            <button type="button" id="auth-gender-female" class="ro-gender-btn">หญิง (Female)</button>
           </div>
 
-          <button id="btn-login" class="btn-primary">⚔️ LOGIN TO REALM</button>
-          <button id="btn-register" class="btn-secondary">📜 REGISTER ACCOUNT</button>
+          <button id="btn-login" class="btn-primary">
+            <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+              <path d="M13 19l6 2 2-6-3-3-5 5z" />
+              <path d="M9.5 6.5L21 18v3h-3L6.5 9.5" />
+              <path d="M11 5L5 3 3 9l3 3 5-5z" />
+            </svg>
+            <span>LOGIN TO REALM</span>
+          </button>
+          <button id="btn-register" class="btn-secondary">
+            <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+              <line x1="9" y1="7" x2="15" y2="7" />
+              <line x1="9" y1="11" x2="15" y2="11" />
+              <line x1="9" y1="15" x2="13" y2="15" />
+            </svg>
+            <span>REGISTER ACCOUNT</span>
+          </button>
           <div class="auth-divider"><span>OR ENTER DIRECTLY</span></div>
-          <button id="btn-guest" class="btn-guest">🎮 PLAY AS GUEST</button>
+          <button id="btn-guest" class="btn-guest">
+            <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <line x1="6" y1="12" x2="10" y2="12" />
+              <line x1="8" y1="10" x2="8" y2="14" />
+              <circle cx="15" cy="13" r="1" />
+              <circle cx="18" cy="11" r="1" />
+              <rect x="2" y="6" width="20" height="12" rx="6" />
+            </svg>
+            <span>PLAY AS GUEST</span>
+          </button>
         </div>
       </div>
       <div class="auth-status" id="auth-status"></div>
@@ -181,9 +304,14 @@
       </div>
 
       <!-- PWA install (shown only when installable) -->
-      <button id="btn-install-pwa"
-        style="display: none; align-items: center; justify-content: center; gap: 8px; margin: 14px auto 0; padding: 11px 20px; border: 1px solid #ffd700; border-radius: 24px; background: linear-gradient(135deg, #7b2ff7, #5a1fd6); color: #fff; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 6px 20px rgba(90,31,214,.45);">
-        <span>📥</span><span>ติดตั้งเกม / Download App</span>
+      <button id="btn-install-pwa" class="auth-pwa-btn" style="display: none;">
+        <svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+          stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span>ติดตั้งเกม / Download App</span>
       </button>
       <div id="pwa-install-hint"
         style="display: none; margin: 10px auto 0; max-width: 320px; font-size: 12px; line-height: 1.5; color: #cbd5e8; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 10px 12px; text-align: center;">

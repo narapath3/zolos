@@ -96,6 +96,7 @@ export class AuthUI {
         this._splashAltEl = document.getElementById('auth-splash-alt');
         this._splashSwitchBtn = document.getElementById('btn-splash-switch');
         this._splashGuestBtn = document.getElementById('btn-splash-guest');
+        this._splashStartBtn = document.getElementById('auth-splash-start-btn');
 
         if (this._startBtn) {
             this._startBtn.addEventListener('click', () => {
@@ -111,7 +112,6 @@ export class AuthUI {
                     this._splashEl.style.display = 'none';
                     this._formWrapperEl.style.display = 'block';
                     this._formWrapperEl.classList.add('fade-in');
-                    // Set default auth mode to login when showing form
                     if (this._formWrapperEl) {
                         this._formWrapperEl.setAttribute('data-auth-mode', 'login');
                     }
@@ -126,7 +126,6 @@ export class AuthUI {
                 this._splashEl.style.display = 'none';
                 this._formWrapperEl.style.display = 'block';
                 this._formWrapperEl.classList.add('fade-in');
-                // Set auth mode to login when switching account
                 if (this._formWrapperEl) {
                     this._formWrapperEl.setAttribute('data-auth-mode', 'login');
                 }
@@ -137,11 +136,17 @@ export class AuthUI {
         if (this._splashGuestBtn) {
             this._splashGuestBtn.addEventListener('click', () => this._handleGuest());
         }
+    }
 
+    _bindEvents() {
         this._loginBtn.addEventListener('click', () => {
-            if (this._sessionData) {
+            if (this._isForgotPwMode) {
+                this._handleForgotPassword();
+            } else if (this._isResetPasswordMode) {
+                this._handleUpdatePassword();
+            } else if (this._sessionData) {
                 this._enterGameWithSession();
-            } else if (this._isRegisterMode || this._isForgotPwMode) {
+            } else if (this._isRegisterMode) {
                 this._setMode('login');
             } else {
                 this._handleLogin();
@@ -149,7 +154,9 @@ export class AuthUI {
         });
 
         this._registerBtn.addEventListener('click', () => {
-            if (this._sessionData) {
+            if (this._isForgotPwMode || this._isResetPasswordMode) {
+                this._setMode('login');
+            } else if (this._sessionData) {
                 this._handleSignOut();
             } else if (!this._isRegisterMode) {
                 this._setMode('register');
@@ -158,26 +165,31 @@ export class AuthUI {
             }
         });
 
-        if (this._changeAccountBtn) {
-            this._changeAccountBtn.addEventListener('click', () => this._handleSignOut());
-        }
-
         if (this._forgotPwBtn) {
-            this._forgotPwBtn.addEventListener('click', () => {
-                if (this._isForgotPwMode) {
-                    this._handleForgotPassword();
-                } else {
-                    this._setMode('forgot');
-                }
+            this._forgotPwBtn.addEventListener('click', (e) => {
+                if (e) e.preventDefault();
+                this._setMode('forgot');
             });
         }
 
         document.getElementById('btn-guest').addEventListener('click', () => this._handleGuest());
 
         // Enter key support
+        document.getElementById('auth-username').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (this._isForgotPwMode) {
+                    this._handleForgotPassword();
+                } else if (!this._isRegisterMode && !this._isResetPasswordMode) {
+                    document.getElementById('auth-password').focus();
+                }
+            }
+        });
+
         document.getElementById('auth-password').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                if (this._isRegisterMode) {
+                if (this._isResetPasswordMode) {
+                    this._handleUpdatePassword();
+                } else if (this._isRegisterMode) {
                     this._charnameEl.focus();
                 } else {
                     this._handleLogin();
@@ -190,9 +202,10 @@ export class AuthUI {
     }
 
     _setMode(mode) {
-        // mode can be: 'login', 'register', 'forgot'
+        // mode can be: 'login', 'register', 'forgot', 'reset_password'
         this._isRegisterMode = mode === 'register';
         this._isForgotPwMode = mode === 'forgot';
+        this._isResetPasswordMode = mode === 'reset_password';
 
         // Set data-auth-mode attribute on #auth-form-wrapper
         if (this._formWrapperEl) {
@@ -201,25 +214,27 @@ export class AuthUI {
 
         const usernameInput = document.getElementById('auth-username');
         const passwordWrapper = document.getElementById('auth-password').parentElement.parentElement;
+        const passwordInput = document.getElementById('auth-password');
 
         if (mode === 'forgot') {
             if (this._charnameWrapEl) this._charnameWrapEl.style.display = 'none';
             if (this._classSelectorEl) this._classSelectorEl.style.display = 'none';
             if (this._genderRowEl) this._genderRowEl.style.display = 'none';
+            usernameInput.style.display = 'block';
             passwordWrapper.style.display = 'none';
-            usernameInput.placeholder = 'Enter your email';
+            usernameInput.placeholder = 'Enter your email (กรอกอีเมลของคุณ)';
 
-            this._loginBtn.textContent = '← Back to Login';
-            this._registerBtn.style.display = 'none';
-            this._forgotPwBtn.textContent = '🚀 Send Reset Link';
-            this._forgotPwBtn.classList.remove('btn-forgot-pw');
-            this._forgotPwBtn.classList.add('btn-secondary');
-            this._forgotPwBtn.style.marginTop = '10px';
-            this._forgotPwBtn.style.textDecoration = 'none';
-            this._forgotPwBtn.style.alignSelf = 'center';
-            this._forgotPwBtn.style.width = '100%';
+            this._loginBtn.style.display = 'inline-flex';
+            this._loginBtn.className = 'btn-primary';
+            this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg><span>SEND RESET LINK / ส่งลิงก์รีเซ็ต</span>`;
 
-            this._setStatus('Enter your email to reset password', 'info');
+            this._registerBtn.style.display = 'inline-flex';
+            this._registerBtn.className = 'btn-secondary';
+            this._registerBtn.innerHTML = `<span>← BACK TO LOGIN</span>`;
+
+            if (this._forgotPwBtn) this._forgotPwBtn.style.display = 'none';
+
+            this._setStatus('Enter your email to receive password reset link', 'info');
 
             const dividers = document.querySelectorAll('.auth-divider');
             const guestBtn = document.getElementById('btn-guest');
@@ -227,33 +242,60 @@ export class AuthUI {
             if (guestBtn) guestBtn.style.display = 'none';
 
             usernameInput.focus();
+        } else if (mode === 'reset_password') {
+            if (this._charnameWrapEl) this._charnameWrapEl.style.display = 'none';
+            if (this._classSelectorEl) this._classSelectorEl.style.display = 'none';
+            if (this._genderRowEl) this._genderRowEl.style.display = 'none';
+            usernameInput.style.display = 'none';
+            passwordWrapper.style.display = 'flex';
+            passwordInput.value = '';
+            passwordInput.placeholder = 'Enter new password (รหัสผ่านใหม่)';
+
+            this._loginBtn.style.display = 'inline-flex';
+            this._loginBtn.className = 'btn-primary';
+            this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>SAVE NEW PASSWORD</span>`;
+
+            this._registerBtn.style.display = 'none';
+            if (this._forgotPwBtn) this._forgotPwBtn.style.display = 'none';
+
+            this._setStatus('Enter a new password for your account', 'info');
+
+            const dividers = document.querySelectorAll('.auth-divider');
+            const guestBtn = document.getElementById('btn-guest');
+            dividers.forEach(el => el.style.display = 'none');
+            if (guestBtn) guestBtn.style.display = 'none';
+
+            passwordInput.focus();
         } else {
             const isRegister = mode === 'register';
             if (this._charnameWrapEl) this._charnameWrapEl.style.display = isRegister ? 'flex' : 'none';
             if (this._classSelectorEl) this._classSelectorEl.style.display = isRegister ? 'flex' : 'none';
             if (this._genderRowEl) this._genderRowEl.style.display = isRegister ? 'flex' : 'none';
+            usernameInput.style.display = 'block';
             passwordWrapper.style.display = 'flex';
             usernameInput.placeholder = 'Email or Username';
 
             if (this._forgotPwBtn) {
                 this._forgotPwBtn.style.display = isRegister ? 'none' : 'block';
                 this._forgotPwBtn.textContent = 'Forgot Password?';
-                this._forgotPwBtn.classList.add('btn-forgot-pw');
-                this._forgotPwBtn.classList.remove('btn-secondary');
-                this._forgotPwBtn.style.marginTop = '';
-                this._forgotPwBtn.style.textDecoration = '';
-                this._forgotPwBtn.style.alignSelf = '';
-                this._forgotPwBtn.style.width = '';
+                this._forgotPwBtn.className = 'btn-forgot-pw';
             }
 
-            this._registerBtn.style.display = 'block';
+            this._registerBtn.style.display = 'inline-flex';
+            this._registerBtn.className = 'btn-secondary';
+            this._loginBtn.style.display = 'inline-flex';
+            this._loginBtn.className = 'btn-primary';
 
             const dividers = document.querySelectorAll('.auth-divider');
             const guestBtn = document.getElementById('btn-guest');
             dividers.forEach(el => el.style.display = '');
             if (guestBtn) guestBtn.style.display = '';
-            this._registerBtn.textContent = isRegister ? '📜 Create Account' : '📜 REGISTER ACCOUNT';
-            this._loginBtn.textContent = isRegister ? '← Back to Login' : '⚔️ LOGIN TO REALM';
+            this._registerBtn.innerHTML = isRegister
+                ? `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>Create Account</span>`
+                : `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>REGISTER ACCOUNT</span>`;
+            this._loginBtn.innerHTML = isRegister
+                ? `<span>← Back to Login</span>`
+                : `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span>LOGIN TO REALM</span>`;
 
             this._setStatus(isRegister ? 'Choose your character name & starter class!' : '', 'info');
             if (isRegister) this._charnameEl.focus();
@@ -348,7 +390,7 @@ export class AuthUI {
         if (this._charnameEl) this._charnameEl.style.display = 'none';
         if (this._changeAccountBtn) this._changeAccountBtn.style.display = 'inline-flex';
 
-        this._loginBtn.textContent = `⚔️ Enter Game as ${username}`;
+        this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span>Enter Game as ${username}</span>`;
         this._registerBtn.style.display = 'none';
 
         const guestBtn = document.getElementById('btn-guest');
@@ -360,7 +402,7 @@ export class AuthUI {
 
     _enterGameWithSession() {
         if (!this._sessionData) return;
-        this._setStatus('Connecting to world... ⚔️', 'success');
+        this._setStatus('Connecting to world...', 'success');
         setTimeout(() => {
             this.onAuthSuccess(this._sessionData);
             this.hide();
@@ -401,9 +443,9 @@ export class AuthUI {
         if (this._formWrapperEl) {
             this._formWrapperEl.setAttribute('data-auth-mode', 'login');
         }
-        this._loginBtn.textContent = '⚔️ Login';
+        this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span>Login</span>`;
         this._registerBtn.style.display = '';
-        this._registerBtn.textContent = '📜 Register';
+        this._registerBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>Register</span>`;
         this._setStatus('', 'info');
     }
 
@@ -417,10 +459,26 @@ export class AuthUI {
         this._setStatus('Sending reset link...', 'info');
         try {
             await sendPasswordResetEmail(email);
-            this._setStatus('Reset link sent! Please check your email.', 'success');
-            setTimeout(() => this._setMode('login'), 3000);
+            this._setStatus('✅ Reset link sent! Check your email inbox.', 'success');
         } catch (e) {
             this._setStatus(e.message || 'Failed to send reset link', 'error');
+        }
+    }
+
+    async _handleUpdatePassword() {
+        const newPassword = document.getElementById('auth-password').value.trim();
+        if (!newPassword || newPassword.length < 6) {
+            this._setStatus('Password must be at least 6 characters', 'error');
+            return;
+        }
+
+        this._setStatus('Saving new password...', 'info');
+        try {
+            await updatePassword(newPassword);
+            this._setStatus('✅ Password updated! You can now login.', 'success');
+            setTimeout(() => this._setMode('login'), 2000);
+        } catch (e) {
+            this._setStatus(e.message || 'Failed to update password', 'error');
         }
     }
 
