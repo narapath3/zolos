@@ -1024,6 +1024,14 @@ Object.assign(ITEMS, {
     'Golden Shield': { emoji: '🛡️', type: 'shield', rarity: 'legendary', desc: 'โล่ทองคำบริสุทธิ์จากใต้ทะเล ป้องกันสูงมาก (DEF +40)', price: 5000, defBonus: 40 },
     'Lord Potion': { emoji: '🧪', type: 'consumable', rarity: 'legendary', desc: 'ยาโพชั่นระดับ Lord ฟื้นฟู HP +1500 และ SP +200 ทันที', price: 3000, healHp: 1500, restoreSp: 200 },
     'Yggdrasil Seed': { emoji: '🌱', type: 'consumable', rarity: 'epic', desc: 'เมล็ดพันธุ์แห่งต้นยักษ์ Yggdrasil ฟื้นฟู HP +800 ทันที', price: 1500, healHp: 800 },
+
+    // ---- CARDS (Socketable items) ----
+    'Poring Card': { emoji: '🃏', type: 'card', rarity: 'rare', desc: 'การ์ดโพริ่ง: เพิ่ม HP +50', hpBonus: 50, price: 1000 },
+    'Fabre Card': { emoji: '🃏', type: 'card', rarity: 'rare', desc: 'การ์ดฟาเบร: เพิ่ม HP +80', hpBonus: 80, price: 1500 },
+    'Rocker Card': { emoji: '🃏', type: 'card', rarity: 'rare', desc: 'การ์ดร็อคเกอร์: เพิ่ม ATK +5', atkBonus: 5, price: 2000 },
+    'Willow Card': { emoji: '🃏', type: 'card', rarity: 'rare', desc: 'การ์ดวิลโลว์: เพิ่ม SP +30', spBonus: 30, price: 1800 },
+    'Andre Card': { emoji: '🃏', type: 'card', rarity: 'epic', desc: 'การ์ดอังเดร: เพิ่ม ATK +20', atkBonus: 20, price: 5000 },
+    'Vitata Card': { emoji: '🃏', type: 'card', rarity: 'epic', desc: 'การ์ดวิตาต้า: เพิ่ม SP +100', spBonus: 100, price: 6000 },
 });
 
 // ============ SKILLS ============
