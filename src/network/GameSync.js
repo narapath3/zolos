@@ -104,7 +104,7 @@ export async function fetchCharacterByUsername(username) {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-        
+
         if (error) {
             console.error('[Zolos] fetchCharacterByUsername error:', error.message);
             return null;
@@ -135,7 +135,7 @@ export async function fetchPublicCharacter(userId) {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-        
+
         if (error) {
             console.error('[Zolos] fetchPublicCharacter error:', error.message);
             return null;
@@ -174,6 +174,35 @@ export async function resolveCharacterByUid(uid) {
     } catch (e) {
         console.error('[Zolos] resolveCharacterByUid error:', e);
         return null;
+    }
+}
+
+// Search characters by name prefix for autocomplete suggestions.
+// Returns up to 5 results as [{ characterId, userId, username, level }].
+export async function searchCharactersByName(query) {
+    if (isOfflineMode || !supabase || !query || query.length < 1) return [];
+    const clean = String(query).trim();
+    if (!clean) return [];
+    try {
+        const { data, error } = await supabase
+            .from('characters')
+            .select('id, user_id, name, level')
+            .ilike('name', `${clean}%`)
+            .order('level', { ascending: false })
+            .limit(5);
+        if (error) {
+            console.error('[Zolos] searchCharactersByName error:', error.message);
+            return [];
+        }
+        return (data || []).map(d => ({
+            characterId: d.id,
+            userId: d.user_id,
+            username: d.name,
+            level: d.level,
+        }));
+    } catch (e) {
+        console.error('[Zolos] searchCharactersByName error:', e);
+        return [];
     }
 }
 
@@ -395,7 +424,7 @@ export async function saveCharacter(characterId, updates) {
             if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
             if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
             if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
-            
+
             filteredUpdates[key] = val;
         }
     }
@@ -497,14 +526,14 @@ export async function saveCharacterByUserId(userId, updates) {
             if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
             if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
             if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
-            
+
             filteredUpdates[key] = val;
         }
     }
 
     console.log(`[Zolos] 💾 Saving by user_id ${userId}. Fields:`, Object.keys(filteredUpdates));
     console.log(`[Zolos] 📤 Supabase Update Payload:`, JSON.stringify(filteredUpdates));
-    
+
     // Use basic update without .select() to avoid potential RLS read issues during update
     const { error, count } = await supabase
         .from('characters')
@@ -531,7 +560,7 @@ export async function saveCharacterByUserId(userId, updates) {
             console.log('[Zolos] ✅ saveCharacterByUserId successful! Rows affected:', count);
         } else {
             console.warn('[Zolos] ⚠️ saveCharacterByUserId: 0 rows updated. userId may not exist or RLS blocked the update.');
-            
+
             // Fallback: try saving by characterId if user_id update affected 0 rows
             // This handles cases where user_id might be missing or incorrect in the state
             const charId = updates.characterId || updates.id;
@@ -1029,8 +1058,8 @@ export async function setInventoryItemQuantity(characterId, itemName, itemType, 
         if (qty <= 0) {
             localDb.set(`inventory_${characterId}`, inv.filter(i => i.item_name !== itemName));
         } else if (existing) {
-                existing.quantity = qty;
-                existing.stats = stats;
+            existing.quantity = qty;
+            existing.stats = stats;
         } else if (qty > 0) {
             inv.push({
                 id: 'inv_' + Math.random().toString(36).substring(2, 10),

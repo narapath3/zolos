@@ -64,6 +64,7 @@ import {
     saveCharacter,
     loadInventory,
     loadCharacterCards,
+    saveInventoryItem,
     joinPresence,
     leavePresence,
     startAutoSave,
@@ -251,6 +252,36 @@ async function initGame(charData) {
 
         for (const cardId of result.drops) {
             const card = getCard(cardId);
+            if (!card) continue;
+
+            const state = character.cardState[cardId] || { owned: 1, stars: 1 };
+
+            if (gameUI) {
+                gameUI.inventory ??= [];
+                const itemIndex = gameUI.inventory.findIndex(entry => getCard(entry.item_name)?.id === card.id);
+                if (itemIndex >= 0) {
+                    gameUI.inventory[itemIndex].quantity = state.owned;
+                    gameUI.inventory[itemIndex].stats ??= {};
+                    gameUI.inventory[itemIndex].stats.card_stars = state.stars;
+                } else {
+                    const newItem = {
+                        item_name: card.itemName,
+                        item_type: 'card',
+                        quantity: state.owned,
+                        emoji: '🃏',
+                        stats: { card_id: card.id, card_stars: state.stars }
+                    };
+                    gameUI.inventory.push(gameUI._enrichItem(newItem));
+                }
+                gameUI._renderInventory();
+                gameUI.refreshCardAlbum?.();
+            }
+
+            if (character.characterId) {
+                saveInventoryItem(character.characterId, card.itemName, 'card', 1, { card_id: card.id, card_stars: state.stars }).catch(() => { });
+                character.saveStatsToDatabase?.().catch(() => { });
+            }
+
             const reveal = {
                 sourceLabel: card?.source?.label || monster.data?.name || cardId,
                 isNew: (Number(previousCardState[cardId]?.owned) || 0) === 0,

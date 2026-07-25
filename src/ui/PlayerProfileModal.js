@@ -3,6 +3,7 @@
 
 import { JobPreview } from '../engine/JobPreview.js';
 import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats, RARITY_COLOR } from '../engine/GameData.js';
+import { getCard } from '../cards/CardCatalog.js';
 
 export class PlayerProfileModal {
   constructor() {
@@ -459,7 +460,7 @@ export class PlayerProfileModal {
     modal.innerHTML = `<div id="player-profile-card"></div>`;
     document.body.appendChild(modal);
     this.modal = modal;
-    
+
     // Global click listener to close if clicking outside the card
     this.modal.addEventListener('click', (e) => {
       if (e.target === this.modal) this.hide();
@@ -473,11 +474,11 @@ export class PlayerProfileModal {
       console.error('[Profile] #player-profile-card not found in DOM');
       return;
     }
-    
+
     // Merge data: DB provides stats, liveAppearance provides current visuals
     const job = liveAppearance?.job || dbData?.job || 'Novice';
     const level = dbData?.level || liveAppearance?.level || player.level || 1;
-    
+
     // STR/AGI/INT are derived from the class + level (the game has no manual
     // stat allocation, so the DB's str/agi/int columns are just a default 1 and
     // must not be used — that showed 1/1/1 for everyone).
@@ -808,7 +809,7 @@ export class PlayerProfileModal {
     }
 
     this.jobPreview = new JobPreview(canvas);
-    
+
     // Apply full appearance to the character
     if (this.jobPreview.char) {
       this.jobPreview.char.applyAppearance(appearance);
@@ -820,7 +821,7 @@ export class PlayerProfileModal {
         this.jobPreview.ring.material.color.setHex(ringColor);
       }
     }
-    
+
     this.jobPreview.start();
   }
 
@@ -910,7 +911,7 @@ export class PlayerProfileModal {
   _renderSkills(jobId) {
     const skillIds = JOBS[jobId]?.skills || [];
     if (skillIds.length === 0) return '<div style="font-size:11px; color:rgba(255,255,255,0.2)">No skills unlocked</div>';
-    
+
     return skillIds.map(id => {
       const s = SKILLS[id];
       const name = s ? s.name : (id.charAt(0).toUpperCase() + id.slice(1));
@@ -954,10 +955,10 @@ export class PlayerProfileModal {
       const displayName = isFilled ? ((rf > 0 ? `+${rf} ` : '') + itemName) : 'Empty';
       const rarCls = itemData?.rarity ? ` rar-${itemData.rarity}` : '';
 
-      const cardName = cards[slot.id];
-      const cardIt = cardName ? ITEMS[cardName] : null;
-      const cardBadge = cardIt
-        ? `<div class="equip-card-badge" title="การ์ด: ${cardName}" style="border-color:${RARITY_COLOR[cardIt.rarity] || '#b8c0cc'}">${cardIt.emoji}</div>`
+      const cardIdOrName = cards[slot.id];
+      const card = cardIdOrName ? getCard(cardIdOrName) : null;
+      const cardBadge = card
+        ? `<div class="equip-card-badge" title="การ์ด: ${card.itemName}" style="border-color:${RARITY_COLOR[card.rarity] || '#b8c0cc'}">🃏</div>`
         : '';
 
       return `
@@ -995,23 +996,23 @@ export class PlayerProfileModal {
 
   _renderBadges(data) {
     const badges = [];
-    
+
     // Title Badge
     const title = data.appearance?.title || data.title;
     if (title) {
       badges.push(`<div class="badge badge-title">${title.replace(/_/g, ' ')}</div>`);
     }
-    
+
     // Veteran Badge
     if (data.level >= 40) {
       badges.push('<div class="badge badge-veteran">Veteran</div>');
     }
-    
+
     // Wealthy Badge
     if (data.gold >= 1000000) {
       badges.push('<div class="badge badge-wealthy">Wealthy</div>');
     }
-    
+
     return badges.join('');
   }
 

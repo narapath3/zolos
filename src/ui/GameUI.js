@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -1438,6 +1438,13 @@ export class GameUI {
     if (statusEl) statusEl.textContent = '';
     const waiting = document.getElementById('card-trade-waiting');
     if (waiting) waiting.style.display = 'none';
+    // Clear autocomplete state
+    this._cardTradeResolvedUid = null;
+    this._cardTradeResolvedName = null;
+    const suggestBox = document.getElementById('card-trade-suggest');
+    if (suggestBox) suggestBox.style.display = 'none';
+    const resolvedBox = document.getElementById('card-trade-resolved');
+    if (resolvedBox) resolvedBox.style.display = 'none';
 
     const modal = document.getElementById('card-trade-modal');
     if (modal) modal.style.display = 'flex';
@@ -2894,7 +2901,7 @@ export class GameUI {
 
         const targetUsername = row.getAttribute('data-username');
         const isOffline = row.getAttribute('data-offline') === 'true';
-        
+
         if (isOffline) {
           const userId = row.getAttribute('data-user-id');
           // For offline friends, we might not have a full player object, but we can still try
@@ -3027,7 +3034,7 @@ export class GameUI {
       }
     };
     if (this._popupHero) { boot({ JobPreview: this._popupHero.constructor }); return; }
-    import('../engine/JobPreview.js').then(boot).catch(() => {});
+    import('../engine/JobPreview.js').then(boot).catch(() => { });
   }
 
   _stopPopupHero() {
@@ -3036,7 +3043,7 @@ export class GameUI {
 
   _showPlayerPopup(player) {
     this.selectedProfilePlayer = player;
-    
+
     // Fetch full character data and show beautiful profile modal
     this._fetchAndShowPlayerProfile(player);
   }
@@ -3135,14 +3142,14 @@ export class GameUI {
     const heroApp = (rp && rp.character && rp.character.getAppearance)
       ? rp.character.getAppearance()
       : {
-          job: ch && ch.job || null,
-          weapon: ch && ch.weapon, hat: ch && ch.hat, glasses: ch && ch.glasses,
-          shield: ch && ch.shield, gear: { body: ch && ch.armor },
-          bodyColor: ch && (ch.body_color ?? ch.bodyColor),
-          hairColor: ch && (ch.hair_color ?? ch.hairColor),
-          pantsColor: ch && (ch.pants_color ?? ch.pantsColor),
-          gender: ch && ch.gender,
-        };
+        job: ch && ch.job || null,
+        weapon: ch && ch.weapon, hat: ch && ch.hat, glasses: ch && ch.glasses,
+        shield: ch && ch.shield, gear: { body: ch && ch.armor },
+        bodyColor: ch && (ch.body_color ?? ch.bodyColor),
+        hairColor: ch && (ch.hair_color ?? ch.hairColor),
+        pantsColor: ch && (ch.pants_color ?? ch.pantsColor),
+        gender: ch && ch.gender,
+      };
     this._renderPopupHero(heroApp);
 
     const gear = (name) => {
@@ -3546,7 +3553,7 @@ export class GameUI {
         this.chatSendCallback(text);
       }
       chatInput.value = '';
-      
+
       // Roblox style: after sending, keep focused or close? 
       // Usually it stays open until Escape or Enter again.
       chatInput.focus();
@@ -3621,7 +3628,7 @@ export class GameUI {
     const mentionBox = document.getElementById('mention-suggest');
 
     // ----- Emoji picker -----
-    const EMOJIS = ['😀','😄','😁','😂','🤣','😊','😉','😍','😘','😎','🤩','🥳','😴','🤔','😮','😢','😭','😡','👍','👎','👏','🙏','💪','🔥','✨','💯','⚔️','🛡️','🏹','🐉','💰','💎','🎣','🐟','🏆','❤️','💔','😱','😅','🤝'];
+    const EMOJIS = ['😀', '😄', '😁', '😂', '🤣', '😊', '😉', '😍', '😘', '😎', '🤩', '🥳', '😴', '🤔', '😮', '😢', '😭', '😡', '👍', '👎', '👏', '🙏', '💪', '🔥', '✨', '💯', '⚔️', '🛡️', '🏹', '🐉', '💰', '💎', '🎣', '🐟', '🏆', '❤️', '💔', '😱', '😅', '🤝'];
     if (emojiPanel && !emojiPanel.dataset.built) {
       emojiPanel.innerHTML = EMOJIS.map(e => `<button type="button" class="emoji-cell">${e}</button>`).join('');
       emojiPanel.dataset.built = '1';
@@ -3690,7 +3697,7 @@ export class GameUI {
     const chatPanel = document.getElementById('chat-panel');
     const chatInput = document.getElementById('chat-input');
     const chatInputRow = chatPanel.querySelector('.chat-input-row');
-    
+
     chatPanel.classList.remove('preview-mode');
     chatPanel.classList.remove('empty');
     if (chatInputRow) chatInputRow.style.display = 'flex';
@@ -3704,7 +3711,7 @@ export class GameUI {
         try { chatInput.focus(); chatInput.select(); } catch (e) { /* ignore */ }
       }, 50);
     }
-    
+
     // Auto scroll to bottom when opening
     const chatMessages = document.getElementById('chat-messages');
     if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -3916,7 +3923,7 @@ export class GameUI {
     const row = document.createElement('div');
     row.className = 'chat-msg-row ' + (isSystem ? 'system' : 'user') + (mentionedMe ? ' mention-me' : '');
     row.innerHTML = `<span class="chat-msg-username">[${esc(username)}]:</span> <span class="chat-msg-text">${body}</span>`;
-        chatMessages.appendChild(row);
+    chatMessages.appendChild(row);
     while (chatMessages.children.length > 80) chatMessages.removeChild(chatMessages.firstChild);
 
     // A new message wakes the chat out of its faint idle state; it fades back
@@ -4060,7 +4067,7 @@ export class GameUI {
         // Sync audio config values when opening the Settings tab
         this._syncAudioSettingsUI();
         this._syncGameplaySettingsUI();
-        
+
         // Use persisted character settings if available
         if (this.character && this.character.gameSettings) {
           const graphicsSelect = document.getElementById('settings-graphics-quality');
@@ -4351,7 +4358,7 @@ export class GameUI {
     const closeEditor = () => {
       modal.style.display = 'none';
       this.updateMobileControlsVisibility();
-      
+
       // Part 1.4: Explicit save on close
       if (this.character && this.character.saveStatsToDatabase) {
         console.log('[Zolos] 💾 Profile/Settings panel closed, triggering save...');
@@ -5429,7 +5436,7 @@ export class GameUI {
       const isPast = r.day < todayIdx || (!canClaim && r.day === todayIdx);
       const isDay7 = r.day === 7;
       const bg = isToday && canClaim
-        ? `linear-gradient(160deg,rgba(${parseInt(r.color.slice(1,3), 16)},${parseInt(r.color.slice(3,5), 16)},${parseInt(r.color.slice(5,7), 16)},.25),rgba(255,122,46,.15))`
+        ? `linear-gradient(160deg,rgba(${parseInt(r.color.slice(1, 3), 16)},${parseInt(r.color.slice(3, 5), 16)},${parseInt(r.color.slice(5, 7), 16)},.25),rgba(255,122,46,.15))`
         : isPast ? 'rgba(95,221,122,.08)' : 'rgba(255,255,255,.04)';
       const border = isToday && canClaim ? r.color : isPast ? 'rgba(95,221,122,.4)' : 'rgba(255,255,255,.09)';
       const label = isPast ? '✅' : (isToday && canClaim ? '⭐ วันนี้' : r.title);
@@ -5498,13 +5505,13 @@ export class GameUI {
       const existing = this.inventory.find(i => i.item_name === it.name);
       if (existing) existing.quantity += it.qty;
       else this.inventory.push({ item_name: it.name, item_type: meta.type || 'material', emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: it.qty, stats: {} });
-      if (this.characterId) saveInventoryItem(this.characterId, it.name, meta.type || 'material', it.qty).catch(() => {});
+      if (this.characterId) saveInventoryItem(this.characterId, it.name, meta.type || 'material', it.qty).catch(() => { });
     }
 
     // Advance the streak and persist
     this.loginStreak = { streak: pending, lastClaim: this._todayStr() };
     await this._saveLoginStreak();
-    if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => {});
+    if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => { });
 
     // Celebration
     const itemTxt = reward.items.map(it => `${(ITEMS[it.name] || {}).emoji || ''} ${it.name}×${it.qty}`).join(', ');
@@ -5529,7 +5536,7 @@ export class GameUI {
         modal.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
         modal.style.opacity = '0';
         modal.style.transform = 'scale(0.95)';
-        
+
         setTimeout(() => {
           modal.style.display = 'none';
           modal.style.opacity = '1';
@@ -5998,7 +6005,7 @@ export class GameUI {
       const type = inv.item_type;
       inv.quantity -= req.qty;
       if (inv.quantity <= 0) this.inventory = this.inventory.filter(i => i !== inv);
-      if (this.characterId) saveInventoryItem(this.characterId, req.name, type, -req.qty).catch(() => {});
+      if (this.characterId) saveInventoryItem(this.characterId, req.name, type, -req.qty).catch(() => { });
     }
 
     // Add the forged weapon
@@ -6007,8 +6014,8 @@ export class GameUI {
     if (existing) existing.quantity += 1;
     else this.inventory.push({ item_name: recipe.result, item_type: resData.type || 'weapon', emoji: resData.emoji, desc: resData.desc, price: resData.price || 0, quantity: 1, stats: {} });
     if (this.characterId) {
-      saveInventoryItem(this.characterId, recipe.result, resData.type || 'weapon', 1).catch(() => {});
-      if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => {});
+      saveInventoryItem(this.characterId, recipe.result, resData.type || 'weapon', 1).catch(() => { });
+      if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => { });
     }
 
     // Spectacle
@@ -8245,6 +8252,122 @@ export class GameUI {
     });
 
     document.getElementById('btn-send-card-trade')?.addEventListener('click', () => this._sendCardTrade());
+
+    // ---- Autocomplete: name → UID resolution ----
+    this._cardTradeResolvedUid = null;   // UID resolved from autocomplete click
+    this._cardTradeResolvedName = null;
+    this._cardTradeSuggestTimer = null;
+
+    const uidInput = document.getElementById('card-trade-uid-input');
+    const suggestBox = document.getElementById('card-trade-suggest');
+    const resolvedBox = document.getElementById('card-trade-resolved');
+    if (!uidInput || !suggestBox) return;
+
+    // On every keystroke: debounce → search
+    uidInput.addEventListener('input', () => {
+      // Clear previous resolved state when user types
+      this._cardTradeResolvedUid = null;
+      this._cardTradeResolvedName = null;
+      if (resolvedBox) resolvedBox.style.display = 'none';
+
+      const val = uidInput.value.trim();
+      if (!val || val.length < 1) { suggestBox.style.display = 'none'; return; }
+
+      // If it looks like a raw UID (all hex), skip autocomplete
+      if (/^[a-fA-F0-9]{1,8}$/.test(val)) { suggestBox.style.display = 'none'; return; }
+
+      clearTimeout(this._cardTradeSuggestTimer);
+      this._cardTradeSuggestTimer = setTimeout(() => this._cardTradeAutocomplete(val), 300);
+    });
+
+    // Hide dropdown on blur (slight delay so a click on a suggestion registers)
+    uidInput.addEventListener('blur', () => {
+      setTimeout(() => { if (suggestBox) suggestBox.style.display = 'none'; }, 200);
+    });
+    uidInput.addEventListener('focus', () => {
+      const val = uidInput.value.trim();
+      if (val && !/^[a-fA-F0-9]{1,8}$/.test(val) && !this._cardTradeResolvedUid) {
+        clearTimeout(this._cardTradeSuggestTimer);
+        this._cardTradeSuggestTimer = setTimeout(() => this._cardTradeAutocomplete(val), 150);
+      }
+    });
+  }
+
+  /** Search online players + DB and render suggestion dropdown. */
+  async _cardTradeAutocomplete(query) {
+    const suggestBox = document.getElementById('card-trade-suggest');
+    if (!suggestBox) return;
+
+    const q = query.toLowerCase();
+    const results = [];
+
+    // 1. Check online players first (instant, no network)
+    if (this.onlinePlayers && this.onlinePlayers.length) {
+      for (const p of this.onlinePlayers) {
+        if (p.username && p.username.toLowerCase().startsWith(q) && p.userId !== this.characterId) {
+          results.push({ username: p.username, level: p.level || 1, userId: p.userId, online: true });
+        }
+        if (results.length >= 5) break;
+      }
+    }
+
+    // 2. If we have fewer than 5 results, search DB
+    if (results.length < 5) {
+      try {
+        const dbResults = await searchCharactersByName(query);
+        for (const d of dbResults) {
+          // Skip duplicates already found online, and skip self
+          if (results.some(r => r.username === d.username)) continue;
+          const myUid = this.characterId?.split('_').pop()?.substring(0, 8);
+          const dUid = d.characterId?.split('_').pop()?.substring(0, 8);
+          if (myUid && dUid && myUid === dUid) continue;
+          const isOnline = (this.onlinePlayers || []).some(p => p.userId === d.userId);
+          results.push({ username: d.username, level: d.level || 1, userId: d.userId, characterId: d.characterId, online: isOnline });
+          if (results.length >= 5) break;
+        }
+      } catch (e) { console.warn('[CardTrade] autocomplete DB error:', e); }
+    }
+
+    if (results.length === 0) {
+      suggestBox.style.display = 'none';
+      return;
+    }
+
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    suggestBox.innerHTML = results.map((r, i) => `
+      <div class="card-trade-suggest-item" data-idx="${i}"
+        style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(100,120,200,0.15);transition:background .12s;"
+        onmouseenter="this.style.background='rgba(80,110,220,0.25)'" onmouseleave="this.style.background='transparent'">
+        <span style="font-size:11px;font-weight:600;color:#fff;flex:1;">${esc(r.username)}</span>
+        <span style="font-size:10px;color:#9fb0e0;">Lv.${r.level}</span>
+        <span style="font-size:9px;color:${r.online ? '#40e080' : '#8b97ba'};">${r.online ? '🟢 Online' : '⚫ Offline'}</span>
+      </div>
+    `).join('');
+    suggestBox.style.display = 'block';
+
+    // Attach click handlers
+    suggestBox.querySelectorAll('.card-trade-suggest-item').forEach((el, i) => {
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // prevent blur from hiding dropdown
+        const r = results[i];
+        if (!r) return;
+        // Resolve UID from characterId
+        const uid = r.characterId
+          ? r.characterId.split('_').pop().substring(0, 8).toUpperCase()
+          : (r.userId || '').substring(0, 8).toUpperCase();
+        const input = document.getElementById('card-trade-uid-input');
+        if (input) input.value = uid;
+        this._cardTradeResolvedUid = uid;
+        this._cardTradeResolvedName = r.username;
+        suggestBox.style.display = 'none';
+        // Show resolved preview
+        const resolvedBox = document.getElementById('card-trade-resolved');
+        if (resolvedBox) {
+          resolvedBox.innerHTML = `✅ <strong>${esc(r.username)}</strong> (Lv.${r.level}) ${r.online ? '<span style="color:#40e080;">🟢 Online</span>' : '<span style="color:#8b97ba;">⚫ Offline</span>'}`;
+          resolvedBox.style.display = 'block';
+        }
+      });
+    });
   }
 
   async _sendCardTrade() {
@@ -8255,13 +8378,37 @@ export class GameUI {
     };
     if (!item || !this.characterId) { setStatus('❌ ไม่ได้เลือกการ์ด', '#ff8f8f'); return; }
 
-    const uid = (document.getElementById('card-trade-uid-input')?.value || '').trim();
+    const rawInput = (document.getElementById('card-trade-uid-input')?.value || '').trim();
     const maxQty = this._sellableQty(item);
     const qty = Math.min(Math.max(1, parseInt(document.getElementById('card-trade-qty-input')?.value) || 1), maxQty);
     const price = Math.max(0, parseInt(document.getElementById('card-trade-price-input')?.value) || 0);
 
-    if (!uid) { setStatus('❌ กรุณากรอก UID ผู้รับ', '#ff8f8f'); return; }
+    if (!rawInput) { setStatus('❌ กรุณากรอกชื่อผู้เล่น หรือ UID ผู้รับ', '#ff8f8f'); return; }
     if (maxQty < 1) { setStatus('❌ ไม่มีการ์ดใบนี้เหลือให้ส่ง', '#ff8f8f'); return; }
+
+    // Determine the UID to use:
+    // Case 1: Already resolved via autocomplete click
+    // Case 2: Looks like a hex UID → use as-is
+    // Case 3: Free-hand name → search DB for the name
+    let uid = null;
+    if (this._cardTradeResolvedUid) {
+      uid = this._cardTradeResolvedUid;
+    } else if (/^[a-fA-F0-9]{1,8}$/.test(rawInput)) {
+      uid = rawInput;
+    } else {
+      // Treat as player name: try searching DB
+      setStatus('⌛ กำลังค้นหาผู้เล่นชื่อ "' + rawInput + '"...', 'var(--text-dim)');
+      try {
+        const dbResults = await searchCharactersByName(rawInput);
+        const exact = dbResults.find(d => d.username.toLowerCase() === rawInput.toLowerCase());
+        if (exact) {
+          uid = exact.characterId.split('_').pop().substring(0, 8);
+        } else if (dbResults.length > 0) {
+          uid = dbResults[0].characterId.split('_').pop().substring(0, 8);
+        }
+      } catch (e) { /* fall through */ }
+      if (!uid) { setStatus('❌ ไม่พบผู้เล่นชื่อ "' + rawInput + '" — ลองเลือกจาก autocomplete หรือกรอก UID', '#ff8f8f'); return; }
+    }
 
     // Guard against sending to yourself.
     const myUid = this.characterId.split('_').pop().substring(0, 8).toUpperCase();
@@ -8316,9 +8463,9 @@ export class GameUI {
       const reason = res && res.reason;
       const msg = reason === 'not_enough' ? '❌ การ์ดไม่พอสำหรับส่ง'
         : reason === 'socketed_reserve' ? '❌ ต้องถอดการ์ดออกจากช่องก่อน (เหลือใบเดียว)'
-        : reason === 'self' ? '❌ ส่งการ์ดให้ตัวเองไม่ได้'
-        : reason === 'no_recipient' ? '❌ ไม่พบผู้รับ'
-        : '❌ ส่งเข้ากล่องจดหมายไม่สำเร็จ';
+          : reason === 'self' ? '❌ ส่งการ์ดให้ตัวเองไม่ได้'
+            : reason === 'no_recipient' ? '❌ ไม่พบผู้รับ'
+              : '❌ ส่งเข้ากล่องจดหมายไม่สำเร็จ';
       setStatus(msg, '#ff8f8f');
       return;
     }
@@ -9412,9 +9559,9 @@ export class GameUI {
             <div class="tile-footer">
               <span class="tile-level">${m.level}</span>
               ${isCurrent
-                ? '<span style="font-size:10px;color:#9aa5c0;font-weight:600;">คุณอยู่ที่นี่</span>'
-                : `<button class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">🌀 วาร์ป</button>`
-              }
+          ? '<span style="font-size:10px;color:#9aa5c0;font-weight:600;">คุณอยู่ที่นี่</span>'
+          : `<button class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">🌀 วาร์ป</button>`
+        }
             </div>
             ${m.monsters.length > 0 ? `
               <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">

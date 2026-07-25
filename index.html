@@ -449,7 +449,8 @@
           style="width:100%;margin-bottom:8px;border-color:#ffd24a;color:#ffd97a;position:relative;">📬 กล่องจดหมายการ์ด
           (Mailbox)<span id="mailbox-badge"
             style="display:none;position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff4d4d;color:#fff;font-size:10px;line-height:18px;text-align:center;font-weight:bold;"></span></button>
-        <p class="mycard-hint">คลิกการ์ดเพื่อดูรายละเอียด · เชื่อม/หลอมรวม · หรือ <b>โอน/ขายให้ผู้เล่นอื่น</b> (ขายให้ NPC ไม่ได้)</p>
+        <p class="mycard-hint">คลิกการ์ดเพื่อดูรายละเอียด · เชื่อม/หลอมรวม · หรือ <b>โอน/ขายให้ผู้เล่นอื่น</b> (ขายให้
+          NPC ไม่ได้)</p>
         <div id="mycard-grid"></div>
       </div>
     </div>
@@ -1188,10 +1189,16 @@
             </div>
           </div>
 
-          <div class="form-group" style="margin-bottom: 10px;">
-            <label for="card-trade-uid-input">UID ผู้รับ:</label>
-            <input type="text" id="card-trade-uid-input" placeholder="กรอก UID ผู้รับ เช่น A1B2C3D4"
-              autocomplete="off" spellcheck="false" style="text-transform: uppercase; width: 100%;">
+          <div class="form-group" style="margin-bottom: 10px; position: relative;">
+            <label for="card-trade-uid-input">ผู้รับ (ชื่อ หรือ UID):</label>
+            <input type="text" id="card-trade-uid-input" placeholder="พิมพ์ชื่อผู้เล่น หรือ UID เช่น A1B2C3D4"
+              autocomplete="off" spellcheck="false" style="width: 100%;">
+            <div id="card-trade-suggest"
+              style="display:none; position:absolute; left:0; right:0; top:100%; z-index:50; background:rgba(12,16,32,0.97); border:1px solid rgba(100,120,200,0.35); border-top:none; border-radius:0 0 6px 6px; max-height:180px; overflow-y:auto; box-shadow:0 6px 20px rgba(0,0,0,0.5);">
+            </div>
+            <div id="card-trade-resolved"
+              style="display:none; font-size:11px; margin-top:5px; padding:6px 10px; background:rgba(40,200,100,0.1); border:1px solid rgba(40,200,100,0.25); border-radius:5px; color:#40e080; font-family:var(--font-pixel);">
+            </div>
           </div>
           <div class="form-row">
             <div class="form-group flex-1">
@@ -1203,7 +1210,8 @@
               <input type="number" id="card-trade-price-input" min="0" value="0" placeholder="0 = โอนฟรี">
             </div>
           </div>
-          <p id="card-trade-status" style="font-size: 10.5px; color: var(--text-dim); min-height: 14px; margin: 6px 0 0;">
+          <p id="card-trade-status"
+            style="font-size: 10.5px; color: var(--text-dim); min-height: 14px; margin: 6px 0 0;">
           </p>
           <button id="btn-send-card-trade" class="btn-primary" style="width: 100%; margin-top: 8px;">🤝 ส่งคำขอเทรด
             (Send Request)</button>
@@ -1223,10 +1231,10 @@
         </div>
         <div class="popup-body">
           <div style="display:flex;gap:6px;margin-bottom:10px;">
-            <button class="mail-tab btn-secondary active" data-mailtab="inbox"
-              style="flex:1;font-size:11px;">📥 กล่องเข้า</button>
-            <button class="mail-tab btn-secondary" data-mailtab="outbox"
-              style="flex:1;font-size:11px;">📤 ที่ส่งไป</button>
+            <button class="mail-tab btn-secondary active" data-mailtab="inbox" style="flex:1;font-size:11px;">📥
+              กล่องเข้า</button>
+            <button class="mail-tab btn-secondary" data-mailtab="outbox" style="flex:1;font-size:11px;">📤
+              ที่ส่งไป</button>
           </div>
           <div id="mail-list" style="max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
         </div>
