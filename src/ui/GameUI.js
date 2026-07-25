@@ -1404,11 +1404,13 @@ export class GameUI {
   _sellCardToMarket(cardId) {
     const card = getCard(cardId);
     if (!card) return;
-    // A card must exist as an unsocketed inventory row to be listed.
+    // The card row must have at least one spare copy to list. A socketed card
+    // keeps its whole stack in one row (quantity stays intact) but reserves the
+    // single copy that is actually socketed — see _sellableQty.
     const row = (this.inventory || []).find(i =>
       i.item_type === 'card' && getCard(i.item_name)?.id === cardId && (i.quantity || 0) >= 1);
-    if (!row) {
-      this.addCombatLog('❌ ไม่มีการ์ดใบนี้ในกระเป๋าให้ตั้งขาย (การ์ดที่เชื่อม/สวมไว้ต้องถอดก่อน)', 'warning');
+    if (!row || this._sellableQty(row) < 1) {
+      this.addCombatLog('❌ ไม่มีการ์ดใบนี้เหลือให้ตั้งขาย (การ์ดที่ใส่ในช่องอยู่ต้องถอดก่อน หรือมีเพียงใบเดียว)', 'warning');
       return;
     }
     // Open the player market on the Sell tab with this card preselected.
@@ -1416,9 +1418,11 @@ export class GameUI {
     const mp = document.getElementById('market-panel');
     if (mp) mp.style.display = 'block';
     this.updateMobileControlsVisibility();
-    this.selectedMarketItem = row;
+    // Switch to the Sell tab FIRST: the tab click handler clears
+    // selectedMarketItem, so the preselection must be applied AFTER the switch.
     const sellTab = document.querySelector('.market-tab[data-tab="sell"]');
-    if (sellTab) sellTab.click(); else this._renderMarket();
+    if (sellTab) sellTab.click(); else { this.marketTab = 'sell'; this._renderMarket(); }
+    this.selectedMarketItem = row;
     this._renderMarketSellInventory();
     this._updateMarketSellForm();
     this.addCombatLog(`💰 ตั้งขายการ์ด "${card.displayName || card.itemName}" — กำหนดราคาแล้วกดตั้งขายได้เลย`, 'system');
@@ -6398,6 +6402,34 @@ export class GameUI {
     return false;
   }
 
+  // How many copies of an item the player may list on the P2P market.
+  // Worn gear cannot be sold at all. A socketed card keeps its whole stack in a
+  // single inventory row but reserves the one copy that is physically socketed,
+  // so only the spare duplicates are listable.
+  _sellableQty(item) {
+    if (!item) return 0;
+    const owned = item.quantity || 0;
+    if (item.item_type === 'card') {
+      const socketedReserve = (item.stats && item.stats.equipped === true) ? 1 : 0;
+      return Math.max(0, owned - socketedReserve);
+    }
+    if (this._isItemEquipped(item)) return 0;
+    return owned;
+  }
+
+  // Icon markup for a market slot/detail. Card rows carry no emoji, so fall back
+  // to the card's art image (or 🃏) instead of rendering an empty box.
+  _itemIconHtml(item) {
+    if (item && item.item_type === 'card') {
+      const card = getCard(item.item_name);
+      if (card && card.art) {
+        return `<img src="${card.art}" alt="" style="width:1.3em;height:1.3em;object-fit:contain;vertical-align:middle;" onerror="this.outerHTML='🃏'">`;
+      }
+      return '🃏';
+    }
+    return item && item.emoji ? item.emoji : '📦';
+  }
+
   async _renderMarket() {
     // Update gold display
     const goldDisplay = document.getElementById('market-gold-amount');
@@ -6486,9 +6518,11 @@ export class GameUI {
     if (!grid) return;
     grid.innerHTML = '';
 
-    // Filter only non-equipped sellable items (pets are listed per-instance
-    // from the pet popup so their custom names carry to the market).
-    const sellable = this.inventory.filter(item => !this._isItemEquipped(item) && item.item_type !== 'pet');
+    // Show every item with at least one listable copy (pets are listed
+    // per-instance from the pet popup so their custom names carry to the
+    // market). A socketed card still lists its spare copies — _sellableQty
+    // reserves only the single socketed one.
+    const sellable = this.inventory.filter(item => item.item_type !== 'pet' && this._sellableQty(item) >= 1);
 
     if (sellable.length === 0) {
       grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
@@ -6502,8 +6536,8 @@ export class GameUI {
         slot.classList.add('selected');
       }
       slot.innerHTML = `
-        <div class="slot-icon">${item.emoji}</div>
-        <div class="slot-quantity">x${item.quantity}</div>
+        <div class="slot-icon">${this._itemIconHtml(item)}</div>
+        <div class="slot-quantity">x${this._sellableQty(item)}</div>
       `;
       slot.addEventListener('click', () => {
         this.selectedMarketItem = item;
@@ -6521,9 +6555,11 @@ export class GameUI {
     form.style.display = 'block';
     // Step 8: Ensure the form is visible without scrolling
     form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    document.getElementById('market-sell-item-icon').textContent = this.selectedMarketItem.emoji;
+    const iconEl = document.getElementById('market-sell-item-icon');
+    if (iconEl) iconEl.innerHTML = this._itemIconHtml(this.selectedMarketItem);
     document.getElementById('market-sell-item-name').textContent = this.selectedMarketItem.item_name;
-    document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่มี: ${this.selectedMarketItem.quantity}`;
+    const sellableQty = this._sellableQty(this.selectedMarketItem);
+    document.getElementById('market-sell-item-qty-info').textContent = `จำนวนที่ขายได้: ${sellableQty}`;
 
     // Load Average Price
     const priceInfoEl = document.getElementById('market-sell-price-info');
@@ -6542,7 +6578,7 @@ export class GameUI {
     const priceInput = document.getElementById('market-sell-price-input');
     if (qtyInput) {
       qtyInput.value = 1;
-      qtyInput.max = this.selectedMarketItem.quantity;
+      qtyInput.max = sellableQty;
     }
     if (priceInput) {
       priceInput.value = '';
@@ -6561,7 +6597,8 @@ export class GameUI {
     const qty = parseInt(qtyInput.value);
     const price = parseInt(priceInput.value);
 
-    if (isNaN(qty) || qty < 1 || qty > item.quantity) {
+    const maxQty = this._sellableQty(item);
+    if (isNaN(qty) || qty < 1 || qty > maxQty) {
       this.addCombatLog('❌ จำนวนที่ตั้งขายไม่ถูกต้อง!', 'system');
       if (this.soundManager) this.soundManager.playErrorSound?.();
       return;
