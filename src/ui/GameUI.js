@@ -1568,8 +1568,9 @@ export class GameUI {
       const cardName = card?.itemName || cardId;
       const cardIt = card ? ITEMS[card.itemName] : null;
       const cardRar = card?.rarity || 'common';
+      const cardEmoji = cardIt?.emoji || card?.displayName?.charAt(0) || '🃏';
       const socket = cardId
-        ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardIt ? cardIt.emoji : '🃏'}</div>`
+        ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardEmoji}</div>`
         : `<div class="eq-card-socket empty" data-cardslot="${slot.id}" title="ช่องการ์ด (ว่าง) — แตะเพื่อใส่การ์ด">＋</div>`;
       return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
         data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
@@ -1914,13 +1915,18 @@ export class GameUI {
   }
 
   // Shared refresh after any card change: recompute stats, redraw doll + HUD.
-  _afterCardChange(msg) {
+  async _afterCardChange(msg) {
     if (msg) { this.addCombatLog(`🃏 ${msg}`, 'system'); this._equipToast(msg, true); }
     if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
     if (this.currentTab === 'equip') this._renderEquipDoll();
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+    // Persist equippedCards + cardState to Supabase so they survive page reload.
+    if (this.characterId && this.character?.saveStatsToDatabase) {
+      try { await this.character.saveStatsToDatabase(); }
+      catch (e) { console.warn('[GameUI] Card persistence save failed:', e?.message || e); }
+    }
   }
 
   // Trim a long item name so it fits a slot label.
@@ -9766,6 +9772,12 @@ export class GameUI {
       this._renderInventory();
       this._updateDetailBox();
       this.updateStats(this.character.stats);
+      
+      // Persist card socket state + inventory stats to Supabase
+      if (this.characterId && this.character?.saveStatsToDatabase) {
+        try { await this.character.saveStatsToDatabase(); }
+        catch (e) { console.warn('[GameUI] Card socket persistence save failed:', e?.message || e); }
+      }
     } catch (err) {
       console.error('Socketing failed:', err);
       this.addCombatLog('❌ เกิดข้อผิดพลาดในการใส่การ์ด', 'system');
@@ -9803,6 +9815,12 @@ export class GameUI {
       this._renderInventory();
       this._updateDetailBox();
       this.updateStats(this.character.stats);
+      
+      // Persist card socket state + inventory stats to Supabase
+      if (this.characterId && this.character?.saveStatsToDatabase) {
+        try { await this.character.saveStatsToDatabase(); }
+        catch (e) { console.warn('[GameUI] Card removal persistence save failed:', e?.message || e); }
+      }
     } catch (err) {
       console.error('Removal failed:', err);
       this.addCombatLog('❌ เกิดข้อผิดพลาดในการถอดการ์ด', 'system');
