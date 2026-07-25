@@ -2716,6 +2716,7 @@ export class CharacterManager {
             if (this.stats.job !== app.job) {
                 this.stats.job = app.job;
                 this._applyJobAppearance();
+                this.updateNameTag();
             }
         }
         if (app.title !== undefined) this.setTitle(app.title);

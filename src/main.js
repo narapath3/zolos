@@ -850,6 +850,9 @@ async function initGame(charData) {
                 }
                 remoteChar.stats.name = rName;
                 remoteChar.stats.level = p.level || 1;
+                if (p.appearance && p.appearance.job) {
+                    remoteChar.stats.job = p.appearance.job;
+                }
                 remoteChar.updateNameTag();
 
                 rp = {
@@ -875,6 +878,12 @@ async function initGame(charData) {
 
             if (rp.character) {
                 rp.character.state = p.state || 'idle';
+
+                // Sync level and refresh name tag if it changed
+                if (p.level && rp.character.stats.level !== p.level) {
+                    rp.character.stats.level = p.level;
+                    rp.character.updateNameTag();
+                }
 
                 // Step 10 Part B: Robust water detection (based on the target pos).
                 const remoteEnv = sceneManager.getEnvironmentAt(rp.targetPos || rp.mesh.position);
