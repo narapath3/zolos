@@ -784,8 +784,14 @@ async function initGame(charData) {
         username,
         character.stats.level,
         async (players) => {
-            // Update online players list
-            if (gameUI) gameUI.updateOnlinePlayers(players);
+            // Update online players list only if running in offline/mock presence mode
+            if (gameUI) {
+                import('./network/SocketClient.js').then(({ isSocketConnected }) => {
+                    if (!isSocketConnected()) {
+                        gameUI.updateOnlinePlayers(players);
+                    }
+                });
+            }
 
             // Handle map isolation and cleanup
             const currentIds = new Set(players.map(p => p.userId));
