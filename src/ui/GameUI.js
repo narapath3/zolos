@@ -3039,11 +3039,15 @@ export class GameUI {
       // Ping (ms): the server measures each socket's latency and includes it in
       // the roster (players_global), so it works for everyone, cross-map.
       let pingHtml = '';
-      const isMe = p.userId === window.userId || p.username === this.character?.stats?.name;
-      const targetPing = (isMe && p.ping == null) ? this.myPing : p.ping;
-      if (!p.isOffline && targetPing != null) {
-        const cls = targetPing < 80 ? 'ping-good' : targetPing < 160 ? 'ping-mid' : 'ping-bad';
-        pingHtml = `<span class="player-ping ${cls}">📶 ${targetPing}ms</span>`;
+      if (!p.isOffline) {
+        const isMe = p.userId === window.userId || p.username === this.character?.stats?.name;
+        const targetPing = (isMe && p.ping == null) ? this.myPing : p.ping;
+        if (targetPing != null) {
+          const cls = targetPing < 80 ? 'ping-good' : targetPing < 160 ? 'ping-mid' : 'ping-bad';
+          pingHtml = `<span class="player-ping ${cls}">📶 ${targetPing}ms</span>`;
+        } else {
+          pingHtml = `<span class="player-ping" style="color:#888;">📶 --ms</span>`;
+        }
       }
 
       return `
