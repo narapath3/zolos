@@ -78,7 +78,6 @@ import {
     isPlaceholderName,
     sendBossHit,
 } from './network/GameSync.js';
-import { isSocketConnected } from './network/SocketClient.js';
 
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
@@ -785,8 +784,9 @@ async function initGame(charData) {
         username,
         character.stats.level,
         async (players) => {
-            // Update online players list only if running in offline/mock presence mode
-            if (gameUI && !isSocketConnected()) {
+            // Keep the map roster as a compatibility fallback. Newer servers
+            // emit players_global immediately afterwards to replace it.
+            if (gameUI) {
                 gameUI.updateOnlinePlayers(players);
             }
 
