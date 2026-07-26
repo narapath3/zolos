@@ -2708,7 +2708,10 @@ export class CharacterManager {
         // Sync class so other players see this hero's job-specific look.
         if (app.job !== undefined) {
             if (!this.stats) this.stats = {};
-            if (this.stats.job !== app.job) {
+            const jobChanged = this.stats.job !== app.job;
+            const jobVisualMissing = !!app.job
+                && (!Array.isArray(this._jobDecor) || this._jobDecor.length === 0);
+            if (jobChanged || jobVisualMissing) {
                 this.stats.job = app.job;
                 this._applyJobAppearance();
                 this.updateNameTag();

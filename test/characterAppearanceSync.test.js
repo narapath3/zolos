@@ -103,3 +103,18 @@ test('applying an owner snapshot reproduces its appearance state', () => {
 
   assert.deepEqual(remote.getAppearance(), snapshot);
 });
+
+test('applyAppearance rebuilds missing job visuals when job state was preset', () => {
+  const remote = createRemoteHarness();
+  remote.stats.job = 'mage';
+  remote._jobDecor = [];
+  let rebuilds = 0;
+  remote._applyJobAppearance = () => {
+    rebuilds += 1;
+    remote._jobDecor = [{}];
+  };
+
+  remote.applyAppearance({ job: 'mage' });
+
+  assert.equal(rebuilds, 1);
+});
