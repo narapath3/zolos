@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   isRawCharacterUid,
+  isTradeCharacterOnline,
   mergeTradeRecipients,
   resolveTradeRecipientInput,
 } from '../src/ui/CardTradeRecipient.js';
+
+const gameUiSource = readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+const gameSyncSource = readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
 
 test('database identity enriches the matching online recipient', () => {
   const results = mergeTradeRecipients(
@@ -103,4 +108,29 @@ test('unresolved names and UIDs return specific failure reasons', async () => {
     searchByName: async () => [],
     resolveByUid: async () => null,
   }), { ok: false, reason: 'uid_not_found' });
+});
+
+test('online delivery requires the exact active character, not only its account', () => {
+  const roster = [{
+    userId: 'shared-account',
+    characterId: 'char_active001',
+    username: 'Active',
+  }];
+
+  assert.equal(isTradeCharacterOnline(roster, {
+    userId: 'shared-account',
+    characterId: 'char_active001',
+  }), true);
+  assert.equal(isTradeCharacterOnline(roster, {
+    userId: 'shared-account',
+    characterId: 'char_other002',
+  }), false);
+});
+
+test('live trade packets carry and validate the target character identity', () => {
+  assert.match(gameUiSource, /isTradeCharacterOnline\(this\.onlinePlayers,\s*target\)/);
+  assert.match(gameUiSource, /cleanStats,\s*target\.characterId/);
+  assert.match(gameUiSource, /payload\.targetCharacterId !== this\.characterId/);
+  assert.match(gameSyncSource, /targetCharacterId:\s*targetCharacterId/);
+  assert.match(gameSyncSource, /payload\.targetCharacterId === characterId/);
 });

@@ -17,7 +17,7 @@ test('album includes filters, progress, locked cards, detail, fusion, and reveal
 
 test('album is phone-safe, touch-safe, and motion-safe', () => {
   assert.match(css, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
-  assert.match(css, /container-type:\s*inline-size/);
+  assert.match(css, /\.card-album-host\s*\{[^}]*container-type:\s*inline-size/);
   assert.match(css, /@container\s*\(min-width:\s*370px\)/);
   assert.match(css, /min-height:\s*44px/);
   assert.match(css, /image-rendering:\s*pixelated/);

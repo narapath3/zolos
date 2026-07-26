@@ -1448,7 +1448,9 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('trade_request', (payload) => {
-                if (payload && payload.targetUserId === userId) {
+                if (payload
+                    && payload.targetUserId === userId
+                    && (!payload.targetCharacterId || payload.targetCharacterId === characterId)) {
                     if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
                 }
             });
@@ -2128,7 +2130,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
 }
 
 // ============ P2P DIRECT TRADE ============
-export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}) {
+export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}, targetCharacterId = null) {
     if (isOfflineMode) {
         // Simulation mode: auto respond after 1.5s
         setTimeout(() => {
@@ -2142,6 +2144,7 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
                         senderCharacterId: senderCharId,
                         senderName: senderName,
                         targetUserId: targetUserId,
+                        targetCharacterId: targetCharacterId,
                         targetName: targetName,
                         itemName: itemName,
                         itemType: itemType,
@@ -2162,6 +2165,7 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
             senderCharacterId: senderCharId,
             senderName: senderName,
             targetUserId: targetUserId,
+            targetCharacterId: targetCharacterId,
             targetName: targetName,
             itemName: itemName,
             itemType: itemType,

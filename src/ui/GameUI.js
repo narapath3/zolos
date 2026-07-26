@@ -7,6 +7,7 @@ import { escapeOnlineText, formatOnlinePlayerMeta } from './OnlinePlayerMeta.js'
 import {
   displayedCharacterUid,
   isRawCharacterUid,
+  isTradeCharacterOnline,
   mergeTradeRecipients,
   resolveTradeRecipientInput,
 } from './CardTradeRecipient.js';
@@ -8642,7 +8643,7 @@ export class GameUI {
 
     // Online recipient → live trade popup (instant, accept/decline).
     // Offline recipient → drop it in their mailbox (escrow, claim later).
-    const online = (this.onlinePlayers || []).some(p => p.userId === target.userId);
+    const online = isTradeCharacterOnline(this.onlinePlayers, target);
     if (online) {
       this.tradeTarget = { userId: target.userId, username: target.username };
       this.tradeSelectedItem = item;
@@ -8654,7 +8655,7 @@ export class GameUI {
         const myName = this.character?.stats?.name || 'Player';
         await sendTradeRequestPacket(
           this.characterId, myName, target.userId, target.username || 'Player',
-          item.item_name, 'card', qty, price, cleanStats
+          item.item_name, 'card', qty, price, cleanStats, target.characterId
         );
 
         this.tradeTimeout = setTimeout(() => {
@@ -8965,6 +8966,7 @@ export class GameUI {
 
   receiveTradeRequest(payload) {
     if (!payload) return;
+    if (payload.targetCharacterId && payload.targetCharacterId !== this.characterId) return;
     this.activeTradeRequest = payload;
 
     // Populate confirm modal fields

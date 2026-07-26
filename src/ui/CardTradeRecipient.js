@@ -12,6 +12,14 @@ export function isRawCharacterUid(value) {
   return /^[a-z0-9]{8}$/i.test(clean);
 }
 
+export function isTradeCharacterOnline(onlinePlayers = [], target = null) {
+  if (!target?.characterId) return false;
+  return onlinePlayers.some(
+    player => player?.characterId === target.characterId
+      && (!target.userId || player?.userId === target.userId),
+  );
+}
+
 export function mergeTradeRecipients(onlinePlayers = [], dbPlayers = [], selfCharacterId = null) {
   const recipients = new Map();
 

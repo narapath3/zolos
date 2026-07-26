@@ -1,5 +1,6 @@
 .card-album-host {
   display: block !important;
+  container-type: inline-size;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -62,7 +63,6 @@
 
 .card-album {
   position: relative;
-  container-type: inline-size;
   width: 100%;
   max-width: 100%;
   min-height: 360px;
