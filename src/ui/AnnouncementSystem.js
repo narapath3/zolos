@@ -42,7 +42,7 @@ export class AnnouncementSystem {
       align-items: center;
       overflow: hidden;
       z-index: 10000;
-      font-family: 'Press Start 2P', cursive, Arial, sans-serif;
+      font-family: var(--font-body);
       font-weight: normal;
       color: #FFFFFF;
       pointer-events: none;
@@ -53,9 +53,11 @@ export class AnnouncementSystem {
     this.textElement = document.createElement('div');
     this.textElement.style.cssText = `
       white-space: nowrap;
+      max-width: 100%;
+      overflow-wrap: anywhere;
       padding: 0 50px;
-      font-size: 11px;
-      letter-spacing: 2px;
+      font-size: clamp(12px, 2.8vw, 14px);
+      letter-spacing: 0.04em;
       animation: scroll-text 18s linear infinite;
       text-shadow: 0 0 8px rgba(255, 0, 110, 0.8);
     `;

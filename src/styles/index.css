@@ -6331,7 +6331,9 @@ a,
   font-family: var(--font-body);
 }
 
-:where(.panel, .popup, .modal, [role="dialog"]) {
+:where(.panel, .side-panel, .popup, .popup-content, .modal, .modal-popup, [role="dialog"]) {
+  max-inline-size: calc(100vw - var(--safe-left) - var(--safe-right));
+  max-block-size: calc(100vh - var(--safe-top) - var(--safe-bottom));
   max-inline-size: calc(100dvw - var(--safe-left) - var(--safe-right));
   max-block-size: calc(100dvh - var(--safe-top) - var(--safe-bottom));
   box-sizing: border-box;
@@ -6348,6 +6350,7 @@ a,
 
 #hud-bottom {
   max-width: calc(100dvw - var(--safe-left) - var(--safe-right));
+  bottom: max(10px, var(--safe-bottom));
 }
 
 @media (pointer: coarse) {
@@ -6363,7 +6366,8 @@ a,
     --text-md: 0.875rem;
   }
 
-  :where(.panel, .popup, .modal, [role="dialog"]) {
+  :where(.panel, .side-panel, .popup, .popup-content, .modal, .modal-popup, [role="dialog"]) {
+    width: calc(100vw - var(--safe-left) - var(--safe-right));
     width: calc(100dvw - var(--safe-left) - var(--safe-right));
     border-radius: 12px;
   }
@@ -6385,7 +6389,7 @@ a,
 }
 
 @media (min-width: 600px) and (max-width: 1180px) {
-  :where(.panel, .popup, .modal, [role="dialog"]) {
+  :where(.panel, .side-panel, .popup, .popup-content, .modal, .modal-popup, [role="dialog"]) {
     max-inline-size: min(92dvw, 760px);
   }
 
