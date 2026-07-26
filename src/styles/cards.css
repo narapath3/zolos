@@ -62,6 +62,7 @@
 
 .card-album {
   position: relative;
+  container-type: inline-size;
   width: 100%;
   max-width: 100%;
   min-height: 360px;
@@ -116,13 +117,15 @@
 .card-fusion h3,
 .card-drop-reveal h2 {
   margin: 0;
-  font-family: var(--font-pixel, "Chakra Petch", "Trebuchet MS", sans-serif);
+  font-family: var(--font-display, "Chakra Petch", "Trebuchet MS", sans-serif);
   line-height: 1.08;
+  overflow-wrap: normal;
+  word-break: keep-all;
   text-wrap: balance;
 }
 
 .card-album h2 {
-  font-size: clamp(1.55rem, 7vw, 2.35rem);
+  font-size: clamp(1.55rem, 7cqi, 2.35rem);
   letter-spacing: 0.02em;
   text-shadow: 0 2px 16px hsl(199 100% 65% / 0.2);
 }
@@ -1022,7 +1025,7 @@
   }
 }
 
-@media (min-width: 370px) {
+@container (min-width: 370px) {
   .card-album {
     padding: 12px;
   }
@@ -1033,7 +1036,7 @@
   }
 }
 
-@media (min-width: 560px) {
+@container (min-width: 560px) {
   .card-album {
     padding: 16px;
   }
@@ -1066,7 +1069,7 @@
   }
 }
 
-@media (min-width: 720px) {
+@container (min-width: 720px) {
   .card-album__grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;

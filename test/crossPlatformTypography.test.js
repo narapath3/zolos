@@ -69,3 +69,13 @@ test('dynamic announcements use readable wrapping instead of retro nowrap text',
     /white-space:\s*nowrap/,
   );
 });
+
+test('card album responds to its container and keeps display words intact', () => {
+  assert.match(cardsCss, /\.card-album\s*\{[\s\S]*container-type:\s*inline-size/);
+  assert.match(
+    cardsCss,
+    /\.card-album h2[\s\S]*overflow-wrap:\s*normal[\s\S]*word-break:\s*keep-all/,
+  );
+  assert.match(cardsCss, /@container\s*\(min-width:\s*560px\)/);
+  assert.doesNotMatch(cardsCss, /@media\s*\(min-width:\s*560px\)/);
+});
