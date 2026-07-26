@@ -1339,7 +1339,9 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     currentLevel = level;
 
     // ===== OFFLINE MODE (No Mock Players) =====
-    if (isOfflineMode || (!isSocketMode() && !supabase)) {
+    // Skip this gate when Socket.io is available — the map server handles
+    // player presence and ping measurement independently of Supabase.
+    if (isOfflineMode && !isSocketMode()) {
         console.log('[Zolos] 📴 Offline Mode active (no bots)');
         if (onPlayersUpdate) onPlayersUpdate([{ userId: 'player_me', username, level }]);
         return;
