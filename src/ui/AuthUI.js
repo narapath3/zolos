@@ -629,65 +629,12 @@ export class AuthUI {
     async _measurePing() {
         if (!this._pingEl) return;
         let ms = null;
-
-        // Strategy 1: Socket.io round-trip (most accurate for game server)
         try {
-            const { getSocket, isSocketConnected } = await import('../network/SocketClient.js');
-            const socket = getSocket();
-            if (socket && isSocketConnected()) {
-                ms = await new Promise((resolve) => {
-                    const t0 = performance.now();
-                    const timeout = setTimeout(() => resolve(null), 3000);
-                    socket.volatile.emit('cli_pong', Date.now(), () => {
-                        clearTimeout(timeout);
-                        resolve(Math.round(performance.now() - t0));
-                    });
-                    // Alternative: listen for the next srv_ping as a round-trip proxy
-                    if (!socket._zolosPingCb) {
-                        socket._zolosPingCb = true;
-                        socket.on('srv_ping', (serverTs) => {
-                            socket.emit('cli_pong', serverTs);
-                        });
-                    }
-                });
-            }
-        } catch { /* socket not available, fall through */ }
-
-        // Strategy 2: HTTP fetch to Supabase REST endpoint
-        if (ms === null) {
-            try {
-                const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
-                const supabaseUrl = (env.VITE_SUPABASE_URL || '').trim();
-                if (supabaseUrl && !supabaseUrl.includes('YOUR_PROJECT')) {
-                    const t0 = performance.now();
-                    await fetch(supabaseUrl + '/rest/v1/', {
-                        method: 'HEAD',
-                        mode: 'no-cors',
-                        cache: 'no-store',
-                    });
-                    ms = Math.round(performance.now() - t0);
-                }
-            } catch { /* offline or CORS blocked */ }
+            const { measurePing } = await import('../network/SocketClient.js');
+            ms = await measurePing();
+        } catch (e) {
+            console.warn('[AuthUI] Failed to measure ping:', e);
         }
-
-        // Strategy 3: Socket URL HTTP ping
-        if (ms === null) {
-            try {
-                const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
-                const socketUrl = (env.VITE_SOCKET_URL || 'https://zolos-server-production.up.railway.app').trim();
-                if (socketUrl && socketUrl !== 'undefined') {
-                    const t0 = performance.now();
-                    await fetch(socketUrl + '/socket.io/?EIO=4&transport=polling', {
-                        method: 'GET',
-                        mode: 'no-cors',
-                        cache: 'no-store',
-                    });
-                    ms = Math.round(performance.now() - t0);
-                }
-            } catch { /* offline */ }
-        }
-
-        // Update the UI
         this._updatePingDisplay(ms);
     }
 

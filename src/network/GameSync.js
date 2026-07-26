@@ -1388,7 +1388,10 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             // Latency: reply to the server's periodic ping so it can measure our
             // round-trip time and put it in the Online roster (players_global).
             socket.on('srv_ping', (t) => {
-                if (socket && socket.connected) socket.emit('srv_pong', t);
+                if (socket && socket.connected) {
+                    socket.emit('srv_pong', t);
+                    socket.emit('cli_pong', t);
+                }
             });
 
             // Client-side RTT measurement: we send client_ping(timestamp),
@@ -1403,14 +1406,23 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                     }
                 }
             });
-            // Start periodic client_ping
+            // Start periodic client_ping using multi-strategy measurePing helper
             if (!window.__zolosClientPingInterval) {
-                window.__zolosClientPingInterval = setInterval(() => {
-                    const s = getSocket();
-                    if (s && s.connected) s.emit('client_ping', Date.now());
-                }, 4000);
+                const runPing = async () => {
+                    try {
+                        const { measurePing } = await import('./SocketClient.js');
+                        const ms = await measurePing();
+                        if (ms != null) {
+                            clientMeasuredPing = clientMeasuredPing == null
+                                ? ms : Math.round(clientMeasuredPing * 0.5 + ms * 0.5);
+                        }
+                    } catch (e) {
+                        console.warn('[GameSync] Ping measurement failed:', e);
+                    }
+                };
+                window.__zolosClientPingInterval = setInterval(runPing, 5000);
                 // Fire first ping immediately
-                if (socket.connected) socket.emit('client_ping', Date.now());
+                runPing();
             }
 
             socket.on('chat', (payload) => {

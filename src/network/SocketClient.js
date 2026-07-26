@@ -132,3 +132,64 @@ export function disconnectSocket() {
         isConnected = false;
     }
 }
+
+/**
+ * Measure server ping with fallbacks:
+ * 1. Socket.io volatile cli_pong emission
+ * 2. Supabase HEAD REST request
+ * 3. Socket server polling GET request
+ */
+export async function measurePing() {
+    let ms = null;
+
+    // Strategy 1: Socket.io round-trip (most accurate for game server)
+    try {
+        if (isConnected && socket && socket.connected) {
+            ms = await new Promise((resolve) => {
+                const t0 = performance.now();
+                const timeout = setTimeout(() => resolve(null), 3000);
+                socket.volatile.emit('cli_pong', Date.now(), () => {
+                    clearTimeout(timeout);
+                    resolve(Math.round(performance.now() - t0));
+                });
+            });
+        }
+    } catch { /* socket not available, fall through */ }
+
+    // Strategy 2: HTTP fetch to Supabase REST endpoint
+    if (ms === null) {
+        try {
+            const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+            const supabaseUrl = (env.VITE_SUPABASE_URL || '').trim();
+            if (supabaseUrl && !supabaseUrl.includes('YOUR_PROJECT')) {
+                const t0 = performance.now();
+                await fetch(supabaseUrl + '/rest/v1/', {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-store',
+                });
+                ms = Math.round(performance.now() - t0);
+            }
+        } catch { /* offline or CORS blocked */ }
+    }
+
+    // Strategy 3: Socket URL HTTP ping
+    if (ms === null) {
+        try {
+            const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : {};
+            const socketUrl = (env.VITE_SOCKET_URL || DEFAULT_SOCKET_URL).trim();
+            if (socketUrl && socketUrl !== 'undefined') {
+                const t0 = performance.now();
+                await fetch(socketUrl + '/socket.io/?EIO=4&transport=polling', {
+                    method: 'GET',
+                    mode: 'no-cors',
+                    cache: 'no-store',
+                });
+                ms = Math.round(performance.now() - t0);
+            }
+        } catch { /* offline */ }
+    }
+
+    return ms;
+}
+
