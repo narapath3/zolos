@@ -35,7 +35,7 @@ export class AnnouncementSystem {
       top: 0;
       left: 0;
       right: 0;
-      height: 30px;
+      min-height: 30px;
       background: linear-gradient(90deg, rgba(255, 0, 110, 0.2) 0%, rgba(10, 10, 15, 0.9) 20%, rgba(10, 10, 15, 0.9) 80%, rgba(255, 0, 110, 0.2) 100%);
       border-bottom: 1px solid rgba(255, 0, 110, 0.4);
       display: flex;
@@ -52,11 +52,12 @@ export class AnnouncementSystem {
     // Create text element
     this.textElement = document.createElement('div');
     this.textElement.style.cssText = `
-      white-space: nowrap;
+      white-space: normal;
       max-width: 100%;
       overflow-wrap: anywhere;
-      padding: 0 50px;
+      padding: 4px 50px;
       font-size: clamp(12px, 2.8vw, 14px);
+      line-height: 1.25;
       letter-spacing: 0.04em;
       animation: scroll-text 18s linear infinite;
       text-shadow: 0 0 8px rgba(255, 0, 110, 0.8);

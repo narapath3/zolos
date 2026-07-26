@@ -63,8 +63,9 @@ test('small-phone and tablet rules use dynamic viewport-safe sizing', () => {
 test('dynamic announcements use readable wrapping instead of retro nowrap text', () => {
   assert.match(announcementSource, /font-family:\s*var\(--font-body\)/);
   assert.match(announcementSource, /overflow-wrap:\s*anywhere/);
+  assert.match(announcementSource, /white-space:\s*normal/);
   assert.doesNotMatch(
     announcementSource,
-    /font-family:\s*'Press Start 2P'[\s\S]{0,160}white-space:\s*nowrap/,
+    /white-space:\s*nowrap/,
   );
 });
