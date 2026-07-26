@@ -3,6 +3,7 @@ import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQua
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
+import { escapeOnlineText, formatOnlinePlayerMeta } from './OnlinePlayerMeta.js';
 import { migrateLegacyCards } from '../cards/CardMigration.js';
 import { getCard } from '../cards/CardCatalog.js';
 
@@ -3027,29 +3028,15 @@ export class GameUI {
     const totalCount = list.length;
     let html = `<div class="online-count-badge">${icon} ${onlineCount} online / ${totalCount} total</div>`;
 
-    // mapId → short city label (players are now listed across all cities)
-    const MAP_NAMES_TH = {
-      prontera: 'เมืองประเทอร์รา',
-      prontera_field: 'ทุ่งประเทอร์รา',
-      payon: 'ป่าเปยอง',
-      glast_heim: 'ปราสาทกลาสท์ไฮม์',
-      mjolnir: 'เทือกเขาหมิโอลนีร์',
-      abyss_lake: 'ทะเลสาบห้วงลึก',
-      svarrga: 'สรวงสวรรค์'
-    };
-
     html += list.map(p => {
       const isFriend = friends.includes(p.username);
       const starHtml = isFriend ? '<span class="friend-star">⭐</span>' : '';
-      const offlineStyle = p.isOffline ? 'opacity:0.6;filter:grayscale(100%);pointer-events:auto;' : '';
-      const dotColor = p.isOffline ? '#666' : '#40e080';
-      const nameColor = p.isOffline ? '#b0c0e0' : '#ffffff';
-      const badgeStyle = p.isOffline ? 'background:rgba(0,0,0,0.5);color:#888;border-color:rgba(255,255,255,0.1);' : 'background:rgba(0,0,0,0.6);color:#ffffff;border-color:var(--primary-glow);';
-
-      const mapName = MAP_NAMES_TH[p.mapId] || p.mapId;
-      const cityHtml = (!p.isOffline && p.mapId)
-        ? `<span class="player-city-tag" style="font-size:9px;color:#7fb0e0;background:rgba(60,110,180,0.18);border:1px solid rgba(120,170,230,0.3);border-radius:6px;padding:1px 6px;margin-left:4px;white-space:nowrap;">📍${mapName}</span>`
-        : '';
+      const isLocal = p.userId === window.userId
+        || p.username === this.character?.stats?.name;
+      const meta = formatOnlinePlayerMeta(p, {
+        isLocal,
+        localPing: this.myPing,
+      });
 
       // Device Icon Map
       const deviceIcons = {
@@ -3058,30 +3045,28 @@ export class GameUI {
         mobile: '📱'
       };
       const deviceIcon = deviceIcons[p.device] || '💻';
-      const deviceHtml = `<span class="player-device-icon" style="margin-right:2px;" title="${p.device || 'desktop'}">${deviceIcon}</span>`;
-
-      // Ping (ms): the server measures each socket's latency and includes it in
-      // the roster (players_global), so it works for everyone, cross-map.
-      let pingHtml = '';
-      if (!p.isOffline) {
-        const isMe = p.userId === window.userId || p.username === this.character?.stats?.name;
-        const targetPing = (isMe && p.ping == null) ? this.myPing : p.ping;
-        if (targetPing != null) {
-          const cls = targetPing < 80 ? 'ping-good' : targetPing < 160 ? 'ping-mid' : 'ping-bad';
-          pingHtml = `<span class="player-ping ${cls}">📶 ${targetPing}ms</span>`;
-        } else {
-          pingHtml = `<span class="player-ping" style="color:#888;">📶 --ms</span>`;
-        }
-      }
+      const safeUsername = escapeOnlineText(p.username);
+      const safeUserId = escapeOnlineText(p.userId || '');
+      const safeDevice = escapeOnlineText(p.device || 'desktop');
+      const rowStateClass = meta.isOffline
+        ? 'player-row--offline'
+        : 'player-row--online';
 
       return `
-        <div class="player-row" data-username="${p.username}" data-user-id="${p.userId || ''}" data-offline="${p.isOffline || false}" style="${offlineStyle}">
-          <span class="online-dot" style="background-color:${dotColor}"></span>
-          ${deviceHtml}
-          <span style="color:${nameColor}; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${p.username}${starHtml}</span>
-          ${cityHtml}
-          <span class="player-level-badge" style="${badgeStyle}">Lv.${p.level}</span>
-          ${pingHtml}
+        <div class="player-row ${rowStateClass}" data-username="${safeUsername}" data-user-id="${safeUserId}" data-offline="${meta.isOffline}">
+          <span class="online-dot" aria-hidden="true"></span>
+          <span class="player-device-icon" aria-label="${safeDevice}" title="${safeDevice}">${deviceIcon}</span>
+          <span class="player-row-content">
+            <span class="player-row-main">
+              <span class="player-name">${safeUsername}</span>
+              ${starHtml}
+            </span>
+            <span class="player-row-meta">
+              <span class="player-city-tag">📍 ${escapeOnlineText(meta.cityLabel)}</span>
+              <span class="player-level-tag">${escapeOnlineText(meta.levelLabel)}</span>
+              <span class="player-ping ${meta.pingClass}">📶 ${escapeOnlineText(meta.pingLabel)}</span>
+            </span>
+          </span>
         </div>
       `;
     }).join('');
