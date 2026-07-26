@@ -112,7 +112,8 @@ export class GameUI {
       if (this.networkStatusEl) this.networkStatusEl.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
     } else if (connected) {
       this.networkDot.style.background = '#0f0';
-      this.networkText.textContent = 'ONLINE';
+      const pingStr = this.myPing != null ? ` ${this.myPing}ms` : '';
+      this.networkText.textContent = 'ONLINE' + pingStr;
       this.networkText.style.color = '#0f0';
       if (this.networkStatusEl) this.networkStatusEl.style.color = '#0f0';
     } else {
@@ -2885,6 +2886,10 @@ export class GameUI {
 
   updateOnlinePlayers(players) {
     this.onlinePlayers = players || [];
+
+    // Track local player's ping for the network status HUD badge
+    const me = this.onlinePlayers.find(p => p.userId === this.character?.stats?.userId || p.username === this.character?.stats?.name);
+    if (me && me.ping != null) this.myPing = me.ping;
 
     // Update auth screen count
     const authCount = document.getElementById('online-players-auth');
