@@ -770,10 +770,10 @@ export class CharacterManager {
         // Body
         const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.4);
         const bodyMat = new THREE.MeshLambertMaterial({ color: this.bodyColor });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = 1.0;
-        body.castShadow = true;
-        this.mesh.add(body);
+        this.body = new THREE.Mesh(bodyGeo, bodyMat);
+        this.body.position.y = 1.0;
+        this.body.castShadow = true;
+        this.mesh.add(this.body);
 
         // Head
         const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
@@ -1001,20 +1001,10 @@ export class CharacterManager {
         let colorVal = typeof color === 'string' ? parseInt(color.replace('#', ''), 16) : color;
         // Guard: never let NaN/undefined poison the color (it would persist as 0 = black)
         if (!Number.isFinite(colorVal)) colorVal = 0x4060c0;
-        const oldColor = this.bodyColor;
         this.bodyColor = colorVal;
-        if (!this.mesh) return;
-        // Body is child 0, arms are children with matching material
-        this.mesh.children.forEach(child => {
-            if (child.material && child.material.color) {
-                // Body (index 0) and arms share the body color
-                // We update them if they match the old color OR the default blue
-                const hex = child.material.color.getHex();
-                if (hex === 0x4060c0 || hex === oldColor || hex === 0x4219072) {
-                    child.material.color.setHex(colorVal);
-                }
-            }
-        });
+        for (const mesh of [this.body, this.leftArm, this.rightArm]) {
+            mesh?.material?.color?.setHex(colorVal);
+        }
     }
 
     // Set gender and rebuild the gender-specific hair.
@@ -2644,12 +2634,17 @@ export class CharacterManager {
         this.updateNameTag();
     }
 
+    _getRenderedColor(mesh, fallback) {
+        const value = mesh?.material?.color?.getHex?.();
+        return Number.isFinite(value) ? value : fallback;
+    }
+
     getAppearance() {
         return {
             gender: this.gender,
-            bodyColor: this.bodyColor,
-            hairColor: this.hairColor,
-            pantsColor: this.pantsColor,
+            bodyColor: this._getRenderedColor(this.body, this.bodyColor),
+            hairColor: this._getRenderedColor(this.hair, this.hairColor),
+            pantsColor: this._getRenderedColor(this.leftLeg, this.pantsColor),
             hat: this.equippedHat,
             glasses: this.equippedGlasses,
             weapon: this.equippedWeapon,
