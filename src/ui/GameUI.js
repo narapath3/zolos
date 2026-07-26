@@ -5799,9 +5799,23 @@ export class GameUI {
           background:linear-gradient(160deg,#2a2010,#171008);border:1.5px solid #ffd24a;
           box-shadow:0 0 34px rgba(255,210,74,.25),0 20px 60px rgba(0,0,0,.7);overflow:hidden;}
         #stall-card .stall-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+        #stall-card .stall-header-row,#stall-card .stall-listing{display:flex;align-items:center;min-width:0;}
+        #stall-card .stall-header-row{gap:10px;}
+        #stall-card .stall-header-copy,#stall-card .stall-listing-copy{flex:1 1 auto;min-width:0;}
+        #stall-card .stall-shop-name{font-weight:900;color:#ffd97a;font-size:17px;line-height:1.35;
+          text-shadow:0 0 10px rgba(255,178,32,.5);overflow-wrap:anywhere;word-break:break-word;}
+        #stall-card .stall-owner-name{font-size:11px;line-height:1.5;color:#c8b088;overflow-wrap:anywhere;}
+        #stall-card .stall-listing{gap:10px;padding:9px 10px;border-radius:10px;margin-bottom:8px;}
+        #stall-card .stall-listing-name{font-weight:800;font-size:12px;line-height:1.4;
+          overflow-wrap:anywhere;word-break:break-word;}
+        #stall-card .stall-price{font-size:11px;color:#ffd97a;font-weight:700;font-variant-numeric:tabular-nums;}
+        #stall-card .stall-action{flex:0 0 auto;min-width:58px;min-height:44px;white-space:normal;line-height:1.25;}
+        #stall-card #stall-close{flex:0 0 44px;width:44px;height:44px;}
         @media (max-width:768px){
           #stall-modal{align-items:flex-start;padding:8px 8px 116px;}
           #stall-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
+          #stall-card .stall-body{padding:12px!important;}
+          #stall-card .stall-listing{align-items:flex-start;gap:8px;}
         }`;
       document.head.appendChild(st);
     }
@@ -5831,11 +5845,11 @@ export class GameUI {
 
     card.innerHTML = `
       <div style="padding:16px 18px;background:linear-gradient(90deg,#4a3410,#241806);border-bottom:1px solid #ffd24a;">
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div class="stall-header-row">
           <div style="font-size:26px;">🏪</div>
-          <div style="flex:1;">
-            <div style="font-weight:900;color:#ffd97a;font-size:17px;text-shadow:0 0 10px rgba(255,178,32,.5);">${esc(stall.shop_name)}</div>
-            <div style="font-size:11px;color:#c8b088;">ร้านของ ${esc(stall.owner_name)}${mine ? ' (ร้านคุณเอง)' : ''}</div>
+          <div class="stall-header-copy">
+            <div class="stall-shop-name">${esc(stall.shop_name)}</div>
+            <div class="stall-owner-name">ร้านของ ${esc(stall.owner_name)}${mine ? ' (ร้านคุณเอง)' : ''}</div>
           </div>
           <button id="stall-close" style="background:rgba(255,255,255,.08);border:none;color:#f0dcb0;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;">✕</button>
         </div>
@@ -5864,16 +5878,15 @@ export class GameUI {
         ? `${esc(l.item_name.replace(/ Pet$/, ''))}${petNm ? ` 「${esc(petNm)}」` : ''}${petLv ? ` Lv.${petLv}` : ''}`
         : `${esc(l.item_name)} ×${l.quantity}`;
       return `
-        <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;margin-bottom:8px;
-          background:rgba(0,0,0,.3);border:1px solid ${rc}44;">
+        <div class="stall-listing" style="background:rgba(0,0,0,.3);border:1px solid ${rc}44;">
           <div style="font-size:22px;">${meta.emoji}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:800;color:${rc};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${disp}</div>
-            <div style="font-size:11px;color:#ffd97a;font-weight:700;">💰 ${Number(l.price).toLocaleString()} Zeny</div>
+          <div class="stall-listing-copy">
+            <div class="stall-listing-name" style="color:${rc};">${disp}</div>
+            <div class="stall-price">💰 ${Number(l.price).toLocaleString()} Zeny</div>
           </div>
           ${mine
-          ? `<button data-stall-cancel="${l.id}" style="border:none;border-radius:10px;padding:7px 12px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(224,72,58,.85);color:#fff;">ยกเลิก</button>`
-          : `<button data-stall-buy="${l.id}" style="border:none;border-radius:10px;padding:7px 14px;cursor:pointer;font-weight:800;font-size:12px;background:linear-gradient(135deg,#ffcf4a,#ff9e2e);color:#3a2600;">ซื้อ</button>`}
+          ? `<button class="stall-action" data-stall-cancel="${l.id}" style="border:none;border-radius:10px;padding:7px 12px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(224,72,58,.85);color:#fff;">ยกเลิก</button>`
+          : `<button class="stall-action" data-stall-buy="${l.id}" style="border:none;border-radius:10px;padding:7px 14px;cursor:pointer;font-weight:800;font-size:12px;background:linear-gradient(135deg,#ffcf4a,#ff9e2e);color:#3a2600;">ซื้อ</button>`}
         </div>`;
     }).join('') : `<div style="text-align:center;color:#8a7a5a;font-size:12px;padding:22px;">😴 ตอนนี้ไม่มีสินค้าวางขาย</div>`;
 

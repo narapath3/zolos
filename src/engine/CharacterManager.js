@@ -19,6 +19,34 @@ function clampToWorld(pos) {
     pos.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.z));
 }
 
+function splitGraphemes(text) {
+    const value = String(text ?? '');
+    if (typeof Intl?.Segmenter === 'function') {
+        const segmenter = new Intl.Segmenter('th', { granularity: 'grapheme' });
+        return Array.from(segmenter.segment(value), part => part.segment);
+    }
+    return Array.from(value);
+}
+
+export function wrapCanvasText(ctx, text, maxWidth) {
+    const glyphs = splitGraphemes(text);
+    if (!glyphs.length) return [''];
+
+    const lines = [];
+    let line = '';
+    for (const glyph of glyphs) {
+        const candidate = line + glyph;
+        if (line && ctx.measureText(candidate).width > maxWidth) {
+            lines.push(line);
+            line = glyph;
+        } else {
+            line = candidate;
+        }
+    }
+    if (line) lines.push(line);
+    return lines;
+}
+
 export class CharacterManager {
     constructor(scene) {
         this.scene = scene;
@@ -1803,25 +1831,18 @@ export class CharacterManager {
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx.font = 'bold 32px Arial';
 
-        const words = text.split(' ');
-        let line = '';
-        const lines = [];
         const maxWidth = 400;
-        let maxLineWidth = 0;
-
-        for (let n = 0; n < words.length; n++) {
-            const testLine = line + words[n] + ' ';
-            const metrics = tempCtx.measureText(testLine);
-            if (metrics.width > maxWidth && n > 0) {
-                lines.push(line.trim());
-                maxLineWidth = Math.max(maxLineWidth, tempCtx.measureText(line.trim()).width);
-                line = words[n] + ' ';
-            } else {
-                line = testLine;
+        const allLines = wrapCanvasText(tempCtx, String(text).slice(0, 240), maxWidth);
+        const lines = allLines.slice(0, 5);
+        if (allLines.length > lines.length) {
+            const lastIndex = lines.length - 1;
+            let lastLine = lines[lastIndex].trimEnd();
+            while (lastLine && tempCtx.measureText(`${lastLine}…`).width > maxWidth) {
+                lastLine = splitGraphemes(lastLine).slice(0, -1).join('');
             }
+            lines[lastIndex] = `${lastLine}…`;
         }
-        lines.push(line.trim());
-        maxLineWidth = Math.max(maxLineWidth, tempCtx.measureText(line.trim()).width);
+        const maxLineWidth = Math.max(...lines.map(value => tempCtx.measureText(value).width));
 
         // High-res canvas for sharpness
         const canvas = document.createElement('canvas');
@@ -1829,7 +1850,7 @@ export class CharacterManager {
         const pointerHeight = 15;
         const lineHeight = 38;
 
-        const bubbleWidth = maxLineWidth + padding * 2;
+        const bubbleWidth = Math.max(120, Math.min(maxWidth, maxLineWidth) + padding * 2);
         const bubbleHeight = lines.length * lineHeight + padding;
 
         // Ensure minimum size and scale for sharpness
