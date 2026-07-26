@@ -434,6 +434,11 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- CLIENT-SIDE PING --- echo timestamp so client can measure its own RTT
+    socket.on('client_ping', (t) => {
+        socket.emit('client_pong', t);
+    });
+
     // --- CHAT ---
     socket.on('chat', (payload) => {
         if (!payload || typeof payload.message !== 'string') return;
@@ -995,21 +1000,23 @@ function broadcastPlayerList(mapId) {
 }
 
 // ===== Latency (ping) measurement =====
-// Every few seconds, ping each socket and refresh the global roster so the
-// Online panel shows live latency. The client replies to 'srv_ping' (echoing
-// the timestamp) with 'srv_pong'.
+// Every few seconds, ping each socket. After a short delay (to let pong
+// replies arrive), refresh the global roster so the Online panel shows
+// live latency. The client replies to 'srv_ping' with 'srv_pong'.
 setInterval(() => {
     const now = Date.now();
     for (const [socketId] of onlinePlayers) {
         const s = io.sockets.sockets.get(socketId);
         if (s) s.emit('srv_ping', now);
     }
-    // Push the freshly-measured pings out to everyone's Online panel.
-    const allPlayers = [];
-    for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, device: info.device || 'desktop', ping: info.ping ?? null, characterId: info.characterId || null });
-    }
-    if (allPlayers.length) io.emit('players_global', allPlayers);
+    // Delay: give clients ~1.5s to reply with srv_pong before broadcasting
+    setTimeout(() => {
+        const allPlayers = [];
+        for (const [, info] of onlinePlayers) {
+            allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, device: info.device || 'desktop', ping: info.ping ?? null, characterId: info.characterId || null });
+        }
+        if (allPlayers.length) io.emit('players_global', allPlayers);
+    }, 1500);
 }, 4000);
 
 // ============ PVP MMR (Elo, K=32) ============

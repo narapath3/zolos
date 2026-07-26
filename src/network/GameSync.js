@@ -13,6 +13,10 @@ let socketListenersAttached = false;
 let chatCallback = null;
 let cardFusionSocket = null;
 const pendingCardFusions = new Map();
+let clientMeasuredPing = null;
+
+/** Return the locally-measured round-trip latency (ms) or null. */
+export function getClientPing() { return clientMeasuredPing; }
 
 let currentUserId = null;
 let currentUsername = 'Adventurer';
@@ -1384,6 +1388,28 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('srv_ping', (t) => {
                 if (socket && socket.connected) socket.emit('srv_pong', t);
             });
+
+            // Client-side RTT measurement: we send client_ping(timestamp),
+            // server echoes it back as client_pong(timestamp), and we compute
+            // our own round-trip latency so the UI can show it immediately.
+            socket.on('client_pong', (t) => {
+                if (typeof t === 'number') {
+                    const rtt = Date.now() - t;
+                    if (rtt >= 0 && rtt < 60000) {
+                        clientMeasuredPing = clientMeasuredPing == null
+                            ? rtt : Math.round(clientMeasuredPing * 0.5 + rtt * 0.5);
+                    }
+                }
+            });
+            // Start periodic client_ping
+            if (!window.__zolosClientPingInterval) {
+                window.__zolosClientPingInterval = setInterval(() => {
+                    const s = getSocket();
+                    if (s && s.connected) s.emit('client_ping', Date.now());
+                }, 4000);
+                // Fire first ping immediately
+                if (socket.connected) socket.emit('client_ping', Date.now());
+            }
 
             socket.on('chat', (payload) => {
                 if (chatCallback && payload) {

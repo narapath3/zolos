@@ -112,7 +112,17 @@ export class GameUI {
       if (this.networkStatusEl) this.networkStatusEl.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
     } else if (connected) {
       this.networkDot.style.background = '#0f0';
-      const pingStr = this.myPing != null ? ` ${this.myPing}ms` : '';
+      // Use client-measured ping (RTT from client_ping/client_pong)
+      let ping = this.myPing;
+      try {
+        const { getClientPing } = await import('../network/GameSync.js');
+        const cp = getClientPing();
+        if (cp != null) {
+          ping = cp;
+          this.myPing = cp;
+        }
+      } catch (e) { /* ignore */ }
+      const pingStr = ping != null ? ` ${ping}ms` : '';
       this.networkText.textContent = 'ONLINE' + pingStr;
       this.networkText.style.color = '#0f0';
       if (this.networkStatusEl) this.networkStatusEl.style.color = '#0f0';
@@ -2887,8 +2897,26 @@ export class GameUI {
   updateOnlinePlayers(players) {
     this.onlinePlayers = players || [];
 
-    // Track local player's ping for the network status HUD badge
-    const me = this.onlinePlayers.find(p => p.userId === this.character?.stats?.userId || p.username === this.character?.stats?.name);
+    // Inject client-measured ping into local player's roster entry.
+    // _gameSyncModule is lazily cached so this stays synchronous after first load.
+    if (!this._gameSyncModule) {
+      import('../network/GameSync.js').then(m => { this._gameSyncModule = m; }).catch(() => { });
+    }
+    if (this._gameSyncModule?.getClientPing) {
+      const cp = this._gameSyncModule.getClientPing();
+      if (cp != null) {
+        this.myPing = cp;
+        const me = this.onlinePlayers.find(p =>
+          p.userId === window.userId || p.username === this.character?.stats?.name
+        );
+        if (me && me.ping == null) me.ping = cp;
+      }
+    }
+
+    // Track local player's ping from server-provided data as fallback
+    const me = this.onlinePlayers.find(p =>
+      p.userId === window.userId || p.username === this.character?.stats?.name
+    );
     if (me && me.ping != null) this.myPing = me.ping;
 
     // Update auth screen count
@@ -3008,9 +3036,11 @@ export class GameUI {
       // Ping (ms): the server measures each socket's latency and includes it in
       // the roster (players_global), so it works for everyone, cross-map.
       let pingHtml = '';
-      if (!p.isOffline && p.ping != null) {
-        const cls = p.ping < 80 ? 'ping-good' : p.ping < 160 ? 'ping-mid' : 'ping-bad';
-        pingHtml = `<span class="player-ping ${cls}">📶 ${p.ping}ms</span>`;
+      const isMe = p.userId === window.userId || p.username === this.character?.stats?.name;
+      const targetPing = (isMe && p.ping == null) ? this.myPing : p.ping;
+      if (!p.isOffline && targetPing != null) {
+        const cls = targetPing < 80 ? 'ping-good' : targetPing < 160 ? 'ping-mid' : 'ping-bad';
+        pingHtml = `<span class="player-ping ${cls}">📶 ${targetPing}ms</span>`;
       }
 
       return `
