@@ -2896,8 +2896,10 @@ export class GameUI {
         }
         const zolText = `🪙 ${(entry.zol ?? 0).toLocaleString()} Zol`;
         const uid = entry.user_id || '';
+        const isSelf = (uid && uid === window.userId) || (username === this.character?.stats?.name);
+        const selfClass = isSelf ? ' lb-row-self' : '';
         return `
-          <div class="lb-row${uid ? ' lb-clickable' : ''}" data-user-id="${uid}" data-username="${username}" data-level="${entry.level ?? 1}">
+          <div class="lb-row${uid ? ' lb-clickable' : ''}${selfClass}" data-user-id="${uid}" data-username="${username}" data-level="${entry.level ?? 1}">
             <span class="lb-rank">${rankIcon}</span>
             <span class="lb-name">
               <span class="lb-username">${username}</span>

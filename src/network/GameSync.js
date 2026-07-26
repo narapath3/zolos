@@ -1303,7 +1303,7 @@ export async function fetchLeaderboard(category = 'level') {
         } else {
             sorted.sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || (b.total_kills ?? 0) - (a.total_kills ?? 0));
         }
-        return sorted.slice(0, 20);
+        return sorted.slice(0, 50);
     }
 
     const applyOrder = (q) => {
@@ -1317,11 +1317,11 @@ export async function fetchLeaderboard(category = 'level') {
     const cols = 'name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses, user_id';
     let query = applyOrder(supabase.from('characters').select(`${cols}, profiles(username)`));
 
-    let { data, error } = await query.limit(20);
+    let { data, error } = await query.limit(50);
     if (error) {
         console.warn('[Zolos] fetchLeaderboard error with profiles relation, retrying without profiles:', error.message);
         // Fallback when database has relationship key mapping cache issue
-        const res = await applyOrder(supabase.from('characters').select(cols)).limit(20);
+        const res = await applyOrder(supabase.from('characters').select(cols)).limit(50);
         data = res.data;
     }
     return data || [];
