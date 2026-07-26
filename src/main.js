@@ -78,6 +78,7 @@ import {
     isPlaceholderName,
     sendBossHit,
 } from './network/GameSync.js';
+import { isSocketConnected } from './network/SocketClient.js';
 
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
@@ -785,12 +786,8 @@ async function initGame(charData) {
         character.stats.level,
         async (players) => {
             // Update online players list only if running in offline/mock presence mode
-            if (gameUI) {
-                import('./network/SocketClient.js').then(({ isSocketConnected }) => {
-                    if (!isSocketConnected()) {
-                        gameUI.updateOnlinePlayers(players);
-                    }
-                });
+            if (gameUI && !isSocketConnected()) {
+                gameUI.updateOnlinePlayers(players);
             }
 
             // Handle map isolation and cleanup
