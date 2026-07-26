@@ -4,6 +4,12 @@ import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
 import { escapeOnlineText, formatOnlinePlayerMeta } from './OnlinePlayerMeta.js';
+import {
+  displayedCharacterUid,
+  isRawCharacterUid,
+  mergeTradeRecipients,
+  resolveTradeRecipientInput,
+} from './CardTradeRecipient.js';
 import { migrateLegacyCards } from '../cards/CardMigration.js';
 import { getCard } from '../cards/CardCatalog.js';
 
@@ -1487,8 +1493,7 @@ export class GameUI {
     const waiting = document.getElementById('card-trade-waiting');
     if (waiting) waiting.style.display = 'none';
     // Clear autocomplete state
-    this._cardTradeResolvedUid = null;
-    this._cardTradeResolvedName = null;
+    this._cardTradeResolvedTarget = null;
     const suggestBox = document.getElementById('card-trade-suggest');
     if (suggestBox) suggestBox.style.display = 'none';
     const resolvedBox = document.getElementById('card-trade-resolved');
@@ -8480,8 +8485,7 @@ export class GameUI {
     document.getElementById('btn-send-card-trade')?.addEventListener('click', () => this._sendCardTrade());
 
     // ---- Autocomplete: name → UID resolution ----
-    this._cardTradeResolvedUid = null;   // UID resolved from autocomplete click
-    this._cardTradeResolvedName = null;
+    this._cardTradeResolvedTarget = null;
     this._cardTradeSuggestTimer = null;
 
     const uidInput = document.getElementById('card-trade-uid-input');
@@ -8492,15 +8496,14 @@ export class GameUI {
     // On every keystroke: debounce → search
     uidInput.addEventListener('input', () => {
       // Clear previous resolved state when user types
-      this._cardTradeResolvedUid = null;
-      this._cardTradeResolvedName = null;
+      this._cardTradeResolvedTarget = null;
       if (resolvedBox) resolvedBox.style.display = 'none';
 
       const val = uidInput.value.trim();
       if (!val || val.length < 1) { suggestBox.style.display = 'none'; return; }
 
       // If it looks like a raw UID (all hex), skip autocomplete
-      if (/^[a-fA-F0-9]{1,8}$/.test(val)) { suggestBox.style.display = 'none'; return; }
+      if (isRawCharacterUid(val)) { suggestBox.style.display = 'none'; return; }
 
       clearTimeout(this._cardTradeSuggestTimer);
       this._cardTradeSuggestTimer = setTimeout(() => this._cardTradeAutocomplete(val), 300);
@@ -8512,7 +8515,7 @@ export class GameUI {
     });
     uidInput.addEventListener('focus', () => {
       const val = uidInput.value.trim();
-      if (val && !/^[a-fA-F0-9]{1,8}$/.test(val) && !this._cardTradeResolvedUid) {
+      if (val && !isRawCharacterUid(val) && !this._cardTradeResolvedTarget) {
         clearTimeout(this._cardTradeSuggestTimer);
         this._cardTradeSuggestTimer = setTimeout(() => this._cardTradeAutocomplete(val), 150);
       }
@@ -8525,34 +8528,31 @@ export class GameUI {
     if (!suggestBox) return;
 
     const q = query.toLowerCase();
-    const results = [];
+    const onlineMatches = [];
 
     // 1. Check online players first (instant, no network)
     if (this.onlinePlayers && this.onlinePlayers.length) {
       for (const p of this.onlinePlayers) {
         if (p.username && p.username.toLowerCase().startsWith(q) && p.userId !== this.characterId) {
-          results.push({ username: p.username, level: p.level || 1, userId: p.userId, online: true });
+          onlineMatches.push({
+            username: p.username,
+            level: p.level || 1,
+            userId: p.userId,
+            characterId: p.characterId || null,
+          });
         }
-        if (results.length >= 5) break;
+        if (onlineMatches.length >= 5) break;
       }
     }
 
-    // 2. If we have fewer than 5 results, search DB
-    if (results.length < 5) {
-      try {
-        const dbResults = await searchCharactersByName(query);
-        for (const d of dbResults) {
-          // Skip duplicates already found online, and skip self
-          if (results.some(r => r.username === d.username)) continue;
-          const myUid = this.characterId?.split('_').pop()?.substring(0, 8);
-          const dUid = d.characterId?.split('_').pop()?.substring(0, 8);
-          if (myUid && dUid && myUid === dUid) continue;
-          const isOnline = (this.onlinePlayers || []).some(p => p.userId === d.userId);
-          results.push({ username: d.username, level: d.level || 1, userId: d.userId, characterId: d.characterId, online: isOnline });
-          if (results.length >= 5) break;
-        }
-      } catch (e) { console.warn('[CardTrade] autocomplete DB error:', e); }
+    // Always enrich online matches with the database character identity.
+    let dbResults = [];
+    try {
+      dbResults = await searchCharactersByName(query);
+    } catch (e) {
+      console.warn('[CardTrade] autocomplete DB error:', e);
     }
+    const results = mergeTradeRecipients(onlineMatches, dbResults, this.characterId);
 
     if (results.length === 0) {
       suggestBox.style.display = 'none';
@@ -8577,14 +8577,10 @@ export class GameUI {
         e.preventDefault(); // prevent blur from hiding dropdown
         const r = results[i];
         if (!r) return;
-        // Resolve UID from characterId
-        const uid = r.characterId
-          ? r.characterId.split('_').pop().substring(0, 8).toUpperCase()
-          : (r.userId || '').substring(0, 8).toUpperCase();
+        const uid = displayedCharacterUid(r.characterId);
         const input = document.getElementById('card-trade-uid-input');
-        if (input) input.value = uid;
-        this._cardTradeResolvedUid = uid;
-        this._cardTradeResolvedName = r.username;
+        if (input) input.value = uid || r.username;
+        this._cardTradeResolvedTarget = r;
         suggestBox.style.display = 'none';
         // Show resolved preview
         const resolvedBox = document.getElementById('card-trade-resolved');
@@ -8612,42 +8608,37 @@ export class GameUI {
     if (!rawInput) { setStatus('❌ กรุณากรอกชื่อผู้เล่น หรือ UID ผู้รับ', '#ff8f8f'); return; }
     if (maxQty < 1) { setStatus('❌ ไม่มีการ์ดใบนี้เหลือให้ส่ง', '#ff8f8f'); return; }
 
-    // Determine the UID to use:
-    // Case 1: Already resolved via autocomplete click
-    // Case 2: Looks like a hex UID → use as-is
-    // Case 3: Free-hand name → search DB for the name
-    let uid = null;
-    if (this._cardTradeResolvedUid) {
-      uid = this._cardTradeResolvedUid;
-    } else if (/^[a-fA-F0-9]{1,8}$/.test(rawInput)) {
-      uid = rawInput;
-    } else {
-      // Treat as player name: try searching DB
-      setStatus('⌛ กำลังค้นหาผู้เล่นชื่อ "' + rawInput + '"...', 'var(--text-dim)');
-      try {
-        const dbResults = await searchCharactersByName(rawInput);
-        const exact = dbResults.find(d => d.username.toLowerCase() === rawInput.toLowerCase());
-        if (exact) {
-          uid = exact.characterId.split('_').pop().substring(0, 8);
-        } else if (dbResults.length > 0) {
-          uid = dbResults[0].characterId.split('_').pop().substring(0, 8);
-        }
-      } catch (e) { /* fall through */ }
-      if (!uid) { setStatus('❌ ไม่พบผู้เล่นชื่อ "' + rawInput + '" — ลองเลือกจาก autocomplete หรือกรอก UID', '#ff8f8f'); return; }
+    setStatus('⌛ กำลังค้นหาผู้รับ...', 'var(--text-dim)');
+    const resolved = await resolveTradeRecipientInput({
+      rawInput,
+      selectedTarget: this._cardTradeResolvedTarget,
+      searchByName: searchCharactersByName,
+      resolveByUid: resolveCharacterByUid,
+    });
+    if (!resolved.ok) {
+      const message = resolved.reason === 'uid_not_found'
+        ? '❌ ไม่พบผู้เล่นที่มี UID นี้'
+        : '❌ ไม่พบผู้เล่นชื่อนี้ กรุณาเลือกชื่อจากรายการค้นหา';
+      setStatus(message, '#ff8f8f');
+      return;
+    }
+    const target = resolved.target;
+    if (!target.userId || !target.characterId) {
+      setStatus('❌ ข้อมูลตัวละครผู้รับไม่สมบูรณ์ กรุณาค้นหาชื่อใหม่อีกครั้ง', '#ff8f8f');
+      return;
     }
 
-    // Guard against sending to yourself.
-    const myUid = this.characterId.split('_').pop().substring(0, 8).toUpperCase();
-    if (uid.toUpperCase() === myUid) { setStatus('❌ ส่งการ์ดให้ตัวเองไม่ได้', '#ff8f8f'); return; }
-
-    setStatus('⌛ กำลังค้นหาผู้รับ...', 'var(--text-dim)');
-    const target = await resolveCharacterByUid(uid);
-    if (!target || !target.userId) { setStatus('❌ ไม่พบผู้เล่นที่มี UID นี้', '#ff8f8f'); return; }
+    // Guard against sending to yourself using the canonical character ID.
+    if (target.characterId === this.characterId) {
+      setStatus('❌ ส่งการ์ดให้ตัวเองไม่ได้', '#ff8f8f');
+      return;
+    }
 
     // Never carry the sender's socket state onto the recipient's fresh copy.
     const catalog = getCard(item.item_name);
     const cleanStats = { card_id: catalog?.id || item.stats?.card_id };
     if (item.stats && item.stats.card_stars) cleanStats.card_stars = item.stats.card_stars;
+    const targetLabel = target.username || displayedCharacterUid(target.characterId);
 
     // Online recipient → live trade popup (instant, accept/decline).
     // Offline recipient → drop it in their mailbox (escrow, claim later).
@@ -8683,7 +8674,7 @@ export class GameUI {
     }
 
     // Offline → mailbox delivery.
-    setStatus(`📬 ผู้รับ (${target.username || uid}) ออฟไลน์ กำลังส่งเข้ากล่องจดหมาย...`, 'var(--text-dim)');
+    setStatus(`📬 ผู้รับ (${targetLabel}) ออฟไลน์ กำลังส่งเข้ากล่องจดหมาย...`, 'var(--text-dim)');
     const res = await sendCardMail(target.characterId, item.item_name, 'card', qty, price, cleanStats);
     if (!res || !res.ok) {
       const reason = res && res.reason;
@@ -8698,7 +8689,7 @@ export class GameUI {
     // Escrow already removed the card server-side — refresh local truth.
     await this.loadInventoryFromDB(this.characterId);
     if (this.cardAlbum) this.cardAlbum.render();
-    this.addCombatLog(`📬 ส่งการ์ด ${item.item_name} x${qty} เข้ากล่องจดหมายของ ${target.username || uid} แล้ว${price > 0 ? ` (ราคา ${price} Zeny)` : ' (ฟรี)'}`, 'system');
+    this.addCombatLog(`📬 ส่งการ์ด ${item.item_name} x${qty} เข้ากล่องจดหมายของ ${targetLabel} แล้ว${price > 0 ? ` (ราคา ${price} Zeny)` : ' (ฟรี)'}`, 'system');
     const modal = document.getElementById('card-trade-modal');
     if (modal) modal.style.display = 'none';
     this._cardTradeItem = null;
