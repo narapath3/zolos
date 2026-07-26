@@ -28,7 +28,37 @@ export function getDeviceTypeFromUserAgent(ua) {
 }
 
 export function getDeviceType() {
-    return getDeviceTypeFromUserAgent(navigator?.userAgent || '');
+    const ua = navigator?.userAgent || '';
+
+    // 1. Explicit keywords check
+    const isTabletUA = /iPad|PlayBook|Silk/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua));
+    const isMobileUA = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+    if (isTabletUA) return 'tablet';
+    if (isMobileUA) return 'mobile';
+
+    // 2. Touch screen features check (crucial for modern iPadOS which defaults to desktop UA)
+    const hasTouch = (navigator.maxTouchPoints > 0) ||
+        ('ontouchstart' in window) ||
+        (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+    if (hasTouch) {
+        const width = window.screen?.width || window.innerWidth || 800;
+        const height = window.screen?.height || window.innerHeight || 600;
+        const minDim = Math.min(width, height);
+        const maxDim = Math.max(width, height);
+
+        // Small screen touch devices are phones
+        if (minDim < 600) {
+            return 'mobile';
+        }
+        // Medium screen touch devices (up to iPad Pro 12.9" portrait dimension of 1024 or landscape 1366) are tablets
+        if (maxDim <= 1366) {
+            return 'tablet';
+        }
+    }
+
+    return 'desktop';
 }
 
 // ============ Character CRUD ============
