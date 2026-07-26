@@ -24,6 +24,7 @@ import {
 } from './securityPolicy.js';
 import { getCard } from './cards/CardCatalog.js';
 import { FUSION_COSTS } from './cards/CardProgression.js';
+import { buildHealthPayload } from './health.js';
 
 // ============ Configuration ============
 const PORT = parseInt(process.env.PORT) || 3001;
@@ -75,13 +76,12 @@ const io = new Server(httpServer, {
 
 // Health check endpoint (Railway uses this)
 app.get('/', (_req, res) => {
-    const playerCount = onlinePlayers.size;
-    res.json({
-        status: 'ok',
-        server: 'zolos-map-server',
-        players: playerCount,
-        uptime: Math.floor(process.uptime())
-    });
+    res.json(buildHealthPayload({
+        playerCount: onlinePlayers.size,
+        uptime: process.uptime(),
+        revision: process.env.RAILWAY_GIT_COMMIT_SHA,
+        fallbackVersion: process.env.npm_package_version,
+    }));
 });
 
 // ============ In-Memory State ============
