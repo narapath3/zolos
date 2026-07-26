@@ -141,6 +141,9 @@ export class GameUI {
       this.networkText.style.color = '#f44';
       if (this.networkStatusEl) this.networkStatusEl.style.color = '#f44';
     }
+
+    // Update map name and ping in local HUD
+    this._updateHUDMapAndPing();
   }
 
   _setupTargetIndicator() {
@@ -491,12 +494,41 @@ export class GameUI {
 
   // ============ Map Name Update ============
   setMapName(mapName, mapId) {
-    const el = document.getElementById('map-name');
-    if (el) el.textContent = mapName;
     if (mapId) {
       this.currentMapId = mapId;
+    }
+    this._updateHUDMapAndPing();
+    if (mapId) {
       // Refresh online players list when map changes to filter correctly
       this._renderOnlinePlayers();
+    }
+  }
+
+  _updateHUDMapAndPing() {
+    const mapId = this.currentMapId || 'prontera';
+    const MAP_NAMES_TH = {
+      prontera: 'เมืองประเทอร์รา',
+      prontera_field: 'ทุ่งประเทอร์รา',
+      payon: 'ป่าเปยอง',
+      glast_heim: 'ปราสาทกลาสท์ไฮม์',
+      mjolnir: 'เทือกเขาหมิโอลนีร์',
+      abyss_lake: 'ทะเลสาบห้วงลึก',
+      svarrga: 'สรวงสวรรค์'
+    };
+    const mapName = MAP_NAMES_TH[mapId] || mapId;
+    const ping = this.myPing;
+    const pingStr = ping != null ? `(📶 ${ping}ms)` : '(📶 --ms)';
+    const el = document.getElementById('map-name');
+    if (el) {
+      let colorClass = 'ping-good';
+      if (ping != null) {
+        if (ping >= 160) {
+          colorClass = 'ping-bad';
+        } else if (ping >= 80) {
+          colorClass = 'ping-mid';
+        }
+      }
+      el.innerHTML = `📍 ${mapName} <span class="hud-ping-badge ${colorClass}">${pingStr}</span>`;
     }
   }
 

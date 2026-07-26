@@ -1598,6 +1598,30 @@ a,
   text-align: center;
   padding: 2px 0;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.hud-ping-badge {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-pixel);
+  padding: 1px 3px;
+  border-radius: 4px;
+}
+
+.hud-ping-badge.ping-good {
+  color: #46e08a;
+}
+
+.hud-ping-badge.ping-mid {
+  color: #ffcf5a;
+}
+
+.hud-ping-badge.ping-bad {
+  color: #ff7a90;
 }
 
 /* ========== CRITICAL FLASH ========== */
