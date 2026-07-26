@@ -33,13 +33,22 @@
   --border: rgba(100, 140, 255, 0.25);
   --glass-border: rgba(255, 255, 255, 0.1);
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
-  /* Ragnarok-flavoured, Thai-capable type system. Chakra Petch gives the
-     angular, gamey HUD/header look; Kanit is the clean, readable body face;
-     Press Start 2P is kept for the retro damage numbers (--font-retro). */
-  --font-pixel: 'Chakra Petch', 'Kanit', system-ui, sans-serif;
-  --font-main: 'Chakra Petch', 'Kanit', system-ui, sans-serif;
-  --font-ui: 'Kanit', 'Chakra Petch', system-ui, sans-serif;
-  --font-retro: 'Press Start 2P', monospace;
+  /* RO display identity + Thai-first reading face. */
+  --font-display: 'Chakra Petch', 'Kanit', system-ui, sans-serif;
+  --font-body: 'Kanit', 'Chakra Petch', system-ui, sans-serif;
+  --font-effect: 'Press Start 2P', ui-monospace, monospace;
+  --font-pixel: var(--font-display);
+  --font-main: var(--font-display);
+  --font-ui: var(--font-body);
+  --font-retro: var(--font-effect);
+  --text-xs: clamp(0.625rem, 0.58rem + 0.2vw, 0.75rem);
+  --text-sm: clamp(0.75rem, 0.7rem + 0.2vw, 0.875rem);
+  --text-md: clamp(0.875rem, 0.82rem + 0.25vw, 1rem);
+  --leading-ui: 1.45;
+  --safe-top: max(0px, env(safe-area-inset-top, 0px));
+  --safe-right: max(8px, env(safe-area-inset-right, 0px));
+  --safe-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  --safe-left: max(8px, env(safe-area-inset-left, 0px));
   --radius: 12px;
   --radius-sm: 10px;
   --radius-xl: 40px;
@@ -58,6 +67,14 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-ui);
   background: var(--bg-dark);
@@ -69,6 +86,9 @@ body {
   min-height: 100dvh;
   cursor: url('/assets/cute_cursor_32.png'), auto;
   text-rendering: optimizeLegibility;
+  line-height: var(--leading-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .game-viewport {
@@ -6230,5 +6250,146 @@ a,
 
   .player-row-meta {
     gap: 4px 6px;
+  }
+}
+
+/* ========== CROSS-PLATFORM RO TYPOGRAPHY & OVERFLOW CONTRACT ========== */
+.ui-title,
+:where(h1, h2, h3, h4, legend),
+:where(.panel-header, .panel-title, .popup-title, .modal-title),
+:where(.online-tab, .wiki-tab, .lb-tab, .popup-tab, .hud-btn) {
+  font-family: var(--font-display);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.ui-copy,
+:where(p, label, input, textarea, select, option),
+:where(.item-description, .chat-message, .announcement-body, .mail-body) {
+  font-family: var(--font-body);
+}
+
+.ui-copy,
+:where(.panel-body, .modal-body, .popup-body),
+:where(.item-description, .chat-message, .announcement-body, .mail-body) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.ui-ellipsis {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-critical-value {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+:where(img, svg, video) {
+  max-width: 100%;
+  height: auto;
+}
+
+:where(
+  .panel-header,
+  .panel-body,
+  .player-row,
+  .player-row-content,
+  .player-row-main,
+  .player-row-meta,
+  .lb-row,
+  .lb-name,
+  .mail-row,
+  .popup-tabs,
+  .hud-group,
+  .inventory-grid,
+  .shop-grid
+) > * {
+  min-width: 0;
+}
+
+:where(button, .hud-btn, .btn-primary, .btn-secondary, .popup-tab, .online-tab, .wiki-tab, .lb-tab) {
+  max-width: 100%;
+  min-height: 44px;
+  height: auto;
+  font-family: var(--font-display);
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+:where(input, textarea, select) {
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--font-body);
+}
+
+:where(.panel, .popup, .modal, [role="dialog"]) {
+  max-inline-size: calc(100dvw - var(--safe-left) - var(--safe-right));
+  max-block-size: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+  box-sizing: border-box;
+}
+
+.game-viewport {
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+}
+
+#hud-top {
+  left: max(16px, var(--safe-left));
+  max-width: calc(100dvw - var(--safe-left) - var(--safe-right));
+}
+
+#hud-bottom {
+  max-width: calc(100dvw - var(--safe-left) - var(--safe-right));
+}
+
+@media (pointer: coarse) {
+  :where(input, textarea, select) {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --text-xs: 0.625rem;
+    --text-sm: 0.75rem;
+    --text-md: 0.875rem;
+  }
+
+  :where(.panel, .popup, .modal, [role="dialog"]) {
+    width: calc(100dvw - var(--safe-left) - var(--safe-right));
+    border-radius: 12px;
+  }
+
+  :where(.panel-header h3, .panel-title, .popup-title, .modal-title) {
+    font-size: clamp(0.75rem, 3.2vw, 0.9rem);
+    letter-spacing: 0.02em;
+  }
+
+  :where(.panel-body, .modal-body, .popup-body) {
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  :where(.hud-btn, .online-tab, .wiki-tab, .lb-tab, .popup-tab) {
+    font-size: clamp(0.625rem, 2.7vw, 0.75rem);
+    padding-inline: 8px;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1180px) {
+  :where(.panel, .popup, .modal, [role="dialog"]) {
+    max-inline-size: min(92dvw, 760px);
+  }
+
+  :where(.panel-body, .modal-body, .popup-body) {
+    font-size: clamp(0.8rem, 1.5vw, 0.95rem);
   }
 }

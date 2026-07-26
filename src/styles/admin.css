@@ -375,3 +375,23 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+.admin-shell,
+.admin-panel {
+  font-family: var(--font-body);
+}
+
+.admin-shell :where(h1, h2, h3, button, .admin-tab, .admin-title),
+.admin-panel :where(h1, h2, h3, button, .admin-tab, .admin-title) {
+  font-family: var(--font-display);
+}
+
+.admin-shell :where(p, label, td, th, .admin-card, .admin-message),
+.admin-panel :where(p, label, td, th, .admin-card, .admin-message) {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+:where(.admin-row, .admin-card, .admin-form, .admin-field) > * {
+  min-width: 0;
+}

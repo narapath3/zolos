@@ -1059,3 +1059,25 @@
     font-size: 42px;
   }
 }
+
+/* Cross-platform auth typography */
+#auth-screen {
+  font-family: var(--font-body);
+  padding-inline:
+    max(8px, env(safe-area-inset-left, 0px))
+    max(8px, env(safe-area-inset-right, 0px));
+}
+
+#auth-screen :where(h1, h2, h3, button, .auth-title, .ro-logo-text) {
+  font-family: var(--font-display);
+}
+
+#auth-screen :where(p, label, .auth-subtitle, .auth-hint, .login-message) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#auth-screen :where(.auth-card, .login-card, .auth-form, .form-group) {
+  min-width: 0;
+  max-width: 100%;
+}

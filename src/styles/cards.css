@@ -1164,3 +1164,21 @@
   font-size: 10px;
   color: var(--text-dim, #9aa4b2);
 }
+
+/* Card text must shrink inside grid tracks before it can widen the page. */
+:where(.card-album, .card-grid, .card-tile, .card-detail, .card-info) > * {
+  min-width: 0;
+}
+
+:where(.card-description, .card-detail-copy, .card-source, .card-owner-copy) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+:where(.card-name, .card-tile__name) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
