@@ -63,17 +63,21 @@ export class PlayerProfileModal {
       }
 
       .profile-x {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.6);
-        width: 32px;
-        height: 32px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: rgba(255, 255, 255, 0.7);
+        width: 36px;
+        height: 36px;
+        min-width: 44px;
+        min-height: 44px;
         border-radius: 50%;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.3s ease;
+        font-size: 18px;
+        -webkit-tap-highlight-color: transparent;
       }
 
       .profile-x:hover {
@@ -81,6 +85,17 @@ export class PlayerProfileModal {
         background: rgba(255, 100, 100, 0.2);
         color: #ff6b6b;
         border-color: rgba(255, 100, 100, 0.3);
+      }
+
+      .profile-x:active {
+        background: rgba(255, 100, 100, 0.35);
+        color: #ff6b6b;
+        transform: scale(0.92);
+      }
+
+      /* Bottom close button for mobile */
+      .profile-bottom-close {
+        display: none;
       }
 
       .profile-main {
@@ -416,33 +431,61 @@ export class PlayerProfileModal {
       }
 
       @media (max-width: 720px) {
+        #player-profile-modal {
+          padding: 6px;
+          align-items: flex-start;
+          padding-top: 12px;
+        }
         #player-profile-card {
-          width: 96vw;
-          max-height: calc(100dvh - 120px);
+          width: 98vw;
+          max-height: calc(100dvh - 24px);
           border-radius: 16px;
         }
-        .profile-head { padding: 10px 16px; }
+        .profile-head {
+          padding: 10px 14px;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: linear-gradient(180deg, #1a223a 60%, rgba(26,34,58,0.95));
+          border-bottom: 1px solid rgba(240, 192, 64, 0.25);
+          flex-shrink: 0;
+        }
         .profile-head h2 { font-size: 15px; }
+        .profile-x {
+          width: 40px;
+          height: 40px;
+          min-width: 48px;
+          min-height: 48px;
+          font-size: 20px;
+          background: rgba(255, 100, 100, 0.12);
+          border-color: rgba(255, 100, 100, 0.25);
+          color: #ff8a8a;
+        }
         .profile-main {
           flex-direction: column;
           overflow-y: auto;
+          overflow-x: hidden;
           padding: 12px;
+          padding-bottom: 24px;
           gap: 16px;
           -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+          touch-action: pan-y;
+          scroll-behavior: smooth;
         }
         .profile-left {
           flex: none;
           width: 100%;
-          gap: 12px;
+          gap: 10px;
         }
         #player-profile-canvas {
-          height: 240px;
+          height: 160px;
         }
         .profile-name { font-size: 18px; }
         .profile-right {
           padding-right: 0;
           overflow-y: visible;
-          gap: 16px;
+          gap: 14px;
         }
         .combat-grid {
           grid-template-columns: repeat(2, 1fr);
@@ -457,6 +500,29 @@ export class PlayerProfileModal {
         .equip-emoji { font-size: 18px; }
         .equip-name { font-size: 9px; }
         .section-title { margin-bottom: 8px; }
+
+        /* Show bottom close button on mobile */
+        .profile-bottom-close {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: 100%;
+          padding: 14px;
+          margin-top: 8px;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 100, 100, 0.25);
+          background: rgba(255, 100, 100, 0.08);
+          color: #ff8a8a;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          transition: background 0.2s;
+        }
+        .profile-bottom-close:active {
+          background: rgba(255, 100, 100, 0.2);
+        }
       }
     `;
     document.head.appendChild(st);
@@ -469,8 +535,11 @@ export class PlayerProfileModal {
     document.body.appendChild(modal);
     this.modal = modal;
 
-    // Global click listener to close if clicking outside the card
+    // Close if clicking/touching outside the card
     this.modal.addEventListener('click', (e) => {
+      if (e.target === this.modal) this.hide();
+    });
+    this.modal.addEventListener('touchend', (e) => {
       if (e.target === this.modal) this.hide();
     });
   }
@@ -626,6 +695,8 @@ export class PlayerProfileModal {
               ${this._renderEquipment(appearance)}
             </div>
           </div>
+
+          <button class="profile-bottom-close">✕ ปิด (Close)</button>
         </div>
       </div>
     `;
@@ -643,9 +714,11 @@ export class PlayerProfileModal {
       this._updateProfileText(card, { dbData, player, level, jobInfo, isOffline, stats, isSelf, isFriend, appearance });
     }
 
-    // Close button handler
+    // Close button handlers (top X + bottom close)
     const closeBtn = card.querySelector('.profile-x');
     if (closeBtn) closeBtn.onclick = () => this.hide();
+    const bottomClose = card.querySelector('.profile-bottom-close');
+    if (bottomClose) bottomClose.onclick = () => this.hide();
 
     // Action button handlers
     if (!isSelf) {
