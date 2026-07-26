@@ -516,19 +516,9 @@ export class GameUI {
       svarrga: 'สรวงสวรรค์'
     };
     const mapName = MAP_NAMES_TH[mapId] || mapId;
-    const ping = this.myPing;
-    const pingStr = ping != null ? `(📶 ${ping}ms)` : '(📶 --ms)';
     const el = document.getElementById('map-name');
     if (el) {
-      let colorClass = 'ping-good';
-      if (ping != null) {
-        if (ping >= 160) {
-          colorClass = 'ping-bad';
-        } else if (ping >= 80) {
-          colorClass = 'ping-mid';
-        }
-      }
-      el.innerHTML = `📍 ${mapName} <span class="hud-ping-badge ${colorClass}">${pingStr}</span>`;
+      el.innerHTML = `📍 ${mapName}`;
     }
   }
 
