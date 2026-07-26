@@ -13,9 +13,11 @@ globalThis.document = {
     createElement: () => ({ style: {} }),
     head: { appendChild: () => null }
 };
-globalThis.navigator = {
-    userAgent: ''
-};
+Object.defineProperty(globalThis, 'navigator', {
+    value: { userAgent: '' },
+    configurable: true,
+    writable: true
+});
 
 import { getDeviceTypeFromUserAgent } from '../src/network/GameSync.js';
 

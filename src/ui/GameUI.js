@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -111,7 +111,6 @@ export class GameUI {
       this.networkText.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
       if (this.networkStatusEl) this.networkStatusEl.style.color = isOfflineMode ? '#aaa' : '#40a0ff';
     } else if (connected) {
-      this.networkDot.style.background = '#0f0';
       // Use client-measured ping (RTT from client_ping/client_pong)
       let ping = this.myPing;
       try {
@@ -124,8 +123,18 @@ export class GameUI {
       } catch (e) { /* ignore */ }
       const pingStr = ping != null ? ` ${ping}ms` : '';
       this.networkText.textContent = 'ONLINE' + pingStr;
-      this.networkText.style.color = '#0f0';
-      if (this.networkStatusEl) this.networkStatusEl.style.color = '#0f0';
+
+      let color = '#46e08a';
+      if (ping != null) {
+        if (ping >= 160) {
+          color = '#ff7a90';
+        } else if (ping >= 80) {
+          color = '#ffcf5a';
+        }
+      }
+      this.networkDot.style.background = color;
+      this.networkText.style.color = color;
+      if (this.networkStatusEl) this.networkStatusEl.style.color = color;
     } else {
       this.networkDot.style.background = '#f44';
       this.networkText.textContent = 'OFFLINE';
@@ -2898,19 +2907,13 @@ export class GameUI {
     this.onlinePlayers = players || [];
 
     // Inject client-measured ping into local player's roster entry.
-    // _gameSyncModule is lazily cached so this stays synchronous after first load.
-    if (!this._gameSyncModule) {
-      import('../network/GameSync.js').then(m => { this._gameSyncModule = m; }).catch(() => { });
-    }
-    if (this._gameSyncModule?.getClientPing) {
-      const cp = this._gameSyncModule.getClientPing();
-      if (cp != null) {
-        this.myPing = cp;
-        const me = this.onlinePlayers.find(p =>
-          p.userId === window.userId || p.username === this.character?.stats?.name
-        );
-        if (me && me.ping == null) me.ping = cp;
-      }
+    const cp = getClientPing ? getClientPing() : null;
+    if (cp != null) {
+      this.myPing = cp;
+      const me = this.onlinePlayers.find(p =>
+        p.userId === window.userId || p.username === this.character?.stats?.name
+      );
+      if (me && me.ping == null) me.ping = cp;
     }
 
     // Track local player's ping from server-provided data as fallback
