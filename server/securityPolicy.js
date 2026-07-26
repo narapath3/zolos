@@ -142,6 +142,22 @@ export function normalizePresence(input = {}) {
     return { username, level, mapId: normalizeMapId(input.mapId) };
 }
 
+const PRESENCE_DEVICES = new Set(['desktop', 'tablet', 'mobile']);
+
+export function serializeOnlinePlayer(info = {}) {
+    const presence = normalizePresence(info);
+    const rawPing = Number(info.ping);
+    return {
+        userId: info.userId || null,
+        username: presence.username,
+        level: presence.level,
+        mapId: presence.mapId,
+        device: PRESENCE_DEVICES.has(info.device) ? info.device : 'desktop',
+        ping: Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null,
+        characterId: info.characterId || null,
+    };
+}
+
 export function isAllowedOrigin(origin, configuredOrigins = []) {
     if (!origin) return true;
     return DEFAULT_ORIGINS.has(origin) || configuredOrigins.includes(origin);

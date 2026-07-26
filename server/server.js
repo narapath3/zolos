@@ -20,6 +20,7 @@ import {
     normalizePresence,
     resolveTrustedMap,
     sanitizeSaveUpdates,
+    serializeOnlinePlayer,
 } from './securityPolicy.js';
 import { getCard } from './cards/CardCatalog.js';
 import { FUSION_COSTS } from './cards/CardProgression.js';
@@ -970,15 +971,7 @@ function broadcastPlayerList(mapId) {
     for (const [, info] of onlinePlayers) {
         globalCount++;
         if (info.mapId === mapId) {
-            playersInMap.push({
-                userId: info.userId,
-                username: info.username,
-                level: info.level,
-                mapId: info.mapId,
-                device: info.device || 'desktop',
-                ping: info.ping ?? null,
-                characterId: info.characterId || null
-            });
+            playersInMap.push(serializeOnlinePlayer(info));
         }
     }
 
@@ -994,7 +987,7 @@ function broadcastPlayerList(mapId) {
     // after players_update so it deterministically wins on the client.
     const allPlayers = [];
     for (const [, info] of onlinePlayers) {
-        allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, device: info.device || 'desktop', ping: info.ping ?? null, characterId: info.characterId || null });
+        allPlayers.push(serializeOnlinePlayer(info));
     }
     io.emit('players_global', allPlayers);
 }
@@ -1013,7 +1006,7 @@ setInterval(() => {
     setTimeout(() => {
         const allPlayers = [];
         for (const [, info] of onlinePlayers) {
-            allPlayers.push({ userId: info.userId, username: info.username, level: info.level, mapId: info.mapId, device: info.device || 'desktop', ping: info.ping ?? null, characterId: info.characterId || null });
+            allPlayers.push(serializeOnlinePlayer(info));
         }
         if (allPlayers.length) io.emit('players_global', allPlayers);
     }, 1500);
