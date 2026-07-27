@@ -130,8 +130,15 @@ export class CardAlbum {
     return this;
   }
 
+  _isDialogOpen() {
+    const detail = this.element?.querySelector('.card-detail');
+    const fusion = this.element?.querySelector('.card-fusion');
+    return !!((detail && (detail.open || detail.hasAttribute('open'))) || (fusion && (fusion.open || fusion.hasAttribute('open'))));
+  }
+
   render() {
     if (!this.element || this.destroyed) return;
+    if (this._isDialogOpen()) return;
     const state = this._cardState();
     const ownedCount = this.catalog.filter(card => (state[card.id]?.owned || 0) > 0).length;
     const cards = this.catalog.filter(card => this._matchesFilters(card, state[card.id]));
@@ -497,18 +504,58 @@ export class CardAlbum {
     const beforeRows = scaledRows(card, preview.fromStars);
     const afterRows = scaledRows(card, preview.toStars);
     this._closeDialog(detail, false);
+
+    const beforeCardTileHtml = this._cardTile(card, { owned: state.owned, stars: preview.fromStars });
+    const afterCardTileHtml = this._cardTile(card, { owned: state.owned - preview.cost, stars: preview.toStars });
+
     content.innerHTML = `
-      <p class="card-fusion__eyebrow">CONFIRM FUSION</p>
-      <h3 id="${this.instanceId}-fusion-title">${escapeHtml(card.displayName)} · ${preview.fromStars} → ${preview.toStars} stars</h3>
-      <p class="card-fusion__cost">Consume exactly <strong>${preview.cost} duplicate${preview.cost === 1 ? '' : 's'}</strong>. Your upgraded copy remains in the album.</p>
-      <div class="card-fusion__preview">
-        <section><h4>Before · ×${formatNumber(starMultiplier(preview.fromStars))}</h4>${this._valueRows(beforeRows)}</section>
-        <section><h4>After · ×${formatNumber(starMultiplier(preview.toStars))}</h4>${this._valueRows(afterRows)}</section>
+      <div class="card-fusion__modal-header">
+        <p class="card-fusion__eyebrow">CONFIRM FUSION</p>
+        <h3 id="${this.instanceId}-fusion-title" class="card-fusion__title">
+          Forge Upgrade: ${escapeHtml(card.displayName)}
+        </h3>
+        <p class="card-fusion__cost">
+          This operation will consume exactly <strong style="color:var(--card-focus)">${preview.cost} duplicate${preview.cost === 1 ? '' : 's'}</strong>.<br>
+          Your upgraded copy remains preserved in your album.
+        </p>
       </div>
+
+      <div class="card-fusion__visual-forge">
+        <div class="card-fusion__preview-wrapper before">
+          <div class="card-fusion__label">CURRENT STATE</div>
+          ${beforeCardTileHtml}
+        </div>
+        
+        <div class="card-fusion__forge-symbol">
+          <div class="forge-symbol__sparkle">✨</div>
+          <div class="forge-symbol__arrow">⚡</div>
+          <div class="forge-symbol__ray"></div>
+        </div>
+
+        <div class="card-fusion__preview-wrapper after">
+          <div class="card-fusion__label glowing">UPGRADED RESULT</div>
+          ${afterCardTileHtml}
+        </div>
+      </div>
+
+      <div class="card-fusion__details-comparison">
+        <div class="card-fusion__stat-column">
+          <span class="card-fusion__stat-title">CURRENT STATS · ★${preview.fromStars}</span>
+          ${this._valueRows(beforeRows)}
+        </div>
+        <div class="card-fusion__stat-column after">
+          <span class="card-fusion__stat-title glowing">UPGRADED STATS · ★${preview.toStars}</span>
+          ${this._valueRows(afterRows)}
+        </div>
+      </div>
+
       <p class="card-fusion__status" aria-live="polite"></p>
+
       <div class="card-fusion__actions">
         <button type="button" class="card-fusion__cancel">Cancel</button>
-        <button type="button" class="card-fusion__confirm" data-card-id="${escapeHtml(card.id)}">Fuse for ${preview.cost} duplicate${preview.cost === 1 ? '' : 's'}</button>
+        <button type="button" class="card-fusion__confirm" data-card-id="${escapeHtml(card.id)}">
+          Begin Fusion Upgrade
+        </button>
       </div>
     `;
     this._lastFocus = trigger;
@@ -600,8 +647,12 @@ export class CardAlbum {
 
   _closeDialog(dialog, restoreFocus = true) {
     if (!dialog) return;
+    const wasOpen = dialog.open || dialog.hasAttribute('open');
     if (typeof dialog.close === 'function' && dialog.open) dialog.close();
     else dialog.removeAttribute('open');
+    if (wasOpen) {
+      this.render();
+    }
     if (restoreFocus) {
       const fallback = this.element?.querySelector(`[data-card-id="${this.selectedCardId}"]`);
       const target = this._lastFocus?.isConnected ? this._lastFocus : fallback;
