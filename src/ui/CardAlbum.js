@@ -419,14 +419,14 @@ export class CardAlbum {
         <section class="card-fusion__summary">
           <div>
             <p>FUSION FORGE</p>
-            <h4>${stars >= 5 ? 'Celestial maximum' : `${stars} → ${nextStars} stars`}</h4>
+            <h4>${stars >= 5 ? 'ระดับดาวสูงสุด' : `${stars} → ${nextStars} ดาว`}</h4>
           </div>
           <div class="card-fusion__meter">
-            <span>${duplicates} duplicate${duplicates === 1 ? '' : 's'} · ${fusion.cost || 0} required</span>
+            <span>การ์ดซ้ำ ${duplicates} ใบ · ใช้ ${fusion.cost || 0} ใบในการอัปเกรด</span>
             <meter min="0" max="${Math.max(1, fusion.cost)}" value="${Math.min(duplicates, fusion.cost || 0)}">${duplicates} of ${fusion.cost}</meter>
           </div>
           <button type="button" class="card-fusion__open" data-card-id="${escapeHtml(card.id)}" ${fusion.canFuse ? '' : 'disabled'}>
-            ${stars >= 5 ? 'Five-star maximum' : fusion.canFuse ? `Preview ${fusion.cost}-duplicate fusion` : `Need ${Math.max(0, fusion.cost - duplicates)} more duplicate${Math.max(0, fusion.cost - duplicates) === 1 ? '' : 's'}`}
+            ${stars >= 5 ? 'หน้าการ์ดถึงระดับสูงสุดแล้ว' : fusion.canFuse ? `อัปเกรดโดยใช้การ์ดซ้ำ ${fusion.cost} ใบ` : `ต้องการการ์ดซ้ำอีก ${Math.max(0, fusion.cost - duplicates)} ใบ`}
           </button>
         </section>
 
@@ -512,17 +512,17 @@ export class CardAlbum {
       <div class="card-fusion__modal-header">
         <p class="card-fusion__eyebrow">CONFIRM FUSION</p>
         <h3 id="${this.instanceId}-fusion-title" class="card-fusion__title">
-          Forge Upgrade: ${escapeHtml(card.displayName)}
+          อัปเกรดดาวระดับสูง: ${escapeHtml(card.displayName)}
         </h3>
         <p class="card-fusion__cost">
-          This operation will consume exactly <strong style="color:var(--card-focus)">${preview.cost} duplicate${preview.cost === 1 ? '' : 's'}</strong>.<br>
-          Your upgraded copy remains preserved in your album.
+          การดำเนินการนี้จะใช้การ์ดซ้ำจำนวน <strong style="color:var(--card-focus)">${preview.cost} ใบ</strong> (ระบบจะจดจำระดับดาวทันที)<br>
+          การ์ดหลักของคุณจะคงอยู่และได้รับการเลื่อนขั้น
         </p>
       </div>
 
       <div class="card-fusion__visual-forge">
         <div class="card-fusion__preview-wrapper before">
-          <div class="card-fusion__label">CURRENT STATE</div>
+          <div class="card-fusion__label">สถานะปัจจุบัน</div>
           ${beforeCardTileHtml}
         </div>
         
@@ -533,18 +533,18 @@ export class CardAlbum {
         </div>
 
         <div class="card-fusion__preview-wrapper after">
-          <div class="card-fusion__label glowing">UPGRADED RESULT</div>
+          <div class="card-fusion__label glowing">ระดับที่เลื่อนขั้นแล้ว</div>
           ${afterCardTileHtml}
         </div>
       </div>
 
       <div class="card-fusion__details-comparison">
         <div class="card-fusion__stat-column">
-          <span class="card-fusion__stat-title">CURRENT STATS · ★${preview.fromStars}</span>
+          <span class="card-fusion__stat-title">สเตตัสปัจจุบัน · ★${preview.fromStars}</span>
           ${this._valueRows(beforeRows)}
         </div>
         <div class="card-fusion__stat-column after">
-          <span class="card-fusion__stat-title glowing">UPGRADED STATS · ★${preview.toStars}</span>
+          <span class="card-fusion__stat-title glowing">สเตตัสใหม่ · ★${preview.toStars}</span>
           ${this._valueRows(afterRows)}
         </div>
       </div>
@@ -552,9 +552,9 @@ export class CardAlbum {
       <p class="card-fusion__status" aria-live="polite"></p>
 
       <div class="card-fusion__actions">
-        <button type="button" class="card-fusion__cancel">Cancel</button>
+        <button type="button" class="card-fusion__cancel">ยกเลิก</button>
         <button type="button" class="card-fusion__confirm" data-card-id="${escapeHtml(card.id)}">
-          Begin Fusion Upgrade
+          ยืนยันการหลอมอัปเกรดดาว
         </button>
       </div>
     `;
@@ -575,18 +575,18 @@ export class CardAlbum {
     const cancel = fusionDialog.querySelector('.card-fusion__cancel');
     button.disabled = true;
     cancel.disabled = true;
-    status.textContent = 'Forging celestial foil…';
+    status.textContent = 'กำลังหลอมการ์ด...';
     try {
       const result = await this.options.onFuse?.(card.id);
-      if (result === false || result == null) throw new Error('Fusion was not completed.');
-      status.textContent = 'Fusion complete.';
+      if (result === false || result == null) throw new Error('การดำเนินการล้มเหลว');
+      status.textContent = 'หลอมการ์ดสำเร็จ';
       this._closeDialog(fusionDialog, false);
       this.render();
       this._openDetail(card.id, null, false);
     } catch (error) {
       button.disabled = false;
       cancel.disabled = false;
-      status.textContent = error?.message || 'Fusion failed. No album state was changed.';
+      status.textContent = error?.message || 'หลอมการ์ดล้มเหลว โปรกดลองใหม่อีกครั้ง';
     }
   }
 
