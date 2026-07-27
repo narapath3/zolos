@@ -80,11 +80,13 @@ export class PlayerProfileModal {
         -webkit-tap-highlight-color: transparent;
       }
 
-      .profile-x:hover {
-        transform: rotate(90deg);
-        background: rgba(255, 100, 100, 0.2);
-        color: #ff6b6b;
-        border-color: rgba(255, 100, 100, 0.3);
+      @media (hover: hover) {
+        .profile-x:hover {
+          transform: rotate(90deg);
+          background: rgba(255, 100, 100, 0.2);
+          color: #ff6b6b;
+          border-color: rgba(255, 100, 100, 0.3);
+        }
       }
 
       .profile-x:active {
@@ -257,10 +259,12 @@ export class PlayerProfileModal {
         transition: transform 0.2s ease;
       }
 
-      .combat-box:hover {
-        transform: translateY(-2px);
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(240, 192, 64, 0.2);
+      @media (hover: hover) {
+        .combat-box:hover {
+          transform: translateY(-2px);
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(240, 192, 64, 0.2);
+        }
       }
 
       .combat-label { font-size: 11px; color: rgba(255, 255, 255, 0.4); font-weight: 600; white-space: nowrap; }

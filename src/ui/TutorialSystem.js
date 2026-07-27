@@ -551,10 +551,17 @@ export class TutorialSystem {
         -webkit-tap-highlight-color: transparent;
       }
       
-      .tutorial-close:hover {
-        background: rgba(231, 76, 60, 0.4);
-        border-color: #ff7675;
-        transform: rotate(90deg);
+      @media (hover: hover) {
+        .tutorial-close:hover {
+          background: rgba(231, 76, 60, 0.4);
+          border-color: #ff7675;
+          transform: rotate(90deg);
+        }
+      }
+
+      .tutorial-close:active {
+        background: rgba(231, 76, 60, 0.5);
+        transform: scale(0.92);
       }
 
       .tutorial-body {
@@ -605,9 +612,15 @@ export class TutorialSystem {
         color: #3a2000;
       }
 
-      .tutorial-btn-primary:hover:not(:disabled) {
-        transform: scale(1.05);
-        box-shadow: 0 4px 12px rgba(255, 207, 74, 0.4);
+      @media (hover: hover) {
+        .tutorial-btn-primary:hover:not(:disabled) {
+          transform: scale(1.05);
+          box-shadow: 0 4px 12px rgba(255, 207, 74, 0.4);
+        }
+      }
+
+      .tutorial-btn-primary:active:not(:disabled) {
+        transform: scale(0.97);
       }
 
       .tutorial-btn-secondary {

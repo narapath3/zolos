@@ -412,9 +412,15 @@ a,
   }
 }
 
-.btn-auto:hover {
-  transform: scale(1.1);
-  border-color: var(--primary);
+@media (hover: hover) {
+  .btn-auto:hover {
+    transform: scale(1.1);
+    border-color: var(--primary);
+  }
+}
+
+.btn-auto:active {
+  transform: scale(0.95);
 }
 
 .btn-auto.active {
@@ -476,9 +482,15 @@ a,
   }
 }
 
-.btn-fishing:hover {
-  transform: scale(1.1);
-  border-color: #40b4dc;
+@media (hover: hover) {
+  .btn-fishing:hover {
+    transform: scale(1.1);
+    border-color: #40b4dc;
+  }
+}
+
+.btn-fishing:active {
+  transform: scale(0.95);
 }
 
 .btn-fishing.active {
@@ -567,14 +579,16 @@ a,
   min-width: 0;
 }
 
-.hud-btn:hover {
-  background: rgba(240, 192, 64, 0.1);
-  border-color: rgba(240, 192, 64, 0.35);
-  color: var(--text);
-  transform: translateY(-2px);
-  box-shadow:
-    0 4px 15px rgba(240, 192, 64, 0.2),
-    0 0 6px rgba(240, 192, 64, 0.1);
+@media (hover: hover) {
+  .hud-btn:hover {
+    background: rgba(240, 192, 64, 0.1);
+    border-color: rgba(240, 192, 64, 0.35);
+    color: var(--text);
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 15px rgba(240, 192, 64, 0.2),
+      0 0 6px rgba(240, 192, 64, 0.1);
+  }
 }
 
 .hud-btn:active {
@@ -681,11 +695,17 @@ a,
   justify-content: center;
 }
 
-.panel-close:hover {
-  background: rgba(255, 96, 128, 0.15);
-  color: var(--accent);
-  border-color: var(--accent);
-  transform: scale(1.05);
+@media (hover: hover) {
+  .panel-close:hover {
+    background: rgba(255, 96, 128, 0.15);
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.05);
+  }
+}
+
+.panel-close:active {
+  transform: scale(0.95);
 }
 
 .panel-body {
@@ -5542,9 +5562,11 @@ a,
   transition: all 0.2s;
 }
 
-.btn-quest-claim:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 10px rgba(240, 192, 64, 0.6);
+@media (hover: hover) {
+  .btn-quest-claim:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 10px rgba(240, 192, 64, 0.6);
+  }
 }
 
 .btn-quest-claim:disabled {

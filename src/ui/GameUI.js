@@ -1530,7 +1530,10 @@ export class GameUI {
       .eq-slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
         min-height:58px;padding:6px 4px;border-radius:10px;cursor:pointer;user-select:none;
         background:rgba(12,16,30,.6);border:1.5px solid rgba(120,140,200,.22);transition:transform .1s,border-color .15s,box-shadow .15s;}
-      .eq-slot:hover{transform:translateY(-2px);border-color:rgba(150,180,255,.6);box-shadow:0 4px 14px rgba(60,90,190,.35);}
+      @media (hover: hover) {
+        .eq-slot:hover{transform:translateY(-2px);border-color:rgba(150,180,255,.6);box-shadow:0 4px 14px rgba(60,90,190,.35);}
+      }
+      .eq-slot:active{transform:translateY(1px);border-color:rgba(150,180,255,.6);}
       .eq-slot.filled{background:rgba(30,40,72,.75);border-color:rgba(255,210,90,.55);}
       .eq-slot.active-filter{border-color:#7fe0ff;box-shadow:0 0 12px rgba(127,224,255,.55);}
       .eq-slot-ic{font-size:24px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));}
@@ -1553,7 +1556,9 @@ export class GameUI {
         display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;cursor:pointer;
         background:rgba(6,10,20,.85);border:1.5px solid rgba(150,160,190,.5);box-shadow:0 1px 3px rgba(0,0,0,.5);
         transition:transform .1s,box-shadow .15s,border-color .15s;z-index:2;}
-      .eq-card-socket:hover{transform:scale(1.18);box-shadow:0 0 10px rgba(160,190,255,.7);}
+      @media (hover: hover) {
+        .eq-card-socket:hover{transform:scale(1.18);box-shadow:0 0 10px rgba(160,190,255,.7);}
+      }
       .eq-card-socket.empty{color:#7c88a8;border-style:dashed;}
       .eq-card-socket.filled{background:radial-gradient(circle at 40% 30%,rgba(60,70,110,.9),rgba(10,14,28,.95));}
       .eq-card-socket.rc-common{border-color:#b8c0cc;}
@@ -5625,7 +5630,9 @@ export class GameUI {
         @keyframes dailyIconBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
         .daily-slot-today{animation:dailyGlow 1.4s ease-in-out infinite;}
         .daily-claim-btn{position:relative;overflow:hidden;}
-        .daily-claim-btn:hover{transform:scale(1.02);box-shadow:0 0 30px rgba(255,207,74,.6) !important;}
+        @media (hover: hover) {
+          .daily-claim-btn:hover{transform:scale(1.02);box-shadow:0 0 30px rgba(255,207,74,.6) !important;}
+        }
         .daily-claim-btn::after{content:'';position:absolute;inset:0;
           background:linear-gradient(110deg,transparent 38%,rgba(255,255,255,.5) 50%,transparent 62%);
           background-size:220% 100%;animation:dailyShine 2.2s linear infinite;}
@@ -9668,10 +9675,12 @@ export class GameUI {
           border: 2px solid rgba(255, 255, 255, 0.08);
           background-size: cover; background-position: center;
         }
-        .warp-tile:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-          border-color: rgba(240, 192, 64, 0.5);
+        @media (hover: hover) {
+          .warp-tile:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            border-color: rgba(240, 192, 64, 0.5);
+          }
         }
         .warp-tile.current {
           border-color: rgba(240, 192, 64, 0.8);
@@ -9719,9 +9728,14 @@ export class GameUI {
           background: linear-gradient(135deg, #ffe89a, #f0c040);
           color: #2a1c00; transition: all 0.2s;
         }
-        .warp-tile .tile-warp-btn:hover {
-          transform: scale(1.05);
-          box-shadow: 0 0 16px rgba(240, 192, 64, 0.5);
+        @media (hover: hover) {
+          .warp-tile .tile-warp-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 16px rgba(240, 192, 64, 0.5);
+          }
+        }
+        .warp-tile .tile-warp-btn:active {
+          transform: scale(0.97);
         }
         .warp-tile .tile-current-badge {
           position: absolute; top: 8px; right: 8px; z-index: 2;

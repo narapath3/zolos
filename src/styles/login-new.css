@@ -451,11 +451,20 @@
   border: 1px solid rgba(255, 96, 128, 0.4);
 }
 
-.btn-primary:hover,
-.btn-secondary:hover,
-.btn-guest:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
+@media (hover: hover) {
+
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-guest:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+  }
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-guest:active {
+  transform: translateY(1px);
 }
 
 .btn-start-game {
@@ -485,12 +494,18 @@
   cursor: pointer;
 }
 
-.btn-start-game:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow:
-    0 14px 40px rgba(240, 192, 64, 0.6),
-    0 2px 0 rgba(255, 255, 255, 0.8) inset;
-  filter: brightness(1.06);
+@media (hover: hover) {
+  .btn-start-game:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow:
+      0 14px 40px rgba(240, 192, 64, 0.6),
+      0 2px 0 rgba(255, 255, 255, 0.8) inset;
+    filter: brightness(1.06);
+  }
+}
+
+.btn-start-game:active {
+  transform: translateY(1px) scale(0.98);
 }
 
 /* ---- Register Specific ---- */
@@ -803,12 +818,14 @@
   letter-spacing: 0.5px;
 }
 
-.btn-ghost-alt:hover {
-  background: rgba(96, 160, 255, 0.08);
-  border-color: rgba(96, 160, 255, 0.35);
-  color: #60a0ff;
-  transform: translateY(-1.5px);
-  box-shadow: 0 4px 12px rgba(96, 160, 255, 0.15);
+@media (hover: hover) {
+  .btn-ghost-alt:hover {
+    background: rgba(96, 160, 255, 0.08);
+    border-color: rgba(96, 160, 255, 0.35);
+    color: #60a0ff;
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 12px rgba(96, 160, 255, 0.15);
+  }
 }
 
 .btn-ghost-alt:active {
@@ -836,11 +853,17 @@
   animation: pwaGlowPulse 2.5s infinite alternate;
 }
 
-.auth-pwa-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(90, 31, 214, 0.65);
-  filter: brightness(1.1);
-  border-color: rgba(240, 192, 64, 0.4);
+@media (hover: hover) {
+  .auth-pwa-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(90, 31, 214, 0.65);
+    filter: brightness(1.1);
+    border-color: rgba(240, 192, 64, 0.4);
+  }
+}
+
+.auth-pwa-btn:active {
+  transform: translateY(1px);
 }
 
 @keyframes pwaGlowPulse {
