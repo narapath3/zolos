@@ -3132,20 +3132,21 @@ export class GameUI {
         const targetUsername = row.getAttribute('data-username');
         const isOffline = row.getAttribute('data-offline') === 'true';
 
-        if (isOffline) {
+        // 1. Try to find the player in the live online list first (most accurate)
+        let player = this.onlinePlayers ? this.onlinePlayers.find(p => p.username === targetUsername) : null;
+        
+        // 2. If not found online, check if it's an offline friend row
+        if (!player && isOffline) {
           const userId = row.getAttribute('data-user-id');
-          // For offline friends, we might not have a full player object, but we can still try
-          this._showPlayerPopup({
+          player = {
             username: targetUsername,
             level: row.querySelector('.player-level-badge')?.textContent.replace('Lv.', '') || '?',
             userId: userId || targetUsername,
             isOffline: true
-          });
-          return;
+          };
         }
 
-        if (!this.onlinePlayers) return;
-        const player = this.onlinePlayers.find(p => p.username === targetUsername);
+        // 3. Show popup if we found a valid target
         if (player) {
           this._showPlayerPopup(player);
         }

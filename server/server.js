@@ -682,6 +682,7 @@ io.on('connection', (socket) => {
             }
         }
         if (!target) {
+            console.warn(`[Server] 🌀 Warp failed: target ${payload.targetUserId} not found or offline.`);
             socket.emit('warp_result', { ok: false, reason: 'offline', targetUserId: payload.targetUserId });
             return;
         }

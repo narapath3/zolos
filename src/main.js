@@ -1667,10 +1667,10 @@ window.warpManager = {
 
     onWarpResult(payload) {
         this.pending = null;
-        if (!payload || !character || !sceneManager) return;
+        if (!payload) return;
 
         if (!payload.ok) {
-            if (gameUI) gameUI.addCombatLog(
+            if (window.gameUI) window.gameUI.addCombatLog(
                 payload.reason === 'offline'
                     ? '❌ วาปไม่ได้ — เพื่อนออฟไลน์แล้ว'
                     : '❌ วาปไม่ได้ ลองใหม่อีกครั้ง',
@@ -1679,9 +1679,15 @@ window.warpManager = {
             return;
         }
 
+        // Safety check for game state
+        if (!window.character || !window.sceneManager) {
+            console.error('[Warp] Cannot warp: character or sceneManager missing');
+            return;
+        }
+
         // Not allowed mid-duel
-        if (duelState) {
-            if (gameUI) gameUI.addCombatLog('❌ วาปไม่ได้ระหว่างการดวล', 'warning');
+        if (window.duelState) {
+            if (window.gameUI) window.gameUI.addCombatLog('❌ วาปไม่ได้ระหว่างการดวล', 'warning');
             return;
         }
 
@@ -1689,27 +1695,29 @@ window.warpManager = {
         let sx = 0;
         let sz = 10;
         let exactWarp = false;
-        if (typeof payload.x === 'number' && typeof payload.z === 'number') {
+        
+        // Use coordinates if provided, otherwise default to map spawn
+        if (payload.x != null && payload.z != null) {
             exactWarp = true;
             // Land a short distance away so we don't stack right on top of them
             const ang = Math.random() * Math.PI * 2;
             const off = 1.8;
-            sx = payload.x + Math.cos(ang) * off;
-            sz = payload.z + Math.sin(ang) * off;
+            sx = Number(payload.x) + Math.cos(ang) * off;
+            sz = Number(payload.z) + Math.sin(ang) * off;
         }
 
-        if (targetMap !== sceneManager.currentMap) {
+        if (targetMap !== window.sceneManager.currentMap) {
             loadMapAndSpawn(targetMap, { x: sx, y: 1.2, z: sz });
         } else {
             // Same map — just reposition and re-broadcast (no reload needed)
-            autoPath = null;
-            character.targetMonster = null;
-            character.baseY = 1.2;
-            character.mesh.position.set(sx, 1.2, sz);
-            broadcastPosition(
-                userId, username, character.stats.level,
-                character.getPosition(), character.mesh.rotation.y,
-                character.state, character.getAppearance(), targetMap
+            window.autoPath = null;
+            window.character.targetMonster = null;
+            window.character.baseY = 1.2;
+            window.character.mesh.position.set(sx, 1.2, sz);
+            window.broadcastPosition(
+                window.userId, window.username, window.character.stats.level,
+                window.character.getPosition(), window.character.mesh.rotation.y,
+                window.character.state, window.character.getAppearance(), targetMap
             );
         }
 
