@@ -1625,7 +1625,7 @@ a,
 /* ========== COMBAT LOG ========== */
 #combat-log {
   position: fixed;
-  bottom: 140px;
+  bottom: 115px;
   /* Adjusted for compact chat */
   left: 16px;
   z-index: 100;
@@ -4095,7 +4095,7 @@ a,
 
   /* Tablet-specific combat log placement at bottom-left */
   #combat-log {
-    bottom: 200px;
+    bottom: 165px;
     left: 10px;
     top: auto;
     right: auto;
@@ -4264,7 +4264,7 @@ a,
 
   /* Combat log above bottom bar, chat panel, and currency widget */
   #combat-log {
-    bottom: calc(230px + env(safe-area-inset-bottom));
+    bottom: calc(195px + env(safe-area-inset-bottom));
     top: auto;
     left: 10px;
     right: auto;
