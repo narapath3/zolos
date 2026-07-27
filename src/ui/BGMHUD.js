@@ -14,6 +14,7 @@ export function initBGMHUD() {
       </div>
       <div class="music-controls">
         <button id="btn-music-play-pause" title="Play/Pause">⏸</button>
+        <button id="btn-music-next" title="Next Song">⏭</button>
         <button id="btn-music-mute" title="Mute/Unmute">🔊</button>
         <input type="range" id="slider-music-volume" min="0" max="100" value="25" title="Volume">
       </div>
@@ -38,6 +39,7 @@ export function initBGMHUD() {
 
     // 3. Setup listeners for the player elements
     const playBtn = document.getElementById('btn-music-play-pause');
+    const nextBtn = document.getElementById('btn-music-next');
     const muteBtn = document.getElementById('btn-music-mute');
     const volSlider = document.getElementById('slider-music-volume');
 
@@ -48,6 +50,12 @@ export function initBGMHUD() {
             } else {
                 youtubeBGM.play();
             }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            youtubeBGM.nextTrack();
         });
     }
 

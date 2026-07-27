@@ -1688,7 +1688,7 @@ a,
 /* ========== KILL COUNTER ========== */
 #kill-counter {
   position: fixed;
-  top: 220px;
+  top: 236px;
   right: 16px;
   z-index: 100;
   background: var(--bg-dark);
@@ -4251,7 +4251,7 @@ a,
   }
 
   #kill-counter {
-    top: 110px !important;
+    top: 130px !important;
     /* Adjust for even smaller minimap */
   }
 
@@ -6424,7 +6424,7 @@ a,
 /* ========== MUSIC PLAYER HUD (Compact Bar) ========== */
 #music-player-hud {
   position: fixed;
-  top: 172px;
+  top: 188px;
   right: 16px;
   z-index: 100;
   background: rgba(10, 15, 30, 0.88);
@@ -6446,7 +6446,7 @@ a,
 
 /* Expanded state — full bar */
 #music-player-hud.music-expanded {
-  width: 210px;
+  width: 235px;
 }
 
 /* Collapsed state — just the icon button */
@@ -6611,13 +6611,13 @@ a,
 /* ---- Mobile overrides ---- */
 @media (max-width: 768px) {
   #music-player-hud {
-    top: 85px;
+    top: 96px;
     right: 10px;
     height: 26px;
   }
 
   #music-player-hud.music-expanded {
-    width: 180px;
+    width: 200px;
   }
 
   #music-player-hud.music-collapsed {

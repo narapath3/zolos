@@ -95,6 +95,12 @@ export class YouTubeBGM {
         });
     }
 
+    nextTrack() {
+        if (!this.enabled) return;
+        this.playing = true;
+        this._playNextRandom();
+    }
+
     _armRetryOnInteraction() {
         if (this._isArmed) return;
         this._isArmed = true;
