@@ -6616,7 +6616,7 @@ a,
     height: 36px;
     border-radius: 18px;
     pointer-events: auto;
-    z-index: 200;
+    z-index: 100;
   }
 
   #music-player-hud.music-expanded {
