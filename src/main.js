@@ -1666,6 +1666,9 @@ window.warpManager = {
     },
 
     onWarpResult(payload) {
+        console.error('[Warp DEBUG] onWarpResult called:', payload);
+        console.error('[Warp DEBUG] character:', !!window.character, 'sceneManager:', !!window.sceneManager);
+
         this.pending = null;
         if (!payload) return;
 
@@ -1710,8 +1713,20 @@ window.warpManager = {
             loadMapAndSpawn(targetMap, { x: sx, y: 1.2, z: sz });
         } else {
             // Same map — just reposition and re-broadcast (no reload needed)
+            // CRITICAL: clear BOTH local autoPath AND window.autoPath so click-to-move
+            // in stepWorld() does not override the teleport (Fix 3)
+            autoPath = null;
             window.autoPath = null;
             window.character.targetMonster = null;
+            window.character.state = 'idle';
+            if (window.combatSystem) {
+                window.combatSystem.currentTarget = null;
+                window.combatSystem.autoFarm = false;
+                window.combatSystem.isFishing = false;
+            }
+            if (inputManager && typeof inputManager.reset === 'function') {
+                inputManager.reset();
+            }
             window.character.baseY = 1.2;
             window.character.mesh.position.set(sx, 1.2, sz);
             window.broadcastPosition(

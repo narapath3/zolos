@@ -1524,7 +1524,10 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             // ===== WARP TO FRIEND =====
-            socket.on('warp_result', (payload) => window.warpManager?.onWarpResult?.(payload));
+            socket.on('warp_result', (payload) => {
+                console.error('[Warp DEBUG] warp_result received:', payload);
+                window.warpManager?.onWarpResult?.(payload);
+            });
 
             // ===== VENDING STALLS =====
             socket.on('stalls_update', () => window.stallManager?.refresh?.());
@@ -2425,6 +2428,7 @@ export function sendBossHit(damage, critical = false) {
 // Ask the server for a friend's current position/map. The reply arrives on the
 // `warp_result` socket event and is handled by window.warpManager.
 export function sendWarpRequest(targetUserId) {
+    console.error('[Warp DEBUG] sendWarpRequest called with:', targetUserId);
     if (isOfflineMode) {
         if (!targetUserId) return { success: false };
         const list = (typeof mockPlayers !== 'undefined' && Array.isArray(mockPlayers)) ? mockPlayers : [];
@@ -2445,14 +2449,17 @@ export function sendWarpRequest(targetUserId) {
             }, 100);
             return { success: true };
         }
+        console.error('[Warp DEBUG] Offline mode: no mock player found for', targetUserId);
         return { success: false };
     }
     if (!targetUserId) return { success: false };
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         socket.emit('warp_request', { targetUserId });
+        console.error('[Warp DEBUG] socket.emit warp_request sent with targetUserId:', targetUserId);
         return { success: true };
     }
+    console.error('[Warp DEBUG] socket not connected or missing:', !!socket, 'connected:', isSocketConnected());
     return { success: false };
 }
 

@@ -762,8 +762,17 @@ export class PlayerProfileModal {
       if (btnWarp) {
         btnWarp.onclick = async () => {
           if (window.gameUI) {
+            // Fix 5: Allow warp by userId OR username (fallback when userId is missing)
+            const warpId = player.userId || player.username;
+            if (!warpId) {
+              console.error('[Warp DEBUG] PlayerProfileModal: no userId or username for', player);
+              window.gameUI.addCombatLog('❌ วาปไม่ได้ (ไม่มีข้อมูลเป้าหมาย)', 'warning');
+              return;
+            }
+            console.error('[Warp DEBUG] PlayerProfileModal sendWarpRequest called with:', warpId, '(userId:', player.userId, ', username:', player.username, ')');
             const { sendWarpRequest } = await import('../network/GameSync.js');
-            const res = sendWarpRequest(player.userId);
+            const res = sendWarpRequest(warpId);
+            console.error('[Warp DEBUG] PlayerProfileModal sendWarpRequest result:', res);
             if (res && res.success) {
               if (window.warpManager) window.warpManager.pending = { targetName: player.username };
               window.gameUI.addCombatLog(`🌀 กำลังวาปไปหา ${player.username}...`, 'system');

@@ -665,14 +665,23 @@ io.on('connection', (socket) => {
     // the target's last-known position (tracked from their `pos` broadcasts),
     // including which map they're on, so cross-map warps work too.
     socket.on('warp_request', (payload) => {
-        if (!payload || !payload.targetUserId) return;
+        console.log(`[Server] 🌀 [Warp DEBUG] warp_request received from ${socket.id}:`, payload);
+        if (!payload || !payload.targetUserId) {
+            console.log(`[Server] 🌀 [Warp DEBUG] warp_request: missing payload or targetUserId`);
+            return;
+        }
         const requester = onlinePlayers.get(socket.id);
-        if (!requester) return;
+        if (!requester) {
+            console.log(`[Server] 🌀 [Warp DEBUG] warp_request: requester not found for socket ${socket.id}`);
+            return;
+        }
+        console.log(`[Server] 🌀 [Warp DEBUG] Requester: ${requester.username} (id: ${requester.userId})`);
 
         // Look up the target player — try userId first, then fall back to
         // scanning by username so warp works even if the UI passed a name.
         let targetSocketId = userSocketMap.get(payload.targetUserId);
         let target = targetSocketId ? onlinePlayers.get(targetSocketId) : null;
+        console.log(`[Server] 🌀 [Warp DEBUG] userSocketMap lookup for '${payload.targetUserId}': found=${!!target}`);
         if (!target) {
             for (const [, p] of onlinePlayers) {
                 if (p.username === payload.targetUserId || p.userId === payload.targetUserId) {
@@ -680,18 +689,22 @@ io.on('connection', (socket) => {
                     break;
                 }
             }
+            console.log(`[Server] 🌀 [Warp DEBUG] Fallback scan result: found=${!!target}`);
         }
         if (!target) {
             console.warn(`[Server] 🌀 Warp failed: target ${payload.targetUserId} not found or offline.`);
+            console.log(`[Server] 🌀 [Warp DEBUG] Emitting warp_result ok:false (offline)`);
             socket.emit('warp_result', { ok: false, reason: 'offline', targetUserId: payload.targetUserId });
             return;
         }
+        console.log(`[Server] 🌀 [Warp DEBUG] Target found: ${target.username} on map ${target.mapId || 'prontera'}`);
 
         const targetMapId = target.mapId || 'prontera';
         const pos = target.lastPos;
         // Use the target's stored coordinates when available; fall back to
         // safe spawn defaults so the warp never stalls with null coords.
         const hasCoords = pos && typeof pos.x === 'number' && typeof pos.z === 'number';
+        console.log(`[Server] 🌀 [Warp DEBUG] Target coords: hasCoords=${hasCoords}, lastPos=${JSON.stringify(pos)}`);
 
         socket.emit('warp_result', {
             ok: true,
@@ -703,6 +716,7 @@ io.on('connection', (socket) => {
             z: hasCoords ? pos.z : 10,
         });
         console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username} (map: ${targetMapId}, coords: ${hasCoords ? 'live' : 'default'})`);
+        console.log(`[Server] 🌀 [Warp DEBUG] warp_result emitted to requester ${requester.username}`);
     });
 
     // ============ PVP DUEL SYSTEM ============

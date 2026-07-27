@@ -3179,11 +3179,19 @@ export class GameUI {
     if (popupWarpBtn) {
       popupWarpBtn.addEventListener('click', async () => {
         const target = this.selectedProfilePlayer;
-        if (!target || !target.userId) return;
+        // Fix 6: Allow warp by userId OR username (fallback when userId is missing)
+        if (!target || (!target.userId && !target.username)) {
+          console.error('[Warp DEBUG] Warp blocked: no target or missing both userId and username');
+          return;
+        }
+        // Fix 5: Pass best available identifier — userId preferred, username as fallback
+        const warpId = target.userId || target.username;
+        console.error('[Warp DEBUG] sendWarpRequest called with:', warpId, '(userId:', target.userId, ', username:', target.username, ')');
         if (popup) popup.style.display = 'none';
         this.updateMobileControlsVisibility();
         const { sendWarpRequest } = await import('../network/GameSync.js');
-        const res = sendWarpRequest(target.userId);
+        const res = sendWarpRequest(warpId);
+        console.error('[Warp DEBUG] sendWarpRequest result:', res);
         if (res && res.success) {
           if (window.warpManager) window.warpManager.pending = { targetName: target.username };
           this.addCombatLog(`🌀 กำลังวาปไปหา ${target.username}...`, 'system');
