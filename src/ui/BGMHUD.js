@@ -28,6 +28,13 @@ export function initBGMHUD() {
         document.body.appendChild(bgmHud);
     }
 
+    // 1b. Block event propagation so game canvas doesn't steal touches
+    ['pointerdown', 'pointerup', 'pointermove',
+        'touchstart', 'touchend', 'touchmove',
+        'mousedown', 'mouseup', 'click'].forEach(evt => {
+            bgmHud.addEventListener(evt, e => e.stopPropagation(), { passive: false });
+        });
+
     // 2. Setup toggle (collapse/expand)
     const toggleBtn = document.getElementById('btn-music-toggle');
     if (toggleBtn) {
