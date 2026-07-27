@@ -1625,7 +1625,7 @@ a,
 /* ========== COMBAT LOG ========== */
 #combat-log {
   position: fixed;
-  bottom: 103px;
+  bottom: 125px;
   /* Adjusted for compact chat */
   left: 16px;
   z-index: 100;
@@ -1645,7 +1645,7 @@ a,
 .combat-msg {
   font-size: 11px;
   padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.08);
   border-radius: 4px;
   animation: msgFadeIn 0.3s ease-out;
   backdrop-filter: blur(4px);
@@ -4095,7 +4095,7 @@ a,
 
   /* Tablet-specific combat log placement at bottom-left */
   #combat-log {
-    bottom: 153px;
+    bottom: 180px;
     left: 10px;
     top: auto;
     right: auto;
@@ -4264,7 +4264,7 @@ a,
 
   /* Combat log above bottom bar, chat panel, and currency widget */
   #combat-log {
-    bottom: calc(183px + env(safe-area-inset-bottom));
+    bottom: calc(210px + env(safe-area-inset-bottom));
     top: auto;
     left: 10px;
     right: auto;
