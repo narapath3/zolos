@@ -599,7 +599,12 @@ export class PlayerProfileModal {
 
     const jobInfo = JOBS[job] || { name: 'Adventurer', emoji: '⚔️' };
     const uid = player.userId || '';
-    const isOffline = player.isOffline || (uid.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(player.userId)));
+    // Check the global online roster (cross-map players) so friends on other
+    // maps are not incorrectly shown as offline.
+    const isInGlobalRoster = window.gameUI && Array.isArray(window.gameUI.onlinePlayers)
+      && window.gameUI.onlinePlayers.some(p => p.userId === uid);
+    const isOffline = isInGlobalRoster ? false
+      : (player.isOffline || (uid.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(uid))));
 
     // Friend status check
     const isFriend = window.gameUI && window.gameUI.friends && window.gameUI.friends.includes(player.username);
@@ -635,7 +640,7 @@ export class PlayerProfileModal {
               <button id="prof-btn-friend" class="profile-btn ${isFriend ? 'danger' : 'primary'}">
                 ${isFriend ? '💔 Remove Friend' : '➕ Add Friend (เพิ่มเพื่อน)'}
               </button>
-              <button id="prof-btn-warp" class="profile-btn" ${isOffline ? 'disabled' : ''}>
+              <button id="prof-btn-warp" class="profile-btn">
                 🌀 Warp To Player (วาปไปหา)
               </button>
               <button id="prof-btn-duel" class="profile-btn" ${isOffline ? 'disabled' : ''}>
@@ -840,9 +845,12 @@ export class PlayerProfileModal {
     const userId = this.currentPlayer.userId;
     // Local player is always online
     const isLocal = window.userId === userId;
-    // Remote player is online if in the map
+    // Remote player is online if in the same map
     const isRemoteOnline = window.remotePlayersMap && window.remotePlayersMap.has(userId);
-    const isOnline = isLocal || isRemoteOnline;
+    // Also check the global online roster (cross-map friends)
+    const isInGlobalRoster = window.gameUI && Array.isArray(window.gameUI.onlinePlayers)
+      && window.gameUI.onlinePlayers.some(p => p.userId === userId);
+    const isOnline = isLocal || isRemoteOnline || isInGlobalRoster;
 
     if (isOnline) {
       badge.className = 'status-badge status-online';

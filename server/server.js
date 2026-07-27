@@ -675,14 +675,17 @@ io.on('connection', (socket) => {
             return;
         }
         const pos = target.lastPos;
+        const targetMapId = target.mapId || 'prontera';
+        const isPosValid = pos && pos.mapId === targetMapId;
+
         socket.emit('warp_result', {
             ok: true,
             targetUserId: target.userId,
             targetName: target.username,
-            mapId: target.mapId || (pos && pos.mapId) || 'prontera',
-            x: pos ? pos.x : null,
-            y: pos ? pos.y : null,
-            z: pos ? pos.z : null,
+            mapId: targetMapId,
+            x: isPosValid ? pos.x : null,
+            y: isPosValid ? pos.y : null,
+            z: isPosValid ? pos.z : null,
         });
         console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username}`);
     });
