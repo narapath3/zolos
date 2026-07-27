@@ -426,6 +426,26 @@ io.on('connection', (socket) => {
         socket.to(`map:${mapId}`).emit('skill_cast', out);
     });
 
+    // --- ATTACK HIT EFFECTS --- relay a player's melee/ranged hit so everyone
+    // on the map sees the slash arc, hit sparks, and damage number at the target.
+    socket.on('attack_hit', (payload) => {
+        if (!payload) return;
+        const self = trustedSender(socket);
+        if (!self) return;
+        const mapId = resolveTrustedMap(self);
+        const out = {
+            userId: self.userId,
+            tc: typeof payload.tc === 'number' ? payload.tc : undefined, // critical flag
+            dmg: typeof payload.dmg === 'number' ? Math.max(0, Math.min(99999, Math.floor(payload.dmg))) : undefined,
+            wsc: typeof payload.wsc === 'string' ? payload.wsc : 'melee',
+        };
+        if (typeof payload.tx === 'number' && typeof payload.tz === 'number') {
+            out.tx = payload.tx;
+            out.tz = payload.tz;
+        }
+        socket.to(`map:${mapId}`).emit('attack_hit', out);
+    });
+
     // --- LATENCY PONG --- reply to our periodic srv_ping; RTT = now - echoed ts
     socket.on('srv_pong', (t) => {
         const info = onlinePlayers.get(socket.id);

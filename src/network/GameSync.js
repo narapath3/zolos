@@ -1550,6 +1550,11 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 if (payload) window.onRemoteSkillCast?.(payload);
             });
 
+            // A teammate landed a hit — render the slash/sparks/damage number.
+            socket.on('attack_hit', (payload) => {
+                if (payload) window.onRemoteAttackHit?.(payload);
+            });
+
             socketListenersAttached = true;
         }
 
@@ -1594,9 +1599,22 @@ export function broadcastMonsterHit(monsterId, damage, currentMapId = 'prontera'
     }
 }
 
-// Tell the map that we cast a skill so everyone can render its effect at our
-// avatar. Only the skill id + optional target position travels; the origin is
-// each receiver's copy of our avatar (server stamps the sender's userId).
+// Tell the map that we hit a target so everyone can render the slash/sparks/damage number.
+export function broadcastAttackHit(targetX, targetZ, isCritical, damage, weaponSoundClass, currentMapId = 'prontera') {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('attack_hit', {
+            tc: isCritical ? 1 : 0,
+            dmg: Math.max(0, Math.min(99999, Math.floor(damage || 0))),
+            wsc: weaponSoundClass || 'melee',
+            tx: targetX,
+            tz: targetZ,
+            mapId: currentMapId,
+        });
+    }
+}
+
 export function broadcastSkillCast(skillId, targetX, targetZ, currentMapId = 'prontera') {
     if (isOfflineMode) return;
     const socket = getSocket();

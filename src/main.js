@@ -73,6 +73,7 @@ import {
     broadcastPosition,
     broadcastMonsterHit,
     broadcastSkillCast,
+    broadcastAttackHit,
     broadcastChat,
     updatePresence,
     getDeterministicGuestName,
@@ -373,6 +374,15 @@ async function initGame(charData) {
                 if (event.weaponClass === 'melee') {
                     registerLocalAttack(character && character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword');
                 }
+                // Broadcast the hit to other players so they see the slash/sparks/damage number too
+                if (typeof broadcastAttackHit === 'function' && event.targetPos) {
+                    const wsc = event.weaponClass === 'melee' ? (character && character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword') : (event.weaponClass || 'melee');
+                    broadcastAttackHit(
+                        event.targetPos.x, event.targetPos.z,
+                        event.critical, event.damage, wsc,
+                        sceneManager.currentMap
+                    );
+                }
                 if (gameUI) {
                     gameUI.addCombatLog(`⚔️ You hit ${event.monsterName} for ${event.damage} damage${event.critical ? ' (CRITICAL!)' : ''}`, 'damage');
                     // Step 5: Screen shake on critical hits only
@@ -522,6 +532,52 @@ async function initGame(charData) {
         const target = (payload.tx != null && payload.tz != null)
             ? new THREE.Vector3(payload.tx, origin.y, payload.tz) : null;
         particles.spawnSkillEffect(payload.skillId, origin, target);
+    };
+
+    // ===== See other players' attack hit effects =====
+    window.onRemoteAttackHit = (payload) => {
+        if (!particles || !payload || !payload.userId) return;
+        const rp = remotePlayersMap.get(payload.userId);
+        if (!rp || !rp.mesh) return;
+        // Cull far-away hits
+        if (character && character.getPosition && rp.mesh.position.distanceTo(character.getPosition()) > 46) return;
+        const isCritical = payload.tc === 1;
+        const damage = payload.dmg || 0;
+        const wsc = payload.wsc || 'melee';
+        // Target position: use server-provided coords or cast forward from caster
+        // spawnSlash internally adds y+=0.9, so we pass raw Y (monster ground level)
+        let targetPos;
+        if (payload.tx != null && payload.tz != null) {
+            targetPos = new THREE.Vector3(payload.tx, rp.mesh.position.y, payload.tz);
+        } else {
+            const forward = new THREE.Vector3(0, 0, 3).applyQuaternion(rp.character.mesh.quaternion);
+            targetPos = rp.mesh.position.clone().add(forward);
+        }
+        // Sword slash arc for melee weapons
+        if (wsc === 'melee' || wsc === 'sword' || wsc === 'blunt' || wsc === 'staff' || wsc === 'spear' || wsc === 'unarmed') {
+            particles.spawnSlash(targetPos, isCritical);
+        } else if (wsc === 'thief' || wsc === 'shadowslash') {
+            particles.spawnShadowSlash(rp.mesh.position, { getPosition: () => targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z) });
+        } else if (wsc === 'lightning' || wsc === 'magic') {
+            particles.spawnLightningBolt(rp.mesh.position, { getPosition: () => targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z) });
+        } else if (wsc === 'holyorb' || wsc === 'acolyte') {
+            particles.spawnHolyOrb(rp.mesh.position, { getPosition: () => targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z) });
+        } else if (wsc === 'bow') {
+            // Bow: arrow projectile visual
+            particles.spawnArrow(rp.mesh.position, { getPosition: () => targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z) });
+        } else if (wsc === 'gun') {
+            // Gun: bullet projectile visual
+            particles.spawnBullet(rp.mesh.position, { getPosition: () => targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z) });
+        }
+        // Hit sparks
+        particles.spawnHitEffect(targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z), isCritical);
+        // Damage number
+        if (damage > 0 && typeof worldToScreen === 'function') {
+            const displayPos = targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z);
+            const screenPos = worldToScreen(displayPos, 1.2);
+            const dmgType = isCritical ? 'critical-dmg' : 'player-dmg';
+            particles.spawnDamageNumber(screenPos.x, screenPos.y, damage, dmgType);
+        }
     };
 
     // Initialize Game UI with character
