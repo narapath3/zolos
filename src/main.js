@@ -1636,8 +1636,9 @@ function loadMapAndSpawn(targetMap, spawn) {
 
 // ============ Warp To Friend ============
 // The player picked an online friend to warp to. sendWarpRequest() asks the
-// server for that friend's current map + position; the reply lands here via the
-// `warp_result` socket event.
+// server for that friend's current map; the reply lands here via the
+// `warp_result` socket event. Uses the same proven teleport mechanism as the
+// warp menu — loads the friend's map/city and drops the player at the spawn.
 window.warpManager = {
     _pending: null,
     _timeoutId: null,
@@ -1667,7 +1668,6 @@ window.warpManager = {
 
     onWarpResult(payload) {
         console.error('[Warp DEBUG] onWarpResult called:', payload);
-        console.error('[Warp DEBUG] character:', !!window.character, 'sceneManager:', !!window.sceneManager);
 
         this.pending = null;
         if (!payload) return;
@@ -1695,57 +1695,40 @@ window.warpManager = {
         }
 
         const targetMap = payload.mapId || 'prontera';
-        let sx = 0;
-        let sz = 10;
-        let exactWarp = false;
-        
-        // Use coordinates if provided, otherwise default to map spawn
+        const targetName = payload.targetName || 'เพื่อน';
+
+        // Always use the friend's city (loadMapAndSpawn) — same mechanism as
+        // the warp menu. Pick a random spawn near the map center (offset from
+        // the friend's exact coords so we don't stack on top of them).
+        let sx, sz;
         if (payload.x != null && payload.z != null) {
-            exactWarp = true;
-            // Land a short distance away so we don't stack right on top of them
+            // Land a short distance away from the friend's exact position
             const ang = Math.random() * Math.PI * 2;
             const off = 1.8;
             sx = Number(payload.x) + Math.cos(ang) * off;
             sz = Number(payload.z) + Math.sin(ang) * off;
-        }
-
-        if (targetMap !== window.sceneManager.currentMap) {
-            loadMapAndSpawn(targetMap, { x: sx, y: 1.2, z: sz });
         } else {
-            // Same map — just reposition and re-broadcast (no reload needed)
-            // CRITICAL: clear BOTH local autoPath AND window.autoPath so click-to-move
-            // in stepWorld() does not override the teleport (Fix 3)
-            autoPath = null;
-            window.autoPath = null;
-            window.character.targetMonster = null;
-            window.character.state = 'idle';
-            if (window.combatSystem) {
-                window.combatSystem.currentTarget = null;
-                window.combatSystem.autoFarm = false;
-                window.combatSystem.isFishing = false;
-            }
-            if (inputManager && typeof inputManager.reset === 'function') {
-                inputManager.reset();
-            }
-            window.character.baseY = 1.2;
-            window.character.mesh.position.set(sx, 1.2, sz);
-            window.broadcastPosition(
-                window.userId, window.username, window.character.stats.level,
-                window.character.getPosition(), window.character.mesh.rotation.y,
-                window.character.state, window.character.getAppearance(), targetMap
-            );
+            // No exact coords — use random spawn near map center (like warp menu)
+            sx = (Math.random() - 0.5) * 8;
+            sz = (Math.random() - 0.5) * 8;
         }
 
-        // A little sparkle on arrival
-        if (particles && typeof particles.spawnHitEffect === 'function') {
-            particles.spawnHitEffect(character.getPosition(), true);
+        // Use loadMapAndSpawn which is the proven working teleport helper
+        // (same as portals and warp menu use). It handles:
+        // - clearing autoPath (local + window)
+        // - clearing combat state / input
+        // - loading the map
+        // - respawning monsters
+        // - updating presence + broadcasting
+        // - clearing remote players
+        loadMapAndSpawn(targetMap, { x: sx, y: 1.2, z: sz });
+
+        // Warp effect + success log
+        if (window.particles && typeof window.particles.spawnWarpEffect === 'function') {
+            window.particles.spawnWarpEffect(window.character.getPosition());
         }
-        if (gameUI) {
-            if (exactWarp) {
-                gameUI.addCombatLog(`✨ วาปไปหา ${payload.targetName || 'เพื่อน'} สำเร็จ!`, 'levelup');
-            } else {
-                gameUI.addCombatLog(`✨ วาปไปยังแผนที่ของ ${payload.targetName || 'เพื่อน'} (${targetMap}) สำเร็จ!`, 'levelup');
-            }
+        if (window.gameUI) {
+            window.gameUI.addCombatLog(`✨ วาปไปหา ${targetName} สำเร็จ!`, 'levelup');
         }
     },
 };
