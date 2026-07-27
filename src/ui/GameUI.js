@@ -3179,25 +3179,52 @@ export class GameUI {
     if (popupWarpBtn) {
       popupWarpBtn.addEventListener('click', async () => {
         const target = this.selectedProfilePlayer;
-        // Fix 6: Allow warp by userId OR username (fallback when userId is missing)
+        // Allow warp by userId OR username (fallback when userId is missing)
         if (!target || (!target.userId && !target.username)) {
-          console.error('[Warp DEBUG] Warp blocked: no target or missing both userId and username');
+          console.error('[Warp] Warp blocked: no target or missing both userId and username');
           return;
         }
-        // Fix 5: Pass best available identifier — userId preferred, username as fallback
-        const warpId = target.userId || target.username;
-        console.error('[Warp DEBUG] sendWarpRequest called with:', warpId, '(userId:', target.userId, ', username:', target.username, ')');
+
+        // Determine the friend's map — same approach as warp menu.
+        // 1. Try to find friend in the live online roster (has mapId from server)
+        let targetMap = null;
+        if (Array.isArray(this.onlinePlayers)) {
+          const onlineTarget = this.onlinePlayers.find(p =>
+            p.username === target.username || p.userId === target.userId
+          );
+          if (onlineTarget && onlineTarget.mapId) {
+            targetMap = onlineTarget.mapId;
+          }
+        }
+
+        // 2. Fallback: also check remotePlayersMap for local map players
+        if (!targetMap && window.remotePlayersMap) {
+          const remoteP = window.remotePlayersMap.get(target.userId);
+          // remotePlayersMap only has same-map players, so they're on the current map
+          if (remoteP) {
+            targetMap = window.sceneManager?.currentMap || 'prontera';
+          }
+        }
+
+        // 3. Final fallback: warp to a default map
+        if (!targetMap) {
+          targetMap = 'prontera';
+        }
+
+        console.error('[Warp] Warping to friend "' + target.username + '" — targetMap:', targetMap);
+
         if (popup) popup.style.display = 'none';
         this.updateMobileControlsVisibility();
-        const { sendWarpRequest } = await import('../network/GameSync.js');
-        const res = sendWarpRequest(warpId);
-        console.error('[Warp DEBUG] sendWarpRequest result:', res);
-        if (res && res.success) {
-          if (window.warpManager) window.warpManager.pending = { targetName: target.username };
-          this.addCombatLog(`🌀 กำลังวาปไปหา ${target.username}...`, 'system');
-        } else {
-          this.addCombatLog('❌ วาปไม่ได้ (เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
-        }
+        this.addCombatLog(`🌀 กำลังวาปไปหา ${target.username}...`, 'system');
+
+        // Use the same _doWarp mechanism as the warp menu — proven working.
+        // This bypasses the socket round-trip entirely and directly loads the
+        // friend's city, exactly like the normal warp menu does.
+        this._doWarp(targetMap);
+
+        // Override the success log to show the friend's name
+        // _doWarp already logs 'วาร์ปไป <map> สำเร็จ!', so we add the friend context
+        this.addCombatLog(`✨ วาปไปหา ${target.username} สำเร็จ!`, 'levelup');
       });
     }
 

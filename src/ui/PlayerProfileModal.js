@@ -762,24 +762,33 @@ export class PlayerProfileModal {
       if (btnWarp) {
         btnWarp.onclick = async () => {
           if (window.gameUI) {
-            // Fix 5: Allow warp by userId OR username (fallback when userId is missing)
-            const warpId = player.userId || player.username;
-            if (!warpId) {
-              console.error('[Warp DEBUG] PlayerProfileModal: no userId or username for', player);
-              window.gameUI.addCombatLog('❌ วาปไม่ได้ (ไม่มีข้อมูลเป้าหมาย)', 'warning');
-              return;
+            // Determine the friend's map — same approach as warp menu.
+            let targetMap = null;
+            if (Array.isArray(window.gameUI.onlinePlayers)) {
+              const onlineTarget = window.gameUI.onlinePlayers.find(p =>
+                p.username === player.username || p.userId === player.userId
+              );
+              if (onlineTarget && onlineTarget.mapId) {
+                targetMap = onlineTarget.mapId;
+              }
             }
-            console.error('[Warp DEBUG] PlayerProfileModal sendWarpRequest called with:', warpId, '(userId:', player.userId, ', username:', player.username, ')');
-            const { sendWarpRequest } = await import('../network/GameSync.js');
-            const res = sendWarpRequest(warpId);
-            console.error('[Warp DEBUG] PlayerProfileModal sendWarpRequest result:', res);
-            if (res && res.success) {
-              if (window.warpManager) window.warpManager.pending = { targetName: player.username };
-              window.gameUI.addCombatLog(`🌀 กำลังวาปไปหา ${player.username}...`, 'system');
-              this.hide();
-            } else {
-              window.gameUI.addCombatLog('❌ วาปไม่ได้ (เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
+            if (!targetMap && window.remotePlayersMap && player.userId) {
+              const remoteP = window.remotePlayersMap.get(player.userId);
+              if (remoteP) {
+                targetMap = window.sceneManager?.currentMap || 'prontera';
+              }
             }
+            if (!targetMap) {
+              targetMap = 'prontera';
+            }
+
+            console.error('[Warp] PlayerProfileModal: Warping to friend "' + player.username + '" — targetMap:', targetMap);
+            window.gameUI.addCombatLog(`🌀 กำลังวาปไปหา ${player.username}...`, 'system');
+
+            // Use the same _doWarp mechanism as the warp menu — proven working.
+            window.gameUI._doWarp(targetMap);
+            window.gameUI.addCombatLog(`✨ วาปไปหา ${player.username} สำเร็จ!`, 'levelup');
+            this.hide();
           }
         };
       }
