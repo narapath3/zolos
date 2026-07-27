@@ -1,21 +1,22 @@
-// BGMHUD.js — Floating Music Player HUD overlay for ZolosOnline BGM control.
+// BGMHUD.js — Compact, collapsible Music Player bar for ZolosOnline BGM control.
 import { youtubeBGM } from '../engine/YouTubeBGM.js';
 
 export function initBGMHUD() {
-    // 1. Create and inject the floating music player HTML
+    // 1. Create and inject the compact music bar HTML
     const bgmHud = document.createElement('div');
     bgmHud.id = 'music-player-hud';
+    bgmHud.classList.add('music-expanded'); // start expanded
     bgmHud.innerHTML = `
-    <div class="music-track-info">
-      <span class="music-icon">🎵</span>
+    <button id="btn-music-toggle" class="music-toggle-btn" title="ย่อ/ขยาย เพลง">🎵</button>
+    <div class="music-bar-content">
       <div class="music-marquee">
         <span id="music-track-name">Loading...</span>
       </div>
-    </div>
-    <div class="music-controls">
-      <button id="btn-music-play-pause" title="Play/Pause">⏸</button>
-      <button id="btn-music-mute" title="Mute/Unmute">🔊</button>
-      <input type="range" id="slider-music-volume" min="0" max="100" value="25" title="Volume">
+      <div class="music-controls">
+        <button id="btn-music-play-pause" title="Play/Pause">⏸</button>
+        <button id="btn-music-mute" title="Mute/Unmute">🔊</button>
+        <input type="range" id="slider-music-volume" min="0" max="100" value="25" title="Volume">
+      </div>
     </div>
   `;
 
@@ -26,7 +27,16 @@ export function initBGMHUD() {
         document.body.appendChild(bgmHud);
     }
 
-    // 2. Setup listeners for the player elements
+    // 2. Setup toggle (collapse/expand)
+    const toggleBtn = document.getElementById('btn-music-toggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            bgmHud.classList.toggle('music-expanded');
+            bgmHud.classList.toggle('music-collapsed');
+        });
+    }
+
+    // 3. Setup listeners for the player elements
     const playBtn = document.getElementById('btn-music-play-pause');
     const muteBtn = document.getElementById('btn-music-mute');
     const volSlider = document.getElementById('slider-music-volume');
@@ -53,7 +63,7 @@ export function initBGMHUD() {
         });
     }
 
-    // 3. Connect to local BGM state
+    // 4. Connect to local BGM state
     youtubeBGM.subscribe((state) => {
         updateMusicPlayerUI(state);
     });
@@ -64,6 +74,7 @@ function updateMusicPlayerUI(state) {
     const muteBtn = document.getElementById('btn-music-mute');
     const trackEl = document.getElementById('music-track-name');
     const volSlider = document.getElementById('slider-music-volume');
+    const toggleBtn = document.getElementById('btn-music-toggle');
 
     if (playBtn) {
         playBtn.textContent = state.playing ? '⏸' : '▶';
@@ -86,5 +97,9 @@ function updateMusicPlayerUI(state) {
     }
     if (volSlider) {
         volSlider.value = state.volume;
+    }
+    // Update toggle icon based on playing state
+    if (toggleBtn) {
+        toggleBtn.textContent = state.playing ? '🎵' : '🎵';
     }
 }
