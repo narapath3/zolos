@@ -46,3 +46,19 @@ test('warpManager.onWarpResult falls back to coordinate defaults', () => {
         /typeof\s+payload\.x\s*===\s*'number'/
     );
 });
+
+test('warpManager handles pending request timeout', () => {
+    assert.match(
+        mainSource,
+        /_timeoutId\s*=\s*setTimeout\(/
+    );
+    assert.match(
+        mainSource,
+        /clearTimeout\(/
+    );
+    assert.match(
+        mainSource,
+        /10000/
+    );
+});
+

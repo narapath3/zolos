@@ -2427,7 +2427,7 @@ export function sendWarpRequest(targetUserId) {
     if (isOfflineMode) {
         if (!targetUserId) return { success: false };
         const list = (typeof mockPlayers !== 'undefined' && Array.isArray(mockPlayers)) ? mockPlayers : [];
-        const mockPlayer = list.find(p => p.userId === targetUserId);
+        const mockPlayer = list.find(p => p.userId === targetUserId || p.username === targetUserId);
         if (mockPlayer) {
             setTimeout(() => {
                 if (window.warpManager && typeof window.warpManager.onWarpResult === 'function') {
@@ -2436,9 +2436,9 @@ export function sendWarpRequest(targetUserId) {
                         targetUserId: mockPlayer.userId,
                         targetName: mockPlayer.username,
                         mapId: mockPlayer.mapId || 'prontera',
-                        x: typeof mockPlayer.x === 'number' ? mockPlayer.x : null,
-                        y: typeof mockPlayer.y === 'number' ? mockPlayer.y : null,
-                        z: typeof mockPlayer.z === 'number' ? mockPlayer.z : null
+                        x: typeof mockPlayer.x === 'number' ? mockPlayer.x : 0,
+                        y: typeof mockPlayer.y === 'number' ? mockPlayer.y : 1.2,
+                        z: typeof mockPlayer.z === 'number' ? mockPlayer.z : 10
                     });
                 }
             }, 100);

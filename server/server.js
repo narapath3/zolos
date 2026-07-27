@@ -668,26 +668,40 @@ io.on('connection', (socket) => {
         if (!payload || !payload.targetUserId) return;
         const requester = onlinePlayers.get(socket.id);
         if (!requester) return;
-        const targetSocketId = userSocketMap.get(payload.targetUserId);
-        const target = targetSocketId ? onlinePlayers.get(targetSocketId) : null;
+
+        // Look up the target player — try userId first, then fall back to
+        // scanning by username so warp works even if the UI passed a name.
+        let targetSocketId = userSocketMap.get(payload.targetUserId);
+        let target = targetSocketId ? onlinePlayers.get(targetSocketId) : null;
+        if (!target) {
+            for (const [, p] of onlinePlayers) {
+                if (p.username === payload.targetUserId || p.userId === payload.targetUserId) {
+                    target = p;
+                    break;
+                }
+            }
+        }
         if (!target) {
             socket.emit('warp_result', { ok: false, reason: 'offline', targetUserId: payload.targetUserId });
             return;
         }
-        const pos = target.lastPos;
+
         const targetMapId = target.mapId || 'prontera';
-        const isPosValid = pos && pos.mapId === targetMapId;
+        const pos = target.lastPos;
+        // Use the target's stored coordinates when available; fall back to
+        // safe spawn defaults so the warp never stalls with null coords.
+        const hasCoords = pos && typeof pos.x === 'number' && typeof pos.z === 'number';
 
         socket.emit('warp_result', {
             ok: true,
             targetUserId: target.userId,
             targetName: target.username,
             mapId: targetMapId,
-            x: isPosValid ? pos.x : null,
-            y: isPosValid ? pos.y : null,
-            z: isPosValid ? pos.z : null,
+            x: hasCoords ? pos.x : 0,
+            y: hasCoords ? pos.y : 1.2,
+            z: hasCoords ? pos.z : 10,
         });
-        console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username}`);
+        console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username} (map: ${targetMapId}, coords: ${hasCoords ? 'live' : 'default'})`);
     });
 
     // ============ PVP DUEL SYSTEM ============

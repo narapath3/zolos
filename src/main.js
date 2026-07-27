@@ -1639,7 +1639,31 @@ function loadMapAndSpawn(targetMap, spawn) {
 // server for that friend's current map + position; the reply lands here via the
 // `warp_result` socket event.
 window.warpManager = {
-    pending: null, // { targetName } while a request is in flight
+    _pending: null,
+    _timeoutId: null,
+
+    get pending() {
+        return this._pending;
+    },
+
+    set pending(val) {
+        this._pending = val;
+        if (this._timeoutId) {
+            clearTimeout(this._timeoutId);
+            this._timeoutId = null;
+        }
+        if (val && val.targetName) {
+            this._timeoutId = setTimeout(() => {
+                if (this._pending) {
+                    console.warn(`[Warp] Warp request to ${this._pending.targetName} timed out.`);
+                    if (window.gameUI) {
+                        window.gameUI.addCombatLog('❌ ไม่สามารถวาปได้ (หมดเวลารอข้อมูลจากเซิร์ฟเวอร์)', 'warning');
+                    }
+                    this._pending = null;
+                }
+            }, 10000);
+        }
+    },
 
     onWarpResult(payload) {
         this.pending = null;
