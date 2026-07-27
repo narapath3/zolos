@@ -2424,7 +2424,29 @@ export function sendBossHit(damage, critical = false) {
 // Ask the server for a friend's current position/map. The reply arrives on the
 // `warp_result` socket event and is handled by window.warpManager.
 export function sendWarpRequest(targetUserId) {
-    if (isOfflineMode || !targetUserId) return { success: false };
+    if (isOfflineMode) {
+        if (!targetUserId) return { success: false };
+        const list = (typeof mockPlayers !== 'undefined' && Array.isArray(mockPlayers)) ? mockPlayers : [];
+        const mockPlayer = list.find(p => p.userId === targetUserId);
+        if (mockPlayer) {
+            setTimeout(() => {
+                if (window.warpManager && typeof window.warpManager.onWarpResult === 'function') {
+                    window.warpManager.onWarpResult({
+                        ok: true,
+                        targetUserId: mockPlayer.userId,
+                        targetName: mockPlayer.username,
+                        mapId: mockPlayer.mapId || 'prontera',
+                        x: typeof mockPlayer.x === 'number' ? mockPlayer.x : null,
+                        y: typeof mockPlayer.y === 'number' ? mockPlayer.y : null,
+                        z: typeof mockPlayer.z === 'number' ? mockPlayer.z : null
+                    });
+                }
+            }, 100);
+            return { success: true };
+        }
+        return { success: false };
+    }
+    if (!targetUserId) return { success: false };
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         socket.emit('warp_request', { targetUserId });

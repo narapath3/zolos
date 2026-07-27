@@ -1655,11 +1655,6 @@ window.warpManager = {
             return;
         }
 
-        if (typeof payload.x !== 'number' || typeof payload.z !== 'number') {
-            if (gameUI) gameUI.addCombatLog('❌ วาปไม่ได้ — ยังไม่รู้ตำแหน่งเพื่อน ลองอีกครั้งสักครู่', 'warning');
-            return;
-        }
-
         // Not allowed mid-duel
         if (duelState) {
             if (gameUI) gameUI.addCombatLog('❌ วาปไม่ได้ระหว่างการดวล', 'warning');
@@ -1667,11 +1662,17 @@ window.warpManager = {
         }
 
         const targetMap = payload.mapId || 'prontera';
-        // Land a short distance away so we don't stack right on top of them
-        const ang = Math.random() * Math.PI * 2;
-        const off = 1.8;
-        const sx = payload.x + Math.cos(ang) * off;
-        const sz = payload.z + Math.sin(ang) * off;
+        let sx = 0;
+        let sz = 10;
+        let exactWarp = false;
+        if (typeof payload.x === 'number' && typeof payload.z === 'number') {
+            exactWarp = true;
+            // Land a short distance away so we don't stack right on top of them
+            const ang = Math.random() * Math.PI * 2;
+            const off = 1.8;
+            sx = payload.x + Math.cos(ang) * off;
+            sz = payload.z + Math.sin(ang) * off;
+        }
 
         if (targetMap !== sceneManager.currentMap) {
             loadMapAndSpawn(targetMap, { x: sx, y: 1.2, z: sz });
@@ -1692,7 +1693,13 @@ window.warpManager = {
         if (particles && typeof particles.spawnHitEffect === 'function') {
             particles.spawnHitEffect(character.getPosition(), true);
         }
-        if (gameUI) gameUI.addCombatLog(`✨ วาปไปหา ${payload.targetName || 'เพื่อน'} สำเร็จ!`, 'levelup');
+        if (gameUI) {
+            if (exactWarp) {
+                gameUI.addCombatLog(`✨ วาปไปหา ${payload.targetName || 'เพื่อน'} สำเร็จ!`, 'levelup');
+            } else {
+                gameUI.addCombatLog(`✨ วาปไปยังแผนที่ของ ${payload.targetName || 'เพื่อน'} (${targetMap}) สำเร็จ!`, 'levelup');
+            }
+        }
     },
 };
 

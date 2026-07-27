@@ -364,6 +364,7 @@ io.on('connection', (socket) => {
             isAdmin: profile?.is_admin === true,
             ping: null, // round-trip latency in ms, measured via srv_ping/srv_pong
             device: data.device || 'desktop',
+            lastPos: { x: 0, y: 1.2, z: 10, mapId: normalizedPresence.mapId },
         };
 
         // Join map-specific room
