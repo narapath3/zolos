@@ -1967,7 +1967,7 @@ export class GameUI {
     }
   }
 
-  async requestCardFusion(cardId, requestId = (crypto.randomUUID?.() || `fusion_${Date.now()}_${Math.random().toString(36).slice(2)}`)) {
+  async requestCardFusion(cardId, requestId = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fusion_${Date.now()}_${Math.random().toString(36).slice(2)}`)) {
     try {
       return await requestCardFusion(cardId, requestId);
     } catch (error) {
