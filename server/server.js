@@ -679,7 +679,7 @@ io.on('connection', (socket) => {
             ok: true,
             targetUserId: target.userId,
             targetName: target.username,
-            mapId: (pos && pos.mapId) || target.mapId || 'prontera',
+            mapId: target.mapId || (pos && pos.mapId) || 'prontera',
             x: pos ? pos.x : null,
             y: pos ? pos.y : null,
             z: pos ? pos.z : null,
