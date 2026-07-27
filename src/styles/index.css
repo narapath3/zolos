@@ -1,7 +1,7 @@
 @import './cards.css';
 
 /* ============================================
-   ZOLOS — Idle RPG Online
+   ZOLOS — Idle MMORPG Online
    Cute Roblox-style Theme
    ============================================ */
 
@@ -6321,8 +6321,7 @@ a,
   height: auto;
 }
 
-:where(
-  .panel-header,
+:where(.panel-header,
   .panel-body,
   .player-row,
   .player-row-content,
@@ -6334,8 +6333,7 @@ a,
   .popup-tabs,
   .hud-group,
   .inventory-grid,
-  .shop-grid
-) > * {
+  .shop-grid)>* {
   min-width: 0;
 }
 

@@ -1,4 +1,4 @@
-// ZOLOS — Idle RPG Online
+// ZOLOS — Idle MMORPG Online
 // Main Entry Point
 
 // Security/privacy: silence verbose console output in production so the browser

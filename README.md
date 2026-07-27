@@ -1,6 +1,6 @@
-# Zolos — Idle RPG Online (Ragnarok Online Inspired)
+# Zolos — Idle MMORPG Online (Ragnarok Online Inspired)
 
-เกมแนว Idle RPG 3D สไตล์ Ragnarok Online ที่มีระบบ Auto-Farm, เก็บเลเวล, ตีมอนสเตอร์, เก็บไอเทมลงกระเป๋า, และระบบจัดอันดับ & ออนไลน์แบบ Realtime ตกแต่งสไตล์ Dark Fantasy สุดพรีเมียมด้วย Three.js และระบบรักษาข้อมูลออนไลน์โดย Supabase
+เกมแนว Idle MMORPG 3D สไตล์ Ragnarok Online ที่มีระบบ Auto-Farm, เก็บเลเวล, ตีมอนสเตอร์, เก็บไอเทมลงกระเป๋า, และระบบจัดอันดับ & ออนไลน์แบบ Realtime ตกแต่งสไตล์ Dark Fantasy สุดพรีเมียมด้วย Three.js และระบบรักษาข้อมูลออนไลน์โดย Supabase
 
 ---
 

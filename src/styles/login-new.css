@@ -1,5 +1,5 @@
 /* ============================================================
-   ZOLOS — Epic RPG Login Screen (2026 Redesign)
+   ZOLOS — Epic MMORPG Login Screen (2026 Redesign)
    Dark Fantasy Cinematic Theme
    ============================================================ */
 
@@ -1064,11 +1064,9 @@
 #auth-screen {
   font-family: var(--font-body);
   padding-block:
-    max(8px, env(safe-area-inset-top, 0px))
-    max(8px, env(safe-area-inset-bottom, 0px));
+    max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-bottom, 0px));
   padding-inline:
-    max(8px, env(safe-area-inset-left, 0px))
-    max(8px, env(safe-area-inset-right, 0px));
+    max(8px, env(safe-area-inset-left, 0px)) max(8px, env(safe-area-inset-right, 0px));
   box-sizing: border-box;
 }
 

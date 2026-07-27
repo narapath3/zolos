@@ -130,7 +130,7 @@ export class TutorialSystem {
       {
         id: 'welcome',
         title: '⚔️ ยินดีต้อนรับสู่ ZOLOS',
-        description: 'เกมไอเดิล RPG ออนไลน์ที่คุณสามารถเล่นได้ตลอดเวลา แม้ว่าจะออฟไลน์ก็ยังได้ EXP!',
+        description: 'เกมไอเดิล MMORPG ออนไลน์ที่คุณสามารถเล่นได้ตลอดเวลา แม้ว่าจะออฟไลน์ก็ยังได้ EXP!',
         targetElement: null,
         action: 'click-next',
         reward: { gold: 100, items: [] },
