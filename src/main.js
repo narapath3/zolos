@@ -45,6 +45,7 @@ import { ParticleSystem } from './engine/ParticleSystem.js';
 import { SoundManager } from './engine/SoundManager.js';
 import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
 import { GameUI } from './ui/GameUI.js';
+import { initBGMHUD } from './ui/BGMHUD.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { loadingOverlay } from './ui/LoadingOverlay.js';
 import { AdminUI } from './ui/AdminUI.js';
@@ -526,6 +527,7 @@ async function initGame(charData) {
     // Initialize Game UI with character
     gameUI = new GameUI(character, soundManager, combatSystem);
     window.gameUI = gameUI;
+    initBGMHUD();
     // Exposed alongside the other systems (particles / rendererSystem /
     // remotePlayersMap) so the scene is reachable for debugging.
     window.sceneManager = sceneManager;

@@ -1,93 +1,49 @@
-// In-game background music streamed via the official YouTube IFrame Player API.
-// The video is NOT downloaded — a hidden embedded player streams it, which is
-// the YouTube-ToS-compliant way to use a YouTube track as BGM.
-//
-// Autoplay policy: browsers may block unmuted autoplay even after the login
-// click. If playback is blocked we retry on the next user interaction (same
-// pattern as the login-screen BGM in AuthUI).
+// Local background music manager playing assets from /public/music/ using HTML5 Audio.
+// Retains class name 'YouTubeBGM' and exports 'youtubeBGM' for seamless compatibility.
 
-const DEFAULT_VIDEO_ID = '-3DEsh283ck';
+const DEFAULT_TRACK = 'New Start - ZolosOnline.mp3';
 
 export class YouTubeBGM {
-    constructor(videoId = DEFAULT_VIDEO_ID) {
-        this.videoId = videoId;
-        this.player = null;
-        this.ready = false;
+    constructor(trackName = DEFAULT_TRACK) {
+        this.trackName = trackName;
+        // Keep videoId property for backward compatibility with external code
+        this.videoId = trackName;
+        this.audio = typeof Audio !== 'undefined' ? new Audio() : null;
         this.enabled = true;      // follows the game's sound_enabled setting
-        this.volume = 25;         // 0–100, keep BGM under the SFX
-        this._pendingPlay = false;
+        this.volume = 25;         // 0–100 range
+        this.playing = false;
+        this.listeners = [];
+
+        if (this.audio) {
+            this.audio.loop = true;
+            this.audio.volume = this.volume / 100;
+        }
+
         this._retryHandler = null;
+        this._isArmed = false;
     }
 
     start() {
-        if (this.player) { this.play(); return; }
-        this._loadApi().then(() => this._createPlayer());
-    }
-
-    _loadApi() {
-        return new Promise((resolve) => {
-            if (window.YT && window.YT.Player) { resolve(); return; }
-            const prev = window.onYouTubeIframeAPIReady;
-            window.onYouTubeIframeAPIReady = () => {
-                if (typeof prev === 'function') prev();
-                resolve();
-            };
-            if (!document.getElementById('yt-iframe-api')) {
-                const tag = document.createElement('script');
-                tag.id = 'yt-iframe-api';
-                tag.src = 'https://www.youtube.com/iframe_api';
-                document.head.appendChild(tag);
-            }
-        });
-    }
-
-    _createPlayer() {
-        let host = document.getElementById('yt-bgm-host');
-        if (!host) {
-            host = document.createElement('div');
-            host.id = 'yt-bgm-host';
-            // Keep it in the DOM but invisible & non-interactive
-            host.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;pointer-events:none;';
-            document.body.appendChild(host);
+        if (!this.audio) return;
+        this._setupTrack();
+        if (this.enabled) {
+            this.play();
         }
-        this.player = new window.YT.Player('yt-bgm-host', {
-            width: 1,
-            height: 1,
-            videoId: this.videoId,
-            playerVars: {
-                autoplay: 1,
-                loop: 1,
-                playlist: this.videoId, // required for loop to work on a single video
-                controls: 0,
-                disablekb: 1,
-                fs: 0,
-                playsinline: 1,
-            },
-            events: {
-                onReady: () => {
-                    this.ready = true;
-                    this.player.setVolume(this.volume);
-                    if (this.enabled) this.play();
-                },
-                onStateChange: (e) => {
-                    // If the browser blocked unmuted autoplay the player lands in
-                    // an UNSTARTED/PAUSED state — retry on next user interaction.
-                    if (this.enabled && (e.data === window.YT.PlayerState.UNSTARTED || e.data === window.YT.PlayerState.PAUSED)) {
-                        this._armRetryOnInteraction();
-                    }
-                },
-                onError: (e) => {
-                    // 101/150 = embedding disabled by the video owner
-                    console.warn('[YouTubeBGM] Player error', e?.data, '— BGM disabled for this session');
-                },
-            },
-        });
+    }
+
+    _setupTrack() {
+        if (!this.audio) return;
+        // Static music folder under public/music/ is served at /music/
+        this.audio.src = `/music/${encodeURIComponent(this.trackName)}`;
     }
 
     _armRetryOnInteraction() {
-        if (this._retryHandler) return;
+        if (this._isArmed) return;
+        this._isArmed = true;
         this._retryHandler = () => {
-            if (this.enabled && this.ready) this.play();
+            if (this.enabled && this.audio && this.audio.paused) {
+                this.play();
+            }
             this._disarmRetry();
         };
         document.addEventListener('click', this._retryHandler);
@@ -96,45 +52,96 @@ export class YouTubeBGM {
     }
 
     _disarmRetry() {
-        if (!this._retryHandler) return;
+        if (!this._isArmed) return;
         document.removeEventListener('click', this._retryHandler);
         document.removeEventListener('keydown', this._retryHandler);
         document.removeEventListener('touchstart', this._retryHandler);
         this._retryHandler = null;
+        this._isArmed = false;
     }
 
     play() {
-        if (this.ready && this.player?.playVideo) this.player.playVideo();
+        if (!this.audio) return;
+        this.playing = true;
+        this.audio.play().then(() => {
+            this._disarmRetry();
+            this._notifyListeners();
+        }).catch((err) => {
+            console.log('[YouTubeBGM] Autoplay blocked, waiting for interaction', err);
+            this._armRetryOnInteraction();
+        });
     }
 
-    switchTrack(videoId) {
-        if (this.videoId === videoId) return;
-        this.videoId = videoId;
-        if (this.ready && this.player && this.player.loadVideoById) {
-            this.player.loadVideoById({
-                videoId: this.videoId,
-                startSeconds: 0,
-                suggestedQuality: 'small'
-            });
-            this.player.setVolume(this.volume);
-            if (!this.enabled) this.pause();
+    switchTrack(trackName) {
+        if (!trackName) return;
+        if (this.trackName === trackName) return;
+
+        this.trackName = trackName;
+        this.videoId = trackName;
+        this._notifyListeners();
+
+        if (!this.audio) return;
+        const wasPlaying = !this.audio.paused || this.playing;
+        this._disarmRetry();
+
+        this.audio.pause();
+        this._setupTrack();
+        this.audio.volume = this.volume / 100;
+
+        if (this.enabled && wasPlaying) {
+            this.play();
         }
     }
 
     pause() {
-        if (this.ready && this.player?.pauseVideo) this.player.pauseVideo();
+        this.playing = false;
+        if (this.audio) {
+            this.audio.pause();
+            this._notifyListeners();
+        }
     }
 
     setEnabled(on) {
         this.enabled = !!on;
-        if (!this.ready) return;
-        if (this.enabled) this.play();
-        else this.pause();
+        if (!this.audio) return;
+        if (this.enabled) {
+            this.play();
+        } else {
+            this.pause();
+        }
     }
 
     setVolume(v) {
         this.volume = Math.max(0, Math.min(100, v));
-        if (this.ready && this.player?.setVolume) this.player.setVolume(this.volume);
+        if (this.audio) {
+            this.audio.volume = this.volume / 100;
+        }
+        this._notifyListeners();
+    }
+
+    // Subscribe to track changes and play/pause status for the HUD UI
+    subscribe(callback) {
+        this.listeners.push(callback);
+        // Expose state immediately on subscription
+        callback({
+            trackName: this.trackName,
+            playing: this.playing && this.audio && !this.audio.paused,
+            volume: this.volume,
+            enabled: this.enabled
+        });
+        return () => {
+            this.listeners = this.listeners.filter(l => l !== callback);
+        };
+    }
+
+    _notifyListeners() {
+        const state = {
+            trackName: this.trackName,
+            playing: this.playing && this.audio && !this.audio.paused,
+            volume: this.volume,
+            enabled: this.enabled
+        };
+        this.listeners.forEach(l => l(state));
     }
 }
 
