@@ -21,6 +21,7 @@ export function getClientPing() { return clientMeasuredPing; }
 let currentUserId = null;
 let currentUsername = 'Adventurer';
 let currentLevel = 1;
+let currentMapId = 'prontera';
 
 // ============ Device Detection ============
 export function getDeviceTypeFromUserAgent(ua) {
