@@ -398,12 +398,6 @@ export class PlayerProfileModal {
         color: #f0c040;
       }
 
-      .profile-btn:hover:not(:disabled) {
-        background: rgba(240, 192, 64, 0.15);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(240, 192, 64, 0.2);
-      }
-
       .profile-btn:disabled {
         opacity: 0.4;
         cursor: not-allowed;
@@ -415,19 +409,32 @@ export class PlayerProfileModal {
         color: #000;
         border: none;
       }
-
-      .profile-btn.primary:hover:not(:disabled) {
-        background: #ffcf50;
-      }
       
       .profile-btn.danger {
         border-color: rgba(255, 100, 100, 0.3);
         background: rgba(255, 100, 100, 0.05);
         color: #ff6b6b;
       }
-      
-      .profile-btn.danger:hover:not(:disabled) {
-        background: rgba(255, 100, 100, 0.15);
+
+      @media (hover: hover) {
+        .profile-btn:hover:not(:disabled) {
+          background: rgba(240, 192, 64, 0.15);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(240, 192, 64, 0.2);
+        }
+
+        .profile-btn.primary:hover:not(:disabled) {
+          background: #ffcf50;
+        }
+
+        .profile-btn.danger:hover:not(:disabled) {
+          background: rgba(255, 100, 100, 0.15);
+        }
+      }
+
+      .profile-btn:active:not(:disabled) {
+        transform: translateY(1px);
+        background: rgba(240, 192, 64, 0.2);
       }
 
       @media (max-width: 720px) {
