@@ -83,12 +83,12 @@ function sanitizeProgressionValue(key, value, previous, elapsedMs) {
     if (next === null) return null;
 
     const prior = boundedInteger(previous?.[key], rule.min, rule.max);
-    if (prior === null) return null;
+    if (prior === null) return next;
     if (next <= prior) return next;
 
     const elapsedMinutes = Math.max(1, Math.min(60, Number(elapsedMs) / 60_000 || 1));
     const maxIncrease = rule.increasePerMinute * elapsedMinutes;
-    return next - prior <= maxIncrease ? next : null;
+    return next - prior <= maxIncrease ? next : prior;
 }
 
 export function sanitizeSaveUpdates(updates, previousUpdates = null, elapsedMs = 60_000) {
@@ -135,25 +135,25 @@ export function resolveTrustedMap(player) {
     return normalizeMapId(player?.mapId);
 }
 
-export function normalizePresence(input = {}) {
+export function normalizePresence(input = {}, currentLevel = null) {
     const username = String(input.username || 'Adventurer').trim().slice(0, 32) || 'Adventurer';
     const parsedLevel = Number.parseInt(input.level, 10);
-    const level = Number.isFinite(parsedLevel) ? Math.max(1, Math.min(300, parsedLevel)) : 1;
+    let level = Number.isFinite(parsedLevel) ? Math.max(1, Math.min(300, parsedLevel)) : 1;
+    if (currentLevel !== null && Number.isFinite(currentLevel) && currentLevel > 0) {
+        level = Math.min(level, currentLevel + 2);
+    }
     return { username, level, mapId: normalizeMapId(input.mapId) };
 }
 
-const PRESENCE_DEVICES = new Set(['desktop', 'tablet', 'mobile']);
-
-export function serializeOnlinePlayer(info = {}) {
+export function normalizeOnlinePlayer(info = {}) {
     const presence = normalizePresence(info);
-    const rawPing = Number(info.ping);
     return {
         userId: info.userId || null,
         username: presence.username,
         level: presence.level,
         mapId: presence.mapId,
-        device: PRESENCE_DEVICES.has(info.device) ? info.device : 'desktop',
-        ping: Number.isFinite(rawPing) && rawPing >= 0 ? Math.round(rawPing) : null,
+        device: info.device || 'desktop',
+        ping: info.ping || null,
         characterId: info.characterId || null,
     };
 }

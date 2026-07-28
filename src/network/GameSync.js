@@ -467,7 +467,7 @@ export async function saveCharacter(characterId, updates) {
         if (allowedFields.includes(key) || appearanceFields.includes(key)) {
             let val = dbUpdates[key];
             // Part 5.3: Client-side stat validation/clamping
-            if (key === 'level') val = Math.max(1, Math.min(999, parseInt(val) || 1));
+            if (key === 'level') val = Math.max(1, Math.min(300, parseInt(val) || 1));
             if (key === 'gold') val = Math.max(0, Math.min(2147483647, parseInt(val) || 0));
             if (key === 'atk') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));
             if (key === 'def') val = Math.max(0, Math.min(1000000, parseInt(val) || 0));

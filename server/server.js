@@ -514,7 +514,7 @@ io.on('connection', (socket) => {
                 username: data.username ?? player.username,
                 level: data.level ?? player.level,
                 mapId: data.mapId ?? player.mapId,
-            });
+            }, player.level);
             player.level = normalized.level;
             player.username = normalized.username;
 
