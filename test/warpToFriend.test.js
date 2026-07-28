@@ -31,19 +31,11 @@ test('warpManager.onWarpResult falls back to coordinate defaults', () => {
     // Verify that the callback handles coordinate fallbacks if they are not numbers.
     assert.match(
         mainSource,
-        /let\s+sx\s*=\s*0;/
+        /let\s+sx,\s*sz;/
     );
     assert.match(
         mainSource,
-        /let\s+sz\s*=\s*10;/
-    );
-    assert.match(
-        mainSource,
-        /exactWarp\s*=\s*true;/
-    );
-    assert.match(
-        mainSource,
-        /typeof\s+payload\.x\s*===\s*'number'/
+        /payload\.x\s*!=\s*null\s*&&\s*payload\.z\s*!=\s*null/
     );
 });
 

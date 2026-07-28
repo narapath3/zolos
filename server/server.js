@@ -348,7 +348,11 @@ io.on('connection', (socket) => {
             if (existingSock) {
                 existingSock.disconnect(true);
             }
-            onlinePlayers.delete(existingSocketId);
+            const oldPlayer = onlinePlayers.get(existingSocketId);
+            if (oldPlayer) {
+                onlinePlayers.delete(existingSocketId);
+                broadcastPlayerList(oldPlayer.mapId);
+            }
         }
 
         const playerInfo = {

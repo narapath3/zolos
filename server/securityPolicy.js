@@ -88,7 +88,7 @@ function sanitizeProgressionValue(key, value, previous, elapsedMs) {
 
     const elapsedMinutes = Math.max(1, Math.min(60, Number(elapsedMs) / 60_000 || 1));
     const maxIncrease = rule.increasePerMinute * elapsedMinutes;
-    return next - prior <= maxIncrease ? next : prior;
+    return next - prior <= maxIncrease ? next : null;
 }
 
 export function sanitizeSaveUpdates(updates, previousUpdates = null, elapsedMs = 60_000) {
@@ -145,15 +145,18 @@ export function normalizePresence(input = {}, currentLevel = null) {
     return { username, level, mapId: normalizeMapId(input.mapId) };
 }
 
-export function normalizeOnlinePlayer(info = {}) {
+export function serializeOnlinePlayer(info = {}) {
     const presence = normalizePresence(info);
+    const rawPing = Number(info.ping);
+    const ping = (Number.isFinite(rawPing) && rawPing >= 0) ? Math.round(rawPing) : null;
+    const device = (info.device === 'desktop' || info.device === 'mobile') ? info.device : 'desktop';
     return {
         userId: info.userId || null,
         username: presence.username,
         level: presence.level,
         mapId: presence.mapId,
-        device: info.device || 'desktop',
-        ping: info.ping || null,
+        device,
+        ping,
         characterId: info.characterId || null,
     };
 }
