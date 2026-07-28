@@ -123,10 +123,13 @@ function fusionErrorMessage(error) {
 // Server-authoritative so it can't be bypassed from the browser console.
 // Longer phrases first so they censor fully before their sub-words match.
 const PROFANITY = [
-    'ควยเย็ดแม่', 'เย็ดแม่', 'เย็ด', 'ควย', 'ควย', 'สัส', 'สาด', 'ไอสัส', 'ไอ้สัส',
-    'เหี้ย', 'ไอเหี้ย', 'ไอ้เหี้ย', 'หน้าหี', 'หี', 'แตด', 'ดอกทอง', 'กะหรี่', 'อีดอก',
-    'สถุน', 'ระยำ', 'ชาติหมา', 'จัญไร', 'สันดาน', 'พ่อมึงตาย', 'แม่มึงตาย', 'ไอ้ควาย',
-    'fuck', 'fuk', 'fvck', 'shit', 'bitch', 'dick', 'cunt', 'pussy', 'asshole', 'motherfucker', 'nigger',
+    'motherfucker', 'ควยเย็ดแม่', 'เย็ดแม่มึง', 'ไอ้ชาติหมา', 'พ่อมึงตาย', 'แม่มึงตาย',
+    'ไอ้หน้าหี', 'ไอหน้าหี', 'ไอ้เหี้ย', 'อีดอกทอง', 'เย็ดแม่', 'ไอเหี้ย',
+    'ไอ้ระยำ', 'ไอ้สลิด', 'ไอ้ควาย', 'ชาติหมา', 'asshole', 'อีระยำ',
+    'ไอ้สัส', 'ดอกทอง', 'อีควาย', 'กะหรี่', 'เควี่ย', 'สันดาน', 'nigger',
+    'ไอสัส', 'อีดอก', 'เหี้ย', 'จัญไร', 'bitch', 'pussy', 'แตดๆ',
+    'เย็ด', 'สถุน', 'ระยำ', 'fuck', 'fvck', 'shit', 'dick', 'cunt',
+    'ควย', 'สัส', 'สาด', 'สัด', 'แตด', 'fuk', 'หี'
 ].sort((a, b) => b.length - a.length);
 const PROFANITY_RE = PROFANITY.map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
 
