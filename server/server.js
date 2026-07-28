@@ -21,6 +21,10 @@ import {
     resolveTrustedMap,
     sanitizeSaveUpdates,
     serializeOnlinePlayer,
+    sanitizeInventoryBackup,
+    validateMovement,
+    shouldRateLimitEvent,
+    clampMonsterDamage,
 } from './securityPolicy.js';
 import { getCard } from './cards/CardCatalog.js';
 import { FUSION_COSTS } from './cards/CardProgression.js';
@@ -84,6 +88,37 @@ app.get('/', (_req, res) => {
     }));
 });
 
+// Gated admin endpoint to retrieve server chat logs
+app.get('/admin/chat-log', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    if (!supabase) {
+        return res.status(503).json({ error: 'Supabase not connected' });
+    }
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+        const { data: profile, error: dbError } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (dbError || !profile || !profile.is_admin) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        res.json(chatLog);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // ============ In-Memory State ============
 // Map<socketId, PlayerInfo>
 const onlinePlayers = new Map();
@@ -98,6 +133,7 @@ const activeDuels = new Map();
 // so a client can't fabricate a duel between two arbitrary players.
 const pendingDuelChallenges = new Map();
 const DUEL_CHALLENGE_TTL_MS = 60 * 1000;
+const chatLog = [];
 
 // Identity helper: every relayed payload is re-stamped with the socket's
 // server-trusted userId. Never echo a client-supplied identity field — the JWT
@@ -372,6 +408,7 @@ io.on('connection', (socket) => {
             ping: null, // round-trip latency in ms, measured via srv_ping/srv_pong
             device: data.device || 'desktop',
             lastPos: { x: 0, y: 1.2, z: 10, mapId: normalizedPresence.mapId },
+            lastPosTime: Date.now(),
         };
 
         // Join map-specific room
@@ -395,11 +432,23 @@ io.on('connection', (socket) => {
         if (!payload) return;
         const self = trustedSender(socket);
         if (!self) return; // must be a joined player
+
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'pos', 25, 1000)) return;
+
         const mapId = resolveTrustedMap(self);
         // Remember the sender's latest position so friends can warp to them —
         // even across maps (positions are only relayed within a map room).
         if (typeof payload.x === 'number' && typeof payload.z === 'number') {
-            self.lastPos = { x: payload.x, y: payload.y, z: payload.z, mapId };
+            const now = Date.now();
+            const elapsed = now - (self.lastPosTime || now);
+            const isValid = validateMovement(self.lastPos, { x: payload.x, y: payload.y, z: payload.z, mapId }, elapsed);
+            if (isValid) {
+                self.lastPos = { x: payload.x, y: payload.y, z: payload.z, mapId };
+                self.lastPosTime = now;
+            } else {
+                return;
+            }
         }
         // Broadcast to all OTHER clients in the SAME map, stamped with the
         // server's identity for this socket so a client can't puppet another
@@ -414,8 +463,13 @@ io.on('connection', (socket) => {
         if (!payload || typeof payload.monsterId !== 'string') return;
         const self = trustedSender(socket);
         if (!self) return;
+
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'monster_hit', 12, 1000)) return;
+
         const mapId = resolveTrustedMap(self);
-        const damage = Math.max(0, Math.min(1e7, Number(payload.damage) || 0));
+        const rawDamage = Number(payload.damage) || 0;
+        const damage = clampMonsterDamage(self.level, rawDamage);
         if (damage <= 0) return;
         socket.to(`map:${mapId}`).emit('monster_hit', { monsterId: payload.monsterId, damage });
     });
@@ -439,11 +493,17 @@ io.on('connection', (socket) => {
         if (!payload) return;
         const self = trustedSender(socket);
         if (!self) return;
+
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'attack_hit', 12, 1000)) return;
+
         const mapId = resolveTrustedMap(self);
+        const rawDmg = typeof payload.dmg === 'number' ? payload.dmg : 0;
+        const clampedDmg = clampMonsterDamage(self.level, rawDmg);
         const out = {
             userId: self.userId,
             tc: typeof payload.tc === 'number' ? payload.tc : undefined, // critical flag
-            dmg: typeof payload.dmg === 'number' ? Math.max(0, Math.min(99999, Math.floor(payload.dmg))) : undefined,
+            dmg: clampedDmg,
             wsc: typeof payload.wsc === 'string' ? payload.wsc : 'melee',
         };
         if (typeof payload.tx === 'number' && typeof payload.tz === 'number') {
@@ -508,6 +568,18 @@ io.on('connection', (socket) => {
             message: msg,
             mapId,
         };
+        // Record in chat log
+        chatLog.push({
+            userId: player.userId,
+            username: player.username,
+            message: msg,
+            mapId,
+            timestamp: Date.now()
+        });
+        if (chatLog.length > 2000) {
+            chatLog.shift();
+        }
+
         io.to(`map:${mapId}`).emit('chat', out);
     });
 
@@ -528,6 +600,8 @@ io.on('connection', (socket) => {
             if (normalized.mapId !== oldMapId) {
                 socket.leave(`map:${oldMapId}`);
                 player.mapId = normalized.mapId;
+                player.lastPos = { x: 0, y: 1.2, z: 10, mapId: player.mapId, teleported: true };
+                player.lastPosTime = Date.now();
                 socket.join(`map:${player.mapId}`);
                 broadcastPlayerList(oldMapId);
                 broadcastPlayerList(player.mapId);
@@ -542,6 +616,9 @@ io.on('connection', (socket) => {
         if (!data || !data.characterId) return;
         const player = onlinePlayers.get(socket.id);
         if (player) {
+            if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+            if (shouldRateLimitEvent(socket._rateLimitTracker, 'save_state', 3, 10000)) return;
+
             // SECURITY: stamp the save with the socket's server-trusted userId so
             // the DB write can be gated on ownership. A client cannot save to a
             // character it doesn't own by lying about characterId.
@@ -742,6 +819,14 @@ io.on('connection', (socket) => {
             y: hasCoords ? pos.y : 1.2,
             z: hasCoords ? pos.z : 10,
         });
+        requester.lastPos = {
+            x: hasCoords ? pos.x : 0,
+            y: hasCoords ? pos.y : 1.2,
+            z: hasCoords ? pos.z : 10,
+            mapId: targetMapId,
+            teleported: true,
+        };
+        requester.lastPosTime = Date.now();
         console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username} (map: ${targetMapId}, coords: ${hasCoords ? 'live' : 'default'})`);
         console.log(`[Server] 🌀 [Warp DEBUG] warp_result emitted to requester ${requester.username}`);
     });
@@ -817,6 +902,10 @@ io.on('connection', (socket) => {
     socket.on('duel_hit', (payload) => {
         const attacker = trustedSender(socket);
         if (!attacker || !payload || !payload.targetUserId) return;
+
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'duel_hit', 12, 1000)) return;
+
         // Only hit the opponent of a duel this socket is actually in, so a
         // client can't spray duel_hit at players it isn't fighting.
         const duel = activeDuels.get(attacker.userId);
@@ -1219,8 +1308,9 @@ async function saveCharacterToSupabase(saveData) {
         // 4. Save full inventory (Safety backup)
         if (inventory && Array.isArray(inventory)) {
             try {
+                const sanitized = sanitizeInventoryBackup(inventory);
                 // Batch update inventory items that have stats
-                const itemsWithStats = inventory.filter(i => i.stats && Object.keys(i.stats).length > 0);
+                const itemsWithStats = sanitized.filter(i => i.stats && Object.keys(i.stats).length > 0);
                 for (const item of itemsWithStats) {
                     await supabase
                         .from('inventory')

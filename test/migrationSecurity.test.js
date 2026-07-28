@@ -6,6 +6,7 @@ const migrationUrl = new URL('../migrations/20260724_security_hardening.sql', im
 const followupUrl = new URL('../migrations/20260724_security_hardening_followup.sql', import.meta.url);
 const cardCollectionUrl = new URL('../migrations/20260724_card_collection.sql', import.meta.url);
 const cardMailboxUrl = new URL('../migrations/20260725_card_mailbox.sql', import.meta.url);
+const lockdownUrl = new URL('../migrations/20260728_lockdown.sql', import.meta.url);
 
 function functionDefinition(sql, name) {
   const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
@@ -229,3 +230,22 @@ test('mailbox RPCs are security-hardened, row-locked, and authenticated-only', a
     assert.doesNotMatch(sql, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${name}\\b[^;]*TO (?:anon|public)`, 'i'));
   }
 });
+
+test('lockdown migration revokes blanket updates and restricts to permitted cosmetic columns', async () => {
+  const sql = await readFile(lockdownUrl, 'utf8');
+  assert.match(sql, /REVOKE\s+INSERT,\s+UPDATE,\s+DELETE\s+ON\s+public\.characters\s+FROM\s+(?:anon,\s*)?authenticated/i);
+  assert.match(sql, /GRANT\s+UPDATE\s*\(\s*name,\s*weapon,\s*hat,\s*glasses,\s*shield,\s*armor/i);
+});
+
+test('lockdown migration applies value bounds check constraints', async () => {
+  const sql = await readFile(lockdownUrl, 'utf8');
+  assert.match(sql, /ADD\s+CONSTRAINT\s+characters_zol_cap\s+CHECK\s*\(\s*zol\s*>=*\s*0\s+AND\s+zol\s*<=\s*500000000\s*\)/i);
+  assert.match(sql, /ADD\s+CONSTRAINT\s+inventory_quantity_nonneg\s+CHECK\s*\(\s*quantity\s*>=*\s*0\s*\)/i);
+  assert.match(sql, /ADD\s+CONSTRAINT\s+marketplace_price_nonneg\s+CHECK\s*\(\s*price\s*>=*\s*0\s*\)/i);
+});
+
+test('lockdown migration hides is_admin settings from public SELECT', async () => {
+  const sql = await readFile(lockdownUrl, 'utf8');
+  assert.match(sql, /REVOKE\s+SELECT\s+\(is_admin\)\s+ON\s+public\.profiles\s+FROM\s+anon,\s*authenticated/i);
+});
+

@@ -165,3 +165,119 @@ export function isAllowedOrigin(origin, configuredOrigins = []) {
     if (!origin) return true;
     return DEFAULT_ORIGINS.has(origin) || configuredOrigins.includes(origin);
 }
+
+export function sanitizeInventoryBackup(inventory) {
+    if (!inventory || !Array.isArray(inventory)) return [];
+    const sanitized = [];
+    for (const item of inventory) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const name = String(item.item_name ?? '').trim().slice(0, 64);
+        const type = String(item.item_type ?? '').trim().slice(0, 32);
+        const quantity = boundedInteger(item.quantity, 0, 999999) ?? 1;
+
+        if (!name) continue;
+
+        const sanitizedItem = {
+            item_name: name,
+            item_type: type,
+            quantity: quantity,
+        };
+
+        if (item.stats && typeof item.stats === 'object' && !Array.isArray(item.stats)) {
+            const stats = {};
+            for (const [sKey, sVal] of Object.entries(item.stats)) {
+                if (sKey === 'equipped' && typeof sVal === 'boolean') {
+                    stats.equipped = sVal;
+                } else if (sKey === 'slot' && typeof sVal === 'string') {
+                    if (CARD_SOCKET_SLOTS.has(sVal)) {
+                        stats.slot = sVal;
+                    }
+                } else if (sKey === 'equippedSlot' && typeof sVal === 'string') {
+                    if (CARD_SOCKET_SLOTS.has(sVal)) {
+                        stats.equippedSlot = sVal;
+                    }
+                } else if (sKey === 'card_id' && typeof sVal === 'string') {
+                    const card = getCard(sVal);
+                    if (card) {
+                        stats.card_id = card.id;
+                    }
+                } else if (sKey === 'card_stars') {
+                    const stars = boundedInteger(sVal, 1, 5);
+                    if (stars !== null) stats.card_stars = stars;
+                } else if (sKey === 'card_pity') {
+                    const pity = boundedInteger(sVal, 0, 1000);
+                    if (pity !== null) stats.card_pity = pity;
+                } else if (sKey === 'cards' && Array.isArray(sVal)) {
+                    const cardsArray = [];
+                    for (const cardVal of sVal) {
+                        if (cardVal === null) {
+                            cardsArray.push(null);
+                        } else if (typeof cardVal === 'string') {
+                            const card = getCard(cardVal);
+                            if (card) {
+                                cardsArray.push(card.id);
+                            } else {
+                                cardsArray.push(null);
+                            }
+                        } else {
+                            cardsArray.push(null);
+                        }
+                    }
+                    stats.cards = cardsArray.slice(0, 5);
+                }
+            }
+            if (Object.keys(stats).length > 0) {
+                sanitizedItem.stats = stats;
+            }
+        }
+        sanitized.push(sanitizedItem);
+    }
+    return sanitized;
+}
+
+export function validateMovement(prevPos, nextPos, elapsedMs) {
+    if (!prevPos || !nextPos) return true;
+    if (prevPos.mapId !== nextPos.mapId) return true;
+    if (prevPos.teleported) {
+        prevPos.teleported = false;
+        return true;
+    }
+    if (elapsedMs < 150) return true;
+
+    const elapsedSecs = Number(elapsedMs) / 1000;
+    const dx = (nextPos.x ?? 0) - (prevPos.x ?? 0);
+    const dz = (nextPos.z ?? 0) - (prevPos.z ?? 0);
+    const distance = Math.sqrt(dx * dx + dz * dz);
+
+    const velocity = distance / elapsedSecs;
+    if (velocity > 40 && distance > 5) {
+        console.warn(`[Security] 🚫 Suspicious movement speed detected: ${velocity.toFixed(2)} units/sec (dist: ${distance.toFixed(2)}, elapsed: ${elapsedMs}ms)`);
+        return false;
+    }
+    return true;
+}
+
+export function shouldRateLimitEvent(tracker, eventName, limit, windowMs, now = Date.now()) {
+    if (!tracker) return false;
+    if (!tracker[eventName]) tracker[eventName] = [];
+    tracker[eventName] = tracker[eventName].filter(t => now - t < windowMs);
+    if (tracker[eventName].length >= limit) {
+        return true;
+    }
+    tracker[eventName].push(now);
+    return false;
+}
+
+/**
+ * Cap PvE damage to a plausible ceiling derived from the player's
+ * server-tracked level. Formula: level * 500 + 5000.
+ * A level-1 player can deal up to 5500; a level-300 player up to 155000.
+ * Returns the clamped value (always >= 0).
+ */
+export function clampMonsterDamage(level, damage) {
+    const lvl = Math.max(1, Math.min(300, Math.floor(Number(level) || 1)));
+    const maxDmg = lvl * 500 + 5000;
+    const dmg = Number(damage) || 0;
+    return Math.max(0, Math.min(maxDmg, dmg));
+}
+

@@ -478,9 +478,15 @@ export async function saveCharacter(characterId, updates) {
         'weapon', 'hat', 'glasses', 'body_color', 'hair_color', 'pants_color', 'gender'
     ];
 
+    const isOnline = isSocketConnected();
+    const statFields = ['level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map'];
+
     // Filter the updates to only include fields we know are safe or intended for DB
     const filteredUpdates = {};
     for (const key of Object.keys(dbUpdates)) {
+        if (isOnline && statFields.includes(key)) {
+            continue;
+        }
         if (allowedFields.includes(key) || appearanceFields.includes(key)) {
             let val = dbUpdates[key];
             // Part 5.3: Client-side stat validation/clamping
@@ -491,6 +497,11 @@ export async function saveCharacter(characterId, updates) {
 
             filteredUpdates[key] = val;
         }
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) {
+        console.log(`[Zolos] 💾 Direct DB save skipped: player is online. Stats will be updated via Socket save_state.`);
+        return;
     }
 
     console.log(`[Zolos] 💾 Attempting DB save for character ${characterId}. Fields:`, Object.keys(filteredUpdates));
@@ -581,8 +592,14 @@ export async function saveCharacterByUserId(userId, updates) {
         'appearance' // full look JSON (pet/refine/cards/all gear) for offline profiles
     ];
 
+    const isOnline = isSocketConnected();
+    const statFields = ['level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'last_map'];
+
     const filteredUpdates = {};
     for (const key of Object.keys(updates)) {
+        if (isOnline && statFields.includes(key)) {
+            continue;
+        }
         if (allowedFields.includes(key)) {
             let val = updates[key];
             // Part 5.3: Client-side stat validation/clamping
@@ -593,6 +610,11 @@ export async function saveCharacterByUserId(userId, updates) {
 
             filteredUpdates[key] = val;
         }
+    }
+
+    if (Object.keys(filteredUpdates).length === 0) {
+        console.log(`[Zolos] 💾 Direct DB save by user_id skipped: player is online. Stats will be updated via Socket save_state.`);
+        return;
     }
 
     console.log(`[Zolos] 💾 Saving by user_id ${userId}. Fields:`, Object.keys(filteredUpdates));

@@ -7,6 +7,10 @@ import {
   normalizePresence,
   resolveTrustedMap,
   sanitizeSaveUpdates,
+  sanitizeInventoryBackup,
+  validateMovement,
+  shouldRateLimitEvent,
+  clampMonsterDamage,
 } from '../server/securityPolicy.js';
 
 test('late cleanup from an old socket preserves the replacement socket mapping', () => {
@@ -130,3 +134,98 @@ test('verified player display identity comes from the server profile', async () 
   assert.match(source, /\.select\(['"]username,\s*is_admin['"]\)/);
   assert.match(source, /username\s*=\s*profile\.username/);
 });
+
+test('sanitizeInventoryBackup filters malformed items and allows valid fields', () => {
+  const inventoryInput = [
+    { item_name: 'Poring Card', item_type: 'card', quantity: 3, stats: { card_id: 'poring', card_stars: 2 } },
+    { item_name: 'Super Weapon', item_type: 'weapon', stats: { cards: ['willow', null, 'invalid_card_name'], custom_exploit: true } },
+    { item_name: '', item_type: 'useless' },
+  ];
+
+  const sanitized = sanitizeInventoryBackup(inventoryInput);
+  assert.equal(sanitized.length, 2);
+
+  assert.equal(sanitized[0].item_name, 'Poring Card');
+  assert.equal(sanitized[0].stats.card_id, 'poring');
+  assert.equal(sanitized[0].stats.card_stars, 2);
+
+  assert.equal(sanitized[1].item_name, 'Super Weapon');
+  assert.deepEqual(sanitized[1].stats.cards, ['willow', null, null]);
+  assert.equal(sanitized[1].stats.custom_exploit, undefined);
+});
+
+test('validateMovement validates velocities correctly', () => {
+  assert.equal(
+    validateMovement(
+      { x: 0, y: 1.2, z: 0, mapId: 'prontera' },
+      { x: 5, y: 1.2, z: 5, mapId: 'prontera' },
+      1000
+    ),
+    true
+  );
+
+  assert.equal(
+    validateMovement(
+      { x: 0, y: 1.2, z: 0, mapId: 'prontera', teleported: true },
+      { x: 200, y: 1.2, z: 200, mapId: 'prontera' },
+      200
+    ),
+    true
+  );
+
+  assert.equal(
+    validateMovement(
+      { x: 0, y: 1.2, z: 0, mapId: 'prontera' },
+      { x: 0, y: 1.2, z: 100, mapId: 'prontera' },
+      1000
+    ),
+    false
+  );
+
+  assert.equal(
+    validateMovement(
+      { x: 0, y: 1.2, z: 0, mapId: 'prontera' },
+      { x: 0, y: 1.2, z: 100, mapId: 'prontera' },
+      100
+    ),
+    true
+  );
+});
+
+test('shouldRateLimitEvent limits event frequency', () => {
+  const tracker = {};
+  assert.equal(shouldRateLimitEvent(tracker, 'attack', 2, 100, 1000), false);
+  assert.equal(shouldRateLimitEvent(tracker, 'attack', 2, 100, 1020), false);
+  assert.equal(shouldRateLimitEvent(tracker, 'attack', 2, 100, 1030), true);
+
+  assert.equal(shouldRateLimitEvent(tracker, 'attack', 2, 100, 1150), false);
+});
+
+test('clampMonsterDamage clamps player PvE damage based on level', () => {
+  assert.equal(clampMonsterDamage(1, 10000), 5500); // level 1: max is 1*500+5000 = 5500
+  assert.equal(clampMonsterDamage(10, 8000), 8000); // level 10: max is 10*500+5000 = 10000
+  assert.equal(clampMonsterDamage(10, 15000), 10000); // level 10: max is 10*500+5000 = 10000
+  assert.equal(clampMonsterDamage(300, 200000), 155000); // level 300: max is 300*500+5000 = 155000
+  assert.equal(clampMonsterDamage(10, -500), 0); // negative damage clamped to 0
+});
+
+test('server.js implements GET /admin/chat-log option and limits chat buffer', async () => {
+  const source = await readFile(new URL('../server/server.js', import.meta.url), 'utf8');
+
+  // Verify the admin chat log express endpoint exists and is gated
+  assert.match(source, /app\.get\(['"]\/admin\/chat-log['"]/);
+  assert.match(source, /authorization/i);
+  assert.match(source, /Bearer/i);
+  assert.match(source, /supabase\.auth\.getUser/);
+  assert.match(source, /\.select\(['"]is_admin['"]\)/);
+
+  // Verify the chat socket event records messages in chat log buffer
+  assert.match(source, /chatLog\.push\(\{/);
+  assert.match(source, /userId:\s*player\.userId/);
+  assert.match(source, /chatLog\.length\s*>\s*2000/);
+  assert.match(source, /chatLog\.shift\(\)/);
+});
+
+
+
+
