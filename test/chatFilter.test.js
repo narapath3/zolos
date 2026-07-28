@@ -36,16 +36,16 @@ test('chat profanity filter censors vulgar Thai words', async () => {
     const PROFANITY_RE = words.sort((a, b) => b.length - a.length).map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
     function censor(text) {
         let out = text;
-        for (const re of PROFANITY_RE) out = out.replace(re, m => '*'.repeat(m.length));
+        for (const re of PROFANITY_RE) out = out.replace(re, '***');
         return out;
     }
 
-    assert.equal(censor('ไอ้หน้าหี'), '*********');
+    assert.equal(censor('ไอ้หน้าหี'), '***');
     assert.equal(censor('ควย'), '***');
-    assert.equal(censor('เย็ด'), '****'); // 'เ' + 'ย' + '็' + 'ด' = length 4
-    assert.equal(censor('เหี้ย'), '*****'); // 'เ' + 'ห' + 'ี' + '่' + 'ย' = length 5
-    assert.equal(censor('แตดๆ'), '****');
-    assert.equal(censor('สัด'), '***'); // 'ส' + 'ั' + 'ด' = length 3!
-    assert.equal(censor('สัส'), '***'); // 'ส' + 'ั' + 'ส' = length 3
-    assert.equal(censor('พ่อมึงตายแม่มึงตาย'), '******************');
+    assert.equal(censor('เย็ด'), '***');
+    assert.equal(censor('เหี้ย'), '***');
+    assert.equal(censor('แตดๆ'), '***');
+    assert.equal(censor('สัด'), '***');
+    assert.equal(censor('สัส'), '***');
+    assert.equal(censor('พ่อมึงตายแม่มึงตาย'), '******');
 });

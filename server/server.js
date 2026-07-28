@@ -135,7 +135,7 @@ const PROFANITY_RE = PROFANITY.map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]
 
 function censorProfanity(text) {
     let out = text;
-    for (const re of PROFANITY_RE) out = out.replace(re, m => '*'.repeat(m.length));
+    for (const re of PROFANITY_RE) out = out.replace(re, '***');
     return out;
 }
 

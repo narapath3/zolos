@@ -15,6 +15,23 @@ let cardFusionSocket = null;
 const pendingCardFusions = new Map();
 let clientMeasuredPing = null;
 
+// ============ Client-side profanity filter (mirrors server) ============
+const _PROFANITY = [
+    'motherfucker', 'ควยเย็ดแม่', 'เย็ดแม่มึง', 'ไอ้ชาติหมา', 'พ่อมึงตาย', 'แม่มึงตาย',
+    'ไอ้หน้าหี', 'ไอหน้าหี', 'ไอ้เหี้ย', 'อีดอกทอง', 'เย็ดแม่', 'ไอเหี้ย',
+    'ไอ้ระยำ', 'ไอ้สลิด', 'ไอ้ควาย', 'ชาติหมา', 'asshole', 'อีระยำ',
+    'ไอ้สัส', 'ดอกทอง', 'อีควาย', 'กะหรี่', 'เควี่ย', 'สันดาน', 'nigger',
+    'ไอสัส', 'อีดอก', 'เหี้ย', 'จัญไร', 'bitch', 'pussy', 'แตดๆ',
+    'เย็ด', 'สถุน', 'ระยำ', 'fuck', 'fvck', 'shit', 'dick', 'cunt',
+    'ควย', 'สัส', 'สาด', 'สัด', 'แตด', 'fuk', 'หี'
+].sort((a, b) => b.length - a.length);
+const _PROFANITY_RE = _PROFANITY.map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+function censorText(text) {
+    let out = text;
+    for (const re of _PROFANITY_RE) out = out.replace(re, '***');
+    return out;
+}
+
 /** Return the locally-measured round-trip latency (ms) or null. */
 export function getClientPing() { return clientMeasuredPing; }
 
@@ -1428,6 +1445,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
 
             socket.on('chat', (payload) => {
                 if (chatCallback && payload) {
+                    if (typeof payload.message === 'string') payload.message = censorText(payload.message);
                     chatCallback(payload);
                 }
             });
@@ -1641,7 +1659,7 @@ export function broadcastChat(userId, username, level, message, currentMapId = '
     if (isOfflineMode) {
         // Echo back local message using object format
         if (chatCallback) {
-            chatCallback({ userId, username, message });
+            chatCallback({ userId, username, message: censorText(message) });
         }
         // Simulation for a quick response
         setTimeout(() => {
