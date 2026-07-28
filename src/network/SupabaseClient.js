@@ -222,7 +222,7 @@ export async function sendPasswordResetEmail(email) {
 export function subscribeOnlineCount(callback) {
   // Check if Socket.io is enabled. Ignore the stale VITE_SOCKET_SERVER_URL —
   // fall back to the known production Map Server (see SocketClient.js).
-  const socketUrl = (env.VITE_SOCKET_URL || 'https://zolos-server-production.up.railway.app').trim();
+  const socketUrl = (env.VITE_SOCKET_URL || 'https://game.zolos.online').trim();
   const isSocketEnabled = socketUrl && socketUrl !== 'undefined';
 
   if (isSocketEnabled) {

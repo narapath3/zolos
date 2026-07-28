@@ -5,12 +5,12 @@
 let socket = null;
 let isConnected = false;
 
-// Known-good production Map Server (Railway public domain).
+// Known-good production Map Server (ReadyIDC VPS, TH — behind nginx + wss).
 // NOTE: VITE_SOCKET_SERVER_URL in the current Vercel project is stale and
 // points at a dead host, which put every client into OFFLINE mode. It is
 // intentionally no longer used as a fallback — set VITE_SOCKET_URL to
 // override this default with a different server.
-export const DEFAULT_SOCKET_URL = 'https://zolos-server-production.up.railway.app';
+export const DEFAULT_SOCKET_URL = 'https://game.zolos.online';
 
 /**
  * Get the SOCKET_URL from env, with fallback logic.
