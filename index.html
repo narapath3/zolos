@@ -889,11 +889,6 @@
       </div>
     </div>
 
-    <!-- Combat Log -->
-    <div id="combat-log">
-      <div id="combat-log-messages"></div>
-    </div>
-
     <!-- Kill Counter -->
     <div id="kill-counter">
       <span class="kill-icon">💀</span>
@@ -902,7 +897,14 @@
 
     <!-- Chat Panel (Ragnarok-style: compact, always-visible, bottom-left) -->
     <div id="chat-panel" class="chat-panel preview-mode">
-      <div id="chat-messages" class="chat-messages-container"></div>
+      <div class="chat-tab-bar">
+        <button class="chat-tab active" data-tab="all">ทั้งหมด</button>
+        <button class="chat-tab" data-tab="general">ทั่วไป</button>
+        <button class="chat-tab" data-tab="system">ระบบ</button>
+      </div>
+      <div id="chat-messages-all" class="chat-messages-container"></div>
+      <div id="chat-messages" class="chat-messages-container" style="display:none;"></div>
+      <div id="combat-log-messages" class="chat-messages-container" style="display:none;"></div>
       <div id="mention-suggest" class="mention-suggest" style="display:none;"></div>
       <div id="emoji-picker" class="emoji-picker" style="display:none;"></div>
       <div class="chat-input-row">

@@ -19,7 +19,10 @@ export class GameUI {
   constructor(character = null, soundManager = null, combatSystem = null) {
     this.gameScreen = document.getElementById('game-screen');
     this.combatLogEl = document.getElementById('combat-log-messages');
-    this.maxLogMessages = 20;
+    this.chatMessagesAllEl = document.getElementById('chat-messages-all');
+    this.chatMessagesEl = document.getElementById('chat-messages');
+    this.maxLogMessages = 80;
+    this.chatActiveTab = 'all';
     this.inventory = [];
     this.characterId = null;
 
@@ -3749,6 +3752,18 @@ export class GameUI {
     // Start idle/faint (no messages yet).
     if (chatPanel) chatPanel.classList.add('empty');
 
+    // Tab switching setup
+    if (chatPanel) {
+      const tabs = chatPanel.querySelectorAll('.chat-tab');
+      tabs.forEach(tabBtn => {
+        tabBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const tabName = tabBtn.getAttribute('data-tab');
+          this._switchChatTab(tabName);
+        });
+      });
+    }
+
     if (btnToggle) {
       btnToggle.addEventListener('click', () => {
         if (chatPanel.classList.contains('preview-mode')) {
@@ -3978,9 +3993,11 @@ export class GameUI {
       }, 50);
     }
 
-    // Auto scroll to bottom when opening
-    const chatMessages = document.getElementById('chat-messages');
-    if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Auto scroll active tab to bottom when opening
+    const cm = this.chatActiveTab === 'all'
+      ? document.getElementById('chat-messages-all')
+      : (this.chatActiveTab === 'general' ? document.getElementById('chat-messages') : document.getElementById('combat-log-messages'));
+    if (cm) cm.scrollTop = cm.scrollHeight;
   }
 
   _closeChatToPreview() {
@@ -3994,11 +4011,49 @@ export class GameUI {
     if (chatInputRow) chatInputRow.style.display = 'flex';
     if (chatInput) chatInput.blur();
 
-    // Auto scroll to bottom
-    const chatMessages = document.getElementById('chat-messages');
-    if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Auto scroll active tab to bottom
+    const cm = this.chatActiveTab === 'all'
+      ? document.getElementById('chat-messages-all')
+      : (this.chatActiveTab === 'general' ? document.getElementById('chat-messages') : document.getElementById('combat-log-messages'));
+    if (cm) cm.scrollTop = cm.scrollHeight;
+
     // Back to faint idle look if there's no conversation on screen.
-    if (chatMessages && chatMessages.children.length === 0) chatPanel.classList.add('empty');
+    if (cm && cm.children.length === 0) chatPanel.classList.add('empty');
+  }
+
+  _switchChatTab(tabName) {
+    this.chatActiveTab = tabName;
+    const chatPanel = document.getElementById('chat-panel');
+    if (!chatPanel) return;
+
+    // Toggle active classes on tab buttons
+    const tabs = chatPanel.querySelectorAll('.chat-tab');
+    tabs.forEach(btn => {
+      if (btn.getAttribute('data-tab') === tabName) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Toggle display of message containers
+    const containers = {
+      all: document.getElementById('chat-messages-all'),
+      general: document.getElementById('chat-messages'),
+      system: document.getElementById('combat-log-messages')
+    };
+
+    for (const [key, el] of Object.entries(containers)) {
+      if (el) {
+        if (key === tabName) {
+          el.style.display = 'block';
+          // Auto-scroll to bottom of the active tab
+          el.scrollTop = el.scrollHeight;
+        } else {
+          el.style.display = 'none';
+        }
+      }
+    }
   }
 
   setupChatSendCallback(callback) {
@@ -4167,7 +4222,7 @@ export class GameUI {
   }
 
   receiveChatMessage(username, message) {
-    const chatMessages = document.getElementById('chat-messages');
+    const chatMessages = this.chatMessagesEl || document.getElementById('chat-messages');
     if (!chatMessages) return;
 
     // SECURITY: escape everything — chat is untrusted input. (Rendering raw
@@ -4189,8 +4244,17 @@ export class GameUI {
     const row = document.createElement('div');
     row.className = 'chat-msg-row ' + (isSystem ? 'system' : 'user') + (mentionedMe ? ' mention-me' : '');
     row.innerHTML = `<span class="chat-msg-username">[${esc(username)}]:</span> <span class="chat-msg-text">${body}</span>`;
+
+    // Append to general tab
     chatMessages.appendChild(row);
     while (chatMessages.children.length > 80) chatMessages.removeChild(chatMessages.firstChild);
+
+    // Append to all tab
+    const chatMessagesAll = this.chatMessagesAllEl || document.getElementById('chat-messages-all');
+    if (chatMessagesAll) {
+      chatMessagesAll.appendChild(row.cloneNode(true));
+      while (chatMessagesAll.children.length > 80) chatMessagesAll.removeChild(chatMessagesAll.firstChild);
+    }
 
     // A new message wakes the chat out of its faint idle state; it fades back
     // ~12s after the last message so an idle chat stays unobtrusive.
@@ -4205,6 +4269,9 @@ export class GameUI {
 
     setTimeout(() => {
       chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+      if (chatMessagesAll) {
+        chatMessagesAll.scrollTo({ top: chatMessagesAll.scrollHeight, behavior: 'smooth' });
+      }
     }, 50);
 
     // Ping when someone tags you (not your own message)
@@ -4219,21 +4286,32 @@ export class GameUI {
     const el = document.createElement('div');
     el.className = `combat-msg ${type}`;
     el.textContent = message;
-    this.combatLogEl.appendChild(el);
 
-    // Limit messages
-    while (this.combatLogEl.children.length > this.maxLogMessages) {
-      this.combatLogEl.removeChild(this.combatLogEl.firstChild);
+    // Append to system tab
+    if (this.combatLogEl) {
+      this.combatLogEl.appendChild(el);
+      while (this.combatLogEl.children.length > this.maxLogMessages) {
+        this.combatLogEl.removeChild(this.combatLogEl.firstChild);
+      }
     }
 
-    // Auto-remove after 8 seconds
-    setTimeout(() => {
-      if (el.parentNode) {
-        el.style.transition = 'opacity 0.5s';
-        el.style.opacity = '0';
-        setTimeout(() => el.remove(), 500);
+    // Append to all tab as clone
+    const chatMessagesAll = this.chatMessagesAllEl || document.getElementById('chat-messages-all');
+    if (chatMessagesAll) {
+      chatMessagesAll.appendChild(el.cloneNode(true));
+      while (chatMessagesAll.children.length > this.maxLogMessages) {
+        chatMessagesAll.removeChild(chatMessagesAll.firstChild);
       }
-    }, 8000);
+    }
+
+    setTimeout(() => {
+      if (this.combatLogEl) {
+        this.combatLogEl.scrollTo({ top: this.combatLogEl.scrollHeight, behavior: 'smooth' });
+      }
+      if (chatMessagesAll) {
+        chatMessagesAll.scrollTo({ top: chatMessagesAll.scrollHeight, behavior: 'smooth' });
+      }
+    }, 50);
   }
 
   // ============ Profile Editor & Settings ============
