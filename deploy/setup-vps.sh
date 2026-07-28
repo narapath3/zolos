@@ -13,13 +13,13 @@
 #   2) You'll be asked to fill server/.env (Supabase keys) if it's missing.
 set -euo pipefail
 
-# ---- Config (edit if needed) -------------------------------
-DOMAIN="game.zolos.online"
-APP_DIR="/opt/zolos"
-REPO_URL="https://github.com/narapath3/zolos.git"
-BRANCH="main"
-LE_EMAIL="admin@zolos.online"   # Let's Encrypt expiry notices
-# ------------------------------------------------------------
+# ---- Config (override via env, e.g. BRANCH=my-branch sudo -E bash ...) ------
+DOMAIN="${DOMAIN:-game.zolos.online}"
+APP_DIR="${APP_DIR:-/opt/zolos}"
+REPO_URL="${REPO_URL:-https://github.com/narapath3/zolos.git}"   # add a PAT for private: https://<TOKEN>@github.com/...
+BRANCH="${BRANCH:-main}"
+LE_EMAIL="${LE_EMAIL:-admin@zolos.online}"   # Let's Encrypt expiry notices
+# ----------------------------------------------------------------------------
 
 log()  { echo -e "\n\033[1;36m==> $*\033[0m"; }
 warn() { echo -e "\033[1;33m[!] $*\033[0m"; }
