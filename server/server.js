@@ -73,8 +73,11 @@ const io = new Server(httpServer, {
         methods: ['GET', 'POST'],
         credentials: true
     },
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    // Tolerant heartbeat: a 5s timeout dropped players on brief mobile/Wi-Fi
+    // jitter, and each drop→reconnect turned them into "ghosts" until re-join.
+    // 20s (socket.io's default) keeps flaky connections alive through hiccups.
+    pingInterval: 20000,
+    pingTimeout: 20000,
     transports: ['websocket', 'polling']
 });
 
