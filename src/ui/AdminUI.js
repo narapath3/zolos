@@ -213,7 +213,17 @@ export class AdminUI {
         }
 
         try {
-            await saveInventoryItem(charId, itemName, 'material', qty);
+            // Admin-privileged grant to ANY character (normal saveInventoryItem
+            // enforces ownership, so an admin can't give to other players).
+            const { data, error } = await supabase.rpc('admin_give_item', {
+                target_char_id: charId,
+                p_item_name: itemName,
+                p_item_type: 'material',
+                p_qty: qty,
+                p_stats: {},
+            });
+            if (error) { alert('❌ Error giving item: ' + error.message); return; }
+            if (data && data.ok === false) { alert('❌ ' + (data.reason || 'give failed')); return; }
             alert(`✅ Gave ${qty}x ${itemName} to player`);
             this.refreshData();
         } catch (e) {
