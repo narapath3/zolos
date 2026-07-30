@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
 import { createPgClient } from './api/pgClient.js';
+import { createApiRouter } from './api/index.js';
 import {
     applyBossContribution,
     awardBossCardRewards,
@@ -86,6 +87,12 @@ const io = new Server(httpServer, {
     pingTimeout: 20000,
     transports: ['websocket', 'polling']
 });
+
+// Mount the self-hosted API (auth + data + rpc) on the same server, so
+// rt.zolos.online/api/* is served here alongside socket.io — no extra
+// service, DNS record, or Caddy change needed. Only active data-wise when
+// USE_LOCAL_DB=true (the API always uses local Postgres).
+app.use('/api', createApiRouter());
 
 // Health check endpoint (Railway uses this)
 app.get('/', (_req, res) => {
