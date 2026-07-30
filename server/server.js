@@ -8,6 +8,7 @@ import { createServer } from 'http';
 import { randomUUID } from 'node:crypto';
 import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
+import { createPgClient } from './api/pgClient.js';
 import {
     applyBossContribution,
     awardBossCardRewards,
@@ -45,11 +46,16 @@ if (process.env.CORS_ALLOW_ALL === 'true') {
 }
 const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 
-// Supabase (database writes require a server-only service-role key)
+// Data backend. USE_LOCAL_DB=true → self-hosted local Postgres (via a
+// supabase-js-compatible adapter); otherwise Supabase service-role.
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const USE_LOCAL_DB = process.env.USE_LOCAL_DB === 'true';
 let supabase = null;
-if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+if (USE_LOCAL_DB) {
+    supabase = createPgClient();
+    console.log('[Server] 🏠 Using local Postgres (self-host)');
+} else if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     console.log('[Server] ✅ Supabase connected (service role)');
 } else {
