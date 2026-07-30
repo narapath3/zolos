@@ -2010,6 +2010,9 @@ export class CharacterManager {
 
         if (leveledUp) {
             this.updateNameTag();
+            // Milestone: push the level-up to the server immediately so it can't
+            // be lost to an abrupt disconnect before the next auto-save tick.
+            if (typeof window !== 'undefined') window.zolosSaveNow?.();
         }
 
         return leveledUp;

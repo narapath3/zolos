@@ -70,6 +70,7 @@ import {
     leavePresence,
     startAutoSave,
     stopAutoSave,
+    sendSaveState,
     broadcastPosition,
     broadcastMonsterHit,
     broadcastSkillCast,
@@ -1071,13 +1072,37 @@ async function initGame(charData) {
         });
     }
 
-    // Persistence fix: Add beforeunload event listener to flush inventory to DB before page closes
-    window.addEventListener('beforeunload', () => {
-        if (isGameStarted && gameUI && typeof gameUI._flushInventoryToDB === 'function') {
-            // best-effort async flush (browsers may kill it, but better than nothing)
-            gameUI._flushInventoryToDB();
-        }
-    });
+    // Persistence: on any tab close / background, push the FINAL state (stats +
+    // inventory) so the server's last snapshot — which it saves on disconnect —
+    // is current to the second, not up to a full auto-save tick stale.
+    const pushFinalSave = () => {
+        try {
+            if (!isGameStarted || !character || !charData?.id) return;
+            if (gameUI && typeof gameUI._flushInventoryToDB === 'function') gameUI._flushInventoryToDB();
+            const sd = character.getSaveData();
+            sendSaveState({
+                characterId: charData.id,
+                userId: charData.user_id,
+                inventory: sd.inventory,
+                updates: sd.updates,
+            });
+        } catch { /* best-effort */ }
+    };
+    window.addEventListener('beforeunload', pushFinalSave);
+    window.addEventListener('pagehide', pushFinalSave);          // more reliable on mobile
+    document.addEventListener('visibilitychange', () => { if (document.hidden) pushFinalSave(); });
+
+    // Lightweight "save now" for milestone events (e.g. level up). Just pushes
+    // the latest stats to the server's snapshot (cheap in-memory update; the DB
+    // flush is throttled server-side), so a disconnect right after a milestone
+    // never loses it. No inventory flush here — kept light for frequent calls.
+    window.zolosSaveNow = () => {
+        try {
+            if (!isGameStarted || !character || !charData?.id) return;
+            const sd = character.getSaveData();
+            sendSaveState({ characterId: charData.id, userId: charData.user_id, inventory: sd.inventory, updates: sd.updates });
+        } catch { /* best-effort */ }
+    };
 
     // Setup Logout Button
     gameUI.setupLogoutButton(async () => {
