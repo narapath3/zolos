@@ -45,7 +45,7 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '')
 if (process.env.CORS_ALLOW_ALL === 'true') {
     console.log('[Server] ⚠️ CORS_ALLOW_ALL is enabled');
 }
-const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+const SAVE_INTERVAL_MS = 30 * 1000; // 30s — local Postgres is cheap; shrinks the server-crash data-loss window
 
 // Data backend. USE_LOCAL_DB=true → self-hosted local Postgres (via a
 // supabase-js-compatible adapter); otherwise Supabase service-role.
