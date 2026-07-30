@@ -23,9 +23,14 @@ export function createApiRouter() {
 
     r.use(express.json({ limit: '256kb' }));
 
-    // global-ish limiter (per IP)
-    const generalLimiter = rateLimit({ windowMs: 60_000, max: 300, standardHeaders: true, legacyHeaders: false });
-    const authLimiter = rateLimit({ windowMs: 60_000, max: 20, standardHeaders: true, legacyHeaders: false });
+    // Per-IP limiters. Generous because carrier-grade NAT (esp. Thai mobile)
+    // puts many legitimate players behind ONE public IP — a tight cap would
+    // 429 real users and block their character load. Still low enough to blunt
+    // a single abusive host. A page load does a burst (character, inventory,
+    // cards, quests, friends, almanac, marketplace, stalls, leaderboard), so
+    // the window must comfortably fit several players loading at once.
+    const generalLimiter = rateLimit({ windowMs: 60_000, max: 1200, standardHeaders: true, legacyHeaders: false });
+    const authLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
     r.use(generalLimiter);
 
     const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch(err => {

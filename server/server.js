@@ -65,6 +65,13 @@ if (USE_LOCAL_DB) {
 
 // ============ Express + Socket.io Setup ============
 const app = express();
+// Behind Caddy (reverse proxy on 127.0.0.1). Trust the loopback hop so
+// req.ip resolves to each client's REAL IP from X-Forwarded-For. Without this,
+// every request looks like it comes from 127.0.0.1, so express-rate-limit
+// buckets ALL players together (429s that block character loads) and warns
+// with ERR_ERL_UNEXPECTED_X_FORWARDED_FOR. 'loopback' trusts only 127.0.0.1/::1
+// — a client can't spoof XFF because Caddy overwrites it.
+app.set('trust proxy', 'loopback');
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
