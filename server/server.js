@@ -10,6 +10,10 @@ import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
 import { createPgClient } from './api/pgClient.js';
 import { createApiRouter } from './api/index.js';
+import { createAdminRouter } from './api/admin.js';
+import * as ipMonitor from './api/ipMonitor.js';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import {
     applyBossContribution,
     awardBossCardRewards,
@@ -156,6 +160,14 @@ const activeDuels = new Map();
 // so a client can't fabricate a duel between two arbitrary players.
 const pendingDuelChallenges = new Map();
 const DUEL_CHALLENGE_TTL_MS = 60 * 1000;
+
+// ============ Admin Dashboard ============
+// Static SPA at /admin and its JSON API at /admin/api. The API is is_admin-gated
+// (JWT → profiles.is_admin) and can read/edit any player, view the economy, and
+// watch suspicious IPs. Mounted here because it needs the live in-memory maps.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use('/admin/api', createAdminRouter({ io, onlinePlayers, userSocketMap }));
+app.use('/admin', express.static(path.join(__dirname, 'admin')));
 const chatLog = [];
 
 // Identity helper: every relayed payload is re-stamped with the socket's
@@ -349,6 +361,13 @@ setInterval(() => {
 io.on('connection', (socket) => {
     console.log(`[Server] 🔌 Socket connected: ${socket.id}`);
 
+    // Real client IP (Caddy forwards it in X-Forwarded-For). Kept for the admin
+    // security panel + stamped onto the player record once they join.
+    const clientIp = ipMonitor.normalizeIp(
+        socket.handshake.headers['x-forwarded-for'] || socket.handshake.address);
+    socket._clientIp = clientIp;
+    ipMonitor.recordConnect(clientIp);
+
     // Send the current online count immediately. Sockets that only connect to
     // watch the count (e.g. the auth/login screen, before they `join`) otherwise
     // never receive a value until the next join/leave, so they'd show 0.
@@ -432,7 +451,9 @@ io.on('connection', (socket) => {
             device: data.device || 'desktop',
             lastPos: { x: 0, y: 1.2, z: 10, mapId: normalizedPresence.mapId },
             lastPosTime: Date.now(),
+            ip: socket._clientIp || 'unknown',
         };
+        if (socket._clientIp) ipMonitor.recordConnect(socket._clientIp, playerInfo.username);
 
         // Join map-specific room
         socket.join(`map:${playerInfo.mapId}`);
@@ -470,6 +491,7 @@ io.on('connection', (socket) => {
                 self.lastPos = { x: payload.x, y: payload.y, z: payload.z, mapId };
                 self.lastPosTime = now;
             } else {
+                if (socket._clientIp) ipMonitor.recordSuspicious(socket._clientIp, `speed-hack ${self.username}`);
                 return;
             }
         }
@@ -645,7 +667,7 @@ io.on('connection', (socket) => {
             // SECURITY: stamp the save with the socket's server-trusted userId so
             // the DB write can be gated on ownership. A client cannot save to a
             // character it doesn't own by lying about characterId.
-            const trusted = { ...data, _ownerUserId: player.userId };
+            const trusted = { ...data, _ownerUserId: player.userId, _clientIp: socket._clientIp };
             player.lastSaveData = trusted;
             pendingSaves.set(player.userId, trusted);
         }
@@ -1246,6 +1268,7 @@ async function saveCharacterToSupabase(saveData) {
             .maybeSingle();
         if (ownErr || !owned) {
             console.warn(`[Server] 🚫 save_state ownership mismatch: char ${characterId} not owned by ${ownerUserId}`);
+            if (saveData._clientIp) ipMonitor.recordSuspicious(saveData._clientIp, `save-ownership-mismatch ${characterId}`);
             return;
         }
 

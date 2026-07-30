@@ -6,6 +6,7 @@ import { rateLimit } from 'express-rate-limit';
 import * as auth from './auth.js';
 import { runQuery } from './data.js';
 import { callRpc } from './rpc.js';
+import * as ipMonitor from './ipMonitor.js';
 
 export function createApiRouter() {
     const r = express.Router();
@@ -29,9 +30,13 @@ export function createApiRouter() {
     // a single abusive host. A page load does a burst (character, inventory,
     // cards, quests, friends, almanac, marketplace, stalls, leaderboard), so
     // the window must comfortably fit several players loading at once.
-    const generalLimiter = rateLimit({ windowMs: 60_000, max: 1200, standardHeaders: true, legacyHeaders: false });
-    const authLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
+    const onLimited = (req, res) => { ipMonitor.recordRateLimited(req.ip); res.status(429).json({ error: 'Too many requests' }); };
+    const generalLimiter = rateLimit({ windowMs: 60_000, max: 1200, standardHeaders: true, legacyHeaders: false, handler: onLimited });
+    const authLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false, handler: onLimited });
     r.use(generalLimiter);
+
+    // Record every request's IP for the admin security panel (cheap, in-memory).
+    r.use((req, _res, next) => { ipMonitor.recordRequest(req.ip); next(); });
 
     const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch(err => {
         const status = err.status || 500;
@@ -44,7 +49,12 @@ export function createApiRouter() {
         res.json(await auth.signUp(req.body || {}));
     }));
     r.post('/auth/login', authLimiter, wrap(async (req, res) => {
-        res.json(await auth.signIn(req.body || {}));
+        try {
+            res.json(await auth.signIn(req.body || {}));
+        } catch (e) {
+            if (e.status === 401) ipMonitor.recordAuthFail(req.ip, String(req.body?.email || '').slice(0, 64));
+            throw e;
+        }
     }));
     r.post('/auth/guest', authLimiter, wrap(async (_req, res) => {
         res.json(await auth.signInAnonymously());
