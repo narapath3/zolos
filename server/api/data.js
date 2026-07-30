@@ -33,13 +33,13 @@ const POLICIES = {
     },
     marketplace: {
         read: 'public',
-        write: 'own_via_character', ownerCol: 'seller_id', // seller_id references characters.id
-        writable: ['seller_id', 'seller_name', 'item_name', 'item_type', 'quantity', 'price', 'stats'],
+        write: 'own', ownerCol: 'seller_id', // seller_id is the seller's user_id (uuid)
+        writable: ['seller_name', 'item_id', 'item_name', 'item_type', 'emoji', 'quantity', 'price', 'stats'],
     },
     vending_stalls: {
         read: 'public',
-        write: 'own_via_character', ownerCol: 'owner_id',
-        writable: ['owner_id', 'owner_name', 'title', 'items', 'is_open'],
+        write: 'own', ownerCol: 'user_id',
+        writable: ['character_id', 'owner_name', 'shop_name', 'slot', 'appearance'],
     },
     market_history: { read: 'public', write: false },
     character_cards: {

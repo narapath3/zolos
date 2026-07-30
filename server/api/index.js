@@ -4,6 +4,7 @@ import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import * as auth from './auth.js';
 import { runQuery } from './data.js';
+import { callRpc } from './rpc.js';
 
 export function createApiRouter() {
     const r = express.Router();
@@ -45,6 +46,13 @@ export function createApiRouter() {
     r.post('/db', wrap(async (req, res) => {
         const a = auth.authFromReq(req);
         const data = await runQuery(req.body || {}, a?.userId || null);
+        res.json({ data });
+    }));
+
+    // ---- rpc (ported Postgres functions) ----
+    r.post('/rpc/:fn', wrap(async (req, res) => {
+        const a = auth.authFromReq(req);
+        const data = await callRpc(req.params.fn, req.body || {}, a?.userId || null);
         res.json({ data });
     }));
 
