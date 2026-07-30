@@ -11,6 +11,7 @@ const RPCS = {
     return_card_mail: ['p_mail_id'],
     admin_update_character: ['target_char_id', 'updates'],
     admin_delete_character: ['target_char_id'],
+    admin_give_item: ['target_char_id', 'p_item_name', 'p_item_type', 'p_qty', 'p_stats'],
 };
 
 export async function callRpc(fn, body, userId) {
