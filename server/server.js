@@ -8,6 +8,8 @@ import { createServer } from 'http';
 import { randomUUID } from 'node:crypto';
 import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
+import { createPgClient } from './api/pgClient.js';
+import { createApiRouter } from './api/index.js';
 import {
     applyBossContribution,
     awardBossCardRewards,
@@ -45,11 +47,16 @@ if (process.env.CORS_ALLOW_ALL === 'true') {
 }
 const SAVE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 
-// Supabase (database writes require a server-only service-role key)
+// Data backend. USE_LOCAL_DB=true → self-hosted local Postgres (via a
+// supabase-js-compatible adapter); otherwise Supabase service-role.
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const USE_LOCAL_DB = process.env.USE_LOCAL_DB === 'true';
 let supabase = null;
-if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+if (USE_LOCAL_DB) {
+    supabase = createPgClient();
+    console.log('[Server] 🏠 Using local Postgres (self-host)');
+} else if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     console.log('[Server] ✅ Supabase connected (service role)');
 } else {
@@ -73,10 +80,19 @@ const io = new Server(httpServer, {
         methods: ['GET', 'POST'],
         credentials: true
     },
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    // Tolerant heartbeat: a 5s timeout dropped players on brief mobile/Wi-Fi
+    // jitter, and each drop→reconnect turned them into "ghosts" until re-join.
+    // 20s (socket.io's default) keeps flaky connections alive through hiccups.
+    pingInterval: 20000,
+    pingTimeout: 20000,
     transports: ['websocket', 'polling']
 });
+
+// Mount the self-hosted API (auth + data + rpc) on the same server, so
+// rt.zolos.online/api/* is served here alongside socket.io — no extra
+// service, DNS record, or Caddy change needed. Only active data-wise when
+// USE_LOCAL_DB=true (the API always uses local Postgres).
+app.use('/api', createApiRouter());
 
 // Health check endpoint (Railway uses this)
 app.get('/', (_req, res) => {

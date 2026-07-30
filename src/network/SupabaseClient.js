@@ -1,24 +1,40 @@
 // Supabase Client Configuration
 // Replace with your actual Supabase URL and Anon Key
 import { createClient } from '@supabase/supabase-js';
+import { createZolosClient } from './ZolosApiClient.js';
 
 const env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' && process.env ? process.env : {});
 const SUPABASE_URL = (env.VITE_SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co').trim();
 const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY').trim();
 
-export const isOfflineMode =
+// Self-host cutover switch: when VITE_API_URL is set, use the VPS API (drop-in
+// shim) instead of Supabase. Unset it to fall back to Supabase — reversible.
+const API_URL = (env.VITE_API_URL || '').trim();
+export const isSelfHostMode = !!(API_URL && API_URL.startsWith('http'));
+
+const supabaseUnconfigured =
   SUPABASE_URL.includes('YOUR_PROJECT') ||
   SUPABASE_ANON_KEY.includes('YOUR_ANON_KEY') ||
   !SUPABASE_URL.startsWith('http');
 
 let supabaseClient = null;
-if (!isOfflineMode) {
+if (isSelfHostMode) {
+  try {
+    supabaseClient = createZolosClient(API_URL);
+    console.log('[Zolos] 🏠 Using self-hosted API:', API_URL);
+  } catch (e) {
+    console.warn('Self-host API client init failed:', e.message);
+  }
+} else if (!supabaseUnconfigured) {
   try {
     supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch (e) {
     console.warn("Supabase initialization failed, running in Offline Fallback mode:", e.message);
   }
 }
+
+// Offline only when neither backend is available.
+export const isOfflineMode = !supabaseClient;
 
 export const supabase = supabaseClient;
 
@@ -231,8 +247,8 @@ export async function updatePassword(newPassword) {
 // ============ Realtime Online Count (Auth Screen) ============
 export function subscribeOnlineCount(callback) {
   // Check if Socket.io is enabled. Ignore the stale VITE_SOCKET_SERVER_URL —
-  // fall back to the known production Map Server (see SocketClient.js).
-  const socketUrl = (env.VITE_SOCKET_URL || 'https://zolos-server-production.up.railway.app').trim();
+  // fall back to the known production Map Server (VPS, see SocketClient.js).
+  const socketUrl = (env.VITE_SOCKET_URL || 'https://rt.zolos.online').trim();
   const isSocketEnabled = socketUrl && socketUrl !== 'undefined';
 
   if (isSocketEnabled) {

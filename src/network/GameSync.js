@@ -1403,8 +1403,29 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             return;
         }
 
+        // Re-emit `join` on every (re)connect. A dropped socket reconnects with
+        // a NEW socket.id and is NOT in any map room until it re-joins; without
+        // this the player becomes a "ghost" — still counted in the global online
+        // number, but invisible to others and unable to see them (their `pos` is
+        // rejected server-side, and they receive no map broadcasts). The map and
+        // level are read live so a reconnect after warping/leveling stays correct.
+        const emitJoin = async () => {
+            let accessToken = null;
+            try { accessToken = (await supabase?.auth?.getSession())?.data?.session?.access_token || null; } catch (e) { /* guest */ }
+            const liveMap = (typeof window !== 'undefined' && window.sceneManager?.currentMap) || currentMapId;
+            const liveLevel = (typeof window !== 'undefined' && window.character?.stats?.level) || level;
+            socket.emit('join', { userId, username, level: liveLevel, mapId: liveMap, characterId, accessToken, device: getDeviceType() });
+            console.log('[Zolos] ✅ Emitted join to Map Server (map=' + liveMap + ')');
+        };
+
         // Attach event listeners (only once)
         if (!socketListenersAttached) {
+            // Whenever the underlying connection is (re)established, re-join our
+            // map room instead of lingering as a ghost. The initial connection is
+            // already up here (so this fires only on later reconnects); the first
+            // join is emitted explicitly below.
+            socket.on('connect', emitJoin);
+
             socket.on('players_update', (players) => {
                 console.log('[Zolos] 👥 Players update via Socket.io:', players.length, players.map(p => p.username));
                 if (onlinePlayersCallback) onlinePlayersCallback(players);
@@ -1598,13 +1619,11 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socketListenersAttached = true;
         }
 
-        // Join the game — include the Supabase access token so the server can
-        // verify our identity (userId) instead of trusting it blindly. Guests
-        // have no token and stay unverified (can't impersonate a real account).
-        let accessToken = null;
-        try { accessToken = (await supabase?.auth?.getSession())?.data?.session?.access_token || null; } catch (e) { /* guest */ }
-        socket.emit('join', { userId, username, level, mapId: currentMapId, characterId, accessToken, device: getDeviceType() });
-        console.log('[Zolos] ✅ Emitted join event to Map Server');
+        // Initial join. Includes the Supabase access token so the server can
+        // verify our identity (userId) instead of trusting it blindly; guests
+        // have no token and stay unverified. Later reconnects re-join via the
+        // `connect` handler registered above.
+        await emitJoin();
         return;
     }
 
