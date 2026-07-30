@@ -224,6 +224,36 @@ export function sanitizeInventoryBackup(inventory) {
                         }
                     }
                     stats.cards = cardsArray.slice(0, 5);
+                } else if (sKey === 'refine') {
+                    // Equipment enchant level (+N). Dropping this on the periodic
+                    // inventory backup silently reset every refined item to +0.
+                    const refine = boundedInteger(sVal, 0, 30);
+                    if (refine !== null) stats.refine = refine;
+                } else if (sKey === 'equippedUid' && typeof sVal === 'string') {
+                    stats.equippedUid = sVal.slice(0, 40);
+                } else if (sKey === 'petName' && (sVal === null || typeof sVal === 'string')) {
+                    stats.petName = sVal === null ? null : sVal.slice(0, 24);
+                } else if (sKey === 'petLevel') {
+                    const lvl = boundedInteger(sVal, 1, 40);
+                    if (lvl !== null) stats.petLevel = lvl;
+                } else if (sKey === 'petXp') {
+                    const xp = boundedInteger(sVal, 0, 100_000_000);
+                    if (xp !== null) stats.petXp = xp;
+                } else if (sKey === 'instances' && Array.isArray(sVal)) {
+                    // Per-pet records {uid,name,level,xp}. Dropping this reset
+                    // every pet's level/xp to 1 on the next reload.
+                    const insts = [];
+                    for (const inst of sVal.slice(0, 200)) {
+                        if (!inst || typeof inst !== 'object' || Array.isArray(inst)) continue;
+                        const uid = typeof inst.uid === 'string' ? inst.uid.slice(0, 40) : null;
+                        if (!uid) continue;
+                        const level = boundedInteger(inst.level, 1, 40) ?? 1;
+                        const xp = boundedInteger(inst.xp, 0, 100_000_000) ?? 0;
+                        const name = (inst.name === null || inst.name === undefined) ? null
+                            : (typeof inst.name === 'string' ? inst.name.slice(0, 24) : null);
+                        insts.push({ uid, name, level, xp });
+                    }
+                    stats.instances = insts;
                 }
             }
             if (Object.keys(stats).length > 0) {
