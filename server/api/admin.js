@@ -235,6 +235,80 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap } = {}) {
         });
     }));
 
+    // ================= MOVEMENT (daily "stock ticker") =================
+    // Each player's daily change: today's live delta (current − today's opening
+    // snapshot) plus a per-day history for sparklines. See api/statSnapshots.js.
+    const MOVE_METRICS = ['level', 'exp', 'gold', 'zol', 'total_kills', 'play_time'];
+    // "Today" = the current Thai calendar day (matches api/statSnapshots.js).
+    const DAY_EXPR = "(now() AT TIME ZONE 'Asia/Bangkok')::date";
+
+    r.get('/movement', requireAdmin, wrap(async (req, res) => {
+        const days = Math.min(30, Math.max(1, parseInt(req.query.days) || 7));
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 200));
+        const metric = MOVE_METRICS.includes(String(req.query.metric)) ? String(req.query.metric) : 'gold';
+
+        const cur = await query(`
+            SELECT c.id, c.name, c.level, c.exp, c.gold, c.zol, c.total_kills, c.play_time,
+                   s.level AS s_level, s.exp AS s_exp, s.gold AS s_gold, s.zol AS s_zol,
+                   s.total_kills AS s_total_kills, s.play_time AS s_play_time,
+                   (s.character_id IS NOT NULL) AS has_baseline
+            FROM characters c
+            LEFT JOIN player_stat_snapshots s
+              ON s.character_id = c.id AND s.snapshot_date = ${DAY_EXPR}`);
+
+        const players = cur.rows.map(row => {
+            const current = {}; const today = {};
+            for (const m of MOVE_METRICS) {
+                current[m] = Number(row[m]) || 0;
+                const sv = row['s_' + m];
+                today[m] = (row.has_baseline && sv != null) ? current[m] - Number(sv) : 0;
+            }
+            return { characterId: row.id, name: row.name, current, today, hasBaseline: row.has_baseline };
+        });
+
+        // aggregate "market" totals for the day
+        const totals = { activePlayers: 0 };
+        for (const m of MOVE_METRICS) totals[m] = 0;
+        for (const p of players) {
+            let moved = false;
+            for (const m of MOVE_METRICS) { totals[m] += p.today[m]; if (p.today[m] !== 0) moved = true; }
+            if (moved) totals.activePlayers++;
+        }
+
+        players.sort((a, b) => b.today[metric] - a.today[metric]);
+        const top = players.slice(0, limit);
+
+        // per-day history for the returned players (for sparklines / detail)
+        const ids = top.map(p => p.characterId);
+        const history = {};
+        if (ids.length) {
+            const h = await query(`
+                SELECT character_id, snapshot_date::text AS date,
+                       level, exp, gold, zol, total_kills, play_time
+                FROM player_stat_snapshots
+                WHERE snapshot_date >= ${DAY_EXPR} - $1::int AND character_id = ANY($2)
+                ORDER BY character_id, snapshot_date`, [days, ids]);
+            for (const rr of h.rows) (history[rr.character_id] ||= []).push(rr);
+        }
+
+        res.json({ date: new Date().toISOString().slice(0, 10), metric, days, totals, players: top, history });
+    }));
+
+    // One player's full daily history (for a detail chart).
+    r.get('/movement/:characterId', requireAdmin, wrap(async (req, res) => {
+        const cid = req.params.characterId;
+        const days = Math.min(90, Math.max(1, parseInt(req.query.days) || 30));
+        const [snaps, cur] = await Promise.all([
+            query(`SELECT snapshot_date::text AS date, level, exp, gold, zol, total_kills, play_time
+                   FROM player_stat_snapshots
+                   WHERE character_id = $1 AND snapshot_date >= ${DAY_EXPR} - $2::int
+                   ORDER BY snapshot_date`, [cid, days]),
+            query('SELECT name, level, exp, gold, zol, total_kills, play_time FROM characters WHERE id = $1', [cid]),
+        ]);
+        if (!cur.rows[0]) throw httpErr(404, 'ไม่พบตัวละคร');
+        res.json({ characterId: cid, name: cur.rows[0].name, current: cur.rows[0], history: snaps.rows });
+    }));
+
     // ================= SECURITY / IP =================
     r.get('/security', requireAdmin, wrap(async (_req, res) => {
         const online = [];

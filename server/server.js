@@ -12,6 +12,7 @@ import { createPgClient } from './api/pgClient.js';
 import { createApiRouter } from './api/index.js';
 import { createAdminRouter } from './api/admin.js';
 import * as ipMonitor from './api/ipMonitor.js';
+import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
@@ -1394,4 +1395,8 @@ httpServer.listen(PORT, HOST, () => {
     console.log(`[Server] 📡 CORS origins: ${CORS_ORIGINS.join(', ')}`);
     console.log(`[Server] 💾 Save interval: ${SAVE_INTERVAL_MS / 1000}s`);
     console.log(`[Server] 🗄️  Supabase: ${supabase ? 'Connected' : 'Disabled'}`);
+    // Daily player-movement snapshots (self-host DB only).
+    if (USE_LOCAL_DB) {
+        startSnapshotScheduler().catch(e => console.error('[Snapshot] scheduler failed:', e.message));
+    }
 });
