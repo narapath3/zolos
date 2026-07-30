@@ -1,6 +1,7 @@
 // Express router exposing the self-hosted auth + data API.
 // Mounted at /api. Hardened: rate limits, JSON size cap, auth middleware.
 import express from 'express';
+import cors from 'cors';
 import { rateLimit } from 'express-rate-limit';
 import * as auth from './auth.js';
 import { runQuery } from './data.js';
@@ -8,6 +9,18 @@ import { callRpc } from './rpc.js';
 
 export function createApiRouter() {
     const r = express.Router();
+
+    // CORS for browser calls from the Vercel frontend (zolos.online).
+    const allowed = new Set((process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean));
+    const allowAll = process.env.CORS_ALLOW_ALL === 'true';
+    r.use(cors({
+        origin: (origin, cb) => {
+            if (!origin || allowAll || allowed.has(origin)) return cb(null, true);
+            cb(null, false);
+        },
+        credentials: true,
+    }));
+
     r.use(express.json({ limit: '256kb' }));
 
     // global-ish limiter (per IP)
