@@ -19,7 +19,7 @@ const POLICIES = {
             'gold', 'zol', 'total_kills', 'play_time', 'last_map', 'job',
             'weapon', 'hat', 'glasses', 'shield', 'armor', 'body_color', 'hair_color',
             'pants_color', 'gender', 'sound_enabled', 'graphics_quality', 'fps_enabled',
-            'appearance', 'updated_at'],
+            'appearance', 'tutorial_completed', 'updated_at'],
     },
     inventory: {
         read: 'own_via_character',
@@ -29,7 +29,14 @@ const POLICIES = {
     profiles: {
         read: 'public',
         write: 'own', ownerCol: 'id',
-        writable: ['username'], // is_admin intentionally NOT writable
+        writable: ['username', 'gender'], // is_admin intentionally NOT writable
+    },
+    // Card-mail inbox. Reads only — sends/claims/returns go through RPCs that
+    // re-check ownership. A player may read mail they SENT or RECEIVED, so
+    // ownership is "either column matches the authed user".
+    card_mailbox: {
+        read: 'own_multi', ownerCols: ['sender_user_id', 'recipient_user_id'],
+        write: false,
     },
     marketplace: {
         read: 'public',
@@ -78,6 +85,13 @@ function ownershipClause(policy, userId, params, forWrite) {
         params.push(userId);
         const col = policy.ownerCol || 'character_id';
         return `"${col}" IN (SELECT id FROM characters WHERE user_id = $${params.length})`;
+    }
+    // "own_multi" (reads only): the row belongs to the user if ANY of the
+    // ownerCols equals the authed user id (e.g. card mail sender OR recipient).
+    if (!forWrite && policy.read === 'own_multi' && Array.isArray(policy.ownerCols)) {
+        params.push(userId);
+        const idx = params.length;
+        return '(' + policy.ownerCols.map(c => `"${c.replace(/"/g, '')}" = $${idx}`).join(' OR ') + ')';
     }
     return null;
 }
