@@ -14,6 +14,7 @@ import { createAdminRouter } from './api/admin.js';
 import * as ipMonitor from './api/ipMonitor.js';
 import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startCheatGuard } from './api/cheatGuard.js';
+import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
@@ -1400,5 +1401,12 @@ httpServer.listen(PORT, HOST, () => {
     if (USE_LOCAL_DB) {
         startSnapshotScheduler().catch(e => console.error('[Snapshot] scheduler failed:', e.message));
         startCheatGuard().catch(e => console.error('[CheatGuard] scheduler failed:', e.message));
+        // World-monster config (Phase 1): create + seed tables from GameData.
+        (async () => {
+            try {
+                await ensureMonsterTables();
+                await seedMonstersIfEmpty();
+            } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
+        })();
     }
 });
