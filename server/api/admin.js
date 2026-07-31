@@ -6,7 +6,7 @@ import express from 'express';
 import { query, tx } from './db.js';
 import { authFromReq, httpErr } from './auth.js';
 import * as ipMonitor from './ipMonitor.js';
-import { sweepCheaters } from './cheatGuard.js';
+import { sweepCheaters, resetCharacter } from './cheatGuard.js';
 
 // Character columns an admin may edit, with bounds. Anything else is ignored.
 const EDITABLE_NUM = {
@@ -340,9 +340,27 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap } = {}) {
 
     // Run a scan on demand (also runs automatically every 5 min + on boot).
     r.post('/cheats/scan', requireAdmin, wrap(async (req, res) => {
-        const reset = await sweepCheaters();
-        console.log(`[Admin] 🔎 ${req.admin.username} ran manual cheat scan → reset ${reset}`);
-        res.json({ ok: true, reset });
+        const { reset, flagged } = await sweepCheaters();
+        console.log(`[Admin] 🔎 ${req.admin.username} ran manual cheat scan → reset ${reset}, flagged ${flagged}`);
+        res.json({ ok: true, reset, flagged });
+    }));
+
+    // Reset a character to a fresh baseline (used for flagged suspects the admin
+    // confirms — safer than deleting).
+    r.post('/players/:characterId/reset', requireAdmin, wrap(async (req, res) => {
+        const cid = req.params.characterId;
+        const cur = await query('SELECT * FROM characters WHERE id = $1', [cid]);
+        if (!cur.rows[0]) throw httpErr(404, 'ไม่พบตัวละคร');
+        const c = cur.rows[0];
+        if (c.user_id === req.admin.userId) throw httpErr(400, 'รีเซตตัวละครของตัวเองผ่านแผงนี้ไม่ได้');
+        await resetCharacter(c);
+        await query(
+            `INSERT INTO cheat_actions (character_id, user_id, name, reason, before_data, action)
+             VALUES ($1,$2,$3,$4,$5,'admin-reset')`,
+            [cid, c.user_id, c.name, `manual reset by ${req.admin.username}`,
+                JSON.stringify({ level: c.level, exp: c.exp, gold: c.gold, zol: c.zol, atk: c.atk, def: c.def, max_hp: c.max_hp })]);
+        console.log(`[Admin] ♻️ ${req.admin.username} reset character ${cid}`);
+        res.json({ ok: true });
     }));
 
     // ================= EVENTS / ANNOUNCE =================

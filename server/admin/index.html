@@ -428,18 +428,26 @@ async function renderSecurity(){
     try{
       const [d,cg]=await Promise.all([api('/security'),api('/cheats').catch(()=>({actions:[]}))]);
       $('#sec-stat').textContent=`ติดตาม ${d.stats.trackedIps} IP · เสี่ยงสูง ${d.stats.highThreat}`;
+      const actBadge=(a)=>a==='flag'
+        ?'<span class="chip" style="background:rgba(255,176,32,.18);color:var(--warn)">น่าสงสัย</span>'
+        :a==='admin-reset'?'<span class="chip" style="background:rgba(74,163,255,.18);color:var(--accent)">แอดมินรีเซต</span>'
+        :'<span class="chip" style="background:rgba(255,84,112,.18);color:var(--bad)">รีเซตอัตโนมัติ</span>';
       const cheatPanel=`
-        <div class="panel"><h2>🚨 บัญชีโกงที่ระบบจัดการอัตโนมัติ (${cg.actions.length})</h2>
-          <div class="muted" style="font-size:12px;margin-bottom:8px">ระบบรีเซตค่าอัตโนมัติเมื่อเจอค่าที่เป็นไปไม่ได้ (เล่นจริง 0 แต่เลเวล/ค่าสูง) · สแกนทุก 5 นาที · แอดมินถูกยกเว้น</div>
+        <div class="panel"><h2>🚨 บัญชีโกง / น่าสงสัย (${cg.actions.length})</h2>
+          <div class="muted" style="font-size:12px;margin-bottom:8px">
+            <b style="color:var(--bad)">รีเซตอัตโนมัติ</b> = ค่าที่เป็นไปไม่ได้ (ไม่เคยเล่นแต่มีค่าสูง / เล่นนานเกินอายุบัญชี) ระบบรีเซตให้แล้ว ·
+            <b style="color:var(--warn)">น่าสงสัย</b> = ขึ้นเร็วเกินกฎ/เกินเพดาน อาจเป็นแอดมินแจกเอง → ตรวจแล้วกดจัดการเอง · สแกนทุก 5 นาที · แอดมินยกเว้น
+          </div>
           <div class="tablewrap"><table>
-          <thead><tr><th>เมื่อ</th><th>ชื่อ</th><th>เหตุผล</th><th>ค่าเดิม (ก่อนรีเซต)</th><th></th></tr></thead>
+          <thead><tr><th>เมื่อ</th><th>สถานะ</th><th>ชื่อ</th><th>เหตุผล</th><th>ค่าเดิม</th><th>จัดการ</th></tr></thead>
           <tbody>${cg.actions.map(a=>{const b=a.before_data||{};return `<tr>
             <td class="muted">${a.created_at?ago(Date.parse(a.created_at)):'-'}</td>
-            <td><b>${esc(a.name||'-')}</b> <span class="muted mono">${(a.character_id||'').slice(0,10)}</span></td>
-            <td style="color:var(--bad)">${esc(a.reason||'-')}</td>
+            <td>${actBadge(a.action)}</td>
+            <td class="clickable" onclick="openPlayer('${a.character_id}')"><b>${esc(a.name||'-')}</b> <span class="muted mono">${(a.character_id||'').slice(0,10)}</span></td>
+            <td style="color:${a.action==='flag'?'var(--warn)':'var(--bad)'};white-space:normal;max-width:280px">${esc(a.reason||'-')}</td>
             <td class="muted mono" style="font-size:11px">Lv${b.level} · exp${fmt(b.exp)} · ${fmt(b.gold)}g · kills${b.total_kills} · play${b.play_time}s</td>
-            <td><button class="btn bad sm" onclick="delCheat('${a.character_id}','${esc(a.name||'')}')">ลบทิ้ง</button></td>
-          </tr>`}).join('')||'<tr><td colspan="5" class="muted">ยังไม่พบบัญชีโกง — สะอาดดี ✅</td></tr>'}</tbody>
+            <td><div class="row" style="gap:5px">${a.action==='flag'?`<button class="btn warn sm" onclick="resetChar('${a.character_id}','${esc(a.name||'')}')">รีเซต</button>`:''}<button class="btn bad sm" onclick="delCheat('${a.character_id}','${esc(a.name||'')}')">ลบทิ้ง</button></div></td>
+          </tr>`}).join('')||'<tr><td colspan="6" class="muted">ยังไม่พบบัญชีโกง — สะอาดดี ✅</td></tr>'}</tbody>
         </table></div></div>`;
       $('#sec-body').innerHTML=cheatPanel+`
         <div class="panel"><h2>IP ที่ต้องจับตา (${d.ips.length})</h2><div class="tablewrap"><table>
@@ -483,7 +491,12 @@ window.kick=async(userId)=>{
   catch(e){toast(e.message,false);}
 };
 window.scanCheats=async()=>{
-  try{const r=await api('/cheats/scan',{method:'POST'});toast(r.reset>0?`รีเซตบัญชีโกง ${r.reset} บัญชี`:'ไม่พบบัญชีโกงเพิ่ม ✅');if(cur==='security')renderSecurity();}
+  try{const r=await api('/cheats/scan',{method:'POST'});toast((r.reset||r.flagged)?`รีเซต ${r.reset} · ปักธงน่าสงสัย ${r.flagged}`:'ไม่พบบัญชีโกงเพิ่ม ✅');if(cur==='security')renderSecurity();}
+  catch(e){toast(e.message,false);}
+};
+window.resetChar=async(cid,name)=>{
+  if(!confirm('รีเซตตัวละคร "'+name+'" กลับเป็นค่าเริ่มต้น (Lv1)? เก็บบัญชีไว้แต่ล้างค่าโกง'))return;
+  try{await api('/players/'+cid+'/reset',{method:'POST'});toast('รีเซตแล้ว');renderSecurity();}
   catch(e){toast(e.message,false);}
 };
 window.delCheat=async(cid,name)=>{
