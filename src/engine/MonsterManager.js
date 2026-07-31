@@ -1226,6 +1226,8 @@ export class MonsterManager {
         this.waterMonsters = [];
         this.deadQueue = [];
         if (this._srvById) this._srvById.clear();
+        // Next snapshot re-fills the map — treat it as initial (no glow burst).
+        this._initialSpawnDone = false;
     }
 
     // ===== Server-authoritative mode (Phase 2) =====
@@ -1244,6 +1246,9 @@ export class MonsterManager {
         if (!this._srvById) this._srvById = new Map();
         for (const s of payload.mons) {
             let m = this._srvById.get(s.id);
+            let spawnedNew = false;
+            // A respawn usually rerolls the monster type, so the id comes back as
+            // a DIFFERENT type — rebuild it (this is a respawn, not a brand-new mob).
             if (m && m.type !== s.t) { this._removeServerMonster(m); m = null; }
             if (!m) {
                 const pos = new THREE.Vector3(s.x, 0, s.z);
@@ -1252,19 +1257,30 @@ export class MonsterManager {
                 m._serverControlled = true;
                 this._srvById.set(s.id, m);
                 (m.isWaterMonster ? this.waterMonsters : this.monsters).push(m);
+                spawnedNew = true;
             }
-            if (!m.alive) {
-                // Revived (server respawn) — play a spawn glow so it materializes.
+            const revived = !m.alive;
+            if (revived) {
                 m.alive = true;
                 m.mesh.visible = true;
                 if (m.mesh) m.mesh.position.set(s.x, m.isWaterMonster ? -0.3 : 0, s.z);
-                if (typeof window !== 'undefined' && window.particles) {
-                    try { window.particles.spawnMonsterSpawn(new THREE.Vector3(s.x, 0, s.z), m.data?.color); } catch { /* ignore */ }
-                }
+            }
+            // Spawn glow on ANY respawn — whether the id revived in place or came
+            // back as a new type — but NOT while the map is first being filled
+            // (that would flash all 16 at once on entry).
+            if ((revived || spawnedNew) && this._initialSpawnDone
+                && typeof window !== 'undefined' && window.particles) {
+                try {
+                    window.particles.spawnMonsterSpawn(
+                        new THREE.Vector3(s.x, m.isWaterMonster ? -0.3 : 0, s.z), m.data?.color);
+                } catch { /* ignore */ }
             }
             m.setServerHp(s.hp, s.mhp);
             m.setServerTarget(s.x, s.z, s.r);
         }
+        // After the first snapshot the map is populated; from here on every new
+        // or revived monster is a genuine respawn worth a glow.
+        this._initialSpawnDone = true;
     }
 
     // A server monster died — hide it and return it so the caller can play death
