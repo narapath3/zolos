@@ -15,6 +15,7 @@ import * as ipMonitor from './api/ipMonitor.js';
 import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startCheatGuard } from './api/cheatGuard.js';
 import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
+import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
@@ -59,6 +60,9 @@ const SAVE_INTERVAL_MS = 30 * 1000; // 30s — local Postgres is cheap; shrinks 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const USE_LOCAL_DB = process.env.USE_LOCAL_DB === 'true';
+// Server-authoritative monster engine (Phase 2). Off by default → legacy
+// client-side spawner runs. Requires local DB (the config + inventory writes).
+const WORLD_MONSTERS = USE_LOCAL_DB && process.env.WORLD_MONSTERS === 'true';
 let supabase = null;
 if (USE_LOCAL_DB) {
     supabase = createPgClient();
@@ -169,7 +173,7 @@ const DUEL_CHALLENGE_TTL_MS = 60 * 1000;
 // (JWT → profiles.is_admin) and can read/edit any player, view the economy, and
 // watch suspicious IPs. Mounted here because it needs the live in-memory maps.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-app.use('/admin/api', createAdminRouter({ io, onlinePlayers, userSocketMap }));
+app.use('/admin/api', createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorld }));
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
 const chatLog = [];
 
@@ -472,6 +476,11 @@ io.on('connection', (socket) => {
         // Send the current world-boss state so the newcomer sees the countdown
         // (or an in-progress fight) immediately.
         socket.emit('boss_state', bossPublicState());
+
+        // Tell the client which monster model is authoritative: server-owned
+        // (Phase 2) or the legacy client-side spawner. Clients switch rendering
+        // accordingly, so flipping the flag needs no client redeploy.
+        socket.emit('world_mode', { serverMonsters: WORLD_MONSTERS });
     });
 
     // --- POSITION BROADCAST ---
@@ -507,6 +516,7 @@ io.on('connection', (socket) => {
     // --- SHARED MONSTER HP --- relay a monster hit to everyone else on the map
     // so their copy of that (deterministically-spawned) monster drains the same
     // HP. Pure relay: the server keeps no monster state; sender is excluded.
+    // Legacy path — only used when the authoritative engine is OFF.
     socket.on('monster_hit', (payload) => {
         if (!payload || typeof payload.monsterId !== 'string') return;
         const self = trustedSender(socket);
@@ -520,6 +530,18 @@ io.on('connection', (socket) => {
         const damage = clampMonsterDamage(self.level, rawDamage);
         if (damage <= 0) return;
         socket.to(`map:${mapId}`).emit('monster_hit', { monsterId: payload.monsterId, damage });
+    });
+
+    // --- AUTHORITATIVE MONSTER HIT (Phase 2) --- the client reports a hit; the
+    // server subtracts the clamped damage from the shared server-owned monster
+    // and, on death, grants exp/gold/drops itself. No client trust for rewards.
+    socket.on('mon_hit', (payload) => {
+        if (!monEngineRunning()) return;
+        const self = trustedSender(socket);
+        if (!self) return;
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'mon_hit', 14, 1000)) return;
+        try { monEngineApplyHit(self, payload); } catch (e) { console.error('[MonEngine] applyHit:', e.message); }
     });
 
     // --- SKILL EFFECTS --- relay a skill cast to the map so everyone renders the
@@ -1402,10 +1424,12 @@ httpServer.listen(PORT, HOST, () => {
         startSnapshotScheduler().catch(e => console.error('[Snapshot] scheduler failed:', e.message));
         startCheatGuard().catch(e => console.error('[CheatGuard] scheduler failed:', e.message));
         // World-monster config (Phase 1): create + seed tables from GameData.
+        // Phase 2: if WORLD_MONSTERS is on, start the authoritative engine.
         (async () => {
             try {
                 await ensureMonsterTables();
                 await seedMonstersIfEmpty();
+                if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
         })();
     }

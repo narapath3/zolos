@@ -1605,9 +1605,30 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('card_reward', (payload) => window.cardRewardManager?.onReward?.(payload));
 
             // Shared monster HP — a teammate hit a monster; drain our copy too.
+            // (Legacy path — only used when the server engine is OFF.)
             socket.on('monster_hit', (payload) => {
                 if (payload) window.applyRemoteMonsterHit?.(payload.monsterId, payload.damage);
             });
+
+            // ===== Server-authoritative monsters (Phase 2) =====
+            // The server tells us which model is authoritative. Store it so the
+            // MonsterManager switches to render-only mode, then notify.
+            socket.on('world_mode', (payload) => {
+                window.__serverMonsters = !!(payload && payload.serverMonsters);
+                window.onWorldMode?.(payload);
+            });
+            // ~10Hz snapshot of every server-owned monster on our map.
+            socket.on('mon_state', (payload) => { if (payload) window.onMonState?.(payload); });
+            // A server monster died — play death FX + queue respawn locally.
+            socket.on('mon_dead', (payload) => { if (payload) window.onMonDead?.(payload); });
+            // We contributed to a kill — the server grants exp/gold authoritatively.
+            socket.on('mon_reward', (payload) => { if (payload) window.onMonReward?.(payload); });
+            // The server rolled a drop for us (already written to our inventory).
+            socket.on('mon_loot', (payload) => { if (payload) window.onMonLoot?.(payload); });
+            // A server monster struck us while chasing.
+            socket.on('mon_atk', (payload) => { if (payload) window.onMonAtk?.(payload); });
+            // Admin changed world config — refetch defs if the version moved.
+            socket.on('world_config', (payload) => { if (payload) window.onWorldConfig?.(payload); });
 
             // A teammate cast a skill — play its effect on our screen too.
             socket.on('skill_cast', (payload) => {
@@ -1658,6 +1679,16 @@ export function broadcastMonsterHit(monsterId, damage, currentMapId = 'prontera'
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         socket.emit('monster_hit', { monsterId, damage, mapId: currentMapId });
+    }
+}
+
+// Phase 2: report a hit on a SERVER-OWNED monster. The server subtracts the
+// (clamped) damage from the shared HP and, on death, grants exp/gold/drops.
+export function reportMonsterHit(monsterId, damage, crit = false) {
+    if (isOfflineMode) return;
+    const socket = getSocket();
+    if (socket && isSocketConnected()) {
+        socket.emit('mon_hit', { monsterId, damage, crit });
     }
 }
 

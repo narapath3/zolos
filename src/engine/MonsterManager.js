@@ -888,8 +888,95 @@ class Monster {
         return this.mesh.position.distanceTo(pos);
     }
 
+    // ===== Server-authoritative helpers (Phase 2) =====
+    // The server owns HP + position; the client only renders + interpolates.
+    setServerTarget(x, z, rot) {
+        this._srvTargetX = x; this._srvTargetZ = z; this._srvRot = rot;
+        this._serverControlled = true;
+    }
+    setServerHp(hp, maxHp) {
+        this.maxHp = maxHp || this.maxHp;
+        this.hp = Math.max(0, hp);
+        if (this.hpBarFill) this.hpBarFill.scale.x = Math.max(0.01, this.hp / this.maxHp);
+    }
+    // Flash + (optional) crit pulse without changing HP — used when WE attack a
+    // server-owned monster; the real HP arrives in the next server snapshot.
+    flashHit(isCritical = false) {
+        this.hitFlash = isCritical ? 0.35 : 0.18;
+        this.isCriticalHit = isCritical;
+    }
+
+    // Render-only update for server-controlled monsters: smooth toward the last
+    // server position, keep the idle bounce + hit flash + HP-bar billboarding,
+    // but run no AI, wander, aggro, or collision.
+    _updateServerRendered(dt, camera) {
+        this.animTimer += dt;
+        this.hitFlash = Math.max(0, this.hitFlash - dt);
+
+        // Interpolate toward the latest server position (~10 Hz snapshots).
+        if (this._srvTargetX !== undefined) {
+            const k = Math.min(1, dt * 12);
+            this.mesh.position.x += (this._srvTargetX - this.mesh.position.x) * k;
+            this.mesh.position.z += (this._srvTargetZ - this.mesh.position.z) * k;
+            const moved = Math.hypot(this._srvTargetX - this.mesh.position.x, this._srvTargetZ - this.mesh.position.z);
+            this.isMoving = moved > 0.02;
+            if (this._srvRot !== undefined) this.mesh.rotation.y = this._srvRot;
+        }
+
+        const bounce = Math.abs(Math.sin(this.animTimer * 2.5)) * 0.1;
+        if (this.isWaterMonster) {
+            this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
+            this.mesh.position.y = -0.3 + Math.sin(this.animTimer * 1.5) * 0.05;
+        } else {
+            this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
+        }
+        this.bodyMesh.scale.y = 1 + bounce * 0.5;
+        this.bodyMesh.scale.x = 1 - bounce * 0.15;
+        this.bodyMesh.scale.z = 1 - bounce * 0.15;
+
+        this._applyHitFlash();
+
+        if (camera) {
+            this._billboardFrame = ((this._billboardFrame || 0) + 1) % 3;
+            if (this._billboardFrame === 0) {
+                this.hpBarFill.lookAt(camera.position);
+                this.hpBarFill.parent.children.forEach(child => {
+                    if (child.geometry && child.geometry.type === 'PlaneGeometry') child.lookAt(camera.position);
+                });
+            }
+        }
+    }
+
+    // Extracted so both the local-AI and server-render paths flash identically.
+    _applyHitFlash() {
+        const isFlashing = this.hitFlash > 0;
+        const wasFlashing = this._wasFlashing || false;
+        if (!(isFlashing || wasFlashing !== isFlashing)) return;
+        this._wasFlashing = isFlashing;
+        let intensity = 0;
+        if (isFlashing) {
+            if (this.isCriticalHit) {
+                const pulseTime = this.hitFlash > 0.15 ? this.hitFlash - 0.15 : this.hitFlash;
+                intensity = pulseTime / 0.15;
+            } else intensity = this.hitFlash / 0.18;
+        }
+        this.bodyMesh.traverse(child => {
+            if (child.isMesh && child.material) {
+                if (!child.userData.originalColor) child.userData.originalColor = child.material.color.clone();
+                if (isFlashing) {
+                    child.material.color.setHex(0xffffff);
+                    if (child.material.emissive) { child.material.emissive.setHex(0xffffff); child.material.emissiveIntensity = intensity; }
+                } else {
+                    child.material.color.copy(child.userData.originalColor);
+                    if (child.material.emissive) { child.material.emissive.setHex(0x000000); child.material.emissiveIntensity = 0; }
+                }
+            }
+        });
+    }
+
     update(dt, camera, sceneManager, player, onAttackPlayer) {
         if (!this.alive) return;
+        if (this._serverControlled) return this._updateServerRendered(dt, camera);
 
         this.animTimer += dt;
         this.hitFlash = Math.max(0, this.hitFlash - dt);
@@ -1133,6 +1220,55 @@ export class MonsterManager {
         this.monsters = [];
         this.waterMonsters = [];
         this.deadQueue = [];
+        if (this._srvById) this._srvById.clear();
+    }
+
+    // ===== Server-authoritative mode (Phase 2) =====
+    // When on, this manager stops spawning/simulating locally and instead
+    // renders monsters streamed from the server via applyServerState().
+    setServerMode(on) {
+        this.serverMode = !!on;
+        if (on) { this.clearAll(); this._srvById = new Map(); }
+    }
+
+    // Ingest a server snapshot: create/update/revive each monster the server
+    // reports. Monsters absent from the snapshot are left as-is; deaths arrive
+    // explicitly via killServerMonster (mon_dead).
+    applyServerState(payload) {
+        if (!this.serverMode || !payload || !Array.isArray(payload.mons)) return;
+        if (!this._srvById) this._srvById = new Map();
+        for (const s of payload.mons) {
+            let m = this._srvById.get(s.id);
+            if (m && m.type !== s.t) { this._removeServerMonster(m); m = null; }
+            if (!m) {
+                const pos = new THREE.Vector3(s.x, 0, s.z);
+                m = new Monster(this.scene, s.t, pos);
+                m.id = s.id;
+                m._serverControlled = true;
+                this._srvById.set(s.id, m);
+                (m.isWaterMonster ? this.waterMonsters : this.monsters).push(m);
+            }
+            if (!m.alive) { m.alive = true; m.mesh.visible = true; }
+            m.setServerHp(s.hp, s.mhp);
+            m.setServerTarget(s.x, s.z, s.r);
+        }
+    }
+
+    // A server monster died — hide it and return it so the caller can play death
+    // FX + resolve card drops. Respawn is server-driven (it reappears in state).
+    killServerMonster(id) {
+        const m = this._srvById && this._srvById.get(id);
+        if (!m || !m.alive) return null;
+        m.alive = false;
+        if (m.mesh) m.mesh.visible = false;
+        return m;
+    }
+
+    _removeServerMonster(m) {
+        if (m.mesh) this.scene.remove(m.mesh);
+        this.monsters = this.monsters.filter(x => x !== m);
+        this.waterMonsters = this.waterMonsters.filter(x => x !== m);
+        if (this._srvById) this._srvById.delete(m.id);
     }
 
     _getRandomPositionForMonster(type, rng) {
@@ -1200,6 +1336,8 @@ export class MonsterManager {
     }
 
     spawnInitial(playerLevel) {
+        // Server-authoritative mode owns spawning — skip the local spawner.
+        if (this.serverMode) return;
         // Seed from the UTC date + this map → identical layout for EVERY player
         // on the map that day, regardless of their level. (playerLevel is
         // intentionally ignored here so no two players ever see different mobs.)

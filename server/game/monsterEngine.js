@@ -1,0 +1,337 @@
+// Server-authoritative monster engine (Phase 2). When WORLD_MONSTERS is on the
+// server OWNS every monster on every populated map: it spawns them from the
+// admin-editable DB config, walks them (wander + aggro) on a fixed tick,
+// broadcasts their state to all clients on the map, resolves damage
+// authoritatively (shared HP → true RO co-op), and on death rolls drops +
+// grants exp/gold SERVER-SIDE (anti-cheat). Clients render whatever the server
+// sends and defer all rewards to it.
+//
+// Gated by a flag: if disabled, this module is never started and gameplay falls
+// back to the legacy client-side spawner — instant rollback.
+//
+// Self-host only: DB writes go through the app's own pool (api/db.js).
+import { query, tx } from '../api/db.js';
+import { getFullConfig } from '../api/monstersConfig.js';
+import { clampMonsterDamage } from '../securityPolicy.js';
+
+const TICK_MS = 100;               // 10 Hz simulation + broadcast
+const SPAWN_RANGE = 12;            // matches client MonsterManager
+const RESPAWN_MS = 4000;
+const AGGRO_MS = 8000;             // how long a hit keeps a monster hunting
+const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
+const ATTACK_REACH = 1.8;
+const ATTACK_CD_MS = 1300;
+
+let io = null;
+let onlinePlayers = null;          // Map<socketId, playerInfo>
+let running = false;
+let loopTimer = null;
+
+// In-memory config (rebuilt on load/reload).
+let cfg = { version: 0, defs: new Map(), dropsByType: new Map(), spawnsByMap: new Map(), mapCfg: new Map() };
+// mapId -> { monsters: Map<id, M>, dirty:boolean }
+const worlds = new Map();
+
+// ---------------- terrain (minimal port of SceneManager) ----------------
+const riverZ = (x) => Math.sin(x * 0.08) * 10 - 2;
+const isWaterAt = (x, z) => Math.abs(z - riverZ(x)) < 5.5;
+const inArena = (mapId, x, z) => {
+    if (mapId !== 'prontera') return false;
+    const dx = x - (-14), dz = z - 14;
+    return dx * dx + dz * dz < 7.5 * 7.5;
+};
+function pickLandPos(mapId) {
+    for (let i = 0; i < 60; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = 4 + Math.random() * (SPAWN_RANGE - 4);
+        const x = Math.cos(a) * d, z = Math.sin(a) * d;
+        if (!isWaterAt(x, z) && !inArena(mapId, x, z)) return { x, z };
+    }
+    return { x: (Math.random() - 0.5) * 16, z: -8 - Math.random() * 6 };
+}
+function pickWaterPos() {
+    const x = -20 + Math.random() * 40;
+    return { x, z: riverZ(x) + (Math.random() - 0.5) * 4 };
+}
+
+// ---------------- config ----------------
+export async function loadConfig() {
+    const full = await getFullConfig();
+    const defs = new Map();
+    for (const d of full.defs) defs.set(d.type, d);
+    const dropsByType = new Map();
+    for (const dr of full.drops) {
+        if (!dropsByType.has(dr.monster_type)) dropsByType.set(dr.monster_type, []);
+        dropsByType.get(dr.monster_type).push(dr);
+    }
+    const spawnsByMap = new Map();
+    for (const s of full.spawns) {
+        if (!spawnsByMap.has(s.map_id)) spawnsByMap.set(s.map_id, []);
+        spawnsByMap.get(s.map_id).push(s);
+    }
+    const mapCfg = new Map();
+    for (const m of full.mapConfig) mapCfg.set(m.map_id, m);
+    cfg = { version: full.version, defs, dropsByType, spawnsByMap, mapCfg };
+}
+
+// ---------------- spawning ----------------
+function weightedPick(entries) {
+    const total = entries.reduce((s, e) => s + (e.weight || 0), 0);
+    if (total <= 0) return entries[0];
+    let roll = Math.random() * total;
+    for (const e of entries) { roll -= e.weight; if (roll <= 0) return e; }
+    return entries[entries.length - 1];
+}
+
+function makeMonster(id, type, isWater) {
+    const def = cfg.defs.get(type);
+    const hp = def ? def.hp : 100;
+    const pos = isWater ? pickWaterPos() : pickLandPos(id.mapId);
+    return {
+        id: id.str, type, isWater,
+        x: pos.x, z: pos.z, rot: Math.random() * Math.PI * 2,
+        spawnX: pos.x, spawnZ: pos.z,
+        hp, maxHp: hp, alive: true,
+        aggroChar: null, aggroUntil: 0, atkReadyAt: 0,
+        wanderUntil: 0, targetX: pos.x, targetZ: pos.z,
+        dmgByChar: new Map(),
+        respawnAt: 0,
+    };
+}
+
+// Build (or rebuild) a map's monster set from config.
+export function spawnMap(mapId) {
+    const spawns = cfg.spawnsByMap.get(mapId) || [];
+    const mc = cfg.mapCfg.get(mapId) || { land_count: 0, water_count: 0 };
+    const land = spawns.filter(s => !s.is_water);
+    const water = spawns.filter(s => s.is_water);
+    const monsters = new Map();
+    for (let i = 0; i < (mc.land_count || 0) && land.length; i++) {
+        const pick = weightedPick(land);
+        const m = makeMonster({ str: `land_${i}`, mapId }, pick.monster_type, false);
+        monsters.set(m.id, m);
+    }
+    for (let i = 0; i < (mc.water_count || 0) && water.length; i++) {
+        const pick = weightedPick(water);
+        const m = makeMonster({ str: `water_${i}`, mapId }, pick.monster_type, true);
+        monsters.set(m.id, m);
+    }
+    worlds.set(mapId, { monsters });
+}
+
+function ensureMapSpawned(mapId) {
+    if (!worlds.has(mapId)) spawnMap(mapId);
+}
+
+// ---------------- helpers ----------------
+function mapHasPlayers(mapId) {
+    if (!onlinePlayers) return false;
+    for (const p of onlinePlayers.values()) if (p.mapId === mapId) return true;
+    return false;
+}
+function socketForChar(characterId) {
+    if (!onlinePlayers || !io) return null;
+    for (const [sid, p] of onlinePlayers) {
+        if (p.characterId === characterId) return io.sockets.sockets.get(sid) || null;
+    }
+    return null;
+}
+// Nearest online player position on a map (for aggro chase), or null.
+function playerPos(characterId, mapId) {
+    if (!onlinePlayers) return null;
+    for (const p of onlinePlayers.values()) {
+        if (p.characterId === characterId && p.mapId === mapId && p.lastPos) return p.lastPos;
+    }
+    return null;
+}
+
+// ---------------- simulation ----------------
+function stepMonster(m, mapId, now, dtSec) {
+    if (!m.alive) return;
+    const def = cfg.defs.get(m.type);
+    const speed = def ? Math.max(0.7, def.speed) : 1;
+
+    // Aggro: chase + strike the player who provoked it.
+    if (m.aggroChar && now < m.aggroUntil) {
+        const pp = playerPos(m.aggroChar, mapId);
+        if (pp) {
+            const dx = pp.x - m.x, dz = pp.z - m.z;
+            const dist = Math.hypot(dx, dz) || 0.001;
+            if (dist > ATTACK_REACH) {
+                const step = (speed + 1.4) * 1.5 * dtSec;
+                m.x += (dx / dist) * step;
+                m.z += (dz / dist) * step;
+            } else if (now >= m.atkReadyAt) {
+                m.atkReadyAt = now + ATTACK_CD_MS;
+                const sock = socketForChar(m.aggroChar);
+                if (sock && def) sock.emit('mon_atk', { id: m.id, atk: def.atk });
+            }
+            m.rot = Math.atan2(dx, dz);
+            return;
+        }
+        m.aggroChar = null; // target gone
+    }
+
+    // Idle wander around the spawn point.
+    if (now >= m.wanderUntil) {
+        m.wanderUntil = now + 1200 + Math.random() * 2500;
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * WANDER_RADIUS;
+        let tx = m.spawnX + Math.cos(a) * d;
+        let tz = m.spawnZ + Math.sin(a) * d;
+        if (!m.isWater && inArena(mapId, tx, tz)) { tx = m.spawnX; tz = m.spawnZ; }
+        m.targetX = Math.max(-SPAWN_RANGE, Math.min(SPAWN_RANGE, tx));
+        m.targetZ = Math.max(-SPAWN_RANGE, Math.min(SPAWN_RANGE, tz));
+    }
+    const dx = m.targetX - m.x, dz = m.targetZ - m.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.15) {
+        const step = speed * dtSec * 1.25;
+        m.x += (dx / dist) * step;
+        m.z += (dz / dist) * step;
+        m.rot = Math.atan2(dx, dz);
+    }
+}
+
+function broadcastMap(mapId, world) {
+    const mons = [];
+    for (const m of world.monsters.values()) {
+        if (!m.alive) continue;
+        mons.push({
+            id: m.id, t: m.type,
+            x: Math.round(m.x * 100) / 100, z: Math.round(m.z * 100) / 100,
+            r: Math.round(m.rot * 100) / 100,
+            hp: m.hp, mhp: m.maxHp,
+        });
+    }
+    io.to(`map:${mapId}`).emit('mon_state', { v: cfg.version, mons });
+}
+
+function tick() {
+    const now = Date.now();
+    const dtSec = TICK_MS / 1000;
+    for (const mapId of cfg.mapCfg.keys()) {
+        if (!mapHasPlayers(mapId)) { worlds.delete(mapId); continue; } // free empty maps
+        ensureMapSpawned(mapId);
+        const world = worlds.get(mapId);
+        for (const m of world.monsters.values()) {
+            if (m.alive) stepMonster(m, mapId, now, dtSec);
+            else if (m.respawnAt && now >= m.respawnAt) respawnMonster(m, mapId);
+        }
+        broadcastMap(mapId, world);
+    }
+}
+
+function respawnMonster(m, mapId) {
+    // Reroll type from the map's table so admin edits take effect on respawn.
+    const spawns = (cfg.spawnsByMap.get(mapId) || []).filter(s => !!s.is_water === m.isWater);
+    if (spawns.length) m.type = weightedPick(spawns).monster_type;
+    const def = cfg.defs.get(m.type);
+    const pos = m.isWater ? pickWaterPos() : pickLandPos(mapId);
+    m.x = pos.x; m.z = pos.z; m.spawnX = pos.x; m.spawnZ = pos.z;
+    m.hp = m.maxHp = def ? def.hp : 100;
+    m.alive = true; m.respawnAt = 0;
+    m.aggroChar = null; m.aggroUntil = 0;
+    m.dmgByChar = new Map();
+}
+
+// ---------------- damage + death (authoritative) ----------------
+export function applyHit(player, payload) {
+    if (!player || !payload || typeof payload.monsterId !== 'string') return;
+    const mapId = player.mapId;
+    const world = worlds.get(mapId);
+    if (!world) return;
+    const m = world.monsters.get(payload.monsterId);
+    if (!m || !m.alive) return;
+
+    const dmg = clampMonsterDamage(player.level || 1, Number(payload.damage) || 0);
+    if (dmg <= 0) return;
+
+    const charId = player.characterId;
+    if (charId) m.dmgByChar.set(charId, (m.dmgByChar.get(charId) || 0) + dmg);
+
+    // A hit provokes the monster toward the most recent attacker.
+    m.aggroChar = charId || m.aggroChar;
+    m.aggroUntil = Date.now() + AGGRO_MS;
+
+    m.hp = Math.max(0, m.hp - dmg);
+    if (m.hp <= 0) killMonster(world, m, mapId);
+}
+
+async function killMonster(world, m, mapId) {
+    m.alive = false;
+    m.respawnAt = Date.now() + RESPAWN_MS;
+    io.to(`map:${mapId}`).emit('mon_dead', { id: m.id });
+
+    const def = cfg.defs.get(m.type);
+    if (!def) return;
+
+    // Contributors (everyone who dealt damage) → exp + gold each. Top-damage
+    // dealer also gets the item drop (RO-style).
+    const contributors = [...m.dmgByChar.entries()];
+    if (!contributors.length) return;
+    let topChar = null, topDmg = -1;
+    for (const [cid, d] of contributors) if (d > topDmg) { topDmg = d; topChar = cid; }
+
+    for (const [cid] of contributors) {
+        const gold = (def.gold_min || 0) + Math.floor(Math.random() * ((def.gold_max || 0) - (def.gold_min || 0) + 1));
+        const sock = socketForChar(cid);
+        if (sock) sock.emit('mon_reward', { id: m.id, type: m.type, name: def.name, exp: def.exp || 0, gold });
+        // Persist gold/exp authoritatively so it survives even if the client
+        // never sends its next save (best-effort; ignore failures).
+        query('UPDATE public.characters SET gold = gold + $2 WHERE id = $1', [cid, gold]).catch(() => {});
+    }
+
+    // Item drops → top-damage contributor.
+    const drops = cfg.dropsByType.get(m.type) || [];
+    for (const dr of drops) {
+        if (Math.random() >= dr.chance) continue;
+        const qty = (dr.qty_min || 1) + Math.floor(Math.random() * ((dr.qty_max || 1) - (dr.qty_min || 1) + 1));
+        try {
+            await grantItem(topChar, dr.item_name, dr.item_type || 'material', qty);
+            const sock = socketForChar(topChar);
+            if (sock) sock.emit('mon_loot', { id: m.id, item_name: dr.item_name, emoji: dr.emoji || '', item_type: dr.item_type || 'material', quantity: qty });
+        } catch (e) {
+            console.error('[MonEngine] grantItem failed:', e.message);
+        }
+    }
+}
+
+// Upsert an item into a character's inventory (mirrors the admin give-item path).
+async function grantItem(characterId, itemName, itemType, qty) {
+    if (!characterId || !itemName || qty <= 0) return;
+    await tx(async (client) => {
+        const cur = await client.query(
+            'SELECT id, quantity FROM inventory WHERE character_id=$1 AND item_name=$2 LIMIT 1',
+            [characterId, itemName]);
+        if (!cur.rows[0]) {
+            await client.query(
+                'INSERT INTO inventory (character_id, item_name, item_type, quantity, stats) VALUES ($1,$2,$3,$4,$5)',
+                [characterId, itemName, String(itemType).slice(0, 32), qty, {}]);
+        } else {
+            await client.query('UPDATE inventory SET quantity = quantity + $2 WHERE id = $1', [cur.rows[0].id, qty]);
+        }
+    });
+}
+
+// ---------------- lifecycle ----------------
+export async function startMonsterEngine(deps) {
+    io = deps.io;
+    onlinePlayers = deps.onlinePlayers;
+    await loadConfig();
+    running = true;
+    if (loopTimer) clearInterval(loopTimer);
+    loopTimer = setInterval(() => { try { tick(); } catch (e) { console.error('[MonEngine] tick error:', e.message); } }, TICK_MS);
+    console.log(`[MonEngine] 🐲 server-authoritative monsters ON (config v${cfg.version})`);
+}
+
+// Called after an admin config edit: reload config and respawn every live map so
+// the change takes effect immediately for everyone.
+export async function reloadWorld() {
+    if (!running) return;
+    await loadConfig();
+    for (const mapId of [...worlds.keys()]) spawnMap(mapId);
+    console.log(`[MonEngine] ♻️ world reloaded (config v${cfg.version})`);
+}
+
+export function isRunning() { return running; }
