@@ -50,7 +50,7 @@ export function createZolosClient(baseUrl) {
             this._columns = '*';
             this._filters = [];
             this._values = undefined;
-            this._order = null;
+            this._orders = [];
             this._limit = undefined;
             this._single = false;
             this._maybe = false;
@@ -74,7 +74,11 @@ export function createZolosClient(baseUrl) {
         gte(col, val) { this._filters.push({ col, op: 'gte', val }); return this; }
         lt(col, val) { this._filters.push({ col, op: 'lt', val }); return this; }
         lte(col, val) { this._filters.push({ col, op: 'lte', val }); return this; }
-        order(col, opts) { this._order = { col, asc: !(opts && opts.ascending === false) }; return this; }
+        // Supabase allows chaining .order() for multi-column sorts (e.g. level
+        // DESC, then total_kills DESC as a tiebreaker). Accumulate them in order
+        // — collapsing to a single column made the "Level" leaderboard sort by
+        // the LAST .order() (total_kills) instead of level.
+        order(col, opts) { this._orders.push({ col, asc: !(opts && opts.ascending === false) }); return this; }
         limit(n) { this._limit = n; return this; }
         single() { this._single = true; this._limit = this._limit ?? 1; return this; }
         maybeSingle() { this._maybe = true; this._limit = this._limit ?? 1; return this; }
@@ -82,7 +86,7 @@ export function createZolosClient(baseUrl) {
         _spec() {
             return {
                 table: this.table, action: this._action, columns: this._columns,
-                filters: this._filters, values: this._values, order: this._order,
+                filters: this._filters, values: this._values, order: this._orders,
                 limit: this._limit, single: false, onConflict: this._onConflict,
             };
         }
