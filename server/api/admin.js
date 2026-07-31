@@ -6,6 +6,7 @@ import express from 'express';
 import { query, tx } from './db.js';
 import { authFromReq, httpErr } from './auth.js';
 import * as ipMonitor from './ipMonitor.js';
+import { sweepCheaters } from './cheatGuard.js';
 
 // Character columns an admin may edit, with bounds. Anything else is ignored.
 const EDITABLE_NUM = {
@@ -326,6 +327,22 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap } = {}) {
             stats: ipMonitor.stats(),
             online,
         });
+    }));
+
+    // ================= CHEAT GUARD =================
+    // Log of accounts the auto cheat-guard reset (high-confidence only).
+    r.get('/cheats', requireAdmin, wrap(async (_req, res) => {
+        const { rows } = await query(
+            `SELECT id, character_id, user_id, name, reason, before_data, action, created_at
+             FROM cheat_actions ORDER BY created_at DESC LIMIT 100`);
+        res.json({ actions: rows });
+    }));
+
+    // Run a scan on demand (also runs automatically every 5 min + on boot).
+    r.post('/cheats/scan', requireAdmin, wrap(async (req, res) => {
+        const reset = await sweepCheaters();
+        console.log(`[Admin] 🔎 ${req.admin.username} ran manual cheat scan → reset ${reset}`);
+        res.json({ ok: true, reset });
     }));
 
     // ================= EVENTS / ANNOUNCE =================
