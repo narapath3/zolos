@@ -1354,7 +1354,10 @@ export async function fetchLeaderboard(category = 'level') {
         return q.order('level', { ascending: false }).order('total_kills', { ascending: false });
     };
 
-    const cols = 'name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses, user_id';
+    // `id` (the char_xxx character id) is needed by the in-game admin panel so
+    // its edit/give/delete RPCs target the right character — admin_*_character
+    // look up WHERE id = target_char_id, not by user_id.
+    const cols = 'id, name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses, user_id';
     let query = applyOrder(supabase.from('characters').select(`${cols}, profiles(username)`));
 
     let { data, error } = await query.limit(50);
