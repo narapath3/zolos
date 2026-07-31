@@ -425,41 +425,50 @@ export class ParticleSystem {
     spawnMonsterSpawn(position, colorHex = 0xfff2b0) {
         if (!this.effectsEnabled) return;
 
-        // Expanding halo ring on the ground
+        // Expanding halo ring on the ground (bright, clearly visible)
         const ring = new THREE.Mesh(
-            new THREE.RingGeometry(0.25, 0.45, 24),
-            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+            new THREE.RingGeometry(0.4, 0.75, 28),
+            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
         );
         ring.position.set(position.x, position.y + 0.08, position.z);
         ring.rotation.x = -Math.PI / 2;
         this.scene.add(ring);
-        this.shockwaves.push({ mesh: ring, life: 0.6, maxLife: 0.6, type: 'level-ring' });
+        this.shockwaves.push({ mesh: ring, life: 0.75, maxLife: 0.75, type: 'level-ring' });
 
-        // Soft glow sphere that fades in place — the "light emanating"
-        const glow = new THREE.Mesh(
-            new THREE.SphereGeometry(0.6, 10, 10),
-            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.55 })
+        // Short vertical light column — the "beam of light" as it materializes
+        const beam = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.55, 0.75, 3.2, 14, 1, true),
+            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
         );
-        glow.position.set(position.x, position.y + 0.5, position.z);
-        this.scene.add(glow);
-        this.hitEffects.push({ mesh: glow, velocity: new THREE.Vector3(0, 0.3, 0), life: 0.5, maxLife: 0.5, gravity: 0 });
+        beam.position.set(position.x, position.y + 1.6, position.z);
+        this.scene.add(beam);
+        this.shockwaves.push({ mesh: beam, life: 0.6, maxLife: 0.6, type: 'pillar' });
 
-        // A few rising motes of light
+        // Soft glow sphere that fades in place — the light emanating
+        const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.95, 12, 12),
+            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.7 })
+        );
+        glow.position.set(position.x, position.y + 0.6, position.z);
+        this.scene.add(glow);
+        this.hitEffects.push({ mesh: glow, velocity: new THREE.Vector3(0, 0.4, 0), life: 0.55, maxLife: 0.55, gravity: 0 });
+
+        // Rising motes of light
         const seg = this.perfMonitor.getGeometrySegments();
-        const n = 8;
+        const n = 12;
         for (let i = 0; i < n; i++) {
             const a = (i / n) * Math.PI * 2;
-            const r = 0.3 + Math.random() * 0.25;
+            const r = 0.35 + Math.random() * 0.3;
             const mote = new THREE.Mesh(
-                new THREE.SphereGeometry(0.07, seg, seg),
+                new THREE.SphereGeometry(0.09, seg, seg),
                 new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1.0 })
             );
             mote.position.set(position.x + Math.cos(a) * r, position.y + 0.1, position.z + Math.sin(a) * r);
             this.scene.add(mote);
             this.hitEffects.push({
                 mesh: mote,
-                velocity: new THREE.Vector3(Math.cos(a) * 0.4, 2 + Math.random() * 1.5, Math.sin(a) * 0.4),
-                life: 0.7, maxLife: 0.7, gravity: 1.5,
+                velocity: new THREE.Vector3(Math.cos(a) * 0.5, 2.5 + Math.random() * 1.8, Math.sin(a) * 0.5),
+                life: 0.8, maxLife: 0.8, gravity: 1.5,
             });
         }
     }
