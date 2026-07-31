@@ -287,10 +287,10 @@ export class AdminUI {
 
             if (error) {
                 console.error('[Admin] RPC error:', error);
-                alert('❌ Error: ' + error.message + '\n\nถ้ายังไม่ได้รัน SQL ใน Supabase Dashboard กรุณารัน SQL สร้าง function ก่อน');
+                alert('❌ ลบไม่สำเร็จ: ' + error.message);
             } else if (data && data.success === false) {
-                console.error('[Admin] Delete failed:', data.error);
-                alert('❌ ' + (data.error || 'Delete failed'));
+                console.error('[Admin] Delete failed:', data.message || data.error);
+                alert('❌ ' + (data.message || data.error || 'Delete failed'));
             } else if (data && data.success === true) {
                 console.log('[Admin] Player deleted successfully:', data.deleted);
                 this.users = this.users.filter(u => u.id !== charId);
