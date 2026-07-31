@@ -473,24 +473,44 @@ export class PlayerProfileModal {
           color: #ff8a8a;
         }
         .profile-main {
-          flex-direction: column;
+          /* Block (not flex) on mobile: stacked children report their true
+             combined height, so the container scrolls correctly. A fixed-height
+             flex column here let tall content (equipment) overflow OUTSIDE the
+             scroll region — making it unreachable. */
+          display: block;
+          flex: 1 1 auto;
+          min-height: 0;
           overflow-y: auto;
           overflow-x: hidden;
           padding: 12px;
-          padding-bottom: 24px;
-          gap: 16px;
+          padding-bottom: 16px;
           -webkit-overflow-scrolling: touch;
           overscroll-behavior: contain;
           touch-action: pan-y;
           scroll-behavior: smooth;
         }
         .profile-left {
-          flex: none;
           width: 100%;
           gap: 10px;
+          margin-bottom: 16px;
         }
+        .profile-right { gap: 14px; }
         #player-profile-canvas {
-          height: 160px;
+          height: 130px;
+        }
+        /* Compact the action buttons into a row so stats/equipment sit higher
+           and need less scrolling in the (previously cramped) body. */
+        .profile-actions {
+          flex-direction: row;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 10px;
+        }
+        .profile-actions .profile-btn {
+          flex: 1 1 30%;
+          min-width: 92px;
+          padding: 9px 6px;
+          font-size: 12px;
         }
         .profile-name { font-size: 18px; }
         .profile-right {
@@ -512,27 +532,29 @@ export class PlayerProfileModal {
         .equip-name { font-size: 9px; }
         .section-title { margin-bottom: 8px; }
 
-        /* Show bottom close button on mobile */
+        /* Persistent close footer on mobile — always visible below the scroll
+           area, so users never have to scroll to find a way out. */
         .profile-bottom-close {
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
           width: 100%;
-          padding: 14px;
-          margin-top: 8px;
-          border-radius: 12px;
-          border: 1px solid rgba(255, 100, 100, 0.25);
-          background: rgba(255, 100, 100, 0.08);
-          color: #ff8a8a;
-          font-size: 15px;
-          font-weight: 700;
+          flex-shrink: 0;
+          padding: 15px;
+          border: none;
+          border-top: 1px solid rgba(255, 100, 100, 0.28);
+          border-radius: 0 0 16px 16px;
+          background: rgba(255, 90, 90, 0.16);
+          color: #ff9a9a;
+          font-size: 16px;
+          font-weight: 800;
           cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           transition: background 0.2s;
         }
         .profile-bottom-close:active {
-          background: rgba(255, 100, 100, 0.2);
+          background: rgba(255, 90, 90, 0.32);
         }
       }
     `;
@@ -711,10 +733,10 @@ export class PlayerProfileModal {
               ${this._renderEquipment(appearance)}
             </div>
           </div>
-
-          <button class="profile-bottom-close">✕ ปิด (Close)</button>
         </div>
       </div>
+
+      <button class="profile-bottom-close">✕ ปิดหน้าต่าง (Close)</button>
     `;
 
     // If the modal was already showing a DIFFERENT player (switched mid-fly),
