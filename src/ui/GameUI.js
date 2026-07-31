@@ -1296,6 +1296,22 @@ export class GameUI {
     }
   }
 
+  // Reflect a drop in the UI WITHOUT persisting — used when the server already
+  // wrote the item to our inventory (Phase 2 server-authoritative drops), so we
+  // must not re-add it to the DB.
+  addItemLocal(item, qty = 1) {
+    const existing = this.inventory.find(i => i.item_name === item.name);
+    if (existing) {
+      existing.quantity += qty;
+    } else {
+      this.inventory.push(this._enrichItem({
+        item_name: item.name, item_type: item.type, quantity: qty, emoji: item.emoji,
+      }));
+    }
+    this._renderInventory();
+    if (this.selectedItemName === item.name) this._updateDetailBox();
+  }
+
   _renderInventory() {
     const grid = document.getElementById('inventory-grid');
     if (!grid) return;

@@ -309,6 +309,27 @@ export class CombatSystem {
         const charAtk = isNaN(this.character.stats.atk) ? 10 : this.character.stats.atk;
         let baseDmg = charAtk + Math.floor(Math.random() * 5);
         if (isCritical) baseDmg = Math.floor(baseDmg * 1.8);
+
+        // ===== Server-authoritative monsters (Phase 2) =====
+        // The server owns HP, death, and rewards. Locally we only flash the
+        // monster + show the damage number, then report the hit. HP/death arrive
+        // from the server (mon_state / mon_dead); exp/gold/loot from mon_reward /
+        // mon_loot. No local takeDamage, counter-attack, kill, or reward here.
+        if (window.__serverMonsters) {
+            monster.flashHit?.(isCritical);
+            monster._localContributed = true;
+            if (this.onMonsterDamaged) this.onMonsterDamaged(monster.id, baseDmg, isCritical);
+            this.onEvent({
+                type: 'playerAttack',
+                damage: baseDmg,
+                critical: isCritical,
+                targetPos: monster.getPosition(),
+                monsterName: monster.data.name,
+                weaponClass: weaponClass || (this.character.getWeaponClass ? this.character.getWeaponClass() : 'melee'),
+            });
+            return;
+        }
+
         const actualDmg = this.character.applyCardDamage
             ? this.character.applyCardDamage(monster, baseDmg, isCritical)
             : monster.takeDamage(baseDmg, isCritical);

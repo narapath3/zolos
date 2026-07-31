@@ -73,6 +73,7 @@ import {
     sendSaveState,
     broadcastPosition,
     broadcastMonsterHit,
+    reportMonsterHit,
     broadcastSkillCast,
     broadcastAttackHit,
     broadcastChat,
@@ -507,18 +508,118 @@ async function initGame(charData) {
     // ===== Shared monster HP (co-op damage) =====
     // Relay every hit we land so teammates' copies of the monster lose the same
     // HP — combined damage kills it faster for everyone.
-    combatSystem.onMonsterDamaged = (monsterId, damage) => {
-        broadcastMonsterHit(monsterId, damage, sceneManager.currentMap);
+    combatSystem.onMonsterDamaged = (monsterId, damage, crit = false) => {
+        // Server-authoritative: report the hit to the engine (it owns HP + kills).
+        // Legacy: relay to teammates so their local copy drains too.
+        if (window.__serverMonsters) reportMonsterHit(monsterId, damage, crit);
+        else broadcastMonsterHit(monsterId, damage, sceneManager.currentMap);
     };
     // Apply a teammate's relayed hit to our copy; if it dies from the combined
     // damage, run the kill (we only get loot if we also damaged it).
+    // (Legacy path — inert in server mode; the server drives shared HP.)
     window.applyRemoteMonsterHit = (monsterId, damage) => {
+        if (window.__serverMonsters) return;
         if (!monsters || !combatSystem) return;
         const m = monsters.getById(monsterId);
         if (!m || !m.alive) return;
         const died = m.applyRemoteDamage(damage);
         if (died) combatSystem.handleRemoteKill(m);
     };
+
+    // ===== Server-authoritative monsters (Phase 2) =====
+    // The server told us it owns the monsters — switch the manager to render-only
+    // mode (or back to the local spawner if disabled).
+    window.onWorldMode = (payload) => {
+        const on = !!(payload && payload.serverMonsters);
+        if (!monsters) return;
+        if (on && !monsters.serverMode) {
+            monsters.setServerMode(true);
+        } else if (!on && monsters.serverMode) {
+            monsters.setServerMode(false);
+            if (character) monsters.spawnInitial(character.stats.level);
+        }
+    };
+    // Stream of authoritative monster positions/HP for our map. Lazily enter
+    // server mode on the first snapshot so it's robust to event ordering (this
+    // also clears any monsters the local spawner created before world_mode).
+    window.onMonState = (payload) => {
+        if (!monsters) return;
+        if (window.__serverMonsters && !monsters.serverMode) monsters.setServerMode(true);
+        monsters.applyServerState(payload);
+    };
+    // A server monster died: hide it, play death FX, resolve card drops if we
+    // helped kill it, and let auto-farm retarget.
+    window.onMonDead = (payload) => {
+        if (!monsters || !payload) return;
+        const m = monsters.killServerMonster(payload.id);
+        if (!m) return;
+        if (particles) { try { particles.spawnHitEffect(m.getPosition(), true); } catch { /* ignore */ } }
+        const contributed = m._localContributed === true;
+        m._localContributed = false;
+        if (contributed && monsters.onMonsterDeath) {
+            try { monsters.onMonsterDeath(m, { eligible: true }); } catch (e) { console.warn('[Zolos] card drop error:', e); }
+        }
+        if (combatSystem && combatSystem.currentTarget === m) combatSystem.currentTarget = null;
+        if (character && character.targetMonster === m) character.targetMonster = null;
+    };
+    // The server granted exp/gold for a kill we contributed to.
+    window.onMonReward = (payload) => {
+        if (!character || !combatSystem || !payload) return;
+        const pos = character.getPosition();
+        const leveled = character.addExp(payload.exp || 0);
+        if (payload.exp) combatSystem.onEvent({ type: 'expGain', amount: payload.exp, targetPos: pos });
+        if (leveled) combatSystem.onEvent({ type: 'levelUp', level: character.stats.level });
+        if (payload.gold) {
+            character.stats.gold += payload.gold;
+            combatSystem.onEvent({ type: 'goldGain', amount: payload.gold, targetPos: pos });
+        }
+        if (character.equippedPet && character.addPetXp) {
+            const petLeveled = character.addPetXp(Math.max(1, Math.round((payload.exp || 0) * 0.5)));
+            if (petLeveled) combatSystem.onEvent({ type: 'petLevelUp', level: character.petLevel });
+        }
+        combatSystem.onEvent({ type: 'monsterKilled', monsterName: payload.name });
+        if (gameUI) gameUI.updateHUD?.(character.stats);
+    };
+    // The server rolled a drop for us and already wrote it to our inventory —
+    // reflect it in the UI without re-persisting (no double-grant).
+    window.onMonLoot = (payload) => {
+        if (!gameUI || !payload) return;
+        const item = { name: payload.item_name, emoji: payload.emoji, type: payload.item_type };
+        gameUI.addItemLocal?.(item, payload.quantity || 1);
+        gameUI.addCombatLog?.(`🎁 ได้รับ: ${payload.emoji || ''} ${payload.item_name}${payload.quantity > 1 ? ' ×' + payload.quantity : ''}`, 'loot');
+    };
+    // A server monster struck us while chasing (server-driven aggro).
+    window.onMonAtk = (payload) => {
+        if (!character || !character.isAlive || !character.isAlive() || !payload) return;
+        if (window.bossEngaged || duelState) return;
+        const atk = Number(payload.atk) || 10;
+        const def = character.stats.def || 0;
+        const dmg = Math.max(1, atk - Math.floor(def * 0.3) + Math.floor(Math.random() * 3));
+        const actual = character.takeDamage(dmg, { preMitigated: true });
+        if (particles) {
+            const sp = worldToScreen(character.getPosition(), 1.6);
+            particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
+        }
+        if (gameUI) gameUI.updateHUD?.(character.stats);
+        if (!character.isAlive()) {
+            if (combatSystem) { combatSystem.autoFarm = false; combatSystem.currentTarget = null; }
+            character.targetMonster = null;
+            if (gameUI) {
+                gameUI.setAutoFarmState?.(false);
+                if (gameUI.showDeathBanner) gameUI.showDeathBanner('มอนสเตอร์');
+            }
+            setTimeout(() => {
+                if (character && !character.isAlive()) {
+                    character.respawn();
+                    if (gameUI) { gameUI.addCombatLog?.('💚 คุณเกิดใหม่แล้ว!', 'system'); gameUI.updateHUD?.(character.stats); }
+                }
+            }, 3000);
+        }
+    };
+    // Admin changed world config — nothing to refetch client-side yet (models
+    // come from local GameData); the server already respawned with the new
+    // layout, which streams in via onMonState.
+    window.onWorldConfig = () => { /* reserved for future def refetch */ };
 
     // ===== See other players' skill effects =====
     window.broadcastSkillCast = broadcastSkillCast;
@@ -1059,6 +1160,7 @@ async function initGame(charData) {
 
     loadingOverlay.setProgress(85, '🐉 Spawning World Monsters & Realm Entities...');
     // Initial Monster Spawn
+    if (window.__serverMonsters) monsters.setServerMode(true);
     monsters.spawnInitial(character.stats.level);
 
     // Populate the arena MMR leaderboard board
@@ -1695,6 +1797,7 @@ function loadMapAndSpawn(targetMap, spawn) {
     sceneManager.loadMap(targetMap);
     monsters.clearAll();
     monsters.mapId = targetMap;
+    if (window.__serverMonsters) monsters.setServerMode(true);
     monsters.spawnInitial(character.stats.level);
 
     // Update multiplayer presence for the new map + broadcast our new spot

@@ -7,6 +7,10 @@ import { query, tx } from './db.js';
 import { authFromReq, httpErr } from './auth.js';
 import * as ipMonitor from './ipMonitor.js';
 import { sweepCheaters, resetCharacter } from './cheatGuard.js';
+import {
+    MAPS, isValidMap, bumpWorldVersion, getMonsterDefs, getMapSpawns,
+    getMonsterDrops,
+} from './monstersConfig.js';
 
 // Character columns an admin may edit, with bounds. Anything else is ignored.
 const EDITABLE_NUM = {
@@ -25,9 +29,20 @@ function clampNum(key, val) {
     return Math.max(min, Math.min(max, n));
 }
 
-export function createAdminRouter({ io, onlinePlayers, userSocketMap } = {}) {
+export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorld } = {}) {
     const r = express.Router();
     r.use(express.json({ limit: '256kb' }));
+
+    // Called after any world-config edit: bump the version, tell the running
+    // monster engine (Phase 2) to reload + respawn, and notify clients so they
+    // refetch defs. reloadWorld is optional so Phase 1 works before the engine
+    // exists. Returns the new version.
+    const applyWorldChange = async () => {
+        const version = await bumpWorldVersion();
+        try { if (typeof reloadWorld === 'function') await reloadWorld(); } catch (e) { console.error('[admin] reloadWorld failed:', e.message); }
+        try { if (io) io.emit('world_config', { version }); } catch { /* ignore */ }
+        return version;
+    };
 
     // ---- auth gate ----
     const requireAdmin = async (req, res, next) => {
@@ -383,6 +398,141 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap } = {}) {
         io.sockets.sockets.get(sid)?.disconnect(true);
         console.log(`[Admin] 👢 ${req.admin.username} kicked ${userId}`);
         res.json({ ok: true });
+    }));
+
+    // ================= WORLD MONSTERS (config) =================
+    // Bounds for monster stat edits — anything outside is clamped/ignored.
+    const MON_NUM = {
+        hp: [1, 100_000_000], atk: [0, 10_000_000], def: [0, 10_000_000],
+        exp: [0, 100_000_000], gold_min: [0, 100_000_000], gold_max: [0, 100_000_000],
+        size: [0.1, 10], speed: [0, 20], color: [0, 0xffffff],
+    };
+    const clampMon = (key, val) => {
+        const [min, max] = MON_NUM[key];
+        const n = Number(val);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(min, Math.min(max, n));
+    };
+
+    // Map list (id + display name) for the dashboard selector.
+    r.get('/world/maps', requireAdmin, wrap(async (_req, res) => {
+        res.json({ maps: MAPS });
+    }));
+
+    // All monster definitions (the catalog).
+    r.get('/monsters', requireAdmin, wrap(async (_req, res) => {
+        res.json({ monsters: await getMonsterDefs() });
+    }));
+
+    // Edit one monster's stats. Only whitelisted numeric fields + name/emoji.
+    r.patch('/monsters/:type', requireAdmin, wrap(async (req, res) => {
+        const type = String(req.params.type);
+        const body = req.body || {};
+        const sets = [], vals = [];
+        for (const key of Object.keys(MON_NUM)) {
+            if (body[key] === undefined) continue;
+            const v = clampMon(key, body[key]);
+            if (v === null) continue;
+            vals.push(v); sets.push(`${key} = $${vals.length}`);
+        }
+        if (typeof body.name === 'string' && body.name.trim()) { vals.push(body.name.trim().slice(0, 40)); sets.push(`name = $${vals.length}`); }
+        if (typeof body.emoji === 'string') { vals.push(body.emoji.slice(0, 8)); sets.push(`emoji = $${vals.length}`); }
+        if (typeof body.is_boss === 'boolean') { vals.push(body.is_boss); sets.push(`is_boss = $${vals.length}`); }
+        if (!sets.length) throw httpErr(400, 'ไม่มีข้อมูลให้แก้ไข');
+        vals.push(type);
+        const { rowCount } = await query(
+            `UPDATE public.monster_defs SET ${sets.join(', ')}, updated_at = now() WHERE type = $${vals.length}`, vals);
+        if (!rowCount) throw httpErr(404, 'ไม่พบมอนสเตอร์');
+        const version = await applyWorldChange();
+        console.log(`[Admin] 👹 ${req.admin.username} edited monster ${type}`);
+        res.json({ ok: true, version });
+    }));
+
+    // Spawn table for one map (which monsters spawn here + counts).
+    r.get('/maps/:mapId/spawns', requireAdmin, wrap(async (req, res) => {
+        const mapId = String(req.params.mapId);
+        if (!isValidMap(mapId)) throw httpErr(400, 'แผนที่ไม่ถูกต้อง');
+        res.json(await getMapSpawns(mapId));
+    }));
+
+    // Set how many land/water monsters spawn on a map.
+    r.put('/maps/:mapId/config', requireAdmin, wrap(async (req, res) => {
+        const mapId = String(req.params.mapId);
+        if (!isValidMap(mapId)) throw httpErr(400, 'แผนที่ไม่ถูกต้อง');
+        const land = Math.max(0, Math.min(60, Math.floor(Number(req.body?.land_count)) || 0));
+        const water = Math.max(0, Math.min(30, Math.floor(Number(req.body?.water_count)) || 0));
+        await query(
+            `INSERT INTO public.map_config (map_id, land_count, water_count) VALUES ($1,$2,$3)
+             ON CONFLICT (map_id) DO UPDATE SET land_count = EXCLUDED.land_count, water_count = EXCLUDED.water_count`,
+            [mapId, land, water]);
+        const version = await applyWorldChange();
+        res.json({ ok: true, version });
+    }));
+
+    // Add or update a spawn entry (which monster + weight) on a map.
+    r.post('/maps/:mapId/spawns', requireAdmin, wrap(async (req, res) => {
+        const mapId = String(req.params.mapId);
+        if (!isValidMap(mapId)) throw httpErr(400, 'แผนที่ไม่ถูกต้อง');
+        const type = String(req.body?.monster_type || '').trim();
+        if (!type) throw httpErr(400, 'ต้องระบุมอนสเตอร์');
+        const def = await query('SELECT environment FROM public.monster_defs WHERE type = $1', [type]);
+        if (!def.rows[0]) throw httpErr(404, 'ไม่พบมอนสเตอร์นี้ในแคตตาล็อก');
+        const weight = Math.max(1, Math.min(1000, Math.floor(Number(req.body?.weight)) || 10));
+        const minLevel = Math.max(1, Math.min(300, Math.floor(Number(req.body?.min_level)) || 1));
+        const isWater = req.body?.is_water === true || def.rows[0].environment === 'water';
+        await query(
+            `INSERT INTO public.map_spawns (map_id, monster_type, weight, min_level, is_water)
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (map_id, monster_type)
+             DO UPDATE SET weight = EXCLUDED.weight, min_level = EXCLUDED.min_level, is_water = EXCLUDED.is_water`,
+            [mapId, type, weight, minLevel, isWater]);
+        const version = await applyWorldChange();
+        console.log(`[Admin] 👹 ${req.admin.username} set spawn ${type}@${mapId} w=${weight}`);
+        res.json({ ok: true, version });
+    }));
+
+    // Remove a spawn entry.
+    r.delete('/spawns/:id', requireAdmin, wrap(async (req, res) => {
+        const id = parseInt(req.params.id);
+        if (!Number.isFinite(id)) throw httpErr(400, 'id ไม่ถูกต้อง');
+        const { rowCount } = await query('DELETE FROM public.map_spawns WHERE id = $1', [id]);
+        if (!rowCount) throw httpErr(404, 'ไม่พบรายการ');
+        const version = await applyWorldChange();
+        res.json({ ok: true, version });
+    }));
+
+    // Drop table for one monster.
+    r.get('/monsters/:type/drops', requireAdmin, wrap(async (req, res) => {
+        res.json({ drops: await getMonsterDrops(String(req.params.type)) });
+    }));
+
+    // Add a drop entry to a monster.
+    r.post('/monsters/:type/drops', requireAdmin, wrap(async (req, res) => {
+        const type = String(req.params.type);
+        const def = await query('SELECT 1 FROM public.monster_defs WHERE type = $1', [type]);
+        if (!def.rows[0]) throw httpErr(404, 'ไม่พบมอนสเตอร์');
+        const itemName = String(req.body?.item_name || '').trim();
+        if (!itemName) throw httpErr(400, 'ต้องระบุชื่อไอเทม');
+        const chance = Math.max(0, Math.min(1, Number(req.body?.chance) || 0.1));
+        const qtyMin = Math.max(1, Math.min(999, Math.floor(Number(req.body?.qty_min)) || 1));
+        const qtyMax = Math.max(qtyMin, Math.min(999, Math.floor(Number(req.body?.qty_max)) || qtyMin));
+        const { rows } = await query(
+            `INSERT INTO public.monster_drops (monster_type, item_name, emoji, item_type, chance, qty_min, qty_max)
+             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+            [type, itemName.slice(0, 60), String(req.body?.emoji || '').slice(0, 8),
+                String(req.body?.item_type || 'material').slice(0, 20), chance, qtyMin, qtyMax]);
+        const version = await applyWorldChange();
+        res.json({ ok: true, id: rows[0].id, version });
+    }));
+
+    // Remove a drop entry.
+    r.delete('/drops/:id', requireAdmin, wrap(async (req, res) => {
+        const id = parseInt(req.params.id);
+        if (!Number.isFinite(id)) throw httpErr(400, 'id ไม่ถูกต้อง');
+        const { rowCount } = await query('DELETE FROM public.monster_drops WHERE id = $1', [id]);
+        if (!rowCount) throw httpErr(404, 'ไม่พบรายการ');
+        const version = await applyWorldChange();
+        res.json({ ok: true, version });
     }));
 
     // error handler (JSON)

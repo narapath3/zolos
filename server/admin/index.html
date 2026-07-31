@@ -80,6 +80,11 @@
   #modal h2{margin:0}
   .modal-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
   .modal-head .spacer{flex:1}
+  .fld{display:flex;flex-direction:column;gap:4px;font-size:12px}
+  .fld>span{color:var(--muted)}
+  .fld input,.fld select{width:100%}
+  .pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;vertical-align:middle}
+  .pill.bad{background:var(--bad);color:#fff}
   .close{background:transparent;border:none;color:var(--muted);font-size:22px;line-height:1}
   .edit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:12px}
   .edit-grid label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px}
@@ -115,6 +120,7 @@
       <button data-tab="dash" class="active">ภาพรวม</button>
       <button data-tab="players">ผู้เล่น</button>
       <button data-tab="movement">📈 การเปลี่ยนแปลง</button>
+      <button data-tab="monsters">👹 มอนสเตอร์</button>
       <button data-tab="economy">เศรษฐกิจ</button>
       <button data-tab="security">ความปลอดภัย</button>
       <button data-tab="events">กิจกรรม</button>
@@ -179,7 +185,7 @@ let cur='dash';
 function go(tab){
   cur=tab;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  ({dash:renderDash,players:renderPlayers,movement:renderMovement,economy:renderEconomy,security:renderSecurity,events:renderEvents}[tab])();
+  ({dash:renderDash,players:renderPlayers,movement:renderMovement,monsters:renderMonsters,economy:renderEconomy,security:renderSecurity,events:renderEvents}[tab])();
 }
 
 // ---------- DASHBOARD ----------
@@ -393,6 +399,142 @@ async function renderMovement(){
 }
 
 // ---------- ECONOMY ----------
+// ---------- MONSTERS (world config) ----------
+let monCatalog=[], monMap='prontera';
+async function renderMonsters(){
+  const v=$('#view');v.innerHTML='<div class="muted">กำลังโหลด...</div>';
+  try{
+    const [{maps},{monsters}]=await Promise.all([api('/world/maps'),api('/monsters')]);
+    monCatalog=monsters;
+    if(!maps.find(m=>m.id===monMap))monMap=maps[0].id;
+    v.innerHTML=`
+      <div class="panel">
+        <div class="row" style="align-items:center">
+          <h2 style="margin:0">🗺️ มอนสเตอร์ประจำแผนที่</h2>
+          <span class="spacer"></span>
+          <select id="mon-map">${maps.map(m=>`<option value="${m.id}" ${m.id===monMap?'selected':''}>${esc(m.name)}</option>`).join('')}</select>
+        </div>
+        <div id="mon-map-body"><div class="muted" style="margin-top:10px">กำลังโหลด...</div></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h2>📖 แคตตาล็อกมอนสเตอร์ (สตัท + ดรอป)</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>มอนสเตอร์</th><th>โซน</th><th class="num">HP</th><th class="num">ATK</th><th class="num">DEF</th><th class="num">EXP</th><th>Gold</th><th></th></tr></thead>
+          <tbody>${monsters.map(m=>`
+            <tr>
+              <td>${m.emoji||''} <b>${esc(m.name)}</b> ${m.is_boss?'<span class="pill bad">BOSS</span>':''} <span class="muted mono">${m.type}</span></td>
+              <td>${m.environment}</td>
+              <td class="num">${fmt(m.hp)}</td><td class="num">${fmt(m.atk)}</td><td class="num">${fmt(m.def)}</td><td class="num">${fmt(m.exp)}</td>
+              <td class="gold">${m.gold_min}-${m.gold_max}</td>
+              <td><button class="btn ghost sm" onclick="openMonster('${m.type}')">แก้ไข / ดรอป</button></td>
+            </tr>`).join('')}</tbody>
+        </table></div>
+      </div>`;
+    $('#mon-map').onchange=e=>{monMap=e.target.value;loadMapSpawns();};
+    loadMapSpawns();
+  }catch(e){authGuard(e);v.innerHTML=`<div class="err">${e.message}</div>`;}
+}
+async function loadMapSpawns(){
+  const box=$('#mon-map-body');if(!box)return;
+  box.innerHTML='<div class="muted" style="margin-top:10px">กำลังโหลด...</div>';
+  try{
+    const d=await api('/maps/'+monMap+'/spawns');
+    const opts=monCatalog.map(m=>`<option value="${m.type}">${m.emoji||''} ${esc(m.name)} (${m.environment})</option>`).join('');
+    box.innerHTML=`
+      <div class="row" style="margin:10px 0;align-items:center;gap:8px">
+        <label>จำนวนบก <input id="mon-land" type="number" min="0" max="60" value="${d.landCount}" style="width:72px"></label>
+        <label>จำนวนน้ำ <input id="mon-water" type="number" min="0" max="30" value="${d.waterCount}" style="width:72px"></label>
+        <button class="btn sm" onclick="saveMapConfig()">บันทึกจำนวน</button>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>มอนสเตอร์</th><th>โซน</th><th class="num">น้ำหนักสุ่ม</th><th></th></tr></thead>
+        <tbody>${d.spawns.length?d.spawns.map(s=>`
+          <tr>
+            <td>${s.emoji||''} <b>${esc(s.name||s.monster_type)}</b> <span class="muted mono">${s.monster_type}</span></td>
+            <td>${s.is_water?'💧 น้ำ':'🌿 บก'}</td>
+            <td class="num"><input type="number" min="1" max="1000" value="${s.weight}" style="width:80px" onchange="saveWeight('${s.monster_type}',this.value,${s.is_water})"></td>
+            <td><button class="btn ghost sm bad" onclick="delSpawn(${s.id})">ลบ</button></td>
+          </tr>`).join(''):'<tr><td colspan="4" class="muted">ยังไม่มีมอนสเตอร์ในแผนที่นี้</td></tr>'}</tbody>
+      </table></div>
+      <div class="row" style="margin-top:12px;gap:8px;align-items:center">
+        <select id="mon-add-type">${opts}</select>
+        <label>น้ำหนัก <input id="mon-add-w" type="number" min="1" max="1000" value="20" style="width:80px"></label>
+        <button class="btn sm" onclick="addSpawn()">➕ เพิ่มลงแผนที่</button>
+      </div>`;
+  }catch(e){authGuard(e);box.innerHTML=`<div class="err">${e.message}</div>`;}
+}
+window.saveMapConfig=async()=>{
+  try{await api('/maps/'+monMap+'/config',{method:'PUT',body:JSON.stringify({land_count:Number($('#mon-land').value),water_count:Number($('#mon-water').value)})});
+    toast('บันทึกจำนวนแล้ว');}catch(e){toast(e.message,false);}
+};
+window.saveWeight=async(type,w,isWater)=>{
+  try{await api('/maps/'+monMap+'/spawns',{method:'POST',body:JSON.stringify({monster_type:type,weight:Number(w),is_water:isWater})});toast('อัปเดตน้ำหนักแล้ว');}catch(e){toast(e.message,false);loadMapSpawns();}
+};
+window.addSpawn=async()=>{
+  try{await api('/maps/'+monMap+'/spawns',{method:'POST',body:JSON.stringify({monster_type:$('#mon-add-type').value,weight:Number($('#mon-add-w').value)})});toast('เพิ่มแล้ว');loadMapSpawns();}catch(e){toast(e.message,false);}
+};
+window.delSpawn=async(id)=>{
+  if(!confirm('ลบมอนสเตอร์นี้ออกจากแผนที่?'))return;
+  try{await api('/spawns/'+id,{method:'DELETE'});toast('ลบแล้ว');loadMapSpawns();}catch(e){toast(e.message,false);}
+};
+window.openMonster=async(type)=>{
+  const m=$('#modal');m.classList.remove('hidden');m.innerHTML='<div class="box"><div class="muted">กำลังโหลด...</div></div>';
+  try{
+    const def=monCatalog.find(x=>x.type===type)||{};
+    const {drops}=await api('/monsters/'+type+'/drops');
+    const f=(label,key,val,step='1')=>`<label class="fld"><span>${label}</span><input data-mf="${key}" type="number" step="${step}" value="${val??0}"></label>`;
+    m.innerHTML=`<div class="box">
+      <div class="modal-head"><h2>${def.emoji||''} ${esc(def.name||type)} <span class="muted mono">${type}</span></h2><button class="btn ghost sm" onclick="closeModal()">ปิด</button></div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px">
+        <label class="fld"><span>ชื่อ</span><input data-mf="name" value="${esc(def.name||'')}"></label>
+        <label class="fld"><span>Emoji</span><input data-mf="emoji" value="${esc(def.emoji||'')}"></label>
+        ${f('HP','hp',def.hp)}${f('ATK','atk',def.atk)}${f('DEF','def',def.def)}${f('EXP','exp',def.exp)}
+        ${f('Gold min','gold_min',def.gold_min)}${f('Gold max','gold_max',def.gold_max)}
+        ${f('ขนาด','size',def.size,'0.1')}${f('ความเร็ว','speed',def.speed,'0.1')}
+        <label class="fld"><span>บอส</span><select data-mf="is_boss"><option value="false" ${!def.is_boss?'selected':''}>ไม่</option><option value="true" ${def.is_boss?'selected':''}>ใช่</option></select></label>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="saveMonster('${type}')">💾 บันทึกสตัท</button></div>
+      <h2 style="margin-top:18px">🎁 ตารางดรอป</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>ไอเทม</th><th>ประเภท</th><th class="num">โอกาส</th><th class="num">จำนวน</th><th></th></tr></thead>
+        <tbody id="mon-drops">${dropRows(drops)}</tbody>
+      </table></div>
+      <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
+        <input id="dp-name" placeholder="ชื่อไอเทม" style="min-width:140px">
+        <input id="dp-emoji" placeholder="emoji" style="width:70px">
+        <input id="dp-type" placeholder="ประเภท" value="material" style="width:100px">
+        <label>% <input id="dp-chance" type="number" min="0" max="100" value="10" style="width:70px"></label>
+        <label>จำนวน <input id="dp-qmin" type="number" min="1" value="1" style="width:56px"> - <input id="dp-qmax" type="number" min="1" value="1" style="width:56px"></label>
+        <button class="btn sm" onclick="addDrop('${type}')">➕ เพิ่มดรอป</button>
+      </div>
+    </div>`;
+  }catch(e){m.innerHTML=`<div class="box"><div class="err">${e.message}</div><button class="btn ghost sm" onclick="closeModal()">ปิด</button></div>`;}
+};
+function dropRows(drops){
+  return drops.length?drops.map(d=>`<tr>
+    <td>${d.emoji||''} ${esc(d.item_name)}</td><td>${esc(d.item_type)}</td>
+    <td class="num">${(d.chance*100).toFixed(1)}%</td><td class="num">${d.qty_min===d.qty_max?d.qty_min:d.qty_min+'-'+d.qty_max}</td>
+    <td><button class="btn ghost sm bad" onclick="delDrop(${d.id},'${d.monster_type}')">ลบ</button></td></tr>`).join(''):'<tr><td colspan="5" class="muted">ยังไม่มีดรอป</td></tr>';
+}
+window.saveMonster=async(type)=>{
+  const body={};document.querySelectorAll('#modal [data-mf]').forEach(i=>{
+    let val=i.value;
+    if(i.dataset.mf==='is_boss')val=(val==='true');
+    else if(!['name','emoji'].includes(i.dataset.mf))val=Number(val);
+    body[i.dataset.mf]=val;
+  });
+  try{await api('/monsters/'+type,{method:'PATCH',body:JSON.stringify(body)});toast('บันทึกสตัทแล้ว');renderMonsters();closeModal();}catch(e){toast(e.message,false);}
+};
+window.addDrop=async(type)=>{
+  const body={item_name:$('#dp-name').value.trim(),emoji:$('#dp-emoji').value.trim(),item_type:$('#dp-type').value.trim()||'material',
+    chance:Number($('#dp-chance').value)/100,qty_min:Number($('#dp-qmin').value),qty_max:Number($('#dp-qmax').value)};
+  if(!body.item_name){toast('ใส่ชื่อไอเทม',false);return;}
+  try{await api('/monsters/'+type+'/drops',{method:'POST',body:JSON.stringify(body)});toast('เพิ่มดรอปแล้ว');openMonster(type);}catch(e){toast(e.message,false);}
+};
+window.delDrop=async(id,type)=>{
+  try{await api('/drops/'+id,{method:'DELETE'});toast('ลบดรอปแล้ว');openMonster(type);}catch(e){toast(e.message,false);}
+};
+
 async function renderEconomy(){
   const v=$('#view');v.innerHTML='<div class="muted">กำลังโหลด...</div>';
   try{
