@@ -421,14 +421,27 @@ async function renderEconomy(){
 let secTimer=null;
 async function renderSecurity(){
   const v=$('#view');
-  v.innerHTML=`<div class="panel"><div class="row"><h2 style="margin:0">🛰️ เฝ้าระวัง IP & การโจมตี</h2><span class="spacer"></span><span class="muted" id="sec-stat"></span><button class="btn ghost sm" onclick="renderSecurity()">รีเฟรช</button></div></div>
+  v.innerHTML=`<div class="panel"><div class="row"><h2 style="margin:0">🛰️ เฝ้าระวัง IP & การโจมตี</h2><span class="spacer"></span><span class="muted" id="sec-stat"></span><button class="btn warn sm" onclick="scanCheats()">🔎 สแกนบัญชีโกงเดี๋ยวนี้</button><button class="btn ghost sm" onclick="renderSecurity()">รีเฟรช</button></div></div>
     <div id="sec-body"><div class="muted">กำลังโหลด...</div></div>`;
   clearTimeout(secTimer);
   const load=async()=>{
     try{
-      const d=await api('/security');
+      const [d,cg]=await Promise.all([api('/security'),api('/cheats').catch(()=>({actions:[]}))]);
       $('#sec-stat').textContent=`ติดตาม ${d.stats.trackedIps} IP · เสี่ยงสูง ${d.stats.highThreat}`;
-      $('#sec-body').innerHTML=`
+      const cheatPanel=`
+        <div class="panel"><h2>🚨 บัญชีโกงที่ระบบจัดการอัตโนมัติ (${cg.actions.length})</h2>
+          <div class="muted" style="font-size:12px;margin-bottom:8px">ระบบรีเซตค่าอัตโนมัติเมื่อเจอค่าที่เป็นไปไม่ได้ (เล่นจริง 0 แต่เลเวล/ค่าสูง) · สแกนทุก 5 นาที · แอดมินถูกยกเว้น</div>
+          <div class="tablewrap"><table>
+          <thead><tr><th>เมื่อ</th><th>ชื่อ</th><th>เหตุผล</th><th>ค่าเดิม (ก่อนรีเซต)</th><th></th></tr></thead>
+          <tbody>${cg.actions.map(a=>{const b=a.before_data||{};return `<tr>
+            <td class="muted">${a.created_at?ago(Date.parse(a.created_at)):'-'}</td>
+            <td><b>${esc(a.name||'-')}</b> <span class="muted mono">${(a.character_id||'').slice(0,10)}</span></td>
+            <td style="color:var(--bad)">${esc(a.reason||'-')}</td>
+            <td class="muted mono" style="font-size:11px">Lv${b.level} · exp${fmt(b.exp)} · ${fmt(b.gold)}g · kills${b.total_kills} · play${b.play_time}s</td>
+            <td><button class="btn bad sm" onclick="delCheat('${a.character_id}','${esc(a.name||'')}')">ลบทิ้ง</button></td>
+          </tr>`}).join('')||'<tr><td colspan="5" class="muted">ยังไม่พบบัญชีโกง — สะอาดดี ✅</td></tr>'}</tbody>
+        </table></div></div>`;
+      $('#sec-body').innerHTML=cheatPanel+`
         <div class="panel"><h2>IP ที่ต้องจับตา (${d.ips.length})</h2><div class="tablewrap"><table>
           <thead><tr><th>ระดับเสี่ยง</th><th>IP</th><th>req/นาที</th><th>รวม req</th><th>ล็อกอินพลาด</th><th>โดนจำกัด</th><th>ผิดปกติ</th><th>ผู้ใช้</th><th>ล่าสุด</th></tr></thead>
           <tbody>${d.ips.slice(0,60).map(x=>`<tr>
@@ -467,6 +480,15 @@ async function renderSecurity(){
 window.kick=async(userId)=>{
   if(!confirm('เตะผู้เล่นนี้ออกจากเกม?'))return;
   try{await api('/kick',{method:'POST',body:JSON.stringify({userId})});toast('เตะออกแล้ว');}
+  catch(e){toast(e.message,false);}
+};
+window.scanCheats=async()=>{
+  try{const r=await api('/cheats/scan',{method:'POST'});toast(r.reset>0?`รีเซตบัญชีโกง ${r.reset} บัญชี`:'ไม่พบบัญชีโกงเพิ่ม ✅');if(cur==='security')renderSecurity();}
+  catch(e){toast(e.message,false);}
+};
+window.delCheat=async(cid,name)=>{
+  if(!confirm('ลบตัวละคร "'+name+'" ถาวร? (ระบบรีเซตค่าให้แล้ว การลบจะกู้คืนไม่ได้)'))return;
+  try{await api('/players/'+cid+'/delete',{method:'POST'});toast('ลบตัวละครแล้ว');renderSecurity();}
   catch(e){toast(e.message,false);}
 };
 
