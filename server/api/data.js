@@ -129,7 +129,13 @@ export async function runQuery(spec, userId) {
         if (Array.isArray(spec.columns)) sel = spec.columns.map(c => ident(c, cols)).join(', ');
         let sql = `SELECT ${sel} FROM "${table}"`;
         if (whereParts.length) sql += ' WHERE ' + whereParts.join(' AND ');
-        if (spec.order && cols.has(spec.order.col)) sql += ` ORDER BY ${ident(spec.order.col, cols)} ${spec.order.asc ? 'ASC' : 'DESC'}`;
+        // Multi-column ORDER BY: accept an array of {col,asc} (chained .order())
+        // or a single {col,asc} for backward compatibility.
+        const orders = (Array.isArray(spec.order) ? spec.order : (spec.order ? [spec.order] : []))
+            .filter(o => o && cols.has(o.col));
+        if (orders.length) {
+            sql += ' ORDER BY ' + orders.map(o => `${ident(o.col, cols)} ${o.asc ? 'ASC' : 'DESC'}`).join(', ');
+        }
         const lim = Math.min(parseInt(spec.limit) || 1000, 5000);
         sql += ` LIMIT ${lim}`;
         const { rows } = await query(sql, params);
