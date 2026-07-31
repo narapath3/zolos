@@ -1190,6 +1190,11 @@ class Monster {
         this.wanderTimer = 0;
         this._localContributed = false; // fresh monster — no shared-damage credit yet
         this._cardDeathResolved = false;
+
+        // Spawn glow so the respawned monster materializes with a flourish.
+        if (typeof window !== 'undefined' && window.particles) {
+            try { window.particles.spawnMonsterSpawn(this.mesh.position.clone(), this.data?.color); } catch { /* ignore */ }
+        }
     }
 
     destroy() {
@@ -1248,7 +1253,15 @@ export class MonsterManager {
                 this._srvById.set(s.id, m);
                 (m.isWaterMonster ? this.waterMonsters : this.monsters).push(m);
             }
-            if (!m.alive) { m.alive = true; m.mesh.visible = true; }
+            if (!m.alive) {
+                // Revived (server respawn) — play a spawn glow so it materializes.
+                m.alive = true;
+                m.mesh.visible = true;
+                if (m.mesh) m.mesh.position.set(s.x, m.isWaterMonster ? -0.3 : 0, s.z);
+                if (typeof window !== 'undefined' && window.particles) {
+                    try { window.particles.spawnMonsterSpawn(new THREE.Vector3(s.x, 0, s.z), m.data?.color); } catch { /* ignore */ }
+                }
+            }
             m.setServerHp(s.hp, s.mhp);
             m.setServerTarget(s.x, s.z, s.r);
         }

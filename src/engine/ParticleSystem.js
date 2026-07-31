@@ -418,6 +418,52 @@ export class ParticleSystem {
         }
     }
 
+    // Monster (re)spawn glow — a gentle burst of light so a fresh monster
+    // "materializes" instead of just popping in. Kept cheap (fires on every
+    // respawn): one expanding halo ring, a soft glow sphere, and a few rising
+    // motes. Optional colorHex themes the light to the monster.
+    spawnMonsterSpawn(position, colorHex = 0xfff2b0) {
+        if (!this.effectsEnabled) return;
+
+        // Expanding halo ring on the ground
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.25, 0.45, 24),
+            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+        );
+        ring.position.set(position.x, position.y + 0.08, position.z);
+        ring.rotation.x = -Math.PI / 2;
+        this.scene.add(ring);
+        this.shockwaves.push({ mesh: ring, life: 0.6, maxLife: 0.6, type: 'level-ring' });
+
+        // Soft glow sphere that fades in place — the "light emanating"
+        const glow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.6, 10, 10),
+            new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.55 })
+        );
+        glow.position.set(position.x, position.y + 0.5, position.z);
+        this.scene.add(glow);
+        this.hitEffects.push({ mesh: glow, velocity: new THREE.Vector3(0, 0.3, 0), life: 0.5, maxLife: 0.5, gravity: 0 });
+
+        // A few rising motes of light
+        const seg = this.perfMonitor.getGeometrySegments();
+        const n = 8;
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            const r = 0.3 + Math.random() * 0.25;
+            const mote = new THREE.Mesh(
+                new THREE.SphereGeometry(0.07, seg, seg),
+                new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1.0 })
+            );
+            mote.position.set(position.x + Math.cos(a) * r, position.y + 0.1, position.z + Math.sin(a) * r);
+            this.scene.add(mote);
+            this.hitEffects.push({
+                mesh: mote,
+                velocity: new THREE.Vector3(Math.cos(a) * 0.4, 2 + Math.random() * 1.5, Math.sin(a) * 0.4),
+                life: 0.7, maxLife: 0.7, gravity: 1.5,
+            });
+        }
+    }
+
     // Enhanced Critical Hit: Screen shake + big red flash + radial sparks
     spawnEnhancedCritical(position) {
         if (!this.effectsEnabled) return;
