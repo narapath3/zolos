@@ -37,3 +37,21 @@ test('players can zoom, disable fog, and cannot walk through shop colliders', as
     assert.match(scene, /resolvePlayerCollisions\(position, previousPosition\)/);
     assert.match(main, /sceneManager\.resolvePlayerCollisions\(character\.mesh\.position/);
 });
+
+test('priest cooldowns remain per-skill and respawn restores the owner mesh', async () => {
+    const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
+    assert.match(character, /this\.cooldowns\[skillId\] = skill\.cooldown/);
+    assert.doesNotMatch(character, /for \(const .*cooldowns.*skill\.cooldown/);
+    assert.match(character, /this\.mesh\.visible = !firstPerson/);
+});
+
+test('monster labels expose danger level and the legacy Lunatic is publicly Moonhare', async () => {
+    const data = await readFile(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
+    const monsters = await readFile(new URL('../src/engine/MonsterManager.js', import.meta.url), 'utf8');
+    const cards = await readFile(new URL('../src/cards/CardCatalog.js', import.meta.url), 'utf8');
+    assert.match(data, /lunatic:\s*\{[\s\S]*?name: 'Moonhare'/);
+    assert.match(monsters, /_updateDangerLabel\(playerLevel\)/);
+    assert.match(monsters, /deadly: '#ff4d55'.*danger: '#ffd34e'.*even: '#ffffff'/);
+    assert.match(monsters, /labelStagger/);
+    assert.match(cards, /displayName: 'Moonhare'/);
+});

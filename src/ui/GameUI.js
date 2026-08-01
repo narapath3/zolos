@@ -9422,7 +9422,7 @@ export class GameUI {
       const newStreak = allCompletedYesterday ? previousStreak + 1 : 0;
 
       // Select random monster
-      const monsterPool = ['Poring', 'Fabre', 'Lunatic', 'Bigfoot', 'Fly'];
+      const monsterPool = ['Poring', 'Fabre', 'Moonhare', 'Bigfoot', 'Fly'];
       const targetMonster = monsterPool[Math.floor(Math.random() * monsterPool.length)];
 
       // Select random consumable
@@ -9726,7 +9726,7 @@ export class GameUI {
       level: 'Lv.1+',
       difficulty: 'Easy',
       difficultyClass: 'easy',
-      monsters: ['Poring', 'Lunatic', 'Fabre', 'Pupa'],
+      monsters: ['Poring', 'Moonhare', 'Fabre', 'Pupa'],
     },
     {
       id: 'payon',

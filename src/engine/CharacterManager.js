@@ -2244,6 +2244,8 @@ export class CharacterManager {
         this.mesh.position.set(0, 1.2, 10);
         this.state = 'idle';
         this.target = null;
+        const firstPerson = window.sceneManager?.getCameraMode?.() === 'first';
+        this.mesh.visible = !firstPerson;
 
         // Step 8: Flag for CombatSystem to check for auto-resume
         this.justRespawned = true;

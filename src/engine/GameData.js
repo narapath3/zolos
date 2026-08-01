@@ -291,7 +291,8 @@ export const MONSTERS = {
         ]
     },
     lunatic: {
-        name: 'Lunatic',
+        // Keep the internal ID for save/drop compatibility; public name/design is original.
+        name: 'Moonhare',
         emoji: '🐰',
         color: 0xffe0f0,
         hp: 40,

@@ -59,6 +59,7 @@ class Monster {
         this.hitFlash = 0;
         this.isMoving = false; // Flag to track movement for water splashing
         this.isWaterMonster = !!this.data.waterOnly;
+        this.estimatedLevel = Math.max(1, Math.round((Math.sqrt(this.data.hp / 30) + this.data.atk / 5) / 2));
 
         this._createModel(position);
 
@@ -172,7 +173,7 @@ class Monster {
             spire.position.set(0, 0.55 * size, 0);
             this.bodyMesh.add(spire);
         } else if (this.type === 'lunatic') {
-            // rabbit ears
+            // Moonhare: asymmetrical moon-leaf ears and a glowing lunar crest.
             const earGeo = new THREE.BoxGeometry(0.08 * size, 0.35 * size, 0.06 * size);
             const earInnerGeo = new THREE.BoxGeometry(0.04 * size, 0.25 * size, 0.07 * size);
             const earMat = createMat(color, 0.6, 0.0);
@@ -195,6 +196,14 @@ class Monster {
             const earRInner = new THREE.Mesh(earInnerGeo, earInnerMat);
             earRInner.position.set(0, 0.02 * size, 0.01 * size);
             earR.add(earRInner);
+
+            const crest = new THREE.Mesh(
+                new THREE.TorusGeometry(0.13 * size, 0.035 * size, 6, 14, Math.PI * 1.45),
+                new THREE.MeshStandardMaterial({ color: 0x8fd8ff, emissive: 0x3188cc, emissiveIntensity: 1.1 })
+            );
+            crest.position.set(0, 0.28 * size, 0.43 * size);
+            crest.rotation.z = 0.45;
+            this.bodyMesh.add(crest);
 
             // Fluffy tail
             const tailGeo = new THREE.SphereGeometry(0.12 * size, 8, 8);
@@ -796,7 +805,8 @@ class Monster {
             new THREE.PlaneGeometry(0.8, 0.08),
             new THREE.MeshBasicMaterial({ color: 0x400000 })
         );
-        hpBarBg.position.y = size + 0.3;
+        const labelStagger = (Math.abs(hashStr(`${this.type}:${position.x.toFixed(1)}:${position.z.toFixed(1)}`)) % 4) * 0.12;
+        hpBarBg.position.y = size + 0.3 + labelStagger;
         hpBarBg.rotation.x = 0;
         this.mesh.add(hpBarBg);
 
@@ -804,7 +814,7 @@ class Monster {
             new THREE.PlaneGeometry(0.78, 0.06),
             new THREE.MeshBasicMaterial({ color: this.isWaterMonster ? 0x2080ff : 0xff2020 })
         );
-        this.hpBarFill.position.y = size + 0.3;
+        this.hpBarFill.position.y = size + 0.3 + labelStagger;
         this.hpBarFill.position.z = 0.001;
         this.mesh.add(this.hpBarFill);
 
@@ -825,8 +835,13 @@ class Monster {
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameSprite = new THREE.Sprite(spriteMat);
         nameSprite.scale.set(1.8, 0.45, 1);
-        nameSprite.position.y = size + 0.8;
+        nameSprite.position.y = size + 0.8 + labelStagger;
         this.mesh.add(nameSprite);
+        this.nameSprite = nameSprite;
+        this._nameCanvas = canvas;
+        this._nameContext = ctx;
+        this._nameTexture = texture;
+        this._dangerTier = null;
 
         // Shadow
         const shadowGeo = new THREE.CircleGeometry(size * 0.5, 12);
@@ -841,6 +856,25 @@ class Monster {
             this.mesh.position.y = -0.3;
         }
         this.scene.add(this.mesh);
+    }
+
+    _updateDangerLabel(playerLevel) {
+        const diff = this.estimatedLevel - Math.max(1, Number(playerLevel) || 1);
+        const tier = diff >= 5 ? 'deadly' : diff >= 2 ? 'danger' : diff <= -4 ? 'easy' : 'even';
+        if (tier === this._dangerTier || !this._nameContext) return;
+        this._dangerTier = tier;
+        const colors = { deadly: '#ff4d55', danger: '#ffd34e', even: '#ffffff', easy: '#7de58c' };
+        const ctx = this._nameContext;
+        ctx.clearRect(0, 0, this._nameCanvas.width, this._nameCanvas.height);
+        ctx.font = 'bold 36px "Press Start 2P", monospace';
+        ctx.fillStyle = colors[tier];
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        ctx.textAlign = 'center';
+        const label = `${this.data.name}  Lv.${this.estimatedLevel}`;
+        ctx.strokeText(label, 256, 75);
+        ctx.fillText(label, 256, 75);
+        this._nameTexture.needsUpdate = true;
     }
 
     takeDamage(amount, isCritical = false, options = {}) {
@@ -975,6 +1009,7 @@ class Monster {
     }
 
     update(dt, camera, sceneManager, player, onAttackPlayer) {
+        this._updateDangerLabel(player?.stats?.level);
         if (!this.alive) return;
         if (this._serverControlled) return this._updateServerRendered(dt, camera);
 
