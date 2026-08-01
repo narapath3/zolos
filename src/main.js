@@ -2568,6 +2568,8 @@ function stepWorld(dt) {
         window.portalCooldown = portalCooldown;
     }
 
+    const positionBeforeMovement = character?.mesh?.position?.clone();
+
     // 1. Movement
     const isFishingActive = combatSystem && combatSystem.isFishing;
     const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
@@ -2689,6 +2691,9 @@ function stepWorld(dt) {
         updateOreTargeting(dt);       // ore in range + AUTO walks to ore and mines
         gameUI.updateMining();        // timed mining "job" (also runs while hidden)
         gameUI.updateAutoPotion(dt);  // auto HP/SP potions (also while hidden)
+    }
+    if (positionBeforeMovement && sceneManager?.resolvePlayerCollisions) {
+        sceneManager.resolvePlayerCollisions(character.mesh.position, positionBeforeMovement);
     }
 }
 

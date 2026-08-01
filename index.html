@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <meta name="description"
     content="Zolos — Idle MMORPG Online inspired by Ragnarok Online with auto-farm, real-time multiplayer, and 3D graphics" />
   <meta name="google" content="notranslate" />
@@ -908,10 +908,10 @@
       <div id="mention-suggest" class="mention-suggest" style="display:none;"></div>
       <div id="emoji-picker" class="emoji-picker" style="display:none;"></div>
       <div class="chat-input-row">
-        <button id="btn-emoji" title="อีโมจิ / @แท็ก">😊</button>
+        <button type="button" id="btn-emoji" title="อีโมจิ / @แท็ก">😊</button>
         <input type="text" id="chat-input" maxlength="100" placeholder="แตะเพื่อพิมพ์แชท... (@ แท็กเพื่อน)"
           autocomplete="off" enterkeyhint="send">
-        <button id="btn-send-chat" title="ส่ง">➤</button>
+        <button type="button" id="btn-send-chat" title="ส่ง" aria-label="ส่งข้อความแชท">➤</button>
       </div>
     </div>
 
@@ -1065,6 +1065,14 @@
             <!-- Visual Effects -->
             <div class="settings-section">
               <div class="settings-section-title">🎆 Visual Effects / เอฟเฟกต์ภาพ</div>
+              <div class="settings-row">
+                <div class="settings-row-text">
+                  <div class="settings-row-label">หมอก / ระยะภาพ (Fog)</div>
+                  <div class="settings-row-sub">ปิดเพื่อให้ฉากและข้อมูลไกล ๆ คมชัดขึ้น</div>
+                </div>
+                <input type="checkbox" id="settings-fog-enabled" class="settings-switch" checked />
+              </div>
+              <hr class="settings-divider" />
               <div class="settings-row">
                 <div class="settings-row-text">
                   <div class="settings-row-label">ปิดเอฟเฟกต์ภาพ</div>

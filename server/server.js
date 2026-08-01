@@ -16,7 +16,7 @@ import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startCheatGuard } from './api/cheatGuard.js';
 import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
 import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
-import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning } from './game/monsterEngine.js';
+import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
@@ -1193,7 +1193,14 @@ io.on('connection', (socket) => {
     // --- PLAYER DEATH ANNOUNCEMENT ---
     socket.on('player_dead', (payload) => {
         const player = onlinePlayers.get(socket.id);
-        if (!player || !payload || !payload.monsterName) return;
+        if (!player) return;
+
+        // A dead/respawning player must never remain a valid server-authoritative
+        // monster target. Clear this before handling the optional announcement so
+        // malformed/older clients cannot accidentally keep aggro alive.
+        clearAggroForCharacter(player.characterId);
+
+        if (!payload || !payload.monsterName) return;
 
         // Only announce if player was above level 5
         if (player.level > 5) {

@@ -129,6 +129,8 @@ export class SceneManager {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(MAP_CONFIGS.prontera.fogColor);
         this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.012);
+        this._fog = this.scene.fog;
+        this.fogEnabled = true;
 
         // Camera (isometric-style)
         const aspect = window.innerWidth / window.innerHeight;
@@ -292,7 +294,7 @@ export class SceneManager {
 
         // Update scene colors
         this.scene.background = new THREE.Color(config.fogColor);
-        this.scene.fog.color.set(config.fogColor);
+        this._fog.color.set(config.fogColor);
         this.ambientLight.color.set(config.ambientColor);
         this.sunLight.color.set(config.sunColor);
         this.sunLight.intensity = config.sunIntensity;
@@ -479,6 +481,42 @@ export class SceneManager {
         if (this.npcWeaponMesh) list.push(this.npcWeaponMesh);
         if (this.npcHeavenMesh) list.push(this.npcHeavenMesh);
         return list;
+    }
+
+    setFogEnabled(enabled) {
+        this.fogEnabled = enabled !== false;
+        this.scene.fog = this.fogEnabled ? this._fog : null;
+        if (this.fogEnabled && this._weatherCur) this._applyWeather();
+    }
+
+    // Resolve shop collision in the X/Z plane. This is called after all forms
+    // of movement, so keyboard, click-to-move and AUTO obey the same boundary.
+    resolvePlayerCollisions(position, previousPosition) {
+        if (!position || this.currentMap !== 'prontera') return false;
+        const stalls = (this.stallMeshes || []).filter(o => o?.userData?.isStall);
+        const obstacles = [...this.getNPCs(), ...stalls];
+        const playerRadius = 0.42;
+        let collided = false;
+
+        for (const obstacle of obstacles) {
+            const radius = obstacle.userData.collisionRadius || (obstacle.userData.isStall ? 1.75 : 2.0);
+            const dx = position.x - obstacle.position.x;
+            const dz = position.z - obstacle.position.z;
+            const minDistance = radius + playerRadius;
+            const distanceSq = dx * dx + dz * dz;
+            if (distanceSq >= minDistance * minDistance) continue;
+
+            collided = true;
+            const distance = Math.sqrt(distanceSq);
+            if (distance > 0.001) {
+                position.x = obstacle.position.x + (dx / distance) * minDistance;
+                position.z = obstacle.position.z + (dz / distance) * minDistance;
+            } else if (previousPosition) {
+                position.x = previousPosition.x;
+                position.z = previousPosition.z;
+            }
+        }
+        return collided;
     }
 
     // ============ Sky Dome ============
@@ -797,7 +835,8 @@ export class SceneManager {
 
     _applyWeather() {
         const c = this._weatherCur;
-        if (this.scene.fog) { this.scene.fog.density = c.fog; this.scene.fog.color.copy(c.fogCol); }
+        this._fog.density = c.fog;
+        this._fog.color.copy(c.fogCol);
         this.scene.background = c.fogCol;
         if (this.sunLight) { this.sunLight.intensity = c.sun; this.sunLight.color.copy(c.sunCol); }
         if (this.ambientLight) this.ambientLight.intensity = c.amb;

@@ -407,4 +407,25 @@ export async function reloadWorld() {
     console.log(`[MonEngine] ♻️ world reloaded (config v${cfg.version})`);
 }
 
+// Remove every live monster target that points at a dead/disconnected player.
+// Returning monsters to their spawn also prevents them from camping the respawn
+// point using the last position received before death.
+export function clearAggroForCharacter(characterId) {
+    if (!characterId) return 0;
+
+    let cleared = 0;
+    for (const world of worlds.values()) {
+        for (const monster of world.monsters.values()) {
+            if (monster.aggroChar !== characterId) continue;
+            monster.aggroChar = null;
+            monster.aggroUntil = 0;
+            monster.atkReadyAt = 0;
+            monster.targetX = monster.spawnX;
+            monster.targetZ = monster.spawnZ;
+            cleared += 1;
+        }
+    }
+    return cleared;
+}
+
 export function isRunning() { return running; }

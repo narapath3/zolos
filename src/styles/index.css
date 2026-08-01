@@ -4123,6 +4123,17 @@ a,
     display: none;
   }
 
+  /* Keep the primary Bag action visible while secondary menus scroll. */
+  #hud-bottom #btn-inventory {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    color: #fff3bd;
+    background: rgba(22, 31, 54, 0.98);
+    border-color: rgba(240, 192, 64, 0.55);
+    box-shadow: 8px 0 14px rgba(6, 10, 20, 0.75);
+  }
+
   .hud-btn {
     padding: 5px 6px;
     min-width: 54px;
