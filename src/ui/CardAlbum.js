@@ -588,7 +588,9 @@ export class CardAlbum {
     if (!preview.canFuse) return;
     const beforeRows = scaledRows(card, preview.fromStars);
     const afterRows = scaledRows(card, preview.toStars);
-    this._closeDialog(detail, false);
+    // Do not render between modal transitions: render() replaces both dialog
+    // nodes and would leave fusionDialog detached before showModal().
+    this._closeDialog(detail, false, false);
 
     const beforeCardTileHtml = this._cardTile(card, { owned: state.owned, stars: preview.fromStars });
     const afterCardTileHtml = this._cardTile(card, { owned: state.owned - preview.cost, stars: preview.toStars });
@@ -646,7 +648,7 @@ export class CardAlbum {
     this._lastFocus = trigger;
     this._showDialog(fusionDialog);
     content.querySelector('.card-fusion__cancel').addEventListener('click', () => {
-      this._closeDialog(fusionDialog, false);
+      this._closeDialog(fusionDialog, false, false);
       this._openDetail(card.id, null, false);
     });
     content.querySelector('.card-fusion__confirm').addEventListener('click', event => {
@@ -660,19 +662,32 @@ export class CardAlbum {
     const cancel = fusionDialog.querySelector('.card-fusion__cancel');
     button.disabled = true;
     cancel.disabled = true;
+    button.textContent = 'กำลังหลอมพลังการ์ด…';
+    fusionDialog.classList.remove('card-fusion--success');
+    fusionDialog.classList.add('card-fusion--forging');
     status.textContent = 'กำลังหลอมการ์ด...';
     try {
       const result = await this.options.onFuse?.(card.id);
       if (result === false || result == null) throw new Error('การดำเนินการล้มเหลว');
-      status.textContent = 'หลอมการ์ดสำเร็จ';
-      this._closeDialog(fusionDialog, false);
+      fusionDialog.classList.remove('card-fusion--forging');
+      fusionDialog.classList.add('card-fusion--success');
+      status.textContent = `อัปเกรดสำเร็จ! ★${result.stars || ''}`;
+      await this._waitForFusionEffect();
+      this._closeDialog(fusionDialog, false, false);
       this.render();
       this._openDetail(card.id, null, false);
     } catch (error) {
+      fusionDialog.classList.remove('card-fusion--forging', 'card-fusion--success');
       button.disabled = false;
       cancel.disabled = false;
-      status.textContent = error?.message || 'หลอมการ์ดล้มเหลว โปรกดลองใหม่อีกครั้ง';
+      button.textContent = 'ยืนยันการหลอมอัปเกรดดาว';
+      status.textContent = error?.message || 'หลอมการ์ดล้มเหลว โปรดลองใหม่อีกครั้ง';
     }
+  }
+
+  _waitForFusionEffect() {
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+    return new Promise(resolve => setTimeout(resolve, reducedMotion ? 180 : 1100));
   }
 
   _bindAlbumEvents() {
@@ -702,7 +717,7 @@ export class CardAlbum {
     fusion.addEventListener('cancel', event => {
       event.preventDefault();
       const cardId = this.selectedCardId;
-      this._closeDialog(fusion, false);
+      this._closeDialog(fusion, false, false);
       this._openDetail(cardId, null, false);
     });
     for (const dialog of [detail, fusion]) {
@@ -730,12 +745,12 @@ export class CardAlbum {
     queueMicrotask(() => focusableElements(dialog)[0]?.focus());
   }
 
-  _closeDialog(dialog, restoreFocus = true) {
+  _closeDialog(dialog, restoreFocus = true, rerender = true) {
     if (!dialog) return;
     const wasOpen = dialog.open || dialog.hasAttribute('open');
     if (typeof dialog.close === 'function' && dialog.open) dialog.close();
     else dialog.removeAttribute('open');
-    if (wasOpen) {
+    if (wasOpen && rerender) {
       this.render();
     }
     if (restoreFocus) {

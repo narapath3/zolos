@@ -38,6 +38,15 @@ test('album interactions are semantic, focus-managed, queued, and authoritative'
   assert.doesNotMatch(source, /combatSystem|pauseSimulation|tcg-emoji/);
 });
 
+test('fusion transition keeps its dialog mounted and exposes upgrade effects', () => {
+  assert.match(source, /_closeDialog\(detail, false, false\)/);
+  assert.match(source, /card-fusion--forging/);
+  assert.match(source, /card-fusion--success/);
+  assert.match(source, /_closeDialog\(dialog, restoreFocus = true, rerender = true\)/);
+  assert.match(css, /@keyframes card-forge-burst/);
+  assert.match(css, /@keyframes card-forge-promote/);
+});
+
 test('GameUI owns one album and removes the injected emoji gallery', () => {
   assert.match(gameUi, /import \{ CardAlbum \} from '\.\/CardAlbum\.js'/);
   assert.match(gameUi, /this\.cardAlbum = new CardAlbum/);

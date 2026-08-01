@@ -1054,6 +1054,89 @@
   animation: textGlowPulse 1.5s ease-in-out infinite alternate;
 }
 
+/* Visible server round-trip and committed-upgrade feedback. */
+.card-fusion--forging .card-fusion__surface {
+  animation: card-forge-pulse 0.72s ease-in-out infinite alternate;
+}
+
+.card-fusion--forging .card-fusion__forge-symbol {
+  animation: card-forge-charge 0.62s ease-in-out infinite alternate;
+}
+
+.card-fusion--forging .forge-symbol__sparkle {
+  animation: card-forge-spin 0.9s linear infinite;
+}
+
+.card-fusion--forging .card-fusion__preview-wrapper.after .card-tile {
+  animation: card-forge-card-charge 0.68s ease-in-out infinite alternate;
+}
+
+.card-fusion--success .card-fusion__surface::after {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+  content: '';
+  background:
+    radial-gradient(circle at 50% 44%, hsl(48 100% 92% / 0.98) 0 2%, hsl(190 100% 72% / 0.72) 8%, hsl(281 100% 72% / 0.35) 20%, transparent 48%),
+    repeating-conic-gradient(from 0deg at 50% 44%, transparent 0 8deg, hsl(48 100% 82% / 0.48) 9deg 10deg, transparent 11deg 22deg);
+  mix-blend-mode: screen;
+  animation: card-forge-burst 1.05s ease-out both;
+}
+
+.card-fusion--success .card-fusion__preview-wrapper.after {
+  position: relative;
+  z-index: 9;
+  animation: card-forge-promote 1.05s cubic-bezier(.2, .9, .2, 1) both;
+}
+
+.card-fusion--success .card-fusion__status {
+  color: hsl(48 100% 78%);
+  border-color: hsl(48 100% 65% / 0.7);
+  background: hsl(42 80% 15% / 0.86);
+  box-shadow: 0 0 24px hsl(48 100% 60% / 0.36);
+}
+
+@keyframes card-forge-pulse {
+  to { box-shadow: inset 0 0 44px hsl(193 100% 58% / 0.12), 0 0 38px hsl(270 100% 66% / 0.22); }
+}
+
+@keyframes card-forge-charge {
+  from { filter: brightness(1); transform: scale(0.94); }
+  to { filter: brightness(1.7) drop-shadow(0 0 16px hsl(48 100% 70%)); transform: scale(1.12); }
+}
+
+@keyframes card-forge-spin {
+  to { transform: rotate(360deg) scale(1.25); }
+}
+
+@keyframes card-forge-card-charge {
+  to { filter: brightness(1.35) saturate(1.35); transform: translateY(-4px) scale(1.025); }
+}
+
+@keyframes card-forge-burst {
+  0% { opacity: 0; transform: scale(0.2) rotate(-8deg); }
+  24% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.45) rotate(8deg); }
+}
+
+@keyframes card-forge-promote {
+  0% { filter: brightness(1); transform: scale(0.9); }
+  28% { filter: brightness(2.2) saturate(1.6); transform: scale(1.12); }
+  100% { filter: brightness(1.2) saturate(1.2); transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-fusion--forging .card-fusion__surface,
+  .card-fusion--forging .card-fusion__forge-symbol,
+  .card-fusion--forging .forge-symbol__sparkle,
+  .card-fusion--forging .card-fusion__preview-wrapper.after .card-tile,
+  .card-fusion--success .card-fusion__surface::after,
+  .card-fusion--success .card-fusion__preview-wrapper.after {
+    animation: none;
+  }
+}
+
 .card-fusion__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
