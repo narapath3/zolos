@@ -13,6 +13,9 @@
 import { query, tx } from '../api/db.js';
 import { getFullConfig } from '../api/monstersConfig.js';
 import { clampMonsterDamage } from '../securityPolicy.js';
+import { getCardsBySource } from '../cards/CardCatalog.js';
+import { resolveCardDrops } from '../cards/CardDrops.js';
+import { getCardOverrides } from '../api/cardEconomy.js';
 
 const TICK_MS = 100;               // 10 Hz simulation + broadcast
 const SPAWN_RANGE = 12;            // matches client MonsterManager
@@ -29,6 +32,8 @@ let loopTimer = null;
 
 // In-memory config (rebuilt on load/reload).
 let cfg = { version: 0, defs: new Map(), dropsByType: new Map(), spawnsByMap: new Map(), mapCfg: new Map() };
+// Admin per-card drop overrides { cardId: {chance,pity,enabled} }, refreshed with config.
+let cardOverrides = {};
 // mapId -> { monsters: Map<id, M>, dirty:boolean }
 const worlds = new Map();
 
@@ -72,6 +77,7 @@ export async function loadConfig() {
     const mapCfg = new Map();
     for (const m of full.mapConfig) mapCfg.set(m.map_id, m);
     cfg = { version: full.version, defs, dropsByType, spawnsByMap, mapCfg };
+    try { cardOverrides = await getCardOverrides(); } catch { cardOverrides = {}; }
 }
 
 // ---------------- spawning ----------------
@@ -293,6 +299,73 @@ async function killMonster(world, m, mapId) {
             if (sock) sock.emit('mon_loot', { id: m.id, item_name: dr.item_name, emoji: dr.emoji || '', item_type: dr.item_type || 'material', quantity: qty });
         } catch (e) {
             console.error('[MonEngine] grantItem failed:', e.message);
+        }
+    }
+
+    // Card drops → EVERY contributor rolls independently (co-op friendly), each
+    // with their own per-card pity tracked authoritatively in character_cards.
+    // A unique nonce per death makes the award_card_drop idempotency keys stable
+    // across accidental replays but distinct across separate kills of the reused
+    // monster id.
+    const killNonce = `${Date.now()}:${(m._kills = (m._kills || 0) + 1)}`;
+    for (const [cid] of contributors) {
+        awardMonsterCards(cid, m.type, mapId, m.id, killNonce).catch(e =>
+            console.error('[MonEngine] card drop failed:', e.message));
+    }
+}
+
+// Roll this monster's card table for one contributor and persist any wins to
+// character_cards via the authoritative award_card_drop RPC (advisory-locked +
+// idempotent). Emits a `card_reward` — the same shape world-boss cards use — so
+// the client's applyTrustedCardReward path (reveal pop-up + album refresh) works
+// unchanged.
+async function awardMonsterCards(characterId, type, mapId, monsterUid, killNonce) {
+    if (!characterId) return;
+    const cards = getCardsBySource('monster', type);
+    if (!cards.length) return;
+
+    // Load current pity/owned for just this monster's cards.
+    const ids = cards.map(c => c.id);
+    const { rows } = await query(
+        'SELECT card_id, owned, stars, pity FROM public.character_cards WHERE character_id = $1 AND card_id = ANY($2)',
+        [characterId, ids]);
+    const cardState = {};
+    for (const r of rows) cardState[r.card_id] = { owned: r.owned, stars: r.stars, pity: r.pity };
+
+    const resolved = resolveCardDrops({
+        source: { kind: 'monster', id: type },
+        cardState,
+        eligible: true,
+        dropRatePct: 0,
+        random: Math.random,
+        overrides: cardOverrides,
+    });
+
+    for (const roll of resolved.rolls) {
+        const card = cards.find(c => c.id === roll.cardId);
+        if (!card) continue;
+        const before = cardState[roll.cardId] || { pity: 0 };
+        const after = resolved.cardState[roll.cardId];
+        try {
+            const { rows: out } = await query(
+                'SELECT public.award_card_drop($1,$2,$3,$4,$5,$6) AS result',
+                [characterId, roll.cardId, before.pity, after.pity, roll.won,
+                    `monster:${mapId}:${monsterUid}:${killNonce}:${characterId}:${roll.cardId}`]);
+            const res = out[0]?.result;
+            if (!res || !res.won) continue;
+            const sock = socketForChar(characterId);
+            if (sock) {
+                sock.emit('card_reward', {
+                    cardId: res.card_id,
+                    owned: Number(res.owned) || 0,
+                    stars: Number(res.stars) || 1,
+                    pity: Number(res.pity) || 0,
+                    source: { kind: 'monster', id: type, label: card.source.label },
+                    isNew: res.is_new === true,
+                });
+            }
+        } catch (e) {
+            console.error('[MonEngine] award_card_drop failed:', e.message);
         }
     }
 }

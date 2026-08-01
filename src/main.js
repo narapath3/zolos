@@ -244,6 +244,12 @@ async function initGame(charData) {
     monsters.onMonsterDeath = (monster, { eligible } = {}) => {
         if (!character || !monster?.type) return;
 
+        // Server-authoritative mode: the server rolls card drops on the kill and
+        // pushes them back via `card_reward` (→ applyTrustedCardReward → reveal
+        // pop-up + album refresh). Rolling here too would double-grant, so bail.
+        // The legacy client-side roll below only runs when WORLD_MONSTERS is off.
+        if (window.__serverMonsters) return;
+
         const previousCardState = character.cardState || {};
         const result = resolveCardDrops({
             source: { kind: 'monster', id: monster.type },

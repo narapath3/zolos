@@ -121,6 +121,7 @@
       <button data-tab="players">ผู้เล่น</button>
       <button data-tab="movement">📈 การเปลี่ยนแปลง</button>
       <button data-tab="monsters">👹 มอนสเตอร์</button>
+      <button data-tab="cards">🃏 การ์ด</button>
       <button data-tab="economy">เศรษฐกิจ</button>
       <button data-tab="security">ความปลอดภัย</button>
       <button data-tab="events">กิจกรรม</button>
@@ -185,7 +186,7 @@ let cur='dash';
 function go(tab){
   cur=tab;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  ({dash:renderDash,players:renderPlayers,movement:renderMovement,monsters:renderMonsters,economy:renderEconomy,security:renderSecurity,events:renderEvents}[tab])();
+  ({dash:renderDash,players:renderPlayers,movement:renderMovement,monsters:renderMonsters,cards:renderCards,economy:renderEconomy,security:renderSecurity,events:renderEvents}[tab])();
 }
 
 // ---------- DASHBOARD ----------
@@ -533,6 +534,75 @@ window.addDrop=async(type)=>{
 };
 window.delDrop=async(id,type)=>{
   try{await api('/drops/'+id,{method:'DELETE'});toast('ลบดรอปแล้ว');openMonster(type);}catch(e){toast(e.message,false);}
+};
+
+// ---------- CARDS ----------
+const RARITY_TH={common:'ธรรมดา',rare:'หายาก',epic:'เอปิก',legendary:'เลเจนดารี',mythic:'มิธิก'};
+let cardFilter='';
+async function renderCards(){
+  const v=$('#view');v.innerHTML='<div class="muted">กำลังโหลด...</div>';
+  try{
+    const {cards,economy}=await api('/cards');
+    window._cards=cards;
+    const econRows=Object.keys(RARITY_TH).map(rr=>{
+      const e=economy[rr]||{refine_dust:0,dust_per_dupe:0};
+      return `<tr>
+        <td><b>${RARITY_TH[rr]}</b> <span class="muted mono">${rr}</span></td>
+        <td class="num"><input type="number" min="0" id="ec-ref-${rr}" value="${e.refine_dust}" style="width:90px"></td>
+        <td class="num"><input type="number" min="0" id="ec-dpd-${rr}" value="${e.dust_per_dupe}" style="width:90px"></td>
+        <td><button class="btn ghost sm" onclick="saveEconomy('${rr}')">บันทึก</button></td>
+      </tr>`;}).join('');
+    const flt=cardFilter.toLowerCase();
+    const list=cards.filter(c=>!flt||c.name.toLowerCase().includes(flt)||c.id.includes(flt)||c.rarity.includes(flt));
+    v.innerHTML=`
+      <div class="panel">
+        <h2>✦ อัตราผงดาว (Stardust) ต่อความหายาก</h2>
+        <p class="muted" style="margin:2px 0 8px">ถลุงการ์ดซ้ำ 1 ใบ = ได้ผงดาว · เติมแทนการ์ดซ้ำที่ขาด 1 ใบ = ใช้ผงดาว</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>ความหายาก</th><th class="num">ได้/ถลุง 1 ใบ</th><th class="num">ใช้/ขาด 1 ใบ</th><th></th></tr></thead>
+          <tbody>${econRows}</tbody>
+        </table></div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="row" style="align-items:center">
+          <h2 style="margin:0">🃏 การ์ด — โอกาสดรอป / pity</h2>
+          <span class="spacer"></span>
+          <input id="card-search" placeholder="ค้นหา..." value="${esc(cardFilter)}" style="min-width:160px">
+        </div>
+        <p class="muted" style="margin:6px 0">ว่าง = ใช้ค่าเริ่มต้นจากแคตตาล็อก · ปิดดรอป = การ์ดจะไม่หล่นจากมอนสเตอร์</p>
+        <div class="tablewrap"><table>
+          <thead><tr><th>การ์ด</th><th>ความหายาก</th><th>แหล่ง</th><th class="num">โอกาส %</th><th class="num">pity</th><th>ดรอป</th><th></th></tr></thead>
+          <tbody>${list.map(c=>cardRow(c)).join('')}</tbody>
+        </table></div>
+      </div>`;
+    $('#card-search').oninput=e=>{cardFilter=e.target.value;const b=$('#card-search');const pos=b.selectionStart;renderCards().then(()=>{const nb=$('#card-search');if(nb){nb.focus();try{nb.setSelectionRange(pos,pos);}catch{}}});};
+  }catch(e){authGuard(e);v.innerHTML=`<div class="err">${e.message}</div>`;}
+}
+function cardRow(c){
+  const chancePct=c.chance!=null?(c.chance*100):(c.defaultChance*100);
+  const pity=c.pity!=null?c.pity:c.defaultPity;
+  const overridden=c.chance!=null||c.pity!=null||!c.enabled;
+  return `<tr>
+    <td><b>${esc(c.name)}</b> <span class="muted mono">${c.id}</span>${overridden?' <span class="pill">ปรับแล้ว</span>':''}</td>
+    <td>${RARITY_TH[c.rarity]||c.rarity}</td>
+    <td class="muted">${esc(c.sourceLabel||c.sourceKind)}</td>
+    <td class="num"><input type="number" step="0.01" min="0" max="100" id="cd-ch-${c.id}" value="${chancePct.toFixed(2)}" style="width:80px"></td>
+    <td class="num"><input type="number" min="1" id="cd-pt-${c.id}" value="${pity}" style="width:80px"></td>
+    <td><input type="checkbox" id="cd-en-${c.id}" ${c.enabled?'checked':''}></td>
+    <td><button class="btn ghost sm" onclick="saveCard('${c.id}')">บันทึก</button></td>
+  </tr>`;
+}
+window.saveCard=async(id)=>{
+  const body={
+    chance:Number($('#cd-ch-'+id).value)/100,
+    pity:Number($('#cd-pt-'+id).value),
+    drop_enabled:$('#cd-en-'+id).checked,
+  };
+  try{await api('/cards/'+id,{method:'PATCH',body:JSON.stringify(body)});toast('บันทึกการ์ดแล้ว');renderCards();}catch(e){toast(e.message,false);}
+};
+window.saveEconomy=async(rr)=>{
+  const body={refine_dust:Number($('#ec-ref-'+rr).value),dust_per_dupe:Number($('#ec-dpd-'+rr).value)};
+  try{await api('/cards/economy/'+rr,{method:'PATCH',body:JSON.stringify(body)});toast('บันทึกอัตราแล้ว');}catch(e){toast(e.message,false);}
 };
 
 async function renderEconomy(){

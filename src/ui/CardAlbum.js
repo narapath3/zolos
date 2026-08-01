@@ -164,6 +164,7 @@ export class CardAlbum {
             <strong>${ownedCount}<span aria-hidden="true"> / </span><span class="sr-only"> of </span>${this.catalog.length}</strong>
             <span>unique cards discovered</span>
             <meter min="0" max="${this.catalog.length}" value="${ownedCount}">${ownedCount} of ${this.catalog.length}</meter>
+            <span class="card-album__stardust" title="ผงดาว — ได้จากการถลุงการ์ดซ้ำ ใช้เติมตอนหลอมการ์ด">✦ ${this._stardust().toLocaleString()} ผงดาว</span>
           </div>
         </header>
 
@@ -243,6 +244,17 @@ export class CardAlbum {
     return (typeof this.options.equippedSlots === 'function'
       ? this.options.equippedSlots()
       : this.options.equippedSlots) || {};
+  }
+
+  _stardust() {
+    const v = typeof this.options.stardust === 'function' ? this.options.stardust() : this.options.stardust;
+    return Math.max(0, Math.floor(Number(v) || 0));
+  }
+
+  // rarity -> { refine_dust, dust_per_dupe }; empty until the server pushes rates.
+  _economyFor(rarity) {
+    const econ = (typeof this.options.cardEconomy === 'function' ? this.options.cardEconomy() : this.options.cardEconomy) || {};
+    return econ[rarity] || { refine_dust: 0, dust_per_dupe: 0 };
   }
 
   _matchesFilters(card, rawState) {
@@ -350,6 +362,15 @@ export class CardAlbum {
     const slots = this._socketSlots(card);
     const defaultSlot = currentSlot || slots[0]?.id || '';
 
+    // Stardust economy for this card's rarity.
+    const econ = this._economyFor(card.rarity);
+    const stardust = this._stardust();
+    const missing = Math.max(0, (fusion.cost || 0) - duplicates);            // dupes short of the cost
+    const dustPerDupe = econ.dust_per_dupe || 0;
+    const dustNeeded = missing * dustPerDupe;                                 // stardust to cover the shortfall
+    const canDustFuse = stars < 5 && !fusion.canFuse && missing > 0 && dustPerDupe > 0 && stardust >= dustNeeded;
+    const refineGain = econ.refine_dust || 0;
+
     content.innerHTML = `
       <div class="card-detail__hero card-detail__hero--${escapeHtml(card.rarity)}">
         ${this._artWindow(card, { owned, secret })}
@@ -428,7 +449,24 @@ export class CardAlbum {
           <button type="button" class="card-fusion__open" data-card-id="${escapeHtml(card.id)}" ${fusion.canFuse ? '' : 'disabled'}>
             ${stars >= 5 ? 'หน้าการ์ดถึงระดับสูงสุดแล้ว' : fusion.canFuse ? `อัปเกรดโดยใช้การ์ดซ้ำ ${fusion.cost} ใบ` : `ต้องการการ์ดซ้ำอีก ${Math.max(0, fusion.cost - duplicates)} ใบ`}
           </button>
+          ${(stars < 5 && !fusion.canFuse && missing > 0 && dustPerDupe > 0) ? `
+          <button type="button" class="card-fusion__dust" data-card-id="${escapeHtml(card.id)}" ${canDustFuse ? '' : 'disabled'}>
+            ✦ เติมผงดาวแทนการ์ดซ้ำ ${missing} ใบ (ใช้ ${dustNeeded.toLocaleString()} ผงดาว)${canDustFuse ? '' : ` · มี ${stardust.toLocaleString()}`}
+          </button>` : ''}
         </section>
+
+        ${(duplicates > 0 && refineGain > 0) ? `
+        <section class="card-refine">
+          <div class="card-refine__head">
+            <p>ถลุงการ์ดซ้ำ → ผงดาว</p>
+            <small>ได้ ${refineGain} ✦ ต่อ 1 ใบ · เก็บใบหลักไว้เสมอ</small>
+          </div>
+          <div class="card-refine__controls">
+            <input type="number" class="card-refine__qty" min="1" max="${duplicates}" value="${duplicates}" aria-label="จำนวนการ์ดซ้ำที่จะถลุง">
+            <button type="button" class="card-refine__go" data-card-id="${escapeHtml(card.id)}">ถลุง (สูงสุด ${duplicates})</button>
+          </div>
+        </section>
+        ` : ''}
 
         ${this.options.onSell ? `
         <section class="card-detail__trade">
@@ -447,6 +485,13 @@ export class CardAlbum {
     });
     content.querySelector('.card-fusion__open')?.addEventListener('click', event => {
       this._openFusionConfirmation(card, event.currentTarget);
+    });
+    content.querySelector('.card-fusion__dust')?.addEventListener('click', event => {
+      this._handleDustFusion(card, event.currentTarget);
+    });
+    content.querySelector('.card-refine__go')?.addEventListener('click', event => {
+      const qty = Number(content.querySelector('.card-refine__qty')?.value) || 0;
+      this._handleRefine(card, qty, event.currentTarget);
     });
     content.querySelector('.card-detail__sell')?.addEventListener('click', () => {
       // The detail is a modal <dialog> (showModal → top layer + backdrop).
@@ -491,6 +536,46 @@ export class CardAlbum {
     } catch (error) {
       button.disabled = false;
       status.textContent = error?.message || 'Could not update this socket.';
+    }
+  }
+
+  // Dust-assisted fusion: not enough natural duplicates, so top up the shortfall
+  // with Stardust. Server recomputes the real dupe/dust split; we just request.
+  async _handleDustFusion(card, button) {
+    const dialog = this.element.querySelector('.card-detail');
+    const status = dialog?.querySelector('.card-detail__status');
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    if (status) status.textContent = 'กำลังหลอมโดยเติมผงดาว…';
+    try {
+      const result = await this.options.onFuseWithDust?.(card.id);
+      if (result === false || result == null) throw new Error('การหลอมล้มเหลว');
+      if (status) status.textContent = 'หลอมสำเร็จ';
+      this.render();
+      this._openDetail(card.id, null, false);
+    } catch (error) {
+      button.disabled = false;
+      if (status) status.textContent = error?.message || 'หลอมโดยเติมผงดาวล้มเหลว';
+    }
+  }
+
+  // Refine N duplicate copies into Stardust (server keeps ≥1 copy).
+  async _handleRefine(card, qty, button) {
+    const dialog = this.element.querySelector('.card-detail');
+    const status = dialog?.querySelector('.card-detail__status');
+    const count = Math.max(1, Math.floor(Number(qty) || 0));
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    if (status) status.textContent = `กำลังถลุงการ์ดซ้ำ ${count} ใบ…`;
+    try {
+      const result = await this.options.onRefine?.(card.id, count);
+      if (result === false || result == null) throw new Error('การถลุงล้มเหลว');
+      if (status) status.textContent = 'ถลุงสำเร็จ';
+      this.render();
+      this._openDetail(card.id, null, false);
+    } catch (error) {
+      button.disabled = false;
+      if (status) status.textContent = error?.message || 'ถลุงการ์ดล้มเหลว';
     }
   }
 
@@ -719,14 +804,22 @@ export class CardAlbum {
           ${escapeHtml(item.context.monsterName || item.context.sourceLabel || card.source.label)}
         </p>
         <p class="card-drop-reveal__owned">${state.owned} owned · ${state.stars || 1} star${state.stars === 1 ? '' : 's'}</p>
-        <button type="button" class="card-drop-reveal__continue">Continue</button>
+        <button type="button" class="card-drop-reveal__continue">แตะเพื่อปิด</button>
       </div>
     `;
     document.body.appendChild(overlay);
     this._revealOverlay = overlay;
     this._bindImageFallbacks(overlay);
     const previousFocus = document.activeElement;
+
+    // The reveal auto-fades so the player never has to dismiss it mid-farm.
+    // Rare/mythic linger a little longer since they earn a look. A tap, click,
+    // or Escape closes it immediately. `closing` guards against the auto-timer
+    // and a manual dismiss both firing.
+    let autoTimer = null;
+    let closing = false;
     const finish = () => {
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
       overlay.remove();
       this._revealOverlay = null;
       this.revealActive = false;
@@ -734,11 +827,28 @@ export class CardAlbum {
       if (previousFocus?.isConnected) previousFocus.focus();
       this._drainDropQueue();
     };
-    overlay.querySelector('.card-drop-reveal__continue').addEventListener('click', finish, { once: true });
+    const beginClose = () => {
+      if (closing) return;
+      closing = true;
+      if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+      if (reducedMotion) { finish(); return; }
+      overlay.classList.add('card-drop-reveal--out');
+      setTimeout(finish, 420);
+    };
+
+    const isRare = card.rarity === 'legendary' || card.rarity === 'mythic';
+    autoTimer = setTimeout(beginClose, isRare ? 4200 : 2800);
+
+    overlay.querySelector('.card-drop-reveal__continue').addEventListener('click', beginClose, { once: true });
+    // A tap/click anywhere on the overlay (backdrop included) also dismisses it.
+    overlay.addEventListener('click', event => {
+      if (event.target.closest('.card-drop-reveal__continue')) return;
+      beginClose();
+    });
     overlay.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        finish();
+        beginClose();
       } else {
         this._trapFocus(event, overlay);
       }

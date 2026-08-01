@@ -18,14 +18,20 @@ export function resolveCardDrops(input = {}) {
   const mvpMultiplier = input.isMvp ? 2 : 1;
   const dropRatePct = Math.max(0, Number(input.dropRatePct) || 0);
   const random = input.random;
+  // Admin per-card overrides: { [cardId]: { chance?, pity?, enabled? } }.
+  const overrides = input.overrides || {};
 
   for (const card of getCardsBySource(source.kind, source.id)) {
+    const ov = overrides[card.id];
+    if (ov && ov.enabled === false) continue; // admin disabled this card's drop
+    const baseChance = ov && Number.isFinite(ov.chance) ? ov.chance : card.source.chance;
+    const basePity = ov && Number.isFinite(ov.pity) ? ov.pity : card.source.pity;
     const entry = cardState[card.id] || DEFAULT_CARD_STATE;
     const chance = Math.min(
-      card.source.chance * 2,
-      card.source.chance * mvpMultiplier * (1 + dropRatePct),
+      baseChance * 2,
+      baseChance * mvpMultiplier * (1 + dropRatePct),
     );
-    const guaranteed = entry.pity + 1 >= card.source.pity;
+    const guaranteed = entry.pity + 1 >= basePity;
     const won = guaranteed || random() < chance;
 
     cardState[card.id] = won

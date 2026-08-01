@@ -1,3 +1,67 @@
+/* ── Stardust economy UI (balance chip, dust-fuse, refine) ───────────────── */
+.card-album__stardust {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: hsl(45 100% 78%);
+  background: hsl(268 45% 22% / 0.55);
+  border: 1px solid hsl(45 90% 60% / 0.45);
+  box-shadow: 0 0 12px hsl(45 90% 55% / 0.25);
+}
+
+.card-fusion__dust {
+  margin-top: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: hsl(45 100% 85%);
+  background: linear-gradient(150deg, hsl(268 55% 32%), hsl(258 60% 20%));
+  border: 1px solid hsl(45 90% 60% / 0.5);
+}
+.card-fusion__dust:disabled { opacity: 0.5; cursor: not-allowed; }
+.card-fusion__dust:not(:disabled):hover { filter: brightness(1.12); }
+
+.card-refine {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: hsl(230 40% 12% / 0.6);
+  border: 1px solid hsl(268 45% 55% / 0.35);
+}
+.card-refine__head p { margin: 0; font-weight: 700; color: hsl(45 100% 80%); }
+.card-refine__head small { color: hsl(220 20% 70%); }
+.card-refine__controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.card-refine__qty {
+  width: 90px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid hsl(268 40% 50% / 0.5);
+  background: hsl(230 40% 8% / 0.8);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+}
+.card-refine__go {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  color: hsl(45 100% 85%);
+  background: linear-gradient(150deg, hsl(268 50% 30%), hsl(250 55% 18%));
+  border: 1px solid hsl(45 90% 60% / 0.4);
+}
+.card-refine__go:hover { filter: brightness(1.12); }
+
 .card-album-host {
   display: block !important;
   container-type: inline-size;
@@ -1013,6 +1077,18 @@
   display: grid;
   padding: 16px;
   place-items: center;
+}
+
+/* The reveal auto-dismisses; this state fades the whole overlay out before it
+   is removed from the DOM (JS waits ~420ms to match). */
+.card-drop-reveal--out {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-drop-reveal--out { transition: none; }
 }
 
 .card-drop-reveal__backdrop {

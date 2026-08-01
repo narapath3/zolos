@@ -11,6 +11,10 @@ import {
     MAPS, isValidMap, bumpWorldVersion, getMonsterDefs, getMapSpawns,
     getMonsterDrops,
 } from './monstersConfig.js';
+import { CARD_CATALOG, getCard } from '../cards/CardCatalog.js';
+import { getCardEconomy, getCardOverrides } from './cardEconomy.js';
+
+const CARD_RARITIES = new Set(['common', 'rare', 'epic', 'legendary', 'mythic']);
 
 // Character columns an admin may edit, with bounds. Anything else is ignored.
 const EDITABLE_NUM = {
@@ -533,6 +537,102 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorl
         if (!rowCount) throw httpErr(404, 'ไม่พบรายการ');
         const version = await applyWorldChange();
         res.json({ ok: true, version });
+    }));
+
+    // ============ CARD MANAGEMENT ============
+    // Catalog + current drop overrides + stardust economy, all in one payload.
+    r.get('/cards', requireAdmin, wrap(async (_req, res) => {
+        const [overrides, economy] = await Promise.all([getCardOverrides(), getCardEconomy()]);
+        const cards = CARD_CATALOG.map(c => {
+            const ov = overrides[c.id] || {};
+            return {
+                id: c.id, name: c.displayName, rarity: c.rarity,
+                sourceKind: c.source.kind, sourceId: c.source.id, sourceLabel: c.source.label,
+                defaultChance: c.source.chance, defaultPity: c.source.pity,
+                chance: ov.chance ?? null, pity: ov.pity ?? null,
+                enabled: ov.enabled !== false,
+            };
+        });
+        res.json({ cards, economy });
+    }));
+
+    // Set (or clear) a card's drop override. Pass chance/pity as null to fall back
+    // to the catalog default; drop_enabled toggles the drop entirely.
+    r.patch('/cards/:cardId', requireAdmin, wrap(async (req, res) => {
+        const card = getCard(String(req.params.cardId));
+        if (!card) throw httpErr(404, 'ไม่พบการ์ด');
+        const body = req.body || {};
+        const chance = body.chance == null ? null : Math.max(0, Math.min(1, Number(body.chance)));
+        const pity = body.pity == null ? null : Math.max(1, Math.min(100000, Math.floor(Number(body.pity))));
+        const enabled = body.drop_enabled === undefined ? true : body.drop_enabled === true;
+        if (body.chance != null && !Number.isFinite(chance)) throw httpErr(400, 'chance ไม่ถูกต้อง');
+        if (body.pity != null && !Number.isFinite(pity)) throw httpErr(400, 'pity ไม่ถูกต้อง');
+        await query(
+            `INSERT INTO public.card_overrides (card_id, chance, pity, drop_enabled, updated_at)
+             VALUES ($1,$2,$3,$4, now())
+             ON CONFLICT (card_id) DO UPDATE
+               SET chance = EXCLUDED.chance, pity = EXCLUDED.pity,
+                   drop_enabled = EXCLUDED.drop_enabled, updated_at = now()`,
+            [card.id, chance, pity, enabled]);
+        const version = await applyWorldChange(); // reloads engine's override cache
+        console.log(`[Admin] 🃏 ${req.admin.username} set card override ${card.id}`);
+        res.json({ ok: true, version });
+    }));
+
+    // Edit a rarity's Stardust rates.
+    r.patch('/cards/economy/:rarity', requireAdmin, wrap(async (req, res) => {
+        const rarity = String(req.params.rarity);
+        if (!CARD_RARITIES.has(rarity)) throw httpErr(400, 'ความหายากไม่ถูกต้อง');
+        const refine = Math.max(0, Math.min(100000, Math.floor(Number(req.body?.refine_dust)) || 0));
+        const perDupe = Math.max(0, Math.min(1000000, Math.floor(Number(req.body?.dust_per_dupe)) || 0));
+        await query(
+            `INSERT INTO public.card_economy (rarity, refine_dust, dust_per_dupe, updated_at)
+             VALUES ($1,$2,$3, now())
+             ON CONFLICT (rarity) DO UPDATE
+               SET refine_dust = EXCLUDED.refine_dust, dust_per_dupe = EXCLUDED.dust_per_dupe, updated_at = now()`,
+            [rarity, refine, perDupe]);
+        console.log(`[Admin] 🃏 ${req.admin.username} set economy ${rarity} ${refine}/${perDupe}`);
+        res.json({ ok: true });
+    }));
+
+    // A player's owned cards + Stardust balance.
+    r.get('/players/:characterId/cards', requireAdmin, wrap(async (req, res) => {
+        const cid = String(req.params.characterId);
+        const [cards, ch] = await Promise.all([
+            query('SELECT card_id, owned, stars, pity FROM public.character_cards WHERE character_id = $1 ORDER BY owned DESC', [cid]),
+            query('SELECT stardust FROM public.characters WHERE id = $1', [cid]),
+        ]);
+        if (!ch.rows[0]) throw httpErr(404, 'ไม่พบตัวละคร');
+        res.json({ cards: cards.rows, stardust: Number(ch.rows[0].stardust) || 0 });
+    }));
+
+    // Grant/adjust a card and/or Stardust for a player.
+    r.post('/players/:characterId/cards', requireAdmin, wrap(async (req, res) => {
+        const cid = String(req.params.characterId);
+        const ch = await query('SELECT 1 FROM public.characters WHERE id = $1', [cid]);
+        if (!ch.rows[0]) throw httpErr(404, 'ไม่พบตัวละคร');
+        const body = req.body || {};
+        if (body.cardId) {
+            const card = getCard(String(body.cardId));
+            if (!card) throw httpErr(404, 'ไม่พบการ์ด');
+            const owned = Math.max(0, Math.min(1_000_000, Math.floor(Number(body.owned)) || 0));
+            const stars = Math.max(1, Math.min(5, Math.floor(Number(body.stars)) || 1));
+            await query(
+                `INSERT INTO public.character_cards (character_id, card_id, owned, stars, pity)
+                 VALUES ($1,$2,$3,$4,0)
+                 ON CONFLICT (character_id, card_id) DO UPDATE
+                   SET owned = EXCLUDED.owned, stars = EXCLUDED.stars`,
+                [cid, card.id, owned, stars]);
+        }
+        if (body.setStardust !== undefined) {
+            const v = Math.max(0, Math.min(2_000_000_000, Math.floor(Number(body.setStardust)) || 0));
+            await query('UPDATE public.characters SET stardust = $2 WHERE id = $1', [cid, v]);
+        } else if (body.addStardust !== undefined) {
+            const v = Math.floor(Number(body.addStardust)) || 0;
+            await query('UPDATE public.characters SET stardust = GREATEST(0, COALESCE(stardust,0) + $2) WHERE id = $1', [cid, v]);
+        }
+        console.log(`[Admin] 🃏 ${req.admin.username} granted cards/stardust to ${cid}`);
+        res.json({ ok: true });
     }));
 
     // error handler (JSON)

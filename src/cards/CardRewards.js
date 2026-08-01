@@ -53,8 +53,13 @@ export function mergeAuthoritativeCardRows(rows, { character, gameUI } = {}) {
     (rows || []).map(row => getCard(row?.card_id)?.id).filter(Boolean),
   );
   let changed = false;
+  // The server (character_cards) is the single source of truth for EVERY card
+  // source now — drops, fusion, and world-boss rewards all live there. Any card
+  // still sitting in local cardState/inventory that the server doesn't report is
+  // stale and gets purged. (Requires the one-time inventory→character_cards
+  // backfill to have run first, otherwise real cards would be dropped.)
   for (const card of CARD_CATALOG) {
-    if (card.source.kind !== 'world_boss' || authoritativeIds.has(card.id)) continue;
+    if (authoritativeIds.has(card.id)) continue;
     if (character?.cardState?.[card.id]) {
       delete character.cardState[card.id];
       changed = true;

@@ -1291,14 +1291,19 @@ async function requestOfflineCardFusion(cardId, requestId) {
     return result;
 }
 
-export async function requestCardFusion(cardId, requestId) {
+export async function requestCardFusion(cardId, requestId, opts = {}) {
     const card = typeof cardId === 'string' ? getCard(cardId) : null;
     if (!card || card.id !== cardId) throw new Error('ไม่พบการ์ดที่ต้องการหลอม');
     if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) {
         throw new Error('รหัสคำขอหลอมการ์ดไม่ถูกต้อง');
     }
+    const useDust = opts?.useDust === true;
 
-    if (isOfflineMode || !isSocketMode()) return requestOfflineCardFusion(cardId, requestId);
+    // Offline has no Stardust ledger, so dust-assisted fusion is server-only.
+    if (isOfflineMode || !isSocketMode()) {
+        if (useDust) throw new Error('การเติมผงดาวใช้ได้เฉพาะตอนออนไลน์');
+        return requestOfflineCardFusion(cardId, requestId);
+    }
 
     const socket = getSocket();
     if (!socket?.connected) throw new Error('การเชื่อมต่อหลุด กรุณาลองใหม่อีกครั้ง');
@@ -1311,8 +1316,69 @@ export async function requestCardFusion(cardId, requestId) {
             reject(new Error('การหลอมการ์ดหมดเวลา กรุณาลองใหม่อีกครั้ง'));
         }, 20_000);
         pendingCardFusions.set(requestId, { resolve, reject, timeout });
-        socket.emit('card_fuse', { cardId, requestId });
+        socket.emit('card_fuse', { cardId, requestId, useDust });
     });
+}
+
+// ============ Card refine (dupes → Stardust) + economy ============
+const pendingCardRefines = new Map();
+let cardRefineSocket = null;
+
+function attachCardRefineListeners(socket) {
+    if (!socket || cardRefineSocket === socket) return;
+    cardRefineSocket = socket;
+    socket.on('card_refine_result', (result) => {
+        const pending = pendingCardRefines.get(result?.requestId);
+        if (!pending) return;
+        pendingCardRefines.delete(result.requestId);
+        clearTimeout(pending.timeout);
+        window.gameUI?.onCardRefineResult?.(result);
+        pending.resolve(result);
+    });
+    socket.on('card_refine_error', (error) => {
+        const pending = pendingCardRefines.get(error?.requestId);
+        if (!pending) return;
+        pendingCardRefines.delete(error.requestId);
+        clearTimeout(pending.timeout);
+        const failure = new Error(error?.message || 'ถลุงการ์ดไม่สำเร็จ');
+        failure.cardFusionPublished = true;
+        pending.reject(failure);
+    });
+    // Balance/economy push (reply to card_econ or after a change).
+    socket.on('card_econ', (payload) => window.gameUI?.onCardEcon?.(payload));
+}
+
+export async function requestCardRefine(cardId, count, requestId) {
+    const card = typeof cardId === 'string' ? getCard(cardId) : null;
+    if (!card || card.id !== cardId) throw new Error('ไม่พบการ์ดที่ต้องการถลุง');
+    if (!Number.isInteger(count) || count < 1) throw new Error('จำนวนการ์ดไม่ถูกต้อง');
+    if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) {
+        throw new Error('รหัสคำขอไม่ถูกต้อง');
+    }
+    if (isOfflineMode || !isSocketMode()) throw new Error('การถลุงการ์ดใช้ได้เฉพาะตอนออนไลน์');
+
+    const socket = getSocket();
+    if (!socket?.connected) throw new Error('การเชื่อมต่อหลุด กรุณาลองใหม่อีกครั้ง');
+    attachCardRefineListeners(socket);
+    if (pendingCardRefines.has(requestId)) throw new Error('คำขอถลุงการ์ดนี้กำลังดำเนินการอยู่');
+
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingCardRefines.delete(requestId);
+            reject(new Error('การถลุงการ์ดหมดเวลา กรุณาลองใหม่อีกครั้ง'));
+        }, 20_000);
+        pendingCardRefines.set(requestId, { resolve, reject, timeout });
+        socket.emit('card_refine', { cardId, count, requestId });
+    });
+}
+
+// Ask the server for our Stardust balance + current economy rates.
+export function requestCardEcon() {
+    if (isOfflineMode || !isSocketMode()) return;
+    const socket = getSocket();
+    if (!socket?.connected) return;
+    attachCardRefineListeners(socket);
+    socket.emit('card_econ');
 }
 
 // ============ Leaderboard ============

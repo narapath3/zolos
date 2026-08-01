@@ -15,6 +15,7 @@ import * as ipMonitor from './api/ipMonitor.js';
 import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startCheatGuard } from './api/cheatGuard.js';
 import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
+import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -740,13 +741,31 @@ io.on('connection', (socket) => {
                 throw new Error('การ์ดนี้ไม่สามารถหลอมได้');
             }
 
-            const { data: result, error } = await supabase.rpc('fuse_card', {
-                p_character_id: player.characterId,
-                p_card_id: card.id,
-                p_expected_stars: stars,
-                p_cost: cost,
-                p_idempotency_key: requestId,
-            });
+            // Dust mode: the player is short on natural duplicates and pays the
+            // shortfall with Stardust. The RPC recomputes how many dupes vs dust
+            // are actually used — the client can't under-pay.
+            const useDust = payload?.useDust === true;
+            let result, error;
+            if (useDust) {
+                const econ = await getCardEconomy();
+                const dustEach = econ[card.rarity]?.dust_per_dupe || 0;
+                ({ data: result, error } = await supabase.rpc('fuse_card_dust', {
+                    p_character_id: player.characterId,
+                    p_card_id: card.id,
+                    p_expected_stars: stars,
+                    p_dupe_cost: cost,
+                    p_dust_each: dustEach,
+                    p_idempotency_key: requestId,
+                }));
+            } else {
+                ({ data: result, error } = await supabase.rpc('fuse_card', {
+                    p_character_id: player.characterId,
+                    p_card_id: card.id,
+                    p_expected_stars: stars,
+                    p_cost: cost,
+                    p_idempotency_key: requestId,
+                }));
+            }
             if (error || !result || result.card_id !== card.id) {
                 throw error || new Error('ผลการหลอมการ์ดไม่ถูกต้อง');
             }
@@ -758,6 +777,7 @@ io.on('connection', (socket) => {
                 pity: Number(result.pity) || 0,
                 requestId,
             };
+            if (result.stardust !== undefined) committed.stardust = Number(result.stardust) || 0;
             if (!Number.isInteger(committed.owned) || !Number.isInteger(committed.stars) || committed.owned < 0 || committed.stars < 1 || committed.stars > 5) {
                 throw new Error('ผลการหลอมการ์ดไม่ถูกต้อง');
             }
@@ -767,6 +787,72 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.error('[Server] card fusion failed:', error.message);
             reject(fusionErrorMessage(error));
+        }
+    });
+
+    // Refine excess duplicate cards into Stardust (the dupe sink). Server owns
+    // the rate (economy[rarity].refine_dust) and enforces keeping ≥1 copy.
+    socket.on('card_refine', async (payload) => {
+        const { cardId, count, requestId } = payload || {};
+        const reject = (message) => socket.emit('card_refine_error', {
+            cardId: typeof cardId === 'string' ? cardId : null,
+            requestId: typeof requestId === 'string' ? requestId : null,
+            message,
+        });
+        const player = trustedSender(socket);
+        if (!player?.verified || !player.characterId || !supabase) {
+            reject('ไม่สามารถยืนยันตัวละครเพื่อถลุงการ์ดได้');
+            return;
+        }
+        if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) {
+            reject('รหัสคำขอไม่ถูกต้อง');
+            return;
+        }
+        const n = Number(count);
+        if (!Number.isInteger(n) || n < 1 || n > 9999) {
+            reject('จำนวนการ์ดที่ถลุงไม่ถูกต้อง');
+            return;
+        }
+        const card = typeof cardId === 'string' ? getCard(cardId) : null;
+        if (!card || card.id !== cardId) {
+            reject('ไม่พบการ์ดที่ต้องการถลุง');
+            return;
+        }
+        try {
+            const econ = await getCardEconomy();
+            const dustEach = econ[card.rarity]?.refine_dust || 0;
+            const { data: result, error } = await supabase.rpc('refine_cards', {
+                p_character_id: player.characterId,
+                p_card_id: card.id,
+                p_count: n,
+                p_dust_each: dustEach,
+                p_idempotency_key: requestId,
+            });
+            if (error || !result || result.card_id !== card.id) {
+                throw error || new Error('ผลการถลุงการ์ดไม่ถูกต้อง');
+            }
+            socket.emit('card_refine_result', {
+                cardId: result.card_id,
+                owned: Number(result.owned) || 0,
+                stardust: Number(result.stardust) || 0,
+                requestId,
+            });
+        } catch (error) {
+            console.error('[Server] card refine failed:', error.message);
+            reject(fusionErrorMessage(error));
+        }
+    });
+
+    // Client asks for its Stardust balance + the current economy rates (on load
+    // and after any card change). Read-only, server-trusted character id.
+    socket.on('card_econ', async () => {
+        const player = trustedSender(socket);
+        if (!player?.verified || !player.characterId || !supabase) return;
+        try {
+            const [stardust, economy] = await Promise.all([getStardust(player.characterId), getCardEconomy()]);
+            socket.emit('card_econ', { stardust, economy });
+        } catch (e) {
+            console.error('[Server] card_econ failed:', e.message);
         }
     });
 
@@ -1429,6 +1515,7 @@ httpServer.listen(PORT, HOST, () => {
             try {
                 await ensureMonsterTables();
                 await seedMonstersIfEmpty();
+                await ensureCardEconomy();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
         })();

@@ -1,5 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -1450,6 +1450,10 @@ export class GameUI {
           return !this.character?.equippedCards?.[slotId];
         },
         onFuse: cardId => this.requestCardFusion(cardId),
+        onFuseWithDust: cardId => this.requestCardFusion(cardId, undefined, { useDust: true }),
+        onRefine: (cardId, count) => this.requestCardRefine(cardId, count),
+        stardust: () => this.character?.stardust || 0,
+        cardEconomy: () => this.cardEconomy || {},
         onSell: cardId => this._openCardTrade(cardId),
         onRareDrop: (card) => {
           window.globalAnnouncements?.addAnnouncement?.({
@@ -1464,6 +1468,9 @@ export class GameUI {
       });
     }
     this.cardAlbum.mount(grid);
+    // Pull the Stardust balance + economy rates so the album header + fusion
+    // forge can show them (server replies via onCardEcon).
+    try { requestCardEcon(); } catch { /* offline / not connected */ }
     const pendingReveals = this.cardDropRevealQueue.splice(0);
     for (const reveal of pendingReveals) {
       this.cardAlbum.showDropReveal(reveal.cardId, reveal.context);
@@ -1991,13 +1998,22 @@ export class GameUI {
     }
   }
 
-  async requestCardFusion(cardId, requestId = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fusion_${Date.now()}_${Math.random().toString(36).slice(2)}`)) {
+  async requestCardFusion(cardId, requestId = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fusion_${Date.now()}_${Math.random().toString(36).slice(2)}`), opts = {}) {
     try {
-      return await requestCardFusion(cardId, requestId);
+      return await requestCardFusion(cardId, requestId, opts);
     } catch (error) {
       if (!error.cardFusionPublished) {
         this.onCardFusionError({ requestId, message: error.message || 'หลอมการ์ดไม่สำเร็จ' });
       }
+      return null;
+    }
+  }
+
+  async requestCardRefine(cardId, count, requestId = (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `refine_${Date.now()}_${Math.random().toString(36).slice(2)}`)) {
+    try {
+      return await requestCardRefine(cardId, count, requestId);
+    } catch (error) {
+      if (!error.cardFusionPublished) this.addCombatLog(`❌ ${error.message || 'ถลุงการ์ดไม่สำเร็จ'}`, 'warning');
       return null;
     }
   }
@@ -2011,6 +2027,8 @@ export class GameUI {
       stars: result.stars,
       pity: result.pity,
     };
+    // Dust-assisted fusions return the new Stardust balance.
+    if (this.character && Number.isInteger(result.stardust)) this.character.stardust = result.stardust;
     const inventoryCard = this.inventory.find(item => item?.item_type === 'card' && getCard(item.item_name)?.id === result.cardId);
     if (inventoryCard) {
       inventoryCard.quantity = result.owned;
@@ -2023,6 +2041,27 @@ export class GameUI {
     }
     this._afterCardChange(`หลอม ${card.itemName} สำเร็จ ★${result.stars}`);
     return true;
+  }
+
+  // A refine committed on the server: sync the reduced dupe count + new balance.
+  onCardRefineResult(result) {
+    const card = getCard(result?.cardId);
+    if (!card || !this.character?.cardState || !Number.isInteger(result.owned)) return false;
+    const prev = this.character.cardState[result.cardId] || { owned: result.owned, stars: 1, pity: 0 };
+    this.character.cardState[result.cardId] = { ...prev, owned: result.owned };
+    if (Number.isInteger(result.stardust)) this.character.stardust = result.stardust;
+    const inventoryCard = this.inventory.find(item => item?.item_type === 'card' && getCard(item.item_name)?.id === result.cardId);
+    if (inventoryCard) inventoryCard.quantity = result.owned;
+    this._afterCardChange(`ถลุง ${card.itemName} → ผงดาว (มี ${result.stardust} ✦)`);
+    return true;
+  }
+
+  // Server pushed our Stardust balance + economy rates (on load / after change).
+  onCardEcon(payload) {
+    if (!payload) return;
+    if (this.character && Number.isInteger(payload.stardust)) this.character.stardust = payload.stardust;
+    if (payload.economy && typeof payload.economy === 'object') this.cardEconomy = payload.economy;
+    this.refreshCardAlbum?.();
   }
 
   onCardFusionError(error) {

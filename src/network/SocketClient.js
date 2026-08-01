@@ -1,16 +1,15 @@
 // ============================================================
-// Socket.io Client Wrapper — Connects to Railway Map Server
+// Socket.io Client Wrapper — Connects to the Zolos Map Server (VPS)
 // ============================================================
 
 let socket = null;
 let isConnected = false;
 
-// Known-good production Map Server (Railway public domain).
-// NOTE: VITE_SOCKET_SERVER_URL in the current Vercel project is stale and
-// points at a dead host, which put every client into OFFLINE mode. It is
-// intentionally no longer used as a fallback — set VITE_SOCKET_URL to
-// override this default with a different server.
-export const DEFAULT_SOCKET_URL = 'https://zolos-server-production.up.railway.app';
+// Known-good production Map Server. As of 2026-07-29 the realtime server moved
+// off Railway (subscription lapsed) onto a self-hosted Windows VPS, fronted by
+// Caddy for TLS at rt.zolos.online. The old Railway host is dead, so this
+// default now points at the VPS — set VITE_SOCKET_URL to override.
+export const DEFAULT_SOCKET_URL = 'https://rt.zolos.online';
 
 /**
  * Get the SOCKET_URL from env, with fallback logic.

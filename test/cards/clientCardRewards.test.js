@@ -53,7 +53,7 @@ test('malformed reward cannot modify card state or open a reveal', () => {
   assert.deepEqual(character.cardState, {});
 });
 
-test('authoritative rows restore on login and reconcile the current card gallery', () => {
+test('authoritative rows replace local card state and reconcile the current card gallery', () => {
   const character = {
     cardState: { poring: { owned: 2, stars: 1, pity: 4 } },
   };
@@ -76,7 +76,6 @@ test('authoritative rows restore on login and reconcile the current card gallery
 
   assert.equal(merged, 1);
   assert.deepEqual(character.cardState, {
-    poring: { owned: 2, stars: 1, pity: 4 },
     valdris: { owned: 3, stars: 2, pity: 7 },
   });
   assert.deepEqual(gameUI.inventory[0], {
@@ -87,7 +86,7 @@ test('authoritative rows restore on login and reconcile the current card gallery
   });
 });
 
-test('missing authoritative world-boss rows remove fabricated legacy ownership', () => {
+test('missing authoritative rows remove fabricated legacy ownership for every card source', () => {
   const character = {
     cardState: {
       poring: { owned: 2, stars: 1, pity: 4 },
@@ -105,8 +104,8 @@ test('missing authoritative world-boss rows remove fabricated legacy ownership',
   mergeAuthoritativeCardRows([], { character, gameUI });
 
   assert.equal(character.cardState.valdris, undefined);
-  assert.deepEqual(character.cardState.poring, { owned: 2, stars: 1, pity: 4 });
-  assert.deepEqual(gameUI.inventory.map(item => item.item_name), ['Poring Card']);
+  assert.equal(character.cardState.poring, undefined);
+  assert.deepEqual(gameUI.inventory.map(item => item.item_name), []);
 });
 
 test('failed authoritative load preserves existing card state and inventory', async () => {
