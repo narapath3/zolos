@@ -7208,25 +7208,25 @@ export class GameUI {
 
   // ============ Skill HUD Updates ============
   updateSkillCooldown(skillId, currentCooldown, maxCooldown) {
-    const overlay = document.getElementById(`cooldown-${skillId}`);
-    if (overlay) {
-      if (currentCooldown <= 0) {
-        overlay.style.height = '0%';
-      } else {
-        const percentage = (currentCooldown / maxCooldown) * 100;
-        overlay.style.height = `${percentage}%`;
+    // Clock-style radial cooldown: a dark shroud that unwinds clockwise to
+    // reveal the icon, with the seconds remaining counting down in the centre.
+    const apply = (overlay) => {
+      if (!overlay) return;
+      if (currentCooldown <= 0 || !maxCooldown) {
+        overlay.classList.remove('cd-active');
+        overlay.style.background = '';
+        overlay.textContent = '';
+        return;
       }
-    }
-
-    const mobOverlay = document.getElementById(`mobile-cooldown-${skillId}`);
-    if (mobOverlay) {
-      if (currentCooldown <= 0) {
-        mobOverlay.style.height = '0%';
-      } else {
-        const percentage = (currentCooldown / maxCooldown) * 100;
-        mobOverlay.style.height = `${percentage}%`;
-      }
-    }
+      const frac = Math.max(0, Math.min(1, currentCooldown / maxCooldown));
+      const elapsed = (1 - frac) * 360; // revealed (light) wedge grows clockwise
+      overlay.style.background =
+        `conic-gradient(rgba(6,10,20,0.10) 0deg ${elapsed}deg, rgba(4,7,16,0.72) ${elapsed}deg 360deg)`;
+      overlay.textContent = currentCooldown >= 1 ? Math.ceil(currentCooldown) : currentCooldown.toFixed(1);
+      overlay.classList.add('cd-active');
+    };
+    apply(document.getElementById(`cooldown-${skillId}`));
+    apply(document.getElementById(`mobile-cooldown-${skillId}`));
   }
 
   // ============ Jobs ============
