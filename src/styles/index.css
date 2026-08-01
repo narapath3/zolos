@@ -6762,3 +6762,43 @@ a,
     font-size: 10px;
   }
 }
+/* Canonical item art — every inventory/shop/equipment surface renders the same
+   source asset. The emoji remains behind the image as a resilient fallback. */
+.item-visual {
+  position: relative;
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(154, 190, 235, 0.24);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 36% 28%, rgba(116, 189, 255, 0.18), transparent 48%),
+    linear-gradient(145deg, rgba(31, 45, 68, 0.96), rgba(10, 15, 28, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 4px 12px rgba(0,0,0,.25);
+  vertical-align: middle;
+}
+
+.item-visual img {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.48));
+}
+
+.item-visual__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+}
+
+.item-visual--emoji > span:first-child { font-size: 24px; }
+.item-visual--detail { width: 72px; height: 72px; border-radius: 15px; }
+.item-visual--equipped { width: 46px; height: 46px; margin: 2px auto; }
+.item-visual.slot-emoji { width: 52px; height: 52px; }

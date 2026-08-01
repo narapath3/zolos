@@ -1,4 +1,5 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
+import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
@@ -1397,7 +1398,7 @@ export class GameUI {
 
         const rfLvl = item.stats && item.stats.refine ? item.stats.refine : 0;
         slot.innerHTML = `
-                  <span>${item.emoji}</span>
+                  ${itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji)}
                   <span class="inv-qty">${item.quantity}</span>
                   ${rfLvl > 0 ? `<span style="position:absolute;top:1px;left:3px;font-size:10px;font-weight:900;color:${refineTierColor(rfLvl)};text-shadow:0 1px 2px #000;">+${rfLvl}</span>` : ''}
                   ${isEquipped ? '<span class="inv-equipped-badge">E</span>' : ''}
@@ -2135,7 +2136,7 @@ export class GameUI {
     placeholder.style.display = 'none';
     content.style.display = 'block';
 
-    document.getElementById('detail-icon').textContent = item.emoji;
+    document.getElementById('detail-icon').innerHTML = itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji, 'item-visual--detail');
     const nameEl = document.getElementById('detail-name');
     const rfx = (item.stats && item.stats.refine) ? `+${item.stats.refine} ` : '';
     nameEl.textContent = rfx + item.item_name;
@@ -3509,7 +3510,7 @@ export class GameUI {
       return `<div style="position:relative;text-align:center;padding:9px 4px 8px;border-radius:11px;background:${bg};
         border:1px solid ${item ? bc : 'var(--border)'};${glow}${item ? '' : 'opacity:.45;'}">
         <div style="font-size:9px;color:var(--text-dim);letter-spacing:.3px;">${s.icon} ${s.label}</div>
-        <div style="font-size:23px;line-height:1.15;margin:2px 0;">${item ? item.emoji : '➖'}</div>
+        <div style="line-height:1.15;margin:2px 0;">${item ? itemIconMarkup(item.name, item.emoji, 'item-visual--equipped') : '➖'}</div>
         <div style="font-size:10px;font-weight:700;color:${item ? '#fff' : 'var(--text-dim)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item ? item.name : '—'}</div>
       </div>`;
     };
@@ -5109,7 +5110,7 @@ export class GameUI {
       }
 
       slot.innerHTML = `
-        <span class="slot-emoji">${itemData.emoji}</span>
+        ${itemIconMarkup(item.name, itemData.emoji, 'slot-emoji')}
         <div class="slot-price-tag">${item.price}z</div>
       `;
 
@@ -5144,7 +5145,7 @@ export class GameUI {
     content.style.display = 'block';
 
     const itemData = ITEMS[this.selectedShopItem.name];
-    document.getElementById('shop-detail-icon').textContent = itemData.emoji;
+    document.getElementById('shop-detail-icon').innerHTML = itemIconMarkup(this.selectedShopItem.name, itemData.emoji, 'item-visual--detail');
     document.getElementById('shop-detail-name').textContent = this.selectedShopItem.name;
     document.getElementById('shop-detail-type').textContent = itemData.type.toUpperCase();
     document.getElementById('shop-detail-desc').textContent = itemData.desc || 'ไม่มีคำอธิบาย';
@@ -6514,7 +6515,7 @@ export class GameUI {
       }
 
       slot.innerHTML = `
-        <span>${item.emoji}</span>
+        ${itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji)}
         <span class="inv-qty">${item.quantity}</span>
       `;
 
@@ -6545,7 +6546,7 @@ export class GameUI {
     content.style.display = 'block';
 
     const item = this.selectedSellShopItem;
-    document.getElementById('sell-shop-detail-icon').textContent = item.emoji;
+    document.getElementById('sell-shop-detail-icon').innerHTML = itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji, 'item-visual--detail');
     document.getElementById('sell-shop-detail-name').textContent = item.item_name;
     document.getElementById('sell-shop-detail-type').textContent = item.item_type.toUpperCase();
     // For pets, spell out that the higher price comes from its level.

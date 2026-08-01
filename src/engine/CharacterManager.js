@@ -609,9 +609,9 @@ export class CharacterManager {
             'Ragnarok Blade': { kind: 'greatsword', blade: 0xff6274, guard: 0x40001c, len: 1.5, gem: 0xff2aa8, glow: 0xff2440, glowI: 1.15 },
             // ---- Forged weapons (Weapon Smith crafts) ----
             'Ember Fang': { kind: 'greatsword', blade: 0xff8a3a, guard: 0x6a2a10, len: 1.25, gem: 0xff3300, glow: 0xff5a1a, glowI: 1.05 },
-            'Frost Cleaver': { kind: 'katana', blade: 0xd0f4ff, guard: 0x2a5a7a, len: 1.2, glow: 0x66ddff, glowI: 1.05 },
+            'Frost Cleaver': { kind: 'axe', blade: 0xd0f4ff, handle: 0x2a3f55, glow: 0x66ddff, glowI: 1.05 },
             'Stormcaller Bow': { kind: 'bow', wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
-            'Soulreaper': { kind: 'dagger', blade: 0xc9a6ff, guard: 0x3a1a5a, len: 0.72, gem: 0xaa33ff, glow: 0xaa66ff, glowI: 1.1 },
+            'Soulreaper': { kind: 'scythe', blade: 0x8f3bd1, handle: 0x29173d, glow: 0xaa66ff, glowI: 1.1 },
             'Godslayer': { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
         };
         let spec = SPECS[itemName];
@@ -636,6 +636,8 @@ export class CharacterManager {
             case 'bow': return this._wpBow(spec);
             case 'crossbow': return this._wpCrossbow(spec);
             case 'gun': return this._wpGun(spec);
+            case 'axe': return this._wpAxe(spec);
+            case 'scythe': return this._wpScythe(spec);
             case 'sword':
             default: return this._wpBlade({ ...spec, width: spec.width || 0.09 });
         }
@@ -705,6 +707,32 @@ export class CharacterManager {
         band.position.set(0, 0.62, 0);
         group.add(band);
         group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    _wpAxe({ blade = 0xc8d2dc, handle = 0x5a3a1a, glow, glowI = 0 }) {
+        const group = new THREE.Group();
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.05, 7), new THREE.MeshLambertMaterial({ color: handle }));
+        shaft.position.set(0, 0.2, 0); shaft.castShadow = true; group.add(shaft);
+        const bladeMat = new THREE.MeshLambertMaterial({ color: blade });
+        if (glow) { bladeMat.emissive = new THREE.Color(glow); bladeMat.emissiveIntensity = glowI; }
+        const head = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.3, 0.4, 3), bladeMat);
+        head.position.set(0.16, 0.68, 0); head.rotation.z = Math.PI / 2; head.castShadow = true; group.add(head);
+        if (glow) group.add(this._wpAura(glow, new THREE.SphereGeometry(0.34, 10, 10), new THREE.Vector3(0.14, 0.68, 0)));
+        group.position.set(0, -0.2, 0.15);
+        return group;
+    }
+
+    _wpScythe({ blade = 0x8f3bd1, handle = 0x29173d, glow, glowI = 0 }) {
+        const group = new THREE.Group();
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.35, 7), new THREE.MeshLambertMaterial({ color: handle }));
+        shaft.position.set(0, 0.3, 0); shaft.castShadow = true; group.add(shaft);
+        const bladeMat = new THREE.MeshLambertMaterial({ color: blade });
+        if (glow) { bladeMat.emissive = new THREE.Color(glow); bladeMat.emissiveIntensity = glowI; }
+        const bladeMesh = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.055, 6, 18, Math.PI * 0.76), bladeMat);
+        bladeMesh.position.set(0.22, 0.92, 0); bladeMesh.rotation.z = -0.45; bladeMesh.castShadow = true; group.add(bladeMesh);
+        if (glow) group.add(this._wpAura(glow, new THREE.SphereGeometry(0.38, 10, 10), new THREE.Vector3(0.22, 0.92, 0)));
+        group.position.set(0, -0.25, 0.15);
         return group;
     }
 
