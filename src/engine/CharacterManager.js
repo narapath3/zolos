@@ -1549,13 +1549,13 @@ export class CharacterManager {
     _gearColor(name, fallback = 0x9aa4b2) {
         const MAP = {
             // shields
-            'Wooden Buckler': 0x8a5a2b, 'Iron Shield': 0x9aa4b2, 'Tear Shield': 0xb9873f,
+            'Wooden Buckler': 0x8a5a2b, 'Iron Shield': 0x9aa4b2, 'Tear Shield': 0x315d99,
             'Golden Shield': 0xffcc33, 'Aegis of Olympus': 0x7fd0ff,
             // head
             'Iron Helm': 0xb8c0cc, 'Ranger Hood': 0x3f6d3f,
             // body
             'Cotton Shirt': 0xdcdce6, 'Adventurer Suit': 0x7a5a3a, 'Steel Plate Mail': 0x9aa4b2,
-            'Valkyrie Armor': 0xffcc44, 'Dragon Scale Mail': 0x3a5a44,
+            'Valkyrie Armor': 0xe8edf2, 'Dragon Scale Mail': 0x315f5b,
             // garment
             'Leather Cloak': 0x6b4a2a, 'Shadow Garment': 0x2a2140, 'Odin Garment': 0x2f5fbf,
             // feet
@@ -1571,6 +1571,21 @@ export class CharacterManager {
         return (it && byRarity[it.rarity]) || fallback;
     }
 
+    _gearAccent(name, fallback = 0xd8b04a) {
+        const MAP = {
+            'Wooden Buckler': 0x8e949c, 'Iron Shield': 0x515a66, 'Tear Shield': 0xd7e5ef,
+            'Golden Shield': 0xffe68a, 'Aegis of Olympus': 0xd9ad42,
+            'Iron Helm': 0x59616b, 'Ranger Hood': 0x253f2b,
+            'Cotton Shirt': 0x8a5b32, 'Adventurer Suit': 0x3e2a1c, 'Steel Plate Mail': 0x4f5864,
+            'Dragon Scale Mail': 0x74a99b, 'Valkyrie Armor': 0xf0bd3e,
+            'Leather Cloak': 0x342217, 'Shadow Garment': 0x8c58c7, 'Odin Garment': 0xe5b646,
+            'Speed Boots': 0xb27a35, 'Leather Pants': 0x39261a, 'Plate Legguards': 0x4f5864,
+            'Dragon Greaves': 0x7eb7c2, 'Leather Bracer': 0x3d2819, 'Steel Bracer': 0x4f5864,
+            'Guardian Wristguard': 0x3d6b9a,
+        };
+        return MAP[name] ?? fallback;
+    }
+
     // Rebuild all armor/shield meshes from equippedGear + equippedShield.
     updateGearVisuals() {
         if (!this.mesh) return;
@@ -1584,16 +1599,21 @@ export class CharacterManager {
         if (g.head) {
             const grp = new THREE.Group();
             const mat = lambert(this._gearColor(g.head));
-            const dome = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat);
-            dome.position.y = 1.82; grp.add(dome);
-            const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.08, 12), mat);
-            rim.position.y = 1.8; grp.add(rim);
             if (g.head === 'Ranger Hood') {
-                // Hood drapes back instead of a metal crest.
-                const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.12), mat);
-                back.position.set(0, 1.72, -0.24); grp.add(back);
+                const hood = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.58, 8), mat);
+                hood.position.y = 1.91; hood.rotation.y = Math.PI / 8; grp.add(hood);
+                const opening = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.035, 6, 12, Math.PI), lambert(this._gearAccent(g.head)));
+                opening.position.set(0, 1.78, 0.27); opening.rotation.z = Math.PI; grp.add(opening);
+                const tail = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.42, 6), mat);
+                tail.position.set(0, 1.66, -0.3); tail.rotation.x = -0.35; grp.add(tail);
             } else {
-                const crest = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.34), lambert(0xffd24a));
+                const dome = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+                dome.position.y = 1.82; grp.add(dome);
+                const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.08, 12), lambert(this._gearAccent(g.head)));
+                rim.position.y = 1.8; grp.add(rim);
+                const faceGuard = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.2, 0.045), mat);
+                faceGuard.position.set(0, 1.7, 0.29); grp.add(faceGuard);
+                const crest = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.34), lambert(this._gearAccent(g.head)));
                 crest.position.y = 2.02; grp.add(crest);
             }
             this.mesh.add(grp); this.gearMeshes.head = grp;
@@ -1605,12 +1625,47 @@ export class CharacterManager {
             const mat = lambert(this._gearColor(g.body), { emissive: 0x000000 });
             const chest = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.62, 0.46), mat);
             chest.position.y = 1.06; grp.add(chest);
-            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), lambert(0x3a2a1a));
+            const accent = lambert(this._gearAccent(g.body));
+            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), accent);
             belt.position.y = 0.72; grp.add(belt);
-            [-0.42, 0.42].forEach(x => {
-                const pad = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.16, 0.3), mat);
-                pad.position.set(x, 1.32, 0); grp.add(pad);
-            });
+            if (g.body === 'Cotton Shirt') {
+                const collar = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.025, 5, 12), accent);
+                collar.position.set(0, 1.38, 0.23); collar.rotation.x = Math.PI / 2; grp.add(collar);
+                for (let y = 0.95; y < 1.28; y += 0.1) {
+                    const lace = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.018, 0.025), accent);
+                    lace.position.set(0, y, 0.245); lace.rotation.z = (Math.round(y * 10) % 2 ? 0.35 : -0.35); grp.add(lace);
+                }
+            } else if (g.body === 'Adventurer Suit') {
+                [-1, 1].forEach(side => {
+                    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.68, 0.025), accent);
+                    strap.position.set(side * 0.19, 1.08, 0.245); strap.rotation.z = side * 0.25; grp.add(strap);
+                    const pad = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.13, 0.3), mat);
+                    pad.position.set(side * 0.42, 1.31, 0); grp.add(pad);
+                });
+            } else {
+                const breastplate = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.42, 0.05), accent);
+                breastplate.position.set(0, 1.08, 0.25); grp.add(breastplate);
+                [-0.42, 0.42].forEach(x => {
+                    const pad = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat);
+                    pad.scale.set(1.25, 0.62, 1); pad.position.set(x, 1.33, 0); grp.add(pad);
+                });
+                if (g.body === 'Dragon Scale Mail') {
+                    for (let row = 0; row < 3; row++) for (let col = 0; col < 4; col++) {
+                        const scale = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.13, 4), accent);
+                        scale.position.set(-0.19 + col * 0.125, 0.96 + row * 0.12, 0.3); scale.rotation.z = Math.PI; grp.add(scale);
+                    }
+                }
+                if (g.body === 'Valkyrie Armor') {
+                    [-1, 1].forEach(side => {
+                        for (let i = 0; i < 3; i++) {
+                            const feather = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.28, 5), mat);
+                            feather.position.set(side * (0.5 + i * 0.07), 1.35 + i * 0.06, -0.02);
+                            feather.rotation.z = side * (-0.65 - i * 0.12); grp.add(feather);
+                        }
+                    });
+                    mat.emissive = new THREE.Color(0x4b3a08); mat.emissiveIntensity = 0.18;
+                }
+            }
             this.mesh.add(grp); this.gearMeshes.body = grp;
         }
 
@@ -1622,6 +1677,15 @@ export class CharacterManager {
             cape.position.set(0, 0.95, -0.26); cape.rotation.x = 0.06; grp.add(cape);
             const collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.18), mat);
             collar.position.set(0, 1.42, -0.16); grp.add(collar);
+            if (g.garment === 'Odin Garment') {
+                const trim = lambert(this._gearAccent(g.garment));
+                [-0.25, 0.25].forEach(x => {
+                    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.92, 0.075), trim);
+                    edge.position.set(x, 0.94, -0.3); grp.add(edge);
+                });
+                const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), trim);
+                clasp.position.set(0, 1.46, -0.06); grp.add(clasp);
+            }
             this.mesh.add(grp); this.gearMeshes.garment = grp;
         }
 
@@ -1632,6 +1696,10 @@ export class CharacterManager {
             [-0.15, 0.15].forEach(x => {
                 const guard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.42, 0.3), mat);
                 guard.position.set(x, 0.45, 0); grp.add(guard);
+                if (g.pants !== 'Leather Pants') {
+                    const knee = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), lambert(this._gearAccent(g.pants)));
+                    knee.scale.set(1, 0.7, 0.6); knee.position.set(x, 0.35, 0.18); grp.add(knee);
+                }
             });
             const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.44), mat);
             skirt.position.y = 0.64; grp.add(skirt);
@@ -1645,6 +1713,10 @@ export class CharacterManager {
             [-0.45, 0.45].forEach(x => {
                 const br = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.24), mat);
                 br.position.set(x, 0.78, 0); grp.add(br);
+                if (g.wrist === 'Guardian Wristguard') {
+                    const gem = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), lambert(this._gearAccent(g.wrist), { emissive: 0x16436f, emissiveIntensity: 0.5 }));
+                    gem.position.set(x, 0.78, 0.14); grp.add(gem);
+                }
             });
             this.mesh.add(grp); this.gearMeshes.wrist = grp;
         }
@@ -1658,6 +1730,12 @@ export class CharacterManager {
                 boot.position.set(x, 0.22, 0.02); grp.add(boot);
                 const toe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.14), mat);
                 toe.position.set(x, 0.1, 0.2); grp.add(toe);
+                if (g.feet === 'Speed Boots') {
+                    [-1, 1].forEach(side => {
+                        const wing = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.2, 5), lambert(0xc9efff, { emissive: 0x4a9dc8, emissiveIntensity: 0.35 }));
+                        wing.position.set(x + side * 0.13, 0.23, 0.02); wing.rotation.z = side * 0.8; grp.add(wing);
+                    });
+                }
             });
             this.mesh.add(grp); this.gearMeshes.feet = grp;
         }
@@ -1666,15 +1744,23 @@ export class CharacterManager {
         if (this.equippedShield) {
             const grp = new THREE.Group();
             const mat = lambert(this._gearColor(this.equippedShield));
-            const round = ['Wooden Buckler', 'Iron Shield', 'Golden Shield', 'Aegis of Olympus'].includes(this.equippedShield);
+            const round = ['Wooden Buckler', 'Aegis of Olympus'].includes(this.equippedShield);
             const plate = round
                 ? new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 16), mat)
-                : new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.08), mat);
+                : new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.29, 0.52, 5), mat);
             if (round) plate.rotation.x = Math.PI / 2;
+            else plate.rotation.x = Math.PI / 2;
             plate.position.set(-0.62, 1.0, 0.08);
             grp.add(plate);
-            const boss = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), lambert(0xffe08a));
+            const accent = lambert(this._gearAccent(this.equippedShield));
+            const rim = new THREE.Mesh(round ? new THREE.TorusGeometry(0.28, 0.025, 7, 18) : new THREE.TorusGeometry(0.22, 0.025, 7, 5), accent);
+            rim.position.set(-0.62, 1.0, 0.14); grp.add(rim);
+            const boss = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), accent);
             boss.position.set(-0.66, 1.0, 0.12); grp.add(boss);
+            if (this.equippedShield === 'Aegis of Olympus') {
+                const aura = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), new THREE.MeshBasicMaterial({ color: 0x72cfff, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false }));
+                aura.position.set(-0.62, 1.0, 0.08); grp.add(aura);
+            }
             this.mesh.add(grp); this.gearMeshes.shield = grp;
         }
     }
