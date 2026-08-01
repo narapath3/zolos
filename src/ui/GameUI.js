@@ -7576,9 +7576,12 @@ export class GameUI {
       btn.style.display = skill ? '' : 'none';
       if (!skill) continue;
       btn.title = skill.name;
-      const icon = btn.querySelector('.skill-icon') || btn.querySelector('span');
+      const icon = btn.querySelector('.btn-icon') || btn.querySelector('.skill-icon') || btn.querySelector('span');
       if (icon) icon.textContent = skill.emoji;
-      const mob = btn.querySelector('.skill-cooldown-overlay') || document.getElementById(`mobile-cooldown-${id}`);
+      // Mobile buttons use .mobile-cooldown-overlay. Re-point its id to the CURRENT
+      // skill every render so the cooldown clock tracks the right skill after a
+      // job change (the hard-coded ids in index.html are only the defaults).
+      const mob = btn.querySelector('.mobile-cooldown-overlay') || btn.querySelector('.skill-cooldown-overlay');
       if (mob) mob.id = `mobile-cooldown-${id}`;
     }
   }
