@@ -1641,6 +1641,8 @@ function handleMouseInteraction(event) {
             gameUI.openForge();
         } else if (npcType === 'heaven_merchant') {
             gameUI.openHeavenShop();
+        } else if (npcType === 'divine_merchant') {
+            gameUI.openDivineZolShop();
         } else {
             gameUI._togglePanel('shop-panel');
             gameUI._renderShop();

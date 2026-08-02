@@ -1,4 +1,4 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
@@ -5413,6 +5413,7 @@ export class GameUI {
     rare: { c: '#4aa3ff', b: '🔵', t: 'หายาก' },
     epic: { c: '#c774ff', b: '🟣', t: 'มหากาพย์' },
     legendary: { c: '#ffcf4a', b: '🟡', t: 'ตำนาน' },
+    mythic: { c: '#ff78d1', b: '💠', t: 'มหาเทพ' },
   };
 
   // The equipped pickaxe inventory item that still has durability (or null).
@@ -5607,6 +5608,84 @@ export class GameUI {
     this._renderHeavenShop();
     this._renderInventory();
     this.updateHUD(this.character.stats);
+  }
+
+  openDivineZolShop() {
+    if (!this.character) return;
+    this._divineCategory = this._divineCategory || 'all';
+    let modal = document.getElementById('divine-shop-modal');
+    if (!modal) {
+      const style = document.createElement('style');
+      style.id = 'divine-shop-style';
+      style.textContent = `#divine-shop-modal{position:fixed;inset:0;z-index:1460;display:none;align-items:center;justify-content:center;background:rgba(1,4,15,.78);backdrop-filter:blur(6px);padding:12px;box-sizing:border-box}.divine-card{width:min(900px,96vw);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;border:2px solid #7defff;border-radius:18px;background:linear-gradient(145deg,#111a38,#090d20);box-shadow:0 0 38px rgba(74,223,255,.35),0 24px 70px #000}.divine-body{padding:14px;overflow:auto}.divine-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px}.divine-tab{border:1px solid #345681;background:#101a36;color:#afc5e9;border-radius:999px;padding:8px 13px;cursor:pointer;font-weight:800}.divine-tab.on{color:#12203b;background:linear-gradient(135deg,#fff2a5,#64eaff);border-color:#fff}.divine-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:10px}.divine-item{border:1px solid rgba(112,225,255,.28);border-radius:14px;padding:11px;background:rgba(16,25,55,.85);display:grid;grid-template-columns:64px 1fr;gap:10px}.divine-buy{grid-column:1/-1;border:0;border-radius:10px;padding:10px;background:linear-gradient(135deg,#ffe780,#41dff7);color:#10203d;font-weight:900;cursor:pointer}.divine-buy:disabled{filter:grayscale(.75);opacity:.5;cursor:not-allowed}@media(max-width:600px){#divine-shop-modal{align-items:flex-start;padding:7px 7px 112px}.divine-card{max-height:calc(100dvh - 124px)}.divine-grid{grid-template-columns:1fr}}`;
+      document.head.appendChild(style);
+      modal = document.createElement('div');
+      modal.id = 'divine-shop-modal';
+      modal.innerHTML = '<div class="divine-card"></div>';
+      modal.onclick = e => { if (e.target === modal) { modal.style.display = 'none'; this.updateMobileControlsVisibility(); } };
+      document.body.appendChild(modal);
+    }
+    this._renderDivineZolShop();
+    modal.style.display = 'flex';
+    this.updateMobileControlsVisibility();
+  }
+
+  _renderDivineZolShop() {
+    const card = document.querySelector('#divine-shop-modal .divine-card');
+    if (!card || !this.character) return;
+    const zol = Number(this.character.stats.zol) || 0;
+    const level = Number(this.character.stats.level) || 1;
+    const categories = [['all', 'ทั้งหมด'], ['weapon', 'อาวุธ'], ['armor', 'ชุดเกราะ'], ['shield', 'โล่'], ['head', 'ศีรษะ'], ['accessory', 'เครื่องประดับ']];
+    const rows = DIVINE_ZOL_SHOP.filter(x => this._divineCategory === 'all' || x.category === this._divineCategory).map(entry => {
+      const item = ITEMS[entry.name];
+      const owned = this.inventory.some(x => x.item_name === entry.name && Number(x.quantity) > 0);
+      const locked = level < (item.levelReq || 1);
+      const poor = zol < entry.zolPrice;
+      const job = itemJob(entry.name);
+      const stats = [['ATK', item.atkBonus], ['DEF', item.defBonus], ['HP', item.hpBonus], ['SP', item.spBonus]].filter(x => x[1]).map(x => `${x[0]} +${Number(x[1]).toLocaleString()}`).join(' · ');
+      const disabled = owned || locked || poor || this._divinePurchasePending;
+      const label = owned ? '✅ มีแล้ว' : locked ? `🔒 เลเวล ${item.levelReq}` : poor ? '🪙 ZOL ไม่พอ' : `ซื้อ ${entry.zolPrice.toLocaleString()} ZOL`;
+      return `<div class="divine-item"><div>${itemIconMarkup(entry.name, item.emoji, 'item-visual--detail')}</div><div><div style="font-weight:900;color:#fff">${entry.name}</div><div style="font-size:11px;color:#ff8fdd">💠 มหาเทพ · Lv.${item.levelReq}${job ? ` · ${JOBS[job]?.name || job}` : ''}</div><div style="font-size:11px;color:#75eaff;margin-top:5px">${stats}</div></div><button class="divine-buy" data-divine-buy="${entry.name}" ${disabled ? 'disabled' : ''}>${label}</button></div>`;
+    }).join('');
+    card.innerHTML = `<div style="padding:16px 18px;border-bottom:1px solid #29476e;position:relative;background:linear-gradient(90deg,rgba(255,216,75,.14),rgba(68,225,255,.1))"><button id="divine-close" style="position:absolute;right:13px;top:12px;border:1px solid #45658c;background:#101831;color:#d8eaff;border-radius:8px;width:32px;height:32px;cursor:pointer">✕</button><div style="font-size:21px;font-weight:900;color:#fff">⚜️ ร้านเทพ ZOL</div><div style="color:#8eeeff;font-size:12px">ของมหาเทพหายาก ซื้อด้วย ZOL เท่านั้น · ยอดคงเหลือ <b>${zol.toLocaleString()} ZOL</b></div></div><div class="divine-body"><div class="divine-tabs">${categories.map(([id, label]) => `<button class="divine-tab ${this._divineCategory === id ? 'on' : ''}" data-divine-cat="${id}">${label}</button>`).join('')}</div><div class="divine-grid">${rows}</div></div>`;
+    card.querySelector('#divine-close').onclick = () => { document.getElementById('divine-shop-modal').style.display = 'none'; this.updateMobileControlsVisibility(); };
+    card.querySelectorAll('[data-divine-cat]').forEach(button => { button.onclick = () => { this._divineCategory = button.dataset.divineCat; this._renderDivineZolShop(); }; });
+    card.querySelectorAll('[data-divine-buy]').forEach(button => { button.onclick = () => this._buyDivineItem(button.dataset.divineBuy); });
+  }
+
+  async _buyDivineItem(name) {
+    if (this._divinePurchasePending) return;
+    const entry = DIVINE_ZOL_SHOP.find(x => x.name === name);
+    const item = entry && ITEMS[name];
+    if (!entry || !item || !this.character) return;
+    const stats = this.character.stats;
+    if ((Number(stats.level) || 1) < item.levelReq || (Number(stats.zol) || 0) < entry.zolPrice) return this._renderDivineZolShop();
+    if (this.inventory.some(x => x.item_name === name && Number(x.quantity) > 0)) return;
+    if (!window.confirm(`ซื้อ ${name} ราคา ${entry.zolPrice.toLocaleString()} ZOL ใช่หรือไม่?`)) return;
+    this._divinePurchasePending = true;
+    const beforeZol = Number(stats.zol) || 0;
+    stats.zol = beforeZol - entry.zolPrice;
+    const record = { item_name: name, item_type: item.type, emoji: item.emoji, desc: item.desc, price: 0, quantity: 1, stats: { equipped: false } };
+    this.inventory.push(record);
+    this._renderDivineZolShop();
+    try {
+      if (this.characterId) {
+        await saveInventoryItem(this.characterId, name, item.type, 1, record.stats);
+        if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+      }
+      this.soundManager?.playBuySellSound?.();
+      this.addCombatLog(`⚜️ ซื้อ ${name} สำเร็จ — ใช้ ${entry.zolPrice.toLocaleString()} ZOL`, 'levelup');
+    } catch (error) {
+      stats.zol = beforeZol;
+      const rollbackIndex = this.inventory.indexOf(record);
+      if (rollbackIndex >= 0) this.inventory.splice(rollbackIndex, 1);
+      if (this.characterId) await saveInventoryItem(this.characterId, name, item.type, -1).catch(() => {});
+      this.addCombatLog('❌ ซื้อไม่สำเร็จ ระบบคืน ZOL แล้ว กรุณาลองใหม่', 'system');
+      console.error('[DivineShop] purchase rolled back:', error);
+    } finally {
+      this._divinePurchasePending = false;
+      this._renderDivineZolShop(); this._renderInventory(); this.updateHUD(this.character.stats);
+    }
   }
 
   // ============ Celestial Mining (timed, auto-repeating "job") ============

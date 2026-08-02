@@ -613,6 +613,10 @@ export class CharacterManager {
             'Stormcaller Bow': { kind: 'bow', wood: 0x9fbfff, scale: 1.3, glow: 0x88bbff, glowI: 1.05 },
             'Soulreaper': { kind: 'scythe', blade: 0x8f3bd1, handle: 0x29173d, glow: 0xaa66ff, glowI: 1.1 },
             'Godslayer': { kind: 'greatsword', blade: 0xfff4c0, guard: 0xffcf3a, len: 1.55, gem: 0x66ffff, glow: 0xffe066, glowI: 1.3 },
+            'Solaris Edge': { kind: 'greatsword', blade: 0xfff9dc, guard: 0xffc933, len: 1.55, gem: 0x43eaff, glow: 0x72ecff, glowI: 1.35 },
+            'Chronos Bow': { kind: 'bow', wood: 0xffdf72, scale: 1.4, glow: 0x55eaff, glowI: 1.3 },
+            'Genesis Staff': { kind: 'staff', shaft: 0xffd86b, gem: 0x3de8ff, glow: 0x63f4ff, glowI: 1.4 },
+            'Seraph Rod': { kind: 'staff', shaft: 0xfff5d8, gem: 0x79eeff, glow: 0xffdf75, glowI: 1.35 },
         };
         let spec = SPECS[itemName];
         if (!spec) {
@@ -1222,8 +1226,9 @@ export class CharacterManager {
             const visor = new THREE.Mesh(visorGeo, capMat);
             visor.position.set(0, 1.95, 0.25);
             hatGroup.add(visor);
-        } else if (this.equippedHat === 'Crown') {
-            const crownMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+        } else if (this.equippedHat === 'Crown' || this.equippedHat === 'Crown of the First Light') {
+            const divine = this.equippedHat === 'Crown of the First Light';
+            const crownMat = new THREE.MeshLambertMaterial({ color: divine ? 0xfff0a3 : 0xffd700, emissive: divine ? 0x2acbe0 : 0x000000, emissiveIntensity: divine ? 0.55 : 0 });
             const crownGeo = new THREE.CylinderGeometry(0.35, 0.3, 0.25, 8, 1, true);
             const crown = new THREE.Mesh(crownGeo, crownMat);
             crown.position.y = 2.05;
@@ -1341,7 +1346,7 @@ export class CharacterManager {
             const bridge = new THREE.Mesh(bridgeGeo, frameMat);
             bridge.position.set(0, 1.72, 0.26);
             glassesGroup.add(bridge);
-        } else if (this.equippedGlasses === 'Monocle') {
+        } else if (this.equippedGlasses === 'Monocle' || this.equippedGlasses === 'Oracle Lens') {
             const lensGeo = new THREE.CircleGeometry(0.1, 12);
             const lens = new THREE.Mesh(lensGeo, lensMat);
             lens.position.set(0.12, 1.72, 0.26);
@@ -1564,6 +1569,9 @@ export class CharacterManager {
             'Leather Pants': 0x6b4a2a, 'Plate Legguards': 0x9aa4b2, 'Dragon Greaves': 0x3a5a44,
             // wrist
             'Leather Bracer': 0x6b4a2a, 'Steel Bracer': 0x9aa4b2, 'Guardian Wristguard': 0xffbe46,
+            'Empyrean Plate': 0xfff3cf, 'Wings of Aeon': 0xf7fbff, 'Aegis Prime': 0xfff0bc,
+            'Titan Bracers': 0xffedb5, 'Astral Legguards': 0x253b77, 'Worldwalker Greaves': 0xf7f7ea,
+            'Eternity Ring': 0xffd84d, 'Heart of Cosmos': 0x246dff,
         };
         if (MAP[name] != null) return MAP[name];
         const it = ITEMS[name];
@@ -1582,6 +1590,9 @@ export class CharacterManager {
             'Speed Boots': 0xb27a35, 'Leather Pants': 0x39261a, 'Plate Legguards': 0x4f5864,
             'Dragon Greaves': 0x7eb7c2, 'Leather Bracer': 0x3d2819, 'Steel Bracer': 0x4f5864,
             'Guardian Wristguard': 0x3d6b9a,
+            'Empyrean Plate': 0x36dff2, 'Wings of Aeon': 0x48e9ff, 'Aegis Prime': 0x2bd9ff,
+            'Titan Bracers': 0x4ee7ff, 'Astral Legguards': 0xffd35a, 'Worldwalker Greaves': 0x45eaff,
+            'Eternity Ring': 0x41dfff, 'Heart of Cosmos': 0xffd84d,
         };
         return MAP[name] ?? fallback;
     }

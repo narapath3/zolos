@@ -9,6 +9,9 @@ const EQUIPMENT_NAMES = [
   'Wooden Buckler', 'Iron Shield', 'Tear Shield', 'Golden Shield', 'Aegis of Olympus', 'Cowboy Hat',
   'Wizard Hat', 'Crown', 'Sunglasses', 'Classic Glasses', 'Cotton Shirt', 'Adventurer Suit',
   'Iron Helm', 'Leather Cloak', 'Steel Plate Mail', 'Ranger Hood', 'Dragon Scale Mail', 'Valkyrie Armor',
+  'Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod', 'Empyrean Plate', 'Wings of Aeon',
+  'Aegis Prime', 'Crown of the First Light', 'Oracle Lens', 'Titan Bracers', 'Astral Legguards',
+  'Worldwalker Greaves', 'Eternity Ring', 'Heart of Cosmos',
 ];
 
 const SHOP_VISUAL_NAMES = [

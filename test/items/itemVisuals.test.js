@@ -6,7 +6,7 @@ import { ITEM_VISUALS, itemIconPath } from '../../src/engine/ItemVisuals.js';
 
 test('canonical equipment visuals are unique real PNG assets', () => {
   const paths = Object.values(ITEM_VISUALS).map(entry => entry.icon);
-  assert.equal(paths.length, 62);
+  assert.equal(paths.length, 76);
   assert.equal(new Set(paths).size, paths.length);
   for (const path of paths) {
     const file = fileURLToPath(new URL(`../../public${path}`, import.meta.url));

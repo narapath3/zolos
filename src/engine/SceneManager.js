@@ -278,6 +278,7 @@ export class SceneManager {
         this.npcSellMesh = null;
         this.npcWeaponMesh = null;
         this.npcHeavenMesh = null;
+        this.npcDivineMesh = null;
         this.clearVendingStalls();
         this.swayingObjects = [];
         this.birds = [];
@@ -480,6 +481,7 @@ export class SceneManager {
         if (this.npcSellMesh) list.push(this.npcSellMesh);
         if (this.npcWeaponMesh) list.push(this.npcWeaponMesh);
         if (this.npcHeavenMesh) list.push(this.npcHeavenMesh);
+        if (this.npcDivineMesh) list.push(this.npcDivineMesh);
         return list;
     }
 
@@ -2832,6 +2834,21 @@ export class SceneManager {
         this.scene.add(merchant);
         this.envObjects.push(merchant);
         this.npcHeavenMesh = merchant;
+
+        const divine = new THREE.Group();
+        const divineRobe = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 1.05, 2.15, 12), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x173b55, emissiveIntensity: 0.3 }));
+        divineRobe.position.y = 1.08; divineRobe.castShadow = true; divine.add(divineRobe);
+        const divineSash = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.1, 8, 20), new THREE.MeshLambertMaterial({ color: 0xffd34d, emissive: 0x6b4700, emissiveIntensity: 0.55 }));
+        divineSash.rotation.x = Math.PI / 2; divineSash.position.y = 1.4; divine.add(divineSash);
+        const divineHead = new THREE.Mesh(new THREE.SphereGeometry(0.43, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffe2c2 }));
+        divineHead.position.y = 2.35; divine.add(divineHead);
+        const divineHalo = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.065, 8, 32), new THREE.MeshBasicMaterial({ color: 0x62edff }));
+        divineHalo.rotation.x = Math.PI / 2; divineHalo.position.y = 3.05; divine.add(divineHalo);
+        const divineLabel = this._makePortalLabel('ร้านเทพ ZOL', new THREE.Color(0x62edff), '⚜️ อุปกรณ์มหาเทพ');
+        divineLabel.position.set(0, 3.95, 0); divineLabel.scale.set(4.5, 1.4, 1); divine.add(divineLabel);
+        divine.userData.npcType = 'divine_merchant'; divine.userData.isNPC = true; divine.userData.collisionRadius = 1.8;
+        divine.position.set(5.5, 0, 4); divine.rotation.y = Math.PI;
+        this.scene.add(divine); this.envObjects.push(divine); this.npcDivineMesh = divine;
 
         // ---- Celestial Ore nodes (minable) ----
         const oreCount = 9;
