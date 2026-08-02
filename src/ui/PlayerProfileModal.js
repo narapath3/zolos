@@ -4,6 +4,7 @@
 import { JobPreview } from '../engine/JobPreview.js';
 import { JOBS, ITEMS, EQUIP_SLOTS, SKILLS, getJobStats, RARITY_COLOR, getJobTierInfo } from '../engine/GameData.js';
 import { getCard } from '../cards/CardCatalog.js';
+import { itemIconMarkup } from '../engine/ItemVisuals.js';
 
 export class PlayerProfileModal {
   constructor() {
@@ -1094,7 +1095,9 @@ export class PlayerProfileModal {
 
       const isFilled = itemName && itemName !== 'None';
       const itemData = isFilled ? ITEMS[itemName] : null;
-      const emoji = itemData?.emoji || '➖';
+      const icon = isFilled
+        ? itemIconMarkup(itemName, itemData?.emoji || '➖', 'item-visual--equipped')
+        : '➖';
       const rf = refine[slot.id] || 0;
       const displayName = isFilled ? ((rf > 0 ? `+${rf} ` : '') + itemName) : 'Empty';
       const rarCls = itemData?.rarity ? ` rar-${itemData.rarity}` : '';
@@ -1108,7 +1111,7 @@ export class PlayerProfileModal {
       return `
         <div class="equip-item ${isFilled ? 'filled' : ''}${rarCls}">
           ${rf > 0 ? `<div class="equip-refine">+${rf}</div>` : ''}
-          <div class="equip-emoji">${emoji}</div>
+          <div class="equip-emoji">${icon}</div>
           <div class="equip-slot-label">${slot.label}</div>
           <div class="equip-name" title="${displayName}">${displayName}</div>
           ${cardBadge}

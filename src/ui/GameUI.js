@@ -1647,7 +1647,9 @@ export class GameUI {
       const filled = !!name;
       const rarity = it && it.rarity ? it.rarity : '';
       const filterCls = this.equipSlotFilter === slot.id ? ' active-filter' : '';
-      const ic = filled && it ? (it.emoji || slot.icon) : slot.icon;
+      const ic = filled && it
+        ? itemIconMarkup(name, it.emoji || slot.icon, 'item-visual--equipped')
+        : slot.icon;
       // Card socket for this slot (shows the socketed card, or a ＋ to add one).
       const cardId = (ch.equippedCards && ch.equippedCards[slot.id]) || null;
       const card = cardId && getCard(cardId);
@@ -1802,7 +1804,7 @@ export class GameUI {
       const equipped = i.item_name === current;
       const locked = (i.item_type === 'weapon') && !canEquipItem(i.item_name, this.character.stats.job);
       return `<div class="sp-row${equipped ? ' sp-eq' : ''}${locked ? ' sp-lock' : ''}" data-name="${i.item_name}">
-        <span class="sp-ic">${i.emoji || slot.icon}</span>
+        <span class="sp-ic">${itemIconMarkup(i, i.emoji || slot.icon, 'item-visual--forge-cell')}</span>
         <span class="sp-nm">${i.item_name}</span>
         <span class="sp-tag">${locked ? '🔒' : equipped ? '✅ ใส่อยู่' : ''}</span>
       </div>`;
@@ -6226,7 +6228,7 @@ export class GameUI {
         if (!ok) allOk = false;
         const md = ITEMS[req.name] || {};
         return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:${ok ? '#bfe0a8' : '#e69a8a'};">
-          <span>${md.emoji || '📦'}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(req.name)}</span>
+          <span>${itemIconMarkup(req.name, md.emoji || '📦', 'item-visual--forge-material')}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(req.name)}</span>
           <span style="font-weight:700;">${have}/${req.qty}</span></div>`;
       }).join('');
 
@@ -6237,7 +6239,7 @@ export class GameUI {
       return `
         <div style="margin-bottom:12px;padding:12px;border-radius:12px;background:rgba(0,0,0,.28);border:1px solid ${rc}55;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <div style="font-size:26px;">${res.emoji || '🗡️'}</div>
+            <div>${itemIconMarkup(r.result, res.emoji || '🗡️', 'item-visual--forge-result')}</div>
             <div style="flex:1;">
               <div style="font-weight:800;color:${rc};font-size:14px;">${esc(r.result)}</div>
               <div style="font-size:11px;color:#d0b090;">ATK +${res.atkBonus || 0}${res.forgeEffect ? ' · ' + (effLabel[res.forgeEffect] || res.forgeEffect) : ''}</div>
@@ -6302,7 +6304,7 @@ export class GameUI {
       const col = refineTierColor(rf);
       return `<div data-rf="${esc(i.item_name)}" style="position:relative;cursor:pointer;text-align:center;padding:8px 4px;border-radius:10px;
         background:${sel ? 'rgba(255,180,80,.16)' : 'rgba(0,0,0,.28)'};border:1.5px solid ${sel ? '#ff9e2e' : (rf > 0 ? col + '66' : 'rgba(180,150,120,.25)')};">
-        <div style="font-size:22px;line-height:1;">${i.emoji || '📦'}</div>
+        <div style="line-height:1;">${itemIconMarkup(i, i.emoji || '📦', 'item-visual--forge-cell')}</div>
         ${rf > 0 ? `<div style="position:absolute;top:2px;right:5px;font-size:10px;font-weight:900;color:${col};">+${rf}</div>` : ''}
         <div style="font-size:8.5px;color:#d9c4ad;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${esc(i.item_name)}</div>
       </div>`;
@@ -6330,7 +6332,7 @@ export class GameUI {
     return `
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin-bottom:12px;max-height:120px;overflow-y:auto;">${cells}</div>
       <div id="refine-stage" style="text-align:center;margin:4px 0 10px;">
-        <div style="font-size:40px;line-height:1;filter:drop-shadow(0 0 10px ${col});">${sel.emoji || '🗡️'}</div>
+        <div style="line-height:1;filter:drop-shadow(0 0 10px ${col});">${itemIconMarkup(sel, sel.emoji || '🗡️', 'item-visual--forge-stage')}</div>
         <div style="font-weight:900;font-size:16px;color:${col};margin-top:4px;">${L > 0 ? '+' + L + ' ' : ''}${esc(sel.item_name)}</div>
       </div>
       <div style="background:rgba(0,0,0,.3);border:1px solid rgba(180,150,120,.25);border-radius:12px;padding:10px 12px;margin-bottom:10px;">
@@ -6344,7 +6346,7 @@ export class GameUI {
         : `<div style="font-size:10.5px;color:#9fd0a0;margin-bottom:8px;">🛡️ ปลอดภัย: ล้มเหลวก็ไม่ลดระดับ</div>`}
       <div style="display:flex;gap:14px;justify-content:center;font-size:12px;margin-bottom:12px;">
         <span style="color:${goldOk ? '#ffcf6a' : '#ff8f7a'};">💰 ${info.gold.toLocaleString()}</span>
-        <span style="color:${oreOk ? '#cfe0ff' : '#ff8f7a'};">${ITEMS[ore] ? ITEMS[ore].emoji : '🔩'} ${ore} ${oreHave}/${info.ore}</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;color:${oreOk ? '#cfe0ff' : '#ff8f7a'};">${itemIconMarkup(ore, ITEMS[ore]?.emoji || '🔩', 'item-visual--forge-material')} ${ore} ${oreHave}/${info.ore}</span>
       </div>
       <button id="refine-go" ${canDo ? '' : 'disabled'} style="width:100%;padding:12px;border:none;border-radius:14px;cursor:${canDo ? 'pointer' : 'not-allowed'};
         font-weight:900;font-size:15px;color:${canDo ? '#2a1000' : '#8a7a6a'};
