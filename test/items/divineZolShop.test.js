@@ -20,7 +20,7 @@ test('divine shop has unique expensive ZOL-only equipment in every requested cat
     assert.equal(item.rarity, 'mythic');
     assert.equal(item.price, 0, 'must not be buyable for Zeny');
     assert.ok(entry.zolPrice >= 125000);
-    assert.ok(item.levelReq >= 40 && item.levelReq <= 55);
+    assert.ok(item.levelReq >= 30 && item.levelReq <= 45);
     slots.add(getEquipSlot(entry.name));
     const icon = itemIconPath(entry.name);
     assert.ok(icon);
