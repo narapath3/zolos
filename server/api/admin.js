@@ -173,6 +173,17 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorl
             `UPDATE characters SET ${sets.join(', ')}, updated_at = now()
              WHERE id = $${params.length} RETURNING *`, params);
         if (!rows[0]) throw httpErr(404, 'ไม่พบตัวละคร');
+        if (io && onlinePlayers) {
+            const changed = {};
+            for (const key of Object.keys(body)) {
+                if (EDITABLE_NUM[key] || EDITABLE_TEXT.has(key)) changed[key] = rows[0][key];
+            }
+            for (const [socketId, player] of onlinePlayers.entries()) {
+                if (String(player.characterId) === String(cid)) {
+                    io.to(socketId).emit('admin_character_update', { characterId: cid, updates: changed });
+                }
+            }
+        }
         console.log(`[Admin] ${req.admin.username} edited character ${cid}: ${sets.join(', ')}`);
         res.json({ ok: true, character: rows[0] });
     }));

@@ -1578,6 +1578,25 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
 
+            socket.on('admin_character_update', (payload) => {
+                const character = window.character;
+                if (!character || !payload || String(payload.characterId) !== String(character.characterId)) return;
+                const updates = payload.updates || {};
+                const numeric = new Set(['level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'mmr', 'pvp_wins', 'pvp_losses']);
+                for (const [key, value] of Object.entries(updates)) {
+                    if (numeric.has(key) && Number.isFinite(Number(value))) character.stats[key] = Number(value);
+                    else if (key === 'name' || key === 'job' || key === 'last_map') character.stats[key] = value;
+                }
+                if (updates.atk !== undefined) character.stats._baseAtk = Number(updates.atk);
+                if (updates.def !== undefined) character.stats._baseDef = Number(updates.def);
+                if (updates.max_hp !== undefined) character.stats._baseMaxHp = Number(updates.max_hp);
+                if (updates.max_sp !== undefined) character.stats._baseMaxSp = Number(updates.max_sp);
+                window.gameUI?.updateHUD?.(character.stats);
+                window.gameUI?.updateStats?.(character.stats);
+                const money = `${updates.gold !== undefined ? ` · Gold ${Number(updates.gold).toLocaleString()}` : ''}${updates.zol !== undefined ? ` · ZOL ${Number(updates.zol).toLocaleString()}` : ''}`;
+                window.gameUI?.addCombatLog?.(`🎁 Admin อัปเดตข้อมูลตัวละครแล้ว${money}`, 'levelup');
+            });
+
             socket.on('trade_request', (payload) => {
                 if (payload
                     && payload.targetUserId === userId

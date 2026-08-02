@@ -1,4 +1,4 @@
-import { supabase, isOfflineMode, localDb } from '../network/SupabaseClient.js';
+import { supabase, isOfflineMode, isSelfHostMode, apiBaseUrl, localDb } from '../network/SupabaseClient.js';
 import { saveInventoryItem, saveCharacter } from '../network/GameSync.js';
 import '../styles/admin.css';
 
@@ -168,6 +168,20 @@ export class AdminUI {
         }
 
         try {
+            if (isSelfHostMode) {
+                const token = localStorage.getItem('zolos_jwt');
+                const adminOrigin = new URL(apiBaseUrl).origin;
+                const response = await fetch(`${adminOrigin}/admin/api/players/${encodeURIComponent(charId)}/character`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+                    body: JSON.stringify(updates),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+                alert('✅ Player updated successfully');
+                await this.refreshData();
+                return;
+            }
             // Use RPC function (SECURITY DEFINER) to bypass RLS
             const { data, error } = await supabase.rpc('admin_update_character', {
                 target_char_id: charId,
@@ -690,6 +704,7 @@ export class AdminUI {
         const fields = [
             { label: 'Level', key: 'level', type: 'number', min: 1, max: 999 },
             { label: 'Gold', key: 'gold', type: 'number', min: 0 },
+            { label: 'ZOL', key: 'zol', type: 'number', min: 0 },
             { label: 'Total Kills', key: 'total_kills', type: 'number', min: 0 },
             { label: 'Play Time (seconds)', key: 'play_time', type: 'number', min: 0 }
         ];

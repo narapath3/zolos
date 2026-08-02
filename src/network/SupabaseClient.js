@@ -10,6 +10,7 @@ const SUPABASE_ANON_KEY = (env.VITE_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY').trim()
 // Self-host cutover switch: when VITE_API_URL is set, use the VPS API (drop-in
 // shim) instead of Supabase. Unset it to fall back to Supabase — reversible.
 const API_URL = (env.VITE_API_URL || '').trim();
+export const apiBaseUrl = API_URL;
 export const isSelfHostMode = !!(API_URL && API_URL.startsWith('http'));
 
 const supabaseUnconfigured =
