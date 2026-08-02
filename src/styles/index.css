@@ -6817,3 +6817,36 @@ a,
 .item-visual--forge-result { width: 54px; height: 54px; border-radius: 11px; flex: 0 0 auto; }
 .item-visual--forge-stage { width: 82px; height: 82px; border-radius: 16px; margin: 0 auto; }
 .item-visual.slot-emoji { width: 52px; height: 52px; }
+
+/* iPad/tablet landscape: reserve a lane ABOVE the centered menu dock for chat.
+   The dock also gets the higher interaction layer, so transparent chat pixels
+   can never swallow taps intended for a menu button. */
+@media (min-width: 769px) and (max-width: 1180px) and (orientation: landscape),
+       (min-width: 1181px) and (max-width: 1366px) and (orientation: landscape) and (pointer: coarse) {
+  :root {
+    --tablet-menu-clearance: calc(96px + var(--safe-bottom));
+  }
+
+  #hud-bottom {
+    z-index: 1100;
+  }
+
+  .chat-panel,
+  .chat-panel.preview-mode,
+  .chat-panel:not(.preview-mode) {
+    left: max(12px, var(--safe-left)) !important;
+    bottom: var(--tablet-menu-clearance) !important;
+    width: min(360px, calc(100dvw - 24px - var(--safe-left) - var(--safe-right))) !important;
+    max-width: 42dvw !important;
+    max-height: min(220px, calc(100dvh - var(--tablet-menu-clearance) - 120px)) !important;
+  }
+
+  .chat-panel.preview-mode .chat-messages-container {
+    pointer-events: none !important;
+  }
+
+  .chat-panel .chat-input-row,
+  .chat-panel .chat-input-row * {
+    pointer-events: auto !important;
+  }
+}

@@ -43,3 +43,11 @@ test('iPad landscape reserves a stable lane above the bottom HUD for combat mess
   assert.match(css, /--tablet-hud-clearance:/);
 }
 );
+
+test('iPad Air landscape chat clears the menu dock and cannot swallow menu taps', () => {
+  assert.match(css, /--tablet-menu-clearance:\s*calc\(96px \+ var\(--safe-bottom\)\)/);
+  assert.match(css, /\.chat-panel,[\s\S]*?bottom:\s*var\(--tablet-menu-clearance\)\s*!important/);
+  assert.match(css, /#hud-bottom\s*\{\s*z-index:\s*1100/);
+  assert.match(css, /\.chat-panel\.preview-mode \.chat-messages-container\s*\{\s*pointer-events:\s*none\s*!important/);
+  assert.match(css, /max-width:\s*42dvw\s*!important/);
+});
