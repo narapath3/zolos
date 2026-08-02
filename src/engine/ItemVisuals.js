@@ -23,11 +23,24 @@ const SHOP_VISUAL_NAMES = [
   'Oridecon', 'Elunium',
 ];
 
+const FISH_VISUAL_NAMES = [
+  'Tilapia', 'Catfish', 'Carp', 'Perch', 'Sardine', 'Anchovy', 'Mackerel', 'Herring', 'Shad', 'Smelt',
+  'Goby', 'Mullet', 'Sole', 'Crucian Carp', 'Bass', 'Trout', 'Pike', 'Bluegill', 'Minnow', 'Sunfish',
+  'Roach', 'Dace', 'Whiting', 'Flounder', 'Snapper', 'Cod', 'Haddock', 'Pollock', 'Butterfish', 'Sea Bass',
+  'Rainbow Trout', 'Salmon', 'Tuna', 'Swordfish', 'Eel', 'Barramundi', 'Grouper', 'Red Snapper', 'Yellowtail',
+  'Pompano', 'Wahoo', 'Mahi-Mahi', 'Sailfish', 'Sturgeon', 'Walleye', 'Striped Bass', 'King Mackerel',
+  'Dorado', 'Arapaima', 'Paddlefish', 'Tarpon', 'Bonefish', 'Golden Koi', 'Arowana', 'Moonfish', 'Ghost Fish',
+  'Crystal Fish', 'Sunstone Fish', 'Stargazer', 'Coelacanth', 'Electric Eel', 'Oarfish', 'Piranha', 'Marlin',
+  'Giant Catfish', 'Anglerfish', 'Great White Shark', 'Hammerhead', 'Raja Ampat Shark', 'Leviathan',
+  'Phoenix Fish', 'Frost Dragon Fish', 'Emperor Fish',
+];
+
 const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-export const ITEM_VISUALS = Object.freeze(Object.fromEntries([...EQUIPMENT_NAMES, ...SHOP_VISUAL_NAMES].map(name => [name, Object.freeze({
-  icon: `/assets/items/equipment/${slug(name)}.png`,
-})])));
+export const ITEM_VISUALS = Object.freeze(Object.fromEntries([
+  ...[...EQUIPMENT_NAMES, ...SHOP_VISUAL_NAMES].map(name => [name, Object.freeze({ icon: `/assets/items/equipment/${slug(name)}.png` })]),
+  ...FISH_VISUAL_NAMES.map(name => [name, Object.freeze({ icon: `/assets/items/fish/${slug(name)}.png` })]),
+]));
 
 export function canonicalItemName(itemOrName) {
   if (typeof itemOrName === 'string') return itemOrName;

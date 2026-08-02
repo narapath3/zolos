@@ -1205,7 +1205,7 @@ export class GameUI {
         return `<div title="${has ? esc(name) + ' — ' + esc(d.desc) : 'ยังไม่ค้นพบ'}"
           style="aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;
           background:${has ? 'rgba(74,163,255,.12)' : 'rgba(255,255,255,.03)'};border:1px solid ${has ? m.color + '66' : 'rgba(255,255,255,.06)'};">
-          <div style="font-size:20px;${has ? '' : 'filter:grayscale(1);opacity:.3;'}">${has ? (d.emoji || '🐟') : '❓'}</div>
+          <div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;${has ? '' : 'filter:grayscale(1);opacity:.3;'}">${has ? itemIconMarkup(name, d.emoji || '🐟', 'item-visual--fish') : '❓'}</div>
           <div style="font-size:8px;text-align:center;line-height:1.1;color:${has ? '#dfe8f2' : '#54606e'};max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${has ? esc(name) : '???'}</div>
         </div>`;
       }).join('');
