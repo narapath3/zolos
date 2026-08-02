@@ -196,11 +196,15 @@ window.stallManager = {
 // ============ Forged-weapon signature on-hit burst ============
 // Colored explosion matching the equipped forged weapon's element. Throttled so
 // it stays spectacular without spamming a 30-spark burst on every single hit.
-const FORGE_EFFECT_COLORS = { fire: 0xff5a1a, frost: 0x66ddff, storm: 0x9fc0ff, soul: 0xaa66ff, nova: 0xffe066 };
+const FORGE_EFFECT_COLORS = { fire: 0xff5a1a, frost: 0x66ddff, storm: 0x9fc0ff, soul: 0xaa66ff, nova: 0xffe066, divine_solar: 0xffd84d, divine_chronos: 0x7deaff, divine_genesis: 0x42a5ff, divine_seraph: 0xfff3a0 };
 function spawnForgeBurst(pos, isCrit) {
     if (!character || !particles || !pos || !character.getForgeEffect) return;
     const eff = character.getForgeEffect();
     if (!eff) return;
+    if (eff.startsWith('divine_') && particles.spawnDivineAttackEffect) {
+        particles.spawnDivineAttackEffect(pos, eff, isCrit);
+        return;
+    }
     if (!isCrit && Math.random() > 0.4) return; // always on crit, ~40% otherwise
     particles.createExplosion(pos, FORGE_EFFECT_COLORS[eff] || 0xffcf4a);
 }
@@ -679,6 +683,10 @@ async function initGame(charData) {
         }
         // Hit sparks
         particles.spawnHitEffect(targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z), isCritical);
+        const remoteForge = rp.character?.getForgeEffect?.();
+        if (remoteForge?.startsWith('divine_') && particles.spawnDivineAttackEffect) {
+            particles.spawnDivineAttackEffect(targetPos, remoteForge, isCritical);
+        }
         // Damage number
         if (damage > 0 && typeof worldToScreen === 'function') {
             const displayPos = targetPos.clone().set(targetPos.x, targetPos.y + 0.8, targetPos.z);

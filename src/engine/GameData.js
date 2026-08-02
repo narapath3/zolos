@@ -1341,30 +1341,32 @@ JOBS.archer.signatureWeapon = 'Bow';
 JOBS.priest.signatureWeapon = 'Holy Rod';
 
 Object.assign(ITEMS, {
-    'Solaris Edge': { emoji: '⚔️', type: 'weapon', rarity: 'mythic', desc: 'ดาบสุริยเทพ ATK +420, HP +900', price: 0, atkBonus: 420, hpBonus: 900, levelReq: 80 },
-    'Chronos Bow': { emoji: '🏹', type: 'weapon', rarity: 'mythic', desc: 'ธนูแห่งกาลเวลา ATK +390, HP +700', price: 0, atkBonus: 390, hpBonus: 700, levelReq: 80 },
-    'Genesis Staff': { emoji: '🔮', type: 'weapon', rarity: 'mythic', desc: 'คทากำเนิดโลก ATK +360, SP +1,800', price: 0, atkBonus: 360, spBonus: 1800, levelReq: 80 },
-    'Seraph Rod': { emoji: '✨', type: 'weapon', rarity: 'mythic', desc: 'คทาเซราฟ ATK +330, HP +1,200, SP +1,500', price: 0, atkBonus: 330, hpBonus: 1200, spBonus: 1500, levelReq: 80 },
-    'Empyrean Plate': { emoji: '🛡️', type: 'armor', rarity: 'mythic', desc: 'เกราะจักรวาล DEF +260, HP +6,500', price: 0, defBonus: 260, hpBonus: 6500, levelReq: 90 },
-    'Wings of Aeon': { emoji: '🪽', type: 'armor', rarity: 'mythic', desc: 'ผ้าคลุมปีกนิรันดร์ DEF +180, HP +3,800, SP +900', price: 0, defBonus: 180, hpBonus: 3800, spBonus: 900, levelReq: 85 },
-    'Aegis Prime': { emoji: '🛡️', type: 'shield', rarity: 'mythic', desc: 'โล่ปฐมเทพ DEF +300, HP +5,000', price: 0, defBonus: 300, hpBonus: 5000, levelReq: 90 },
-    'Crown of the First Light': { emoji: '👑', type: 'hat', rarity: 'mythic', desc: 'มงกุฎแสงแรก DEF +120, HP +2,200, SP +1,000', price: 0, defBonus: 120, hpBonus: 2200, spBonus: 1000, levelReq: 75 },
-    'Oracle Lens': { emoji: '🔍', type: 'glasses', rarity: 'mythic', desc: 'เลนส์ญาณทิพย์ ATK +150, SP +800', price: 0, atkBonus: 150, spBonus: 800, levelReq: 70 },
-    'Titan Bracers': { emoji: '🦾', type: 'armor', rarity: 'mythic', desc: 'ปลอกแขนไททัน ATK +80, DEF +140, HP +2,600', price: 0, atkBonus: 80, defBonus: 140, hpBonus: 2600, levelReq: 75 },
-    'Astral Legguards': { emoji: '👖', type: 'armor', rarity: 'mythic', desc: 'เกราะขาดารา DEF +190, HP +4,200', price: 0, defBonus: 190, hpBonus: 4200, levelReq: 80 },
-    'Worldwalker Greaves': { emoji: '🥾', type: 'armor', rarity: 'mythic', desc: 'รองเท้าท่องพิภพ DEF +170, HP +3,300', price: 0, defBonus: 170, hpBonus: 3300, levelReq: 80 },
-    'Eternity Ring': { emoji: '💍', type: 'armor', rarity: 'mythic', desc: 'แหวนนิรันดร์ ATK +180, DEF +80, HP +1,800, SP +700', price: 0, atkBonus: 180, defBonus: 80, hpBonus: 1800, spBonus: 700, levelReq: 85 },
-    'Heart of Cosmos': { emoji: '💠', type: 'armor', rarity: 'mythic', desc: 'หัวใจจักรวาล ATK +220, DEF +120, HP +3,000, SP +1,200', price: 0, atkBonus: 220, defBonus: 120, hpBonus: 3000, spBonus: 1200, levelReq: 90 },
+    'Solaris Edge': { emoji: '⚔️', type: 'weapon', rarity: 'mythic', desc: 'ดาบสุริยเทพ ATK +420, HP +900', price: 0, atkBonus: 420, hpBonus: 900, levelReq: 45, forgeEffect: 'divine_solar' },
+    'Chronos Bow': { emoji: '🏹', type: 'weapon', rarity: 'mythic', desc: 'ธนูแห่งกาลเวลา ATK +390, HP +700', price: 0, atkBonus: 390, hpBonus: 700, levelReq: 45, forgeEffect: 'divine_chronos' },
+    'Genesis Staff': { emoji: '🔮', type: 'weapon', rarity: 'mythic', desc: 'คทากำเนิดโลก ATK +360, SP +1,800', price: 0, atkBonus: 360, spBonus: 1800, levelReq: 45, forgeEffect: 'divine_genesis' },
+    'Seraph Rod': { emoji: '✨', type: 'weapon', rarity: 'mythic', desc: 'คทาเซราฟ ATK +330, HP +1,200, SP +1,500', price: 0, atkBonus: 330, hpBonus: 1200, spBonus: 1500, levelReq: 45, forgeEffect: 'divine_seraph' },
+    'Empyrean Plate': { emoji: '🛡️', type: 'armor', rarity: 'mythic', desc: 'เกราะจักรวาล DEF +260, HP +6,500', price: 0, defBonus: 260, hpBonus: 6500, levelReq: 55 },
+    'Wings of Aeon': { emoji: '🪽', type: 'armor', rarity: 'mythic', desc: 'ผ้าคลุมปีกนิรันดร์ DEF +180, HP +3,800, SP +900', price: 0, defBonus: 180, hpBonus: 3800, spBonus: 900, levelReq: 50 },
+    'Aegis Prime': { emoji: '🛡️', type: 'shield', rarity: 'mythic', desc: 'โล่ปฐมเทพ DEF +300, HP +5,000', price: 0, defBonus: 300, hpBonus: 5000, levelReq: 55 },
+    'Crown of the First Light': { emoji: '👑', type: 'hat', rarity: 'mythic', desc: 'มงกุฎแสงแรก DEF +120, HP +2,200, SP +1,000', price: 0, defBonus: 120, hpBonus: 2200, spBonus: 1000, levelReq: 42 },
+    'Oracle Lens': { emoji: '🔍', type: 'glasses', rarity: 'mythic', desc: 'เลนส์ญาณทิพย์ ATK +150, SP +800', price: 0, atkBonus: 150, spBonus: 800, levelReq: 40 },
+    'Titan Bracers': { emoji: '🦾', type: 'armor', rarity: 'mythic', desc: 'ปลอกแขนไททัน ATK +80, DEF +140, HP +2,600', price: 0, atkBonus: 80, defBonus: 140, hpBonus: 2600, levelReq: 42 },
+    'Astral Legguards': { emoji: '👖', type: 'armor', rarity: 'mythic', desc: 'เกราะขาดารา DEF +190, HP +4,200', price: 0, defBonus: 190, hpBonus: 4200, levelReq: 48 },
+    'Worldwalker Greaves': { emoji: '🥾', type: 'armor', rarity: 'mythic', desc: 'รองเท้าท่องพิภพ DEF +170, HP +3,300', price: 0, defBonus: 170, hpBonus: 3300, levelReq: 45 },
+    'Eternity Ring': { emoji: '💍', type: 'armor', rarity: 'mythic', desc: 'แหวนนิรันดร์ ATK +180, DEF +80, HP +1,800, SP +700', price: 0, atkBonus: 180, defBonus: 80, hpBonus: 1800, spBonus: 700, levelReq: 50 },
+    'Heart of Cosmos': { emoji: '💠', type: 'armor', rarity: 'mythic', desc: 'หัวใจจักรวาล ATK +220, DEF +120, HP +3,000, SP +1,200', price: 0, atkBonus: 220, defBonus: 120, hpBonus: 3000, spBonus: 1200, levelReq: 55 },
+    'Celestial Sovereign Helm': { emoji: '🪖', type: 'armor', rarity: 'mythic', desc: 'หมวกเกราะราชันสวรรค์ DEF +175, HP +3,400, SP +600', price: 0, defBonus: 175, hpBonus: 3400, spBonus: 600, levelReq: 48 },
 });
 
 export const DIVINE_ZOL_SHOP = [
     { name: 'Solaris Edge', category: 'weapon', zolPrice: 180000 }, { name: 'Chronos Bow', category: 'weapon', zolPrice: 175000 },
     { name: 'Genesis Staff', category: 'weapon', zolPrice: 185000 }, { name: 'Seraph Rod', category: 'weapon', zolPrice: 185000 },
-    { name: 'Empyrean Plate', category: 'armor', zolPrice: 240000 }, { name: 'Wings of Aeon', category: 'armor', zolPrice: 210000 },
-    { name: 'Aegis Prime', category: 'shield', zolPrice: 230000 }, { name: 'Crown of the First Light', category: 'head', zolPrice: 160000 },
-    { name: 'Oracle Lens', category: 'head', zolPrice: 125000 }, { name: 'Titan Bracers', category: 'accessory', zolPrice: 145000 },
-    { name: 'Astral Legguards', category: 'armor', zolPrice: 175000 }, { name: 'Worldwalker Greaves', category: 'armor', zolPrice: 165000 },
-    { name: 'Eternity Ring', category: 'accessory', zolPrice: 200000 }, { name: 'Heart of Cosmos', category: 'accessory', zolPrice: 260000 },
+    { name: 'Crown of the First Light', category: 'hat', zolPrice: 160000 }, { name: 'Oracle Lens', category: 'glasses', zolPrice: 125000 },
+    { name: 'Celestial Sovereign Helm', category: 'head', zolPrice: 195000 }, { name: 'Empyrean Plate', category: 'body', zolPrice: 240000 },
+    { name: 'Wings of Aeon', category: 'garment', zolPrice: 210000 }, { name: 'Titan Bracers', category: 'wrist', zolPrice: 145000 },
+    { name: 'Astral Legguards', category: 'pants', zolPrice: 175000 }, { name: 'Worldwalker Greaves', category: 'feet', zolPrice: 165000 },
+    { name: 'Aegis Prime', category: 'shield', zolPrice: 230000 }, { name: 'Eternity Ring', category: 'ring', zolPrice: 200000 },
+    { name: 'Heart of Cosmos', category: 'accessory', zolPrice: 260000 },
 ];
 
 // ============ JOB EQUIP RESTRICTIONS ============
@@ -1444,6 +1446,7 @@ const ARMOR_ITEM_SLOT = {
     'Leather Bracer': 'wrist', 'Steel Bracer': 'wrist', 'Guardian Wristguard': 'wrist',
     'Empyrean Plate': 'body', 'Wings of Aeon': 'garment', 'Titan Bracers': 'wrist',
     'Astral Legguards': 'pants', 'Worldwalker Greaves': 'feet', 'Eternity Ring': 'ring', 'Heart of Cosmos': 'accessory',
+    'Celestial Sovereign Helm': 'head',
 };
 
 // The paper-doll slot id an item belongs to (weapon/shield/hat/glasses map by

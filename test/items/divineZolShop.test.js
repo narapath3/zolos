@@ -10,9 +10,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 
 test('divine shop has unique expensive ZOL-only equipment in every requested category', () => {
-  assert.equal(DIVINE_ZOL_SHOP.length, 14);
-  assert.equal(new Set(DIVINE_ZOL_SHOP.map(x => x.name)).size, 14);
-  assert.deepEqual(new Set(DIVINE_ZOL_SHOP.map(x => x.category)), new Set(['weapon', 'armor', 'shield', 'head', 'accessory']));
+  assert.equal(DIVINE_ZOL_SHOP.length, 15);
+  assert.equal(new Set(DIVINE_ZOL_SHOP.map(x => x.name)).size, 15);
+  assert.deepEqual(new Set(DIVINE_ZOL_SHOP.map(x => x.category)), new Set(['hat', 'glasses', 'head', 'body', 'garment', 'wrist', 'pants', 'feet', 'weapon', 'shield', 'ring', 'accessory']));
   const slots = new Set();
   for (const entry of DIVINE_ZOL_SHOP) {
     const item = ITEMS[entry.name];
@@ -20,7 +20,7 @@ test('divine shop has unique expensive ZOL-only equipment in every requested cat
     assert.equal(item.rarity, 'mythic');
     assert.equal(item.price, 0, 'must not be buyable for Zeny');
     assert.ok(entry.zolPrice >= 125000);
-    assert.ok(item.levelReq >= 70);
+    assert.ok(item.levelReq >= 40 && item.levelReq <= 55);
     slots.add(getEquipSlot(entry.name));
     const icon = itemIconPath(entry.name);
     assert.ok(icon);
@@ -29,7 +29,7 @@ test('divine shop has unique expensive ZOL-only equipment in every requested cat
     const png = readFileSync(file);
     assert.equal(png.toString('ascii', 1, 4), 'PNG');
   }
-  for (const slot of ['weapon', 'body', 'garment', 'shield', 'hat', 'glasses', 'wrist', 'pants', 'feet', 'ring', 'accessory']) assert.ok(slots.has(slot), slot);
+  for (const slot of ['weapon', 'head', 'body', 'garment', 'shield', 'hat', 'glasses', 'wrist', 'pants', 'feet', 'ring', 'accessory']) assert.ok(slots.has(slot), slot);
 });
 
 test('divine NPC opens the guarded ZOL purchase flow and character visuals know divine gear', () => {
@@ -43,4 +43,9 @@ test('divine NPC opens the guarded ZOL purchase flow and character visuals know 
   assert.match(ui, /_divinePurchasePending/);
   assert.doesNotMatch(ui.match(/async _buyDivineItem[\s\S]*?\n  }/)?.[0] || '', /stats\.gold|s\.gold/);
   for (const name of ['Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod', 'Empyrean Plate', 'Aegis Prime']) assert.ok(character.includes(`'${name}'`), name);
+  for (const name of ['Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod']) assert.match(ITEMS[name].forgeEffect, /^divine_/);
+  assert.match(character, /_updateDivineAura\(\)/);
+  const particles = readFileSync(join(root, 'src', 'engine', 'ParticleSystem.js'), 'utf8');
+  assert.match(particles, /spawnDivineAttackEffect/);
+  assert.match(particles, /TorusGeometry/);
 });

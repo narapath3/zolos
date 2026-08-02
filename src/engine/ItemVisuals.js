@@ -12,6 +12,7 @@ const EQUIPMENT_NAMES = [
   'Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod', 'Empyrean Plate', 'Wings of Aeon',
   'Aegis Prime', 'Crown of the First Light', 'Oracle Lens', 'Titan Bracers', 'Astral Legguards',
   'Worldwalker Greaves', 'Eternity Ring', 'Heart of Cosmos',
+  'Celestial Sovereign Helm',
 ];
 
 const SHOP_VISUAL_NAMES = [

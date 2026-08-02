@@ -547,6 +547,39 @@ export class ParticleSystem {
         }
     }
 
+    // Premium multi-layer impact reserved for Divine ZOL weapons. It combines
+    // two celestial bursts, expanding sigil rings and a short light pillar;
+    // the normal adaptive effect budget still protects low-end devices.
+    spawnDivineAttackEffect(position, effectId = 'divine_solar', isCritical = false) {
+        if (!this.effectsEnabled || !position || this._throttleEffect(true)) return;
+        const palette = {
+            divine_solar: [0xffd84d, 0xffffff],
+            divine_chronos: [0x55eaff, 0x9d7bff],
+            divine_genesis: [0x42f5ff, 0x4285ff],
+            divine_seraph: [0xfff3a0, 0x8effff],
+        }[effectId] || [0xffd84d, 0x66eaff];
+        this.createExplosion(position, palette[0]);
+        this.createExplosion(new THREE.Vector3(position.x, position.y + 0.45, position.z), palette[1]);
+        const layers = isCritical ? 4 : 3;
+        for (let i = 0; i < layers; i++) {
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(0.48 + i * 0.18, 0.045, 8, 28),
+                new THREE.MeshBasicMaterial({ color: palette[i % 2], transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })
+            );
+            ring.position.copy(position); ring.position.y += 0.12 + i * 0.28;
+            ring.rotation.x = Math.PI / 2; ring.rotation.z = i * 0.55;
+            this.scene.add(ring);
+            this.shockwaves.push({ mesh: ring, life: 0.7 + i * 0.08, maxLife: 0.7 + i * 0.08, type: 'level-ring' });
+        }
+        const pillar = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.38, 0.9, isCritical ? 6 : 4.5, 16, 1, true),
+            new THREE.MeshBasicMaterial({ color: palette[1], transparent: true, opacity: 0.35, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })
+        );
+        pillar.position.copy(position); pillar.position.y += isCritical ? 3 : 2.25;
+        this.scene.add(pillar);
+        this.shockwaves.push({ mesh: pillar, life: 0.65, maxLife: 0.65, type: 'pillar' });
+    }
+
     createHealEffect(position) {
         if (!this.effectsEnabled) return;
         // Green sparkles rising up

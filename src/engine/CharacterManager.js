@@ -394,6 +394,7 @@ export class CharacterManager {
     equipWeapon(itemName) {
         this.equippedWeapon = itemName;
         this.updateWeaponVisuals(itemName);
+        this._updateDivineAura();
     }
 
     updateWeaponVisuals(itemName) {
@@ -1200,7 +1201,7 @@ export class CharacterManager {
             this.hatMesh = null;
         }
 
-        if (this.equippedHat === 'None' || this.equippedHat === 'none') return;
+        if (this.equippedHat === 'None' || this.equippedHat === 'none') { this._updateDivineAura(); return; }
 
         const hatGroup = new THREE.Group();
 
@@ -1292,6 +1293,7 @@ export class CharacterManager {
 
         this.hatMesh = hatGroup;
         this.mesh.add(this.hatMesh);
+        this._updateDivineAura();
     }
 
     setGlasses(glassesName) {
@@ -1312,7 +1314,7 @@ export class CharacterManager {
             this.glassesMesh = null;
         }
 
-        if (this.equippedGlasses === 'None' || this.equippedGlasses === 'none') return;
+        if (this.equippedGlasses === 'None' || this.equippedGlasses === 'none') { this._updateDivineAura(); return; }
 
         const glassesGroup = new THREE.Group();
         const frameMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
@@ -1382,6 +1384,7 @@ export class CharacterManager {
 
         this.glassesMesh = glassesGroup;
         this.mesh.add(this.glassesMesh);
+        this._updateDivineAura();
     }
 
     // Companion pet that trots beside the hero. The model is a child of the
@@ -1571,7 +1574,7 @@ export class CharacterManager {
             'Leather Bracer': 0x6b4a2a, 'Steel Bracer': 0x9aa4b2, 'Guardian Wristguard': 0xffbe46,
             'Empyrean Plate': 0xfff3cf, 'Wings of Aeon': 0xf7fbff, 'Aegis Prime': 0xfff0bc,
             'Titan Bracers': 0xffedb5, 'Astral Legguards': 0x253b77, 'Worldwalker Greaves': 0xf7f7ea,
-            'Eternity Ring': 0xffd84d, 'Heart of Cosmos': 0x246dff,
+            'Eternity Ring': 0xffd84d, 'Heart of Cosmos': 0x246dff, 'Celestial Sovereign Helm': 0xfff2d2,
         };
         if (MAP[name] != null) return MAP[name];
         const it = ITEMS[name];
@@ -1592,9 +1595,34 @@ export class CharacterManager {
             'Guardian Wristguard': 0x3d6b9a,
             'Empyrean Plate': 0x36dff2, 'Wings of Aeon': 0x48e9ff, 'Aegis Prime': 0x2bd9ff,
             'Titan Bracers': 0x4ee7ff, 'Astral Legguards': 0xffd35a, 'Worldwalker Greaves': 0x45eaff,
-            'Eternity Ring': 0x41dfff, 'Heart of Cosmos': 0xffd84d,
+            'Eternity Ring': 0x41dfff, 'Heart of Cosmos': 0xffd84d, 'Celestial Sovereign Helm': 0x42e9ff,
         };
         return MAP[name] ?? fallback;
+    }
+
+    _updateDivineAura() {
+        if (!this.mesh) return;
+        if (this.divineAura) { this._disposeMesh(this.divineAura); this.divineAura = null; }
+        const divineNames = new Set(['Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod', 'Empyrean Plate', 'Wings of Aeon', 'Aegis Prime', 'Crown of the First Light', 'Oracle Lens', 'Titan Bracers', 'Astral Legguards', 'Worldwalker Greaves', 'Eternity Ring', 'Heart of Cosmos', 'Celestial Sovereign Helm']);
+        const equipped = [this.equippedWeapon, this.equippedShield, this.equippedHat, this.equippedGlasses, ...Object.values(this.equippedGear || {})];
+        const count = equipped.filter(name => divineNames.has(name)).length;
+        if (!count) return;
+        const group = new THREE.Group();
+        const additive = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+        const floorCyan = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.045, 8, 40), additive(0x54eaff, 0.85));
+        floorCyan.rotation.x = Math.PI / 2; floorCyan.position.y = 0.04; group.add(floorCyan);
+        const floorGold = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.025, 8, 32), additive(0xffd85a, 0.85));
+        floorGold.rotation.x = Math.PI / 2; floorGold.position.y = 0.055; group.add(floorGold);
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.035, 8, 40), additive(0xffef9d, 0.75));
+        halo.position.set(0, 1.25, -0.28); group.add(halo);
+        const orbit = new THREE.Group(); orbit.position.y = 1.05;
+        for (let i = 0; i < Math.min(6, 3 + count); i++) {
+            const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.055 + count * 0.004), additive(i % 2 ? 0xffdc62 : 0x60efff, 0.95));
+            const angle = i / Math.min(6, 3 + count) * Math.PI * 2;
+            gem.position.set(Math.cos(angle) * 0.82, (i % 2) * 0.22, Math.sin(angle) * 0.82); orbit.add(gem);
+        }
+        group.add(orbit); group.userData.orbit = orbit; group.userData.power = Math.min(1.45, 1 + count * 0.06);
+        this.mesh.add(group); this.divineAura = group;
     }
 
     // Rebuild all armor/shield meshes from equippedGear + equippedShield.
@@ -1774,6 +1802,7 @@ export class CharacterManager {
             }
             this.mesh.add(grp); this.gearMeshes.shield = grp;
         }
+        this._updateDivineAura();
     }
 
     // Achievement titles rendered above the name. Glow color feeds the canvas
@@ -2325,6 +2354,13 @@ export class CharacterManager {
             this.auraRing.rotation.z += dt * 0.7;
             const s = 1 + Math.sin(this.animTimer * 2.2) * 0.05;
             this.auraRing.scale.set(s, s, 1);
+        }
+        if (this.divineAura) {
+            this.divineAura.rotation.y += dt * 0.65;
+            const orbit = this.divineAura.userData.orbit;
+            if (orbit) { orbit.rotation.y -= dt * 1.8; orbit.rotation.z = Math.sin(this.animTimer * 1.5) * 0.08; }
+            const pulse = (this.divineAura.userData.power || 1) * (1 + Math.sin(this.animTimer * 3) * 0.045);
+            this.divineAura.scale.set(pulse, pulse, pulse);
         }
 
         // Pet idle animation: ground pets bounce with a lively squash/stretch;

@@ -5635,7 +5635,7 @@ export class GameUI {
     if (!card || !this.character) return;
     const zol = Number(this.character.stats.zol) || 0;
     const level = Number(this.character.stats.level) || 1;
-    const categories = [['all', 'ทั้งหมด'], ['weapon', 'อาวุธ'], ['armor', 'ชุดเกราะ'], ['shield', 'โล่'], ['head', 'ศีรษะ'], ['accessory', 'เครื่องประดับ']];
+    const categories = [['all', '✨ ทั้งหมด'], ['hat', '🎩 หมวก'], ['glasses', '👓 แว่นตา'], ['head', '🪖 ศีรษะ'], ['body', '👕 เสื้อเกราะ'], ['garment', '🧥 ผ้าคลุม'], ['wrist', '⌚ ข้อมือ'], ['pants', '👖 กางเกง'], ['feet', '🥾 รองเท้า'], ['weapon', '⚔️ อาวุธ'], ['shield', '🛡️ โล่'], ['ring', '💍 แหวน'], ['accessory', '💎 เครื่องประดับ']];
     const rows = DIVINE_ZOL_SHOP.filter(x => this._divineCategory === 'all' || x.category === this._divineCategory).map(entry => {
       const item = ITEMS[entry.name];
       const owned = this.inventory.some(x => x.item_name === entry.name && Number(x.quantity) > 0);
