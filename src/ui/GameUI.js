@@ -2215,9 +2215,12 @@ export class GameUI {
     }
 
     let socketHtml = '';
-    if (['weapon', 'armor', 'shield', 'ring', 'wrist', 'accessory'].includes(item.item_type) && item.stats) {
-      const cards = item.stats.cards || [];
-      const maxSockets = 4;
+    const equipmentSlot = this._equipmentSlotForItem(item);
+    if (equipmentSlot && item.stats && item.stats.equipped === true) {
+      const equippedCardId = this.character?.equippedCards?.[equipmentSlot] || null;
+      const equippedCard = equippedCardId ? getCard(equippedCardId) : null;
+      const cards = equippedCardId ? [equippedCard?.itemName || equippedCardId] : [];
+      const maxSockets = 1;
       socketHtml = `<br/><br/><strong style="color:var(--secondary)">🕳️ Sockets / ช่องใส่การ์ด:</strong><br/>`;
       socketHtml += `<div style="display:flex;flex-direction:column;gap:5px;margin-top:5px">`;
       for (let i = 0; i < maxSockets; i++) {
@@ -2244,10 +2247,10 @@ export class GameUI {
                 ${bonusStr ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">${bonusStr}</span>` : ''}
               </div>
             </div>
-            <button class="btn-remove-card" data-idx="${i}" style="background:#ff4444;border:none;color:white;padding:2px 6px;border-radius:3px;font-size:11px;cursor:pointer">ถอด</button>
+            <button class="btn-remove-card" data-slot="${equipmentSlot}" style="background:#ff4444;border:none;color:white;padding:2px 6px;border-radius:3px;font-size:11px;cursor:pointer">ถอด</button>
           </div>`;
         } else {
-          socketHtml += `<div class="eq-detail-socket empty-slot" data-target-item="${item.item_name}" data-socket-idx="${i}" style="display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;padding:4px 8px;cursor:pointer;border-radius:4px;border:1px dashed rgba(150,160,190,0.4);transition:background .15s,border-color .15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.borderColor='rgba(150,160,190,0.7)'" onmouseout="this.style.background='transparent';this.style.borderColor='rgba(150,160,190,0.4)'" title="แตะเพื่อเลือกการ์ดใส่">
+          socketHtml += `<div class="eq-detail-socket empty-slot" data-equip-slot="${equipmentSlot}" style="display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:13px;padding:4px 8px;cursor:pointer;border-radius:4px;border:1px dashed rgba(150,160,190,0.4);transition:background .15s,border-color .15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.borderColor='rgba(150,160,190,0.7)'" onmouseout="this.style.background='transparent';this.style.borderColor='rgba(150,160,190,0.4)'" title="เลือกการ์ดประจำช่อง (สูงสุด 1 ใบ)">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:rgba(255,255,255,0.04);font-size:14px;color:#7c88a8">＋</span>
             <span>Empty Slot (ว่าง) — คลิกเพื่อเลือกการ์ด</span>
           </div>`;
@@ -2262,17 +2265,16 @@ export class GameUI {
     document.querySelectorAll('.btn-remove-card').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const idx = parseInt(btn.getAttribute('data-idx'));
-        this._removeCardFromItem(item, idx);
+        const slotId = btn.getAttribute('data-slot');
+        if (slotId) this._unsocketCard(slotId);
       });
     });
     // Attach empty-socket click handlers to open the direct card picker
     document.querySelectorAll('.eq-detail-socket.empty-slot').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
-        const targetItemName = el.getAttribute('data-target-item');
-        const socketIdx = parseInt(el.getAttribute('data-socket-idx'));
-        this._openCardSocketDirectPicker(targetItemName, socketIdx);
+        const slotId = el.getAttribute('data-equip-slot');
+        if (slotId) this._openCardPicker(slotId);
       });
     });
     document.getElementById('detail-price-val').textContent = item.price;
@@ -2292,6 +2294,18 @@ export class GameUI {
     } else {
       useBtn.style.display = 'none';
     }
+  }
+
+  _equipmentSlotForItem(item) {
+    if (!item) return null;
+    if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') return 'weapon';
+    if (item.item_type === 'shield') return 'shield';
+    if (item.item_type === 'hat') return 'hat';
+    if (item.item_type === 'glasses') return 'glasses';
+    if (item.item_type === 'armor' || ['ring', 'wrist', 'accessory'].includes(item.item_type)) {
+      return getEquipSlot(item.item_name) || item.item_type;
+    }
+    return null;
   }
 
   async _useSelectedItem() {
@@ -10040,10 +10054,10 @@ export class GameUI {
     if (!cardData || !cardData.cardSlot) return;
 
     // Filter equipped items that match the card's required slot type
-    const targets = this.inventory.filter(i =>
-      i.stats && i.stats.equipped === true &&
-      (i.item_type === cardData.cardSlot || (cardData.cardSlot === 'accessory' && (i.item_type === 'ring' || i.item_type === 'wrist' || i.item_type === 'accessory')))
-    );
+    const targets = this.inventory.filter(i => {
+      const slotId = this._equipmentSlotForItem(i);
+      return i.stats?.equipped === true && slotId && cardFitsSlot(cardItem.item_name, slotId);
+    });
 
     if (targets.length === 0) {
       this.addCombatLog(`❌ คุณไม่มีอุปกรณ์ประเภท "${cardData.cardSlot}" ที่สวมใส่อยู่`, 'system');
@@ -10055,11 +10069,11 @@ export class GameUI {
       <div style="display:grid;gap:8px">`;
 
     targets.forEach(t => {
-      const cards = (t.stats && t.stats.cards) || [];
-      const maxSockets = 4;
-      html += `<div class="socket-target-row" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" data-item="${t.item_name}">
-        <div>${t.emoji} ${t.item_name} <span style="font-size:12px;color:var(--text-dim)">(${cards.length}/${maxSockets} sockets)</span></div>
-        <div style="display:flex;gap:3px">${Array.from({ length: maxSockets }).map((_, i) => `<div style="width:6px;height:6px;border-radius:50%;background:${i < cards.length ? '#ffd700' : 'rgba(255,255,255,0.2)'}"></div>`).join('')}</div>
+      const slotId = this._equipmentSlotForItem(t);
+      const occupied = Boolean(this.character?.equippedCards?.[slotId]);
+      html += `<div class="socket-target-row" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" data-slot="${slotId}">
+        <div>${t.emoji} ${t.item_name} <span style="font-size:12px;color:var(--text-dim)">(${occupied ? 1 : 0}/1 socket)</span></div>
+        <div style="width:8px;height:8px;border-radius:50%;background:${occupied ? '#ffd700' : 'rgba(255,255,255,0.2)'}"></div>
       </div>`;
     });
 
@@ -10081,12 +10095,11 @@ export class GameUI {
 
     modal.querySelectorAll('.socket-target-row').forEach(row => {
       row.addEventListener('click', async () => {
-        const targetName = row.getAttribute('data-item');
-        const targetItem = targets.find(i => i.item_name === targetName);
-        if (targetItem) {
+        const slotId = row.getAttribute('data-slot');
+        if (slotId) {
           modal.remove();
           document.removeEventListener('mousedown', closeHandler);
-          await this._socketCardToItem(targetItem, cardItem);
+          await this._socketCard(slotId, cardItem.item_name);
         }
       });
     });
@@ -10098,8 +10111,8 @@ export class GameUI {
     if (!targetItem.stats) targetItem.stats = {};
     if (!targetItem.stats.cards) targetItem.stats.cards = [];
 
-    if (targetItem.stats.cards.length >= 4) {
-      this.addCombatLog(`❌ อุปกรณ์นี้มีรูเต็มแล้ว (สูงสุด 4)`, 'system');
+    if (targetItem.stats.cards.length >= 1) {
+      this.addCombatLog(`❌ อุปกรณ์นี้มีช่องการ์ดเต็มแล้ว (สูงสุด 1 ใบ)`, 'system');
       return;
     }
 
@@ -10205,8 +10218,8 @@ export class GameUI {
     const targetItem = this.inventory.find(i => i.item_name === itemName);
     if (!targetItem || !targetItem.stats) return;
     if (!targetItem.stats.cards) targetItem.stats.cards = [];
-    if (targetItem.stats.cards.length >= 4) {
-      this.addCombatLog('❌ อุปกรณ์นี้มีรูเต็มแล้ว (สูงสุด 4)', 'system');
+    if (targetItem.stats.cards.length >= 1) {
+      this.addCombatLog('❌ อุปกรณ์นี้มีช่องการ์ดเต็มแล้ว (สูงสุด 1 ใบ)', 'system');
       return;
     }
 
@@ -10221,7 +10234,7 @@ export class GameUI {
         <div style="font-weight:800;color:var(--secondary);font-size:14px">🃏 เลือกการ์ดใส่ ${targetItem.emoji} ${itemName}</div>
         <div id="csp-close" style="cursor:pointer;color:#9fb0e0;font-size:18px;line-height:1;padding:2px 6px">✕</div>
       </div>
-      <div style="font-size:11px;color:#8b97ba;margin-bottom:8px">การ์ดทั้งหมดในกระเป๋าของคุณ — คลิกเพื่อใส่ (${targetItem.stats.cards.length}/4 ช่องใช้แล้ว)</div>
+      <div style="font-size:11px;color:#8b97ba;margin-bottom:8px">การ์ดทั้งหมดในกระเป๋าของคุณ — คลิกเพื่อใส่ (${targetItem.stats.cards.length}/1 ช่องใช้แล้ว)</div>
       <div style="display:flex;flex-direction:column;gap:4px;max-height:400px;overflow-y:auto">`;
 
     if (availableCards.length === 0) {

@@ -55,3 +55,22 @@ test('monster labels expose danger level and the legacy Lunatic is publicly Moon
     assert.match(monsters, /labelStagger/);
     assert.match(cards, /displayName: 'Moonhare'/);
 });
+
+test('inventory detail and Equip share one canonical card socket per gear slot', async () => {
+    const ui = await readFile(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+    const detailStart = ui.indexOf('let socketHtml');
+    const detailEnd = ui.indexOf("document.getElementById('detail-price-val')", detailStart);
+    const detail = ui.slice(detailStart, detailEnd);
+    const pickerStart = ui.indexOf('_openCardSocketPicker(cardItem)');
+    const pickerEnd = ui.indexOf('async _socketCardToItem', pickerStart);
+    const picker = ui.slice(pickerStart, pickerEnd);
+
+    assert.match(detail, /const maxSockets = 1/);
+    assert.match(detail, /this\.character\?\.equippedCards\?\.\[equipmentSlot\]/);
+    assert.match(detail, /this\._openCardPicker\(slotId\)/);
+    assert.match(detail, /this\._unsocketCard\(slotId\)/);
+    assert.doesNotMatch(detail, /item\.stats\.cards/);
+    assert.match(picker, /await this\._socketCard\(slotId, cardItem\.item_name\)/);
+    assert.match(picker, /\(\$\{occupied \? 1 : 0\}\/1 socket\)/);
+    assert.doesNotMatch(picker, /maxSockets = 4|_socketCardToItem\(/);
+});
