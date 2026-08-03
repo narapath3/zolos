@@ -5,6 +5,7 @@ import { buildPet } from './PetModels.js';
 import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
 import { getCard } from '../cards/CardCatalog.js';
 import { normalizeCardState } from '../cards/CardProgression.js';
+import { getEquipmentVisualSpec } from './EquipmentVisualSpecs.js';
 import {
     aggregateCardEffects, applyIncomingCardEffects, applyOnKillCardEffects,
     resolveOutgoingCardEffects,
@@ -1714,11 +1715,13 @@ export class CharacterManager {
 
         const g = this.equippedGear || {};
         const lambert = (color, opts = {}) => new THREE.MeshLambertMaterial({ color, ...opts });
+        const additive = (color, opacity = 0.78) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 
         // ---- Helmet (head armor) ----
         if (g.head) {
             const grp = new THREE.Group();
             const mat = lambert(this._gearColor(g.head));
+            const signature = getEquipmentVisualSpec('head', g.head);
             if (g.head === 'Ranger Hood') {
                 const hood = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.58, 8), mat);
                 hood.position.y = 1.91; hood.rotation.y = Math.PI / 8; grp.add(hood);
@@ -1735,6 +1738,14 @@ export class CharacterManager {
                 faceGuard.position.set(0, 1.7, 0.29); grp.add(faceGuard);
                 const crest = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.34), lambert(this._gearAccent(g.head)));
                 crest.position.y = 2.02; grp.add(crest);
+                if (signature === 'celestial-helm') {
+                    [-1, 1].forEach(side => {
+                        const wing = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.38, 5), lambert(0xeaffff, { emissive: 0x27dff5, emissiveIntensity: 0.65 }));
+                        wing.position.set(side * 0.36, 1.98, 0); wing.rotation.z = side * -0.72; grp.add(wing);
+                    });
+                    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.095), additive(0x78f4ff, 0.95));
+                    star.position.set(0, 2.13, 0.16); grp.add(star);
+                }
             }
             this.mesh.add(grp); this.gearMeshes.head = grp;
         }
@@ -1742,7 +1753,8 @@ export class CharacterManager {
         // ---- Body armor (chest plate + pauldrons over the torso) ----
         if (g.body) {
             const grp = new THREE.Group();
-            const mat = lambert(this._gearColor(g.body), { emissive: 0x000000 });
+            const signature = getEquipmentVisualSpec('body', g.body);
+            const mat = lambert(this._gearColor(g.body), { emissive: signature === 'empyrean-star' ? 0x164c5d : 0x000000, emissiveIntensity: signature === 'empyrean-star' ? 0.4 : 0 });
             const chest = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.62, 0.46), mat);
             chest.position.y = 1.06; grp.add(chest);
             const accent = lambert(this._gearAccent(g.body));
@@ -1785,6 +1797,14 @@ export class CharacterManager {
                     });
                     mat.emissive = new THREE.Color(0x4b3a08); mat.emissiveIntensity = 0.18;
                 }
+                if (signature === 'empyrean-star') {
+                    const core = new THREE.Mesh(new THREE.OctahedronGeometry(0.11), additive(0x62efff, 0.95));
+                    core.position.set(0, 1.12, 0.34); grp.add(core);
+                    for (let i = 0; i < 3; i++) {
+                        const ray = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.26, 4), additive(0xffec9a));
+                        ray.position.set((i - 1) * 0.17, 1.43, 0.05); ray.rotation.z = (i - 1) * 0.45; grp.add(ray);
+                    }
+                }
             }
             this.mesh.add(grp); this.gearMeshes.body = grp;
         }
@@ -1792,8 +1812,9 @@ export class CharacterManager {
         // ---- Garment (cape down the back) ----
         if (g.garment) {
             const grp = new THREE.Group();
+            const signature = getEquipmentVisualSpec('garment', g.garment);
             const mat = lambert(this._gearColor(g.garment), { side: THREE.DoubleSide });
-            const cape = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.0, 0.06), mat);
+            const cape = new THREE.Mesh(new THREE.BoxGeometry(signature === 'aeon-wings' ? 0.34 : 0.56, 1.0, 0.06), mat);
             cape.position.set(0, 0.95, -0.26); cape.rotation.x = 0.06; grp.add(cape);
             const collar = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.16, 0.18), mat);
             collar.position.set(0, 1.42, -0.16); grp.add(collar);
@@ -1805,6 +1826,19 @@ export class CharacterManager {
                 });
                 const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), trim);
                 clasp.position.set(0, 1.46, -0.06); grp.add(clasp);
+            }
+            if (signature === 'shadow-cape') {
+                for (let i = 0; i < 4; i++) {
+                    const wisp = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 5), additive(0xa957ff, 0.48));
+                    wisp.position.set(-0.22 + i * 0.145, 0.42, -0.32); wisp.rotation.z = (i - 1.5) * 0.18; grp.add(wisp);
+                }
+            } else if (signature === 'aeon-wings') {
+                [-1, 1].forEach(side => {
+                    for (let i = 0; i < 5; i++) {
+                        const feather = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.62 - i * 0.055, 6), lambert(i % 2 ? 0xbaf6ff : 0xffffff, { emissive: 0x2cbfd4, emissiveIntensity: 0.35 }));
+                        feather.position.set(side * (0.25 + i * 0.1), 1.15 - i * 0.08, -0.27); feather.rotation.z = side * (-0.65 - i * 0.09); grp.add(feather);
+                    }
+                });
             }
             this.mesh.add(grp); this.gearMeshes.garment = grp;
         }
@@ -1823,6 +1857,9 @@ export class CharacterManager {
             });
             const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.14, 0.44), mat);
             skirt.position.y = 0.64; grp.add(skirt);
+            if (getEquipmentVisualSpec('pants', g.pants) === 'astral-legguards') {
+                [-0.15, 0.15].forEach(x => { const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.055), additive(0xffdf65, 0.92)); star.position.set(x, 0.44, 0.22); grp.add(star); });
+            }
             this.mesh.add(grp); this.gearMeshes.pants = grp;
         }
 
@@ -1833,9 +1870,13 @@ export class CharacterManager {
             [-0.45, 0.45].forEach(x => {
                 const br = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.24), mat);
                 br.position.set(x, 0.78, 0); grp.add(br);
-                if (g.wrist === 'Guardian Wristguard') {
+                if (g.wrist === 'Guardian Wristguard' || g.wrist === 'Titan Bracers') {
                     const gem = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 8), lambert(this._gearAccent(g.wrist), { emissive: 0x16436f, emissiveIntensity: 0.5 }));
                     gem.position.set(x, 0.78, 0.14); grp.add(gem);
+                    if (g.wrist === 'Titan Bracers') {
+                        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.2, 5), additive(0x63edff));
+                        spike.position.set(x, 0.92, 0); grp.add(spike);
+                    }
                 }
             });
             this.mesh.add(grp); this.gearMeshes.wrist = grp;
@@ -1856,15 +1897,56 @@ export class CharacterManager {
                         wing.position.set(x + side * 0.13, 0.23, 0.02); wing.rotation.z = side * 0.8; grp.add(wing);
                     });
                 }
+                if (g.feet === 'Dragon Greaves') {
+                    const claw = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.18, 5), lambert(this._gearAccent(g.feet)));
+                    claw.position.set(x, 0.12, 0.3); claw.rotation.x = Math.PI / 2; grp.add(claw);
+                } else if (g.feet === 'Worldwalker Greaves') {
+                    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.022, 6, 18), additive(0x4aeaff));
+                    halo.position.set(x, 0.1, 0.03); halo.rotation.x = Math.PI / 2; grp.add(halo);
+                }
             });
             this.mesh.add(grp); this.gearMeshes.feet = grp;
+        }
+
+        // Rings now visibly wrap the right hand and retain their icon theme.
+        if (g.ring) {
+            const grp = new THREE.Group();
+            const signature = getEquipmentVisualSpec('ring', g.ring);
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.018, 7, 18), lambert(this._gearColor(g.ring, 0xd9dde5)));
+            ring.position.set(0.48, 0.67, 0.04); ring.rotation.y = Math.PI / 2; grp.add(ring);
+            const gemColor = signature === 'gorgon-eye' ? 0x58ff62 : signature === 'glow-ring' ? 0xe45cff : signature === 'eternity-ring' ? 0x45eaff : 0xc8e4ff;
+            const gem = new THREE.Mesh(new THREE.OctahedronGeometry(signature === 'eternity-ring' ? 0.075 : 0.052), additive(gemColor, 0.95));
+            gem.position.set(0.55, 0.7, 0.05); grp.add(gem);
+            if (signature === 'eternity-ring') {
+                const orbit = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.012, 5, 20), additive(0xffd84d));
+                orbit.position.set(0.49, 0.69, 0.03); orbit.rotation.y = Math.PI / 2; grp.add(orbit);
+            }
+            this.mesh.add(grp); this.gearMeshes.ring = grp;
+        }
+
+        // Accessories appear at their real location: earring or cosmic pendant.
+        if (g.accessory) {
+            const grp = new THREE.Group();
+            if (getEquipmentVisualSpec('accessory', g.accessory) === 'gold-earring') {
+                const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.014, 6, 16), lambert(0xffce45));
+                hoop.position.set(0.31, 1.62, 0.05); hoop.rotation.y = Math.PI / 2; grp.add(hoop);
+            } else {
+                const chain = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.012, 6, 24, Math.PI), lambert(0xffdc66));
+                chain.position.set(0, 1.25, 0.25); chain.rotation.z = Math.PI; grp.add(chain);
+                const heart = new THREE.Mesh(new THREE.OctahedronGeometry(0.105), additive(0x45a5ff, 0.95));
+                heart.position.set(0, 1.08, 0.29); heart.scale.y = 1.25; grp.add(heart);
+                const orbit = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.012, 5, 24), additive(0xffd84d));
+                orbit.position.copy(heart.position); orbit.rotation.x = 0.75; grp.add(orbit);
+            }
+            this.mesh.add(grp); this.gearMeshes.accessory = grp;
         }
 
         // ---- Shield (off-hand, on the left arm) ----
         if (this.equippedShield) {
             const grp = new THREE.Group();
             const mat = lambert(this._gearColor(this.equippedShield));
-            const round = ['Wooden Buckler', 'Aegis of Olympus'].includes(this.equippedShield);
+            const shieldSignature = getEquipmentVisualSpec('shield', this.equippedShield);
+            const round = ['wood-buckler', 'olympus-aegis', 'prime-aegis'].includes(shieldSignature);
             const plate = round
                 ? new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 16), mat)
                 : new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.29, 0.52, 5), mat);
@@ -1880,6 +1962,19 @@ export class CharacterManager {
             if (this.equippedShield === 'Aegis of Olympus') {
                 const aura = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 10), new THREE.MeshBasicMaterial({ color: 0x72cfff, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false }));
                 aura.position.set(-0.62, 1.0, 0.08); grp.add(aura);
+            }
+            if (shieldSignature === 'tear-shield') {
+                const tear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 6), additive(0x8ddcff));
+                tear.position.set(-0.62, 0.87, 0.19); grp.add(tear);
+            } else if (shieldSignature === 'prime-aegis') {
+                const aura = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.025, 7, 24), additive(0x56eeff));
+                aura.position.set(-0.62, 1.0, 0.1); grp.add(aura);
+                for (let i = 0; i < 4; i++) {
+                    const ray = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.2, 4), additive(0xffe982));
+                    const angle = i * Math.PI / 2;
+                    ray.position.set(-0.62 + Math.cos(angle) * 0.32, 1 + Math.sin(angle) * 0.32, 0.12);
+                    ray.rotation.z = -angle; grp.add(ray);
+                }
             }
             this.mesh.add(grp); this.gearMeshes.shield = grp;
         }

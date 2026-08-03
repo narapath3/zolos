@@ -18,7 +18,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-07-16.52 (socket-jwt-auth)';
+const BUILD_VERSION = '2026-08-04.53 (smooth-character-load)';
 window.ZOLOS_BUILD = BUILD_VERSION;
 
 // Notify + offer reload when a newer build is deployed while this tab is open
@@ -1501,27 +1501,84 @@ async function initGame(charData) {
     });
 }
 
+let characterLoadInFlight = null;
+let characterLoadRetryTimer = null;
+let characterLoadCountdownTimer = null;
+let characterLoadGuest = false;
+
+const waitForCharacterRetry = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const isCharacterAuthError = (error) => [401, 403].includes(Number(error?.status))
+    || /jwt|token|session|unauthorized|forbidden/i.test(String(error?.message || ''));
+
+async function loadCharacterResilient() {
+    const waits = [0, 650, 1600];
+    let lastError = null;
+    let refreshedSession = false;
+    for (let attempt = 0; attempt < waits.length; attempt++) {
+        if (waits[attempt]) await waitForCharacterRetry(waits[attempt]);
+        loadingOverlay.setProgress(18 + attempt * 9, attempt === 0
+            ? '⚡ กำลังโหลดข้อมูลตัวละครอย่างปลอดภัย...'
+            : `🔄 การเชื่อมต่อยังไม่นิ่ง กำลังลองใหม่ ${attempt + 1}/${waits.length}...`);
+        try {
+            const char = await loadCharacter(userId);
+            if (char) return char;
+            lastError = new Error('Character record unavailable');
+        } catch (error) {
+            lastError = error;
+            console.warn(`[Zolos] Character load attempt ${attempt + 1} failed:`, error?.message || error);
+            if (!refreshedSession && isCharacterAuthError(error)) {
+                refreshedSession = true;
+                try {
+                    const { supabase } = await import('./network/SupabaseClient.js');
+                    if (typeof supabase?.auth?.refreshSession === 'function') await supabase.auth.refreshSession();
+                } catch (refreshError) {
+                    console.warn('[Zolos] Session refresh before character retry failed:', refreshError?.message || refreshError);
+                }
+            }
+        }
+    }
+    throw lastError || new Error('Character load failed');
+}
+
 async function showCharacterSelect(isGuest = false) {
+    characterLoadGuest = isGuest;
+    if (characterLoadInFlight) return characterLoadInFlight;
+    clearTimeout(characterLoadRetryTimer);
+    clearInterval(characterLoadCountdownTimer);
+    const staleOverlay = document.getElementById('char-load-error');
+    if (staleOverlay) staleOverlay.style.display = 'none';
     loadingOverlay.show();
-    loadingOverlay.setProgress(15, '⚡ Initializing ZOLOS Realm & Account Data...');
-    try {
-        const char = await loadCharacter(userId);
-        if (char) {
+
+    const task = (async () => {
+        try {
+            const char = await loadCharacterResilient();
             char.isGuest = isGuest;
             await initGame(char);
-        } else {
-            showCharacterLoadError();
+        } catch (error) {
+            console.error('Failed to load character after safe retries:', error);
+            showCharacterLoadError(error);
         }
-    } catch (e) {
-        console.error("Failed to load character:", e);
-        showCharacterLoadError();
+    })();
+    characterLoadInFlight = task;
+    try {
+        await task;
+    } finally {
+        if (characterLoadInFlight === task) characterLoadInFlight = null;
     }
 }
 
 // Non-destructive failure screen: keeps the player OUT of the game (so no
 // auto-save can run) and offers a manual retry. Reloading re-attempts the load
 // from scratch; it never writes to the DB.
-function showCharacterLoadError() {
+function retryCharacterLoadNow() {
+    clearTimeout(characterLoadRetryTimer);
+    clearInterval(characterLoadCountdownTimer);
+    const overlay = document.getElementById('char-load-error');
+    if (overlay) overlay.style.display = 'none';
+    showCharacterSelect(characterLoadGuest);
+}
+
+function showCharacterLoadError(error) {
     // Never leave the loading intro covering the error screen.
     const introOv = document.getElementById('intro-loading-overlay');
     if (introOv) introOv.style.display = 'none';
@@ -1538,18 +1595,49 @@ function showCharacterLoadError() {
         overlay.innerHTML = `
             <div style="max-width:420px;text-align:center;padding:28px 26px;border:1px solid #4aa3ff;border-radius:14px;background:#0e1626;color:#e2e8f0;font-family:system-ui,sans-serif;">
                 <div style="font-size:38px;margin-bottom:8px;">⚠️</div>
-                <div style="font-weight:800;font-size:18px;color:#9fccff;margin-bottom:10px;">โหลดตัวละครไม่สำเร็จ</div>
-                <div style="font-size:13px;line-height:1.6;opacity:.9;margin-bottom:20px;">
-                    เชื่อมต่อฐานข้อมูลไม่ได้ชั่วคราว เพื่อความปลอดภัยของข้อมูล
-                    ระบบจะไม่เข้าเกมจนกว่าจะโหลดข้อมูลเดิมได้ครบ<br>กรุณาลองใหม่อีกครั้ง
+                <div style="font-weight:800;font-size:18px;color:#9fccff;margin-bottom:10px;">การเชื่อมต่อยังไม่เสถียร</div>
+                <div id="char-load-message" style="font-size:13px;line-height:1.6;opacity:.9;margin-bottom:10px;"></div>
+                <div id="char-load-auto" style="font-size:12px;color:#79c3ff;margin-bottom:18px;min-height:20px;"></div>
+                <div style="display:flex;justify-content:center;gap:9px;flex-wrap:wrap;">
+                  <button id="char-load-retry" style="border:none;border-radius:10px;padding:11px 22px;cursor:pointer;font-weight:800;font-size:14px;background:#4aa3ff;color:#04101f;">ลองเชื่อมต่อทันที</button>
+                  <button id="char-load-back" style="border:1px solid #52637d;border-radius:10px;padding:10px 18px;cursor:pointer;font-weight:700;font-size:13px;background:#172033;color:#dce8f8;">กลับหน้าเข้าสู่ระบบ</button>
                 </div>
-                <button id="char-load-retry" style="border:none;border-radius:10px;padding:11px 22px;cursor:pointer;font-weight:800;font-size:14px;background:#4aa3ff;color:#04101f;">ลองใหม่</button>
             </div>`;
         document.body.appendChild(overlay);
-        overlay.querySelector('#char-load-retry').addEventListener('click', () => location.reload());
+        overlay.querySelector('#char-load-retry').addEventListener('click', retryCharacterLoadNow);
+        overlay.querySelector('#char-load-back').addEventListener('click', () => {
+            clearTimeout(characterLoadRetryTimer);
+            clearInterval(characterLoadCountdownTimer);
+            overlay.style.display = 'none';
+            loadingOverlay.hide?.();
+            authUI?.show?.();
+        });
     }
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    const authProblem = isCharacterAuthError(error);
+    overlay.querySelector('#char-load-message').textContent = offline
+        ? 'อุปกรณ์ไม่มีอินเทอร์เน็ต ระบบเก็บข้อมูลเดิมของคุณไว้อย่างปลอดภัย และจะเชื่อมต่อใหม่เมื่อออนไลน์'
+        : authProblem
+            ? 'เซสชันเข้าสู่ระบบหมดอายุ ระบบกำลังต่ออายุและเชื่อมต่อข้อมูลตัวละครใหม่โดยไม่เขียนทับข้อมูลเดิม'
+            : 'เซิร์ฟเวอร์ตอบช้าหรือเครือข่ายสลับชั่วคราว ข้อมูลเดิมยังปลอดภัย ระบบจะลองเชื่อมต่อให้อัตโนมัติ';
     overlay.style.display = 'flex';
+
+    let seconds = offline ? 0 : 6;
+    const auto = overlay.querySelector('#char-load-auto');
+    const updateCountdown = () => {
+        auto.textContent = offline ? 'รอสัญญาณอินเทอร์เน็ต...' : `กำลังลองใหม่อัตโนมัติใน ${seconds} วินาที`;
+    };
+    updateCountdown();
+    if (!offline) {
+        characterLoadCountdownTimer = setInterval(() => { seconds = Math.max(0, seconds - 1); updateCountdown(); }, 1000);
+        characterLoadRetryTimer = setTimeout(retryCharacterLoadNow, 6000);
+    }
 }
+
+window.addEventListener('online', () => {
+    const overlay = document.getElementById('char-load-error');
+    if (overlay?.style.display === 'flex' && !characterLoadInFlight) retryCharacterLoadNow();
+});
 
 // ============ Input Handling ============
 function handleMouseInteraction(event) {

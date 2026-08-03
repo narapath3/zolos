@@ -80,6 +80,7 @@ export function createZolosClient(baseUrl) {
         // the LAST .order() (total_kills) instead of level.
         order(col, opts) { this._orders.push({ col, asc: !(opts && opts.ascending === false) }); return this; }
         limit(n) { this._limit = n; return this; }
+        abortSignal(signal) { this._signal = signal; return this; }
         single() { this._single = true; this._limit = this._limit ?? 1; return this; }
         maybeSingle() { this._maybe = true; this._limit = this._limit ?? 1; return this; }
 
@@ -93,7 +94,7 @@ export function createZolosClient(baseUrl) {
 
         async _run() {
             try {
-                const body = await apiFetch('/db', { method: 'POST', body: JSON.stringify(this._spec()) });
+                const body = await apiFetch('/db', { method: 'POST', body: JSON.stringify(this._spec()), signal: this._signal });
                 let data = body.data;
                 if (this._single || this._maybe) {
                     const row = Array.isArray(data) ? (data[0] ?? null) : (data ?? null);

@@ -104,19 +104,26 @@ export async function loadCharacter(userId) {
         return await createCharacter(userId);
     }
 
-    const { data, error } = await supabase
+    const timeoutSignal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+        ? AbortSignal.timeout(8000)
+        : (() => { const c = new AbortController(); setTimeout(() => c.abort(), 8000); return c.signal; })();
+    const query = supabase
         .from('characters')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+    const { data, error, status } = await (typeof query.abortSignal === 'function' ? query.abortSignal(timeoutSignal) : query);
 
     if (error && error.code === 'PGRST116') {
         // No character found, create one
         return await createCharacter(userId);
     }
-    if (error) throw error;
+    if (error) {
+        if (status && !error.status) error.status = status;
+        throw error;
+    }
 
     let char = data;
     // Part 2.2: Profile name always takes priority over character name
