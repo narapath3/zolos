@@ -14,7 +14,11 @@ test('player base model uses rounded production chibi geometry', () => {
 });
 
 test('chibi face and layered hair include expressive detail', () => {
-  assert.match(source, /this\.hairTufts = new THREE\.Group\(\)/);
+  assert.match(source, /this\.hairTufts = this\._buildChibiHairSilhouette\(hairMat\)/);
+  assert.match(source, /group\.name = 'chibi-hair-silhouette'/);
+  assert.match(source, /Overlapping teardrop bangs/);
+  assert.match(source, /this\.hairHighlightMaterial/);
+  assert.doesNotMatch(source, /hairTufts[\s\S]{0,500}ConeGeometry/);
   assert.match(source, /const shine = faceMesh/);
   assert.match(source, /new THREE\.TorusGeometry\(0\.055/);
   assert.match(source, /const leftHand = new THREE\.Mesh\(new THREE\.SphereGeometry/);

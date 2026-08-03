@@ -857,18 +857,11 @@ export class CharacterManager {
         const hairGeo = new THREE.SphereGeometry(0.5, 18, 12);
         const hairMat = new THREE.MeshStandardMaterial({ color: this.hairColor, roughness: 0.74, metalness: 0 });
         this.hair = new THREE.Mesh(hairGeo, hairMat);
-        this.hair.position.set(0, 1.91, -0.025);
-        this.hair.scale.set(0.72, 0.34, 0.63);
+        this.hair.position.set(0, 1.94, -0.035);
+        this.hair.scale.set(0.72, 0.29, 0.63);
         this.mesh.add(this.hair);
 
-        this.hairTufts = new THREE.Group();
-        [-0.24, -0.12, 0, 0.13, 0.25].forEach((x, index) => {
-            const lock = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.24 + (index % 2) * 0.05, 7), hairMat);
-            lock.position.set(x, 1.79 + Math.abs(x) * 0.08, 0.27);
-            lock.rotation.z = x * 1.35;
-            lock.rotation.x = -0.18;
-            this.hairTufts.add(lock);
-        });
+        this.hairTufts = this._buildChibiHairSilhouette(hairMat);
         this.mesh.add(this.hairTufts);
 
         // Gender-specific hair (female = long hair down the back)
@@ -1167,6 +1160,43 @@ export class CharacterManager {
         this._fishLineMesh.geometry.setFromPoints(curve.getPoints(16));
     }
 
+    _buildChibiHairSilhouette(mat) {
+        const group = new THREE.Group();
+        group.name = 'chibi-hair-silhouette';
+        const highlightColor = mat.color.clone().offsetHSL(0, -0.04, 0.12);
+        this.hairHighlightMaterial = new THREE.MeshStandardMaterial({ color: highlightColor, roughness: 0.62, metalness: 0 });
+        const smoothLock = ({ x, y, z, sx, sy, sz, rz = 0, rx = 0, material = mat }) => {
+            const lock = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), material);
+            lock.position.set(x, y, z);
+            lock.scale.set(sx, sy, sz);
+            lock.rotation.set(rx, 0, rz);
+            lock.castShadow = true;
+            group.add(lock);
+            return lock;
+        };
+
+        // Overlapping teardrop bangs form a continuous soft hairline. Their
+        // lower edges stop above the eyes, so expressions stay readable.
+        [
+            { x: -0.255, y: 1.835, z: 0.275, sx: 0.105, sy: 0.18, sz: 0.075, rz: -0.34 },
+            { x: -0.135, y: 1.855, z: 0.294, sx: 0.125, sy: 0.22, sz: 0.078, rz: -0.17 },
+            { x: 0.000, y: 1.862, z: 0.302, sx: 0.135, sy: 0.215, sz: 0.08, rz: 0.04 },
+            { x: 0.140, y: 1.852, z: 0.292, sx: 0.12, sy: 0.205, sz: 0.078, rz: 0.19 },
+            { x: 0.255, y: 1.832, z: 0.273, sx: 0.10, sy: 0.17, sz: 0.073, rz: 0.35 },
+        ].forEach(smoothLock);
+
+        // Crown volumes and side locks create an attractive silhouette from
+        // every camera angle instead of looking like flat hair painted on top.
+        smoothLock({ x: -0.20, y: 2.045, z: -0.035, sx: 0.17, sy: 0.115, sz: 0.16, rz: -0.34 });
+        smoothLock({ x: 0.00, y: 2.075, z: -0.055, sx: 0.18, sy: 0.12, sz: 0.17, rz: 0.03 });
+        smoothLock({ x: 0.20, y: 2.045, z: -0.035, sx: 0.17, sy: 0.115, sz: 0.16, rz: 0.34 });
+        smoothLock({ x: -0.315, y: 1.775, z: 0.065, sx: 0.085, sy: 0.205, sz: 0.105, rz: -0.13 });
+        smoothLock({ x: 0.315, y: 1.775, z: 0.065, sx: 0.085, sy: 0.205, sz: 0.105, rz: 0.13 });
+        smoothLock({ x: -0.10, y: 2.075, z: 0.105, sx: 0.075, sy: 0.035, sz: 0.055, rz: -0.20, material: this.hairHighlightMaterial });
+        smoothLock({ x: 0.055, y: 2.085, z: 0.11, sx: 0.055, sy: 0.028, sz: 0.05, rz: 0.10, material: this.hairHighlightMaterial });
+        return group;
+    }
+
     _applyGenderHair() {
         if (!this.mesh) return;
 
@@ -1185,19 +1215,24 @@ export class CharacterManager {
         const mat = this.hair.material;
         const group = new THREE.Group();
 
-        // Back panel flowing down to shoulder level
-        const back = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.5, 6, 12), mat);
-        back.position.set(0, 1.5, -0.3);
-        back.scale.x = 1.45;
-        back.scale.z = 0.55;
-        group.add(back);
+        const longLock = (x, y, z, sx, sy, rz = 0) => {
+            const lock = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), mat);
+            lock.position.set(x, y, z);
+            lock.scale.set(sx, sy, 0.10);
+            lock.rotation.z = rz;
+            lock.castShadow = true;
+            group.add(lock);
+        };
+
+        // Layered back locks taper visually through overlap and move as one
+        // lightweight group with the existing character animation.
+        longLock(0, 1.53, -0.29, 0.23, 0.50);
+        longLock(-0.19, 1.57, -0.275, 0.16, 0.43, -0.12);
+        longLock(0.19, 1.57, -0.275, 0.16, 0.43, 0.12);
 
         // Side strands framing the face
         for (const side of [-1, 1]) {
-            const strand = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.38, 5, 9), mat);
-            strand.position.set(side * 0.3, 1.62, -0.12);
-            strand.rotation.z = side * -0.08;
-            group.add(strand);
+            longLock(side * 0.305, 1.64, 0.105, 0.085, 0.30, side * 0.10);
         }
 
         this.longHair = group;
@@ -1210,6 +1245,9 @@ export class CharacterManager {
         this.hairColor = colorVal;
         if (this.hair && this.hair.material) {
             this.hair.material.color.setHex(colorVal);
+        }
+        if (this.hairHighlightMaterial) {
+            this.hairHighlightMaterial.color.setHex(colorVal).offsetHSL(0, -0.04, 0.12);
         }
         if (this.brows) this.brows.forEach(b => b.material && b.material.color.setHex(colorVal));
     }
