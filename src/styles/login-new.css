@@ -24,13 +24,21 @@
   position: absolute;
   inset: -20px;
   z-index: 0;
-  background-image: url('/src/assets/login_bg_new.png'), url('/src/assets/login_bg.png');
+  background-image: url('/src/assets/login_bg_desktop_v2.webp');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  filter: brightness(0.65) contrast(1.1) saturate(1.2);
+  filter: brightness(0.76) contrast(1.05) saturate(1.08);
   animation: authBgPan 25s ease-in-out infinite alternate;
   pointer-events: none;
+}
+
+/* Art-directed portrait artwork avoids destructively cropping desktop key art. */
+@media (orientation: portrait) {
+  .auth-bg-img {
+    background-image: url('/src/assets/login_bg_mobile_v2.webp');
+    background-position: center center;
+  }
 }
 
 @keyframes authBgPan {
@@ -232,10 +240,15 @@
   flex-shrink: 0;
 }
 
-/* Hide duplicate logo icon and duplicate title inside card so background artwork ZOLOS.ONLINE is hero */
-.auth-logo .auth-icon-img,
-.auth-logo .game-title-new {
+/* Keep the icon hidden; the text-free wallpaper uses crisp live brand text. */
+.auth-logo .auth-icon-img {
   display: none !important;
+}
+
+.auth-logo .game-title-new {
+  display: block !important;
+  font-size: clamp(24px, 4.4vh, 38px);
+  margin-bottom: 5px;
 }
 
 .logo-aura {

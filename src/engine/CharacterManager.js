@@ -829,27 +829,47 @@ export class CharacterManager {
         this.mesh = new THREE.Group();
 
         // Body
-        const bodyGeo = new THREE.BoxGeometry(0.6, 0.8, 0.4);
-        const bodyMat = new THREE.MeshLambertMaterial({ color: this.bodyColor });
+        const bodyGeo = new THREE.CapsuleGeometry(0.29, 0.30, 7, 14);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: this.bodyColor, roughness: 0.72, metalness: 0.02 });
         this.body = new THREE.Mesh(bodyGeo, bodyMat);
         this.body.position.y = 1.0;
+        this.body.scale.z = 0.72;
         this.body.castShadow = true;
         this.mesh.add(this.body);
 
         // Head
-        const headGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        const headMat = new THREE.MeshLambertMaterial({ color: 0xffccaa });
-        const head = new THREE.Mesh(headGeo, headMat);
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xffc9a5, roughness: 0.82, metalness: 0 });
+        const headGeo = new THREE.SphereGeometry(0.5, 22, 16);
+        const head = new THREE.Mesh(headGeo, skinMat);
         head.position.y = 1.7;
+        head.scale.set(0.68, 0.64, 0.60);
         head.castShadow = true;
         this.mesh.add(head);
 
+        for (const side of [-1, 1]) {
+            const ear = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), skinMat);
+            ear.position.set(side * 0.335, 1.69, 0);
+            ear.scale.set(0.65, 1, 0.55);
+            this.mesh.add(ear);
+        }
+
         // Hair
-        const hairGeo = new THREE.BoxGeometry(0.55, 0.3, 0.55);
-        const hairMat = new THREE.MeshLambertMaterial({ color: this.hairColor });
+        const hairGeo = new THREE.SphereGeometry(0.5, 18, 12);
+        const hairMat = new THREE.MeshStandardMaterial({ color: this.hairColor, roughness: 0.74, metalness: 0 });
         this.hair = new THREE.Mesh(hairGeo, hairMat);
-        this.hair.position.y = 1.95;
+        this.hair.position.set(0, 1.91, -0.025);
+        this.hair.scale.set(0.72, 0.34, 0.63);
         this.mesh.add(this.hair);
+
+        this.hairTufts = new THREE.Group();
+        [-0.24, -0.12, 0, 0.13, 0.25].forEach((x, index) => {
+            const lock = new THREE.Mesh(new THREE.ConeGeometry(0.085, 0.24 + (index % 2) * 0.05, 7), hairMat);
+            lock.position.set(x, 1.79 + Math.abs(x) * 0.08, 0.27);
+            lock.rotation.z = x * 1.35;
+            lock.rotation.x = -0.18;
+            this.hairTufts.add(lock);
+        });
+        this.mesh.add(this.hairTufts);
 
         // Gender-specific hair (female = long hair down the back)
         this._applyGenderHair();
@@ -863,43 +883,63 @@ export class CharacterManager {
             this.mesh.add(m);
             return m;
         };
-        const scleraGeo = new THREE.BoxGeometry(0.12, 0.11, 0.04);
-        const pupilGeo = new THREE.BoxGeometry(0.06, 0.07, 0.05);
+        const scleraGeo = new THREE.SphereGeometry(0.075, 12, 9);
+        const pupilGeo = new THREE.SphereGeometry(0.043, 10, 8);
         [-0.13, 0.13].forEach(x => {
-            faceMesh(scleraGeo, 0xffffff, x, 1.73, 0.255);         // eye white
-            faceMesh(pupilGeo, 0x241a14, x + (x < 0 ? 0.01 : -0.01), 1.725, 0.27); // pupil
+            const white = faceMesh(scleraGeo, 0xffffff, x, 1.73, 0.298);
+            white.scale.set(0.92, 1.18, 0.28);
+            const pupil = faceMesh(pupilGeo, 0x182342, x + (x < 0 ? 0.008 : -0.008), 1.724, 0.322);
+            pupil.scale.set(0.84, 1.16, 0.25);
+            const shine = faceMesh(new THREE.SphereGeometry(0.012, 7, 6), 0xffffff, x - 0.014, 1.744, 0.336);
+            shine.scale.z = 0.25;
         });
         // Eyebrows (match hair) — kept as refs so they recolor with the hair.
-        const browGeo = new THREE.BoxGeometry(0.13, 0.03, 0.04);
-        this.brows = [-0.13, 0.13].map(x => faceMesh(browGeo, this.hairColor, x, 1.84, 0.255, false));
+        const browGeo = new THREE.CapsuleGeometry(0.012, 0.09, 3, 6);
+        this.brows = [-0.13, 0.13].map(x => {
+            const brow = faceMesh(browGeo, this.hairColor, x, 1.835, 0.302, false);
+            brow.rotation.z = Math.PI / 2 + (x < 0 ? -0.08 : 0.08);
+            return brow;
+        });
         // Nose — a small skin-tone wedge that sticks out.
-        faceMesh(new THREE.BoxGeometry(0.09, 0.12, 0.1), 0xecb391, 0, 1.65, 0.27, false);
+        const nose = faceMesh(new THREE.SphereGeometry(0.035, 9, 7), 0xecaa88, 0, 1.655, 0.322, false);
+        nose.scale.set(0.7, 0.8, 0.55);
         // Mouth.
-        faceMesh(new THREE.BoxGeometry(0.16, 0.035, 0.03), 0x8a4038, 0, 1.55, 0.27);
+        const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.011, 6, 14, Math.PI), new THREE.MeshBasicMaterial({ color: 0x8a4038 }));
+        mouth.position.set(0, 1.585, 0.327);
+        mouth.rotation.z = Math.PI;
+        this.mesh.add(mouth);
         // Rosy cheeks for a friendly look.
-        const cheekGeo = new THREE.BoxGeometry(0.09, 0.06, 0.03);
-        [-0.2, 0.2].forEach(x => { const c = faceMesh(cheekGeo, 0xff9aa8, x, 1.62, 0.255); c.material.transparent = true; c.material.opacity = 0.75; });
+        const cheekGeo = new THREE.SphereGeometry(0.05, 9, 7);
+        [-0.21, 0.21].forEach(x => { const c = faceMesh(cheekGeo, 0xff8fa1, x, 1.635, 0.301); c.scale.set(1.15, 0.58, 0.18); c.material.transparent = true; c.material.opacity = 0.62; });
 
         // Arms
-        const armGeo = new THREE.BoxGeometry(0.2, 0.6, 0.2);
-        const armMat = new THREE.MeshLambertMaterial({ color: this.bodyColor });
+        const armGeo = new THREE.CapsuleGeometry(0.105, 0.36, 5, 10);
+        const armMat = new THREE.MeshStandardMaterial({ color: this.bodyColor, roughness: 0.72 });
 
         this.leftArm = new THREE.Mesh(armGeo, armMat);
-        this.leftArm.position.set(-0.45, 1.0, 0);
+        this.leftArm.position.set(-0.43, 1.0, 0);
         this.leftArm.castShadow = true;
+        const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.12, 11, 8), skinMat);
+        leftHand.position.y = -0.31;
+        leftHand.scale.y = 0.85;
+        this.leftArm.add(leftHand);
         this.mesh.add(this.leftArm);
 
         this.rightArm = new THREE.Mesh(armGeo, armMat);
-        this.rightArm.position.set(0.45, 1.0, 0);
+        this.rightArm.position.set(0.43, 1.0, 0);
         this.rightArm.castShadow = true;
+        const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.12, 11, 8), skinMat);
+        rightHand.position.y = -0.31;
+        rightHand.scale.y = 0.85;
+        this.rightArm.add(rightHand);
         this.mesh.add(this.rightArm);
 
         // Build starting weapon visuals (defaults to Sword until loaded from DB)
         this.updateWeaponVisuals('Sword');
 
         // Legs
-        const legGeo = new THREE.BoxGeometry(0.22, 0.5, 0.25);
-        const legMat = new THREE.MeshLambertMaterial({ color: this.pantsColor });
+        const legGeo = new THREE.CapsuleGeometry(0.12, 0.28, 5, 10);
+        const legMat = new THREE.MeshStandardMaterial({ color: this.pantsColor, roughness: 0.8 });
 
         this.leftLeg = new THREE.Mesh(legGeo, legMat);
         this.leftLeg.position.set(-0.15, 0.35, 0);
@@ -1146,14 +1186,17 @@ export class CharacterManager {
         const group = new THREE.Group();
 
         // Back panel flowing down to shoulder level
-        const back = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.85, 0.14), mat);
+        const back = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.5, 6, 12), mat);
         back.position.set(0, 1.5, -0.3);
+        back.scale.x = 1.45;
+        back.scale.z = 0.55;
         group.add(back);
 
         // Side strands framing the face
         for (const side of [-1, 1]) {
-            const strand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.55, 0.16), mat);
+            const strand = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.38, 5, 9), mat);
             strand.position.set(side * 0.3, 1.62, -0.12);
+            strand.rotation.z = side * -0.08;
             group.add(strand);
         }
 
