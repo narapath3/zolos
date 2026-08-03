@@ -51,3 +51,7 @@ test('iPad Air landscape chat clears the menu dock and cannot swallow menu taps'
   assert.match(css, /\.chat-panel\.preview-mode \.chat-messages-container\s*\{\s*pointer-events:\s*none\s*!important/);
   assert.match(css, /max-width:\s*42dvw\s*!important/);
 });
+
+test('Bag scrolls with the menu instead of becoming a floating sticky button', () => {
+  assert.doesNotMatch(css, /#hud-bottom\s+#btn-inventory\s*\{[^}]*position:\s*sticky/s);
+});

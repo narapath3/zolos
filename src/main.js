@@ -2006,21 +2006,27 @@ function initBossUI() {
     const style = document.createElement('style');
     style.id = 'boss-ui-style';
     style.textContent = `
-    #boss-hpbar{position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:61;
-      width:min(560px,86vw);display:none;text-align:center;}
-    #boss-hpbar .bh-name{color:#ffcf6a;font-weight:800;font-size:15px;
-      text-shadow:0 2px 6px rgba(0,0,0,.8);letter-spacing:.5px;margin-bottom:3px;}
-    #boss-hpbar .bh-track{height:20px;border-radius:11px;background:rgba(0,0,0,.55);
-      border:1.5px solid #7a2d1f;overflow:hidden;position:relative;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+    #boss-hpbar{position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:61;
+      width:min(440px,72vw);display:none;text-align:center;pointer-events:none;padding:7px 10px 9px;
+      border:1px solid rgba(255,126,64,.5);border-radius:13px;background:linear-gradient(180deg,rgba(30,12,18,.92),rgba(12,10,18,.82));
+      box-shadow:0 7px 22px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.08);backdrop-filter:blur(7px);}
+    #boss-hpbar .bh-head{display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:5px;min-width:0;}
+    #boss-hpbar .bh-name{color:#ffcf6a;font-weight:900;font-size:13px;line-height:1.1;
+      text-shadow:0 2px 6px rgba(0,0,0,.8);letter-spacing:.45px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    #boss-hpbar .bh-location{flex:none;color:#ffd8bf;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;
+      background:rgba(255,111,54,.16);border:1px solid rgba(255,143,91,.28);white-space:nowrap;}
+    #boss-hpbar .bh-track{height:15px;border-radius:9px;background:rgba(0,0,0,.62);
+      border:1px solid #7a2d1f;overflow:hidden;position:relative;box-shadow:inset 0 2px 5px rgba(0,0,0,.48);}
     #boss-hpbar .bh-fill{height:100%;width:100%;
       background:linear-gradient(90deg,#ff3b30,#ff7a2e,#ffb038);transition:width .18s ease;}
     #boss-hpbar .bh-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-      color:#fff;font-weight:700;font-size:12px;text-shadow:0 1px 3px rgba(0,0,0,.9);}
+      color:#fff;font-weight:800;font-size:10px;text-shadow:0 1px 3px rgba(0,0,0,.9);}
     @media(max-width:768px){
-      #boss-hpbar{top:78px;}
-      #boss-hpbar .bh-name{font-size:13px;}
-      #boss-hpbar .bh-track{height:16px;}
-      #boss-hpbar .bh-text{font-size:10px;}
+      #boss-hpbar{top:max(8px,env(safe-area-inset-top));width:min(360px,64vw);padding:6px 8px 7px;}
+      #boss-hpbar .bh-name{font-size:11px;}
+      #boss-hpbar .bh-location{font-size:8px;max-width:92px;overflow:hidden;text-overflow:ellipsis;}
+      #boss-hpbar .bh-track{height:13px;}
+      #boss-hpbar .bh-text{font-size:9px;}
     }
     #boss-toast{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%) scale(.7);z-index:2000;
       text-align:center;pointer-events:none;opacity:0;transition:all .5s cubic-bezier(.2,1.3,.4,1);}
@@ -2056,7 +2062,9 @@ function initBossUI() {
 
     const bar = document.createElement('div');
     bar.id = 'boss-hpbar';
-    bar.innerHTML = `<div class="bh-name"></div>
+    bar.setAttribute('role', 'status');
+    bar.setAttribute('aria-live', 'polite');
+    bar.innerHTML = `<div class="bh-head"><div class="bh-name"></div><div class="bh-location"></div></div>
       <div class="bh-track"><div class="bh-fill"></div><div class="bh-text"></div></div>`;
     document.body.appendChild(bar);
 
@@ -2088,7 +2096,7 @@ window.worldBossManager = {
                 z: p.z || 0,
             };
             bossRewardClaimed = false;
-            this._showBar();
+            this._syncBarVisibility();
         } else {
             bossState = null;
             this._hideBar();
@@ -2113,12 +2121,7 @@ window.worldBossManager = {
         bossRewardClaimed = false;
 
         // Only show bar if the player is actually on the boss map.
-        const onBossMap = sceneManager && sceneManager.currentMap === bossState.mapId;
-        if (onBossMap) {
-            this._showBar();
-        } else {
-            this._hideBar();
-        }
+        this._syncBarVisibility();
 
         this.reconcileMesh();
         if (gameUI) gameUI.addCombatLog(`👹 บอสโลก [${p.name}] ปรากฏตัวที่ ${mapName}! รีบไปช่วยกันตี!`, 'levelup');
@@ -2131,13 +2134,7 @@ window.worldBossManager = {
         bossState.hp = p.hp;
         bossState.maxHp = p.maxHp;
 
-        const onBossMap = sceneManager && sceneManager.currentMap === bossState.mapId;
-        if (onBossMap) {
-            this._showBar(); // Show if they just entered the map
-            this._updateBar();
-        } else {
-            this._hideBar(); // Hide if they are elsewhere
-        }
+        this._syncBarVisibility();
     },
 
     onDead(p) {
@@ -2177,6 +2174,7 @@ window.worldBossManager = {
         } else if (sceneManager._worldBoss) {
             sceneManager.removeWorldBoss();
         }
+        this._syncBarVisibility();
     },
 
     _applyReward(p) {
@@ -2200,10 +2198,24 @@ window.worldBossManager = {
 
     },
 
+    _isOnBossMap() {
+        return !!(bossState && bossState.active && sceneManager && bossState.mapId
+            && sceneManager.currentMap === bossState.mapId);
+    },
+    _syncBarVisibility() {
+        if (this._isOnBossMap()) {
+            this._showBar();
+            this._updateBar();
+        } else {
+            this._hideBar();
+        }
+    },
     _showBar() {
         const bar = document.getElementById('boss-hpbar');
-        if (bar) { bar.style.display = 'block'; bar.querySelector('.bh-name').textContent = `👹 ${bossState.name}`; }
-        this._updateBar();
+        if (!bar || !this._isOnBossMap()) return this._hideBar();
+        bar.style.display = 'block';
+        bar.querySelector('.bh-name').textContent = `👹 ${bossState.name}`;
+        bar.querySelector('.bh-location').textContent = `📍 ${bossState.mapName}`;
     },
     _updateBar() {
         const bar = document.getElementById('boss-hpbar');
