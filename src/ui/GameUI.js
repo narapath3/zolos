@@ -6788,7 +6788,7 @@ export class GameUI {
       const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
 
       slot.innerHTML = `
-        <span class="slot-emoji">${item.emoji || itemData.emoji || '📦'}</span>
+        <span class="slot-emoji">${itemIconMarkup(item, item.emoji || itemData.emoji || '📦')}</span>
         <span class="slot-qty">${item.quantity}</span>
         <div class="slot-price-tag" style="font-size:8px;color:#ffdd44;">${sellPrice}z</div>
       `;
@@ -6831,7 +6831,7 @@ export class GameUI {
     const basePrice = itemData.price || item.price || 10;
     const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
 
-    document.getElementById('sell-shop-detail-icon').textContent = item.emoji || itemData.emoji || '📦';
+    document.getElementById('sell-shop-detail-icon').innerHTML = itemIconMarkup(item, item.emoji || itemData.emoji || '📦', 'item-visual--detail');
     document.getElementById('sell-shop-detail-name').textContent = item.item_name;
     document.getElementById('sell-shop-detail-type').textContent = (itemData.type || item.item_type || 'etc').toUpperCase();
     document.getElementById('sell-shop-detail-desc').textContent = itemData.desc || item.desc || 'ไม่มีคำอธิบาย';

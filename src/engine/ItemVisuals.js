@@ -56,7 +56,7 @@ export function itemIconMarkup(itemOrName, fallbackEmoji = '📦', className = '
   const path = itemIconPath(name);
   const safeName = String(name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   if (path) {
-    return `<span class="item-visual ${className}" aria-hidden="true"><img src="${path}" alt="" loading="lazy"><span class="item-visual__fallback">${fallbackEmoji}</span></span><span class="sr-only">${safeName}</span>`;
+    return `<span class="item-visual ${className}" aria-hidden="true"><img src="${path}" alt="" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="item-visual__fallback" hidden>${fallbackEmoji}</span></span><span class="sr-only">${safeName}</span>`;
   }
   return `<span class="item-visual item-visual--emoji ${className}" aria-hidden="true"><span>${fallbackEmoji}</span></span><span class="sr-only">${safeName}</span>`;
 }

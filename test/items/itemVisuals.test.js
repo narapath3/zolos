@@ -42,6 +42,16 @@ test('shop, inventory and equipped summaries share the canonical renderer', () =
   assert.match(character, /'Soulreaper': \{ kind: 'scythe'/);
 });
 
+test('real item art hides its emoji fallback and the active sell shop uses canonical art', () => {
+  const gameUi = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
+  const visuals = fs.readFileSync(new URL('../../src/engine/ItemVisuals.js', import.meta.url), 'utf8');
+  assert.match(visuals, /class="item-visual__fallback" hidden/);
+  assert.match(visuals, /onerror="this\.hidden=true;this\.nextElementSibling\.hidden=false"/);
+  assert.match(gameUi, /itemIconMarkup\(item, item\.emoji \|\| itemData\.emoji \|\| '📦'\)/);
+  assert.match(gameUi, /sell-shop-detail-icon'\)\.innerHTML = itemIconMarkup/);
+  assert.doesNotMatch(gameUi, /sell-shop-detail-icon'\)\.textContent = item\.emoji/);
+});
+
 test('settings equipment and every blacksmith item surface use canonical PNG art', () => {
   const gameUi = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
   const profile = fs.readFileSync(new URL('../../src/ui/PlayerProfileModal.js', import.meta.url), 'utf8');
