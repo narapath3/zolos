@@ -205,55 +205,35 @@
 
           <!-- RO Class Badge Selection (Register Mode) -->
           <div id="auth-class-selector" class="auth-class-selector" style="display: none;">
-            <div class="class-selector-label">เลือกสายอาชีพตั้งต้น (Starter Class):</div>
+            <div class="class-selector-label">
+              <span>เลือกสายอาชีพเริ่มต้น</span>
+              <small>เลือกสไตล์การต่อสู้ของคุณ</small>
+            </div>
             <div class="class-badges-grid">
-              <div class="class-badge active" data-class="novice">
-                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  </svg></span>
-                <span class="badge-title">Novice</span>
-              </div>
-              <div class="class-badge" data-class="swordman">
-                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
-                    <path d="M13 19l6 2 2-6-3-3-5 5z" />
-                    <path d="M9.5 6.5L21 18v3h-3L6.5 9.5" />
-                    <path d="M11 5L5 3 3 9l3 3 5-5z" />
-                  </svg></span>
-                <span class="badge-title">Swordman</span>
-              </div>
-              <div class="class-badge" data-class="mage">
-                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <polygon
-                      points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg></span>
-                <span class="badge-title">Mage</span>
-              </div>
-              <div class="class-badge" data-class="archer">
-                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 6v12M6 12h12" />
-                  </svg></span>
-                <span class="badge-title">Archer</span>
-              </div>
-              <div class="class-badge" data-class="acolyte">
-                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M12 2v20M2 12h20" />
-                  </svg></span>
-                <span class="badge-title">Acolyte</span>
-              </div>
-              <div class="class-badge" data-class="thief">
-                <span class="badge-icon"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
-                    stroke="currentColor" stroke-width="2">
-                    <path d="M6 3h12l4 6-10 12L2 9z" />
-                  </svg></span>
-                <span class="badge-title">Thief</span>
-              </div>
+              <button type="button" class="class-badge class-novice active" data-class="novice" aria-pressed="true">
+                <span class="class-art"><img src="/assets/items/equipment/novice-cutter.png" alt="" /></span>
+                <span class="badge-copy"><strong>Novice</strong><small>สมดุล · เริ่มง่าย</small></span><span class="class-check">✓</span>
+              </button>
+              <button type="button" class="class-badge class-swordman" data-class="swordman" aria-pressed="false">
+                <span class="class-art"><img src="/assets/items/equipment/sword.png" alt="" /></span>
+                <span class="badge-copy"><strong>Swordsman</strong><small>แข็งแกร่ง · แนวหน้า</small></span><span class="class-check">✓</span>
+              </button>
+              <button type="button" class="class-badge class-mage" data-class="mage" aria-pressed="false">
+                <span class="class-art"><img src="/assets/items/equipment/mage-staff.png" alt="" /></span>
+                <span class="badge-copy"><strong>Mage</strong><small>เวทแรง · ระยะไกล</small></span><span class="class-check">✓</span>
+              </button>
+              <button type="button" class="class-badge class-archer" data-class="archer" aria-pressed="false">
+                <span class="class-art"><img src="/assets/items/equipment/bow.png" alt="" /></span>
+                <span class="badge-copy"><strong>Archer</strong><small>ว่องไว · ยิงไกล</small></span><span class="class-check">✓</span>
+              </button>
+              <button type="button" class="class-badge class-acolyte" data-class="acolyte" aria-pressed="false">
+                <span class="class-art"><img src="/assets/items/equipment/holy-rod.png" alt="" /></span>
+                <span class="badge-copy"><strong>Acolyte</strong><small>รักษา · สนับสนุน</small></span><span class="class-check">✓</span>
+              </button>
+              <button type="button" class="class-badge class-thief" data-class="thief" aria-pressed="false">
+                <span class="class-art"><img src="/assets/items/equipment/silver-dagger.png" alt="" /></span>
+                <span class="badge-copy"><strong>Thief</strong><small>คริติคอล · หลบหลีก</small></span><span class="class-check">✓</span>
+              </button>
             </div>
           </div>
 

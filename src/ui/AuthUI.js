@@ -67,6 +67,7 @@ export class AuthUI {
             badge.addEventListener('click', () => {
                 classBadges.forEach(b => b.classList.remove('active'));
                 badge.classList.add('active');
+                classBadges.forEach(b => b.setAttribute('aria-pressed', String(b === badge)));
                 this._selectedClass = badge.getAttribute('data-class') || 'novice';
             });
         });
