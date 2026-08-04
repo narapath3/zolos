@@ -282,6 +282,39 @@ export class GameUI {
   }
 
   _setupPanels() {
+    // Compact categorized bottom HUD. Existing action IDs stay on the real
+    // buttons, so grouping does not change any gameplay behavior.
+    const hudTriggers = document.querySelectorAll('.hud-menu-trigger');
+    const closeHudMenus = (except = null) => {
+      document.querySelectorAll('.hud-menu-popover').forEach(panel => {
+        if (panel !== except) panel.hidden = true;
+      });
+      hudTriggers.forEach(trigger => {
+        const panel = document.querySelector(`[data-hud-panel="${trigger.dataset.hudMenu}"]`);
+        trigger.setAttribute('aria-expanded', String(panel ? !panel.hidden : false));
+      });
+    };
+    hudTriggers.forEach(trigger => {
+      trigger.addEventListener('click', event => {
+        event.stopPropagation();
+        const panel = document.querySelector(`[data-hud-panel="${trigger.dataset.hudMenu}"]`);
+        if (!panel) return;
+        const willOpen = panel.hidden;
+        closeHudMenus(panel);
+        panel.hidden = !willOpen;
+        trigger.setAttribute('aria-expanded', String(willOpen));
+      });
+    });
+    document.querySelectorAll('.hud-menu-popover .hud-btn').forEach(button => {
+      button.addEventListener('click', () => closeHudMenus());
+    });
+    document.addEventListener('click', event => {
+      if (!event.target.closest?.('#hud-bottom')) closeHudMenus();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeHudMenus();
+    });
+
     // Panel toggle buttons
     document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
     document.getElementById('btn-mycard')?.addEventListener('click', () => this._openMyCard());

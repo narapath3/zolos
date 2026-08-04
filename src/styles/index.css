@@ -539,8 +539,8 @@ a,
   padding: 8px 12px;
   backdrop-filter: blur(14px) saturate(180%);
   animation: slideInUp 0.5s ease-out;
-  min-width: 680px;
-  max-width: 780px;
+  min-width: 350px;
+  max-width: min(520px, calc(100vw - 20px));
   box-shadow:
     0 8px 32px 0 rgba(0, 0, 0, 0.6),
     inset 0 1px 1px rgba(255, 255, 255, 0.08),
@@ -549,6 +549,75 @@ a,
 
 #hud-bottom .hud-btn {
   flex: 1;
+}
+
+.hud-icon {
+  width: 23px;
+  height: 23px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+.hud-menu-group {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.hud-menu-group > .hud-btn {
+  width: 100%;
+}
+
+.hud-menu-trigger[aria-expanded="true"] {
+  color: #ffe17a;
+  border-color: rgba(255, 213, 82, 0.55);
+  background: linear-gradient(180deg, rgba(255, 213, 82, 0.16), rgba(255, 213, 82, 0.06));
+  box-shadow: 0 0 18px rgba(255, 200, 55, 0.15), inset 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.hud-menu-popover {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 15px);
+  transform: translateX(-50%);
+  z-index: 1900;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(74px, 1fr));
+  gap: 6px;
+  width: max-content;
+  max-width: min(330px, calc(100vw - 20px));
+  padding: 9px;
+  border: 1px solid rgba(111, 162, 255, 0.34);
+  border-radius: 14px;
+  background: linear-gradient(155deg, rgba(17, 27, 49, 0.98), rgba(7, 12, 25, 0.98));
+  backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.58), inset 0 1px rgba(255, 255, 255, 0.08);
+  animation: hudMenuReveal 0.18s ease-out;
+}
+
+.hud-menu-popover[hidden] { display: none !important; }
+
+.hud-menu-popover .hud-btn {
+  flex: none !important;
+  min-width: 74px;
+  min-height: 58px;
+  padding: 7px 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.hud-menu-popover .hud-btn--danger { color: #ff8d91; }
+
+@keyframes hudMenuReveal {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 @keyframes slideInUp {
@@ -6879,5 +6948,26 @@ a,
   .chat-panel .chat-input-row,
   .chat-panel .chat-input-row * {
     pointer-events: auto !important;
+  }
+}
+
+/* The compact five-button dock no longer needs horizontal scrolling. Keeping
+   overflow visible is essential because categorized menus open above it. */
+@media (max-width: 1024px) {
+  #hud-bottom {
+    overflow: visible;
+    justify-content: center;
+  }
+
+  #hud-bottom > .hud-btn,
+  #hud-bottom > .hud-menu-group {
+    flex: 1 1 0;
+    min-width: 48px;
+  }
+
+  .hud-menu-popover {
+    position: fixed;
+    left: 50%;
+    bottom: calc(82px + env(safe-area-inset-bottom));
   }
 }

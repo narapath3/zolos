@@ -429,62 +429,49 @@
     <!-- Bottom HUD -->
     <div id="hud-bottom">
       <button class="hud-btn" id="btn-inventory" title="Inventory">
-        <span>🎒</span>
+        <svg class="hud-icon" viewBox="0 0 24 24"><path d="M8 8V6a4 4 0 0 1 8 0v2M6 8h12l2 13H4L6 8Z"/><path d="M9 13h6v4H9z"/></svg>
         <small>Bag</small>
       </button>
       <button class="hud-btn" id="btn-mycard" title="My Card">
-        <span>🃏</span>
+        <svg class="hud-icon" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="m12 7 1.3 2.6 2.7.4-2 2 .5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-2 2.7-.4L12 7Z"/></svg>
         <small>My Card</small>
       </button>
-      <button class="hud-btn" id="btn-warp" title="Warp Map">
-        <span>🌀</span>
-        <small>วาร์ป</small>
-      </button>
-      <button class="hud-btn" id="btn-market" title="ตลาด">
-        <span>⚖️</span>
-        <small>ตลาด</small>
-      </button>
-      <button class="hud-btn" id="btn-leaderboard" title="Leaderboard">
-        <span>🏆</span>
-        <small>Rank</small>
-      </button>
-      <button class="hud-btn" id="btn-chat-toggle" title="Chat">
-        <span>💬</span>
-        <small>Chat</small>
-      </button>
-      <button class="hud-btn" id="btn-players-list" title="Online Players">
-        <span>👥</span>
-        <small>Online</small>
-      </button>
-      <button class="hud-btn" id="btn-wiki" title="Wiki">
-        <span>📖</span>
-        <small>Wiki</small>
-      </button>
-      <button class="hud-btn" id="btn-daily-quests" title="Daily Quests">
-        <span>📜</span>
-        <small>Quest</small>
-      </button>
-      <button class="hud-btn" id="btn-daily-reward" title="Login Streak / รางวัลเข้าเกมรายวัน">
-        <span>🎁</span>
-        <small>รายวัน</small>
-      </button>
-      <button class="hud-btn" id="btn-almanac" title="Fishing Almanac / สมุดสะสมปลา">
-        <span>🐟</span>
-        <small>สมุดปลา</small>
-      </button>
-      <button class="hud-btn" id="btn-profile" title="Settings">
-        <span>⚙️</span>
-        <small>Settings</small>
-      </button>
 
-      <button class="hud-btn" id="btn-admin" title="Admin" style="display: none;">
-        <span>🛡️</span>
-        <small>Admin</small>
-      </button>
-      <button class="hud-btn" id="btn-logout" title="Logout">
-        <span>🚪</span>
-        <small>Logout</small>
-      </button>
+      <div class="hud-menu-group">
+        <button class="hud-btn hud-menu-trigger" type="button" data-hud-menu="adventure" aria-expanded="false">
+          <svg class="hud-icon" viewBox="0 0 24 24"><path d="m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6Z"/><circle cx="12" cy="12" r="2"/></svg><small>ผจญภัย</small>
+        </button>
+        <div class="hud-menu-popover" data-hud-panel="adventure" hidden>
+          <button class="hud-btn" id="btn-warp" title="Warp Map"><svg class="hud-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4c4 4-4 4 0 8s-4 4 0 8"/></svg><small>วาร์ป</small></button>
+          <button class="hud-btn" id="btn-market" title="ตลาด"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M12 4v16M5 7h14M7 7l-3 6h6L7 7Zm10 0-3 6h6l-3-6Z"/></svg><small>ตลาด</small></button>
+          <button class="hud-btn" id="btn-leaderboard" title="Leaderboard"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/><path d="M8 6H4v2a4 4 0 0 0 4 4m8-6h4v2a4 4 0 0 1-4 4m-4 1v4m-4 3h8"/></svg><small>Rank</small></button>
+          <button class="hud-btn" id="btn-daily-quests" title="Daily Quests"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 8h6m-6 4h6m-6 4h4"/></svg><small>Quest</small></button>
+          <button class="hud-btn" id="btn-daily-reward" title="Login Streak"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M4 10h16v11H4zM3 7h18v3H3zM12 7v14"/><path d="M12 7c-3 0-5-1-5-3 0-1 1-2 2-2 2 0 3 3 3 5Zm0 0c3 0 5-1 5-3 0-1-1-2-2-2-2 0-3 3-3 5Z"/></svg><small>รายวัน</small></button>
+          <button class="hud-btn" id="btn-almanac" title="Fishing Almanac"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M4 12s3-5 9-5c4 0 7 5 7 5s-3 5-7 5c-6 0-9-5-9-5Z"/><path d="m4 12-2-3v6l2-3Zm10-1h.01"/></svg><small>สมุดปลา</small></button>
+        </div>
+      </div>
+
+      <div class="hud-menu-group">
+        <button class="hud-btn hud-menu-trigger" type="button" data-hud-menu="social" aria-expanded="false">
+          <svg class="hud-icon" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8m-8 3h5"/></svg><small>สังคม</small>
+        </button>
+        <div class="hud-menu-popover" data-hud-panel="social" hidden>
+          <button class="hud-btn" id="btn-chat-toggle" title="Chat"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9h8m-8 3h6"/></svg><small>Chat</small></button>
+          <button class="hud-btn" id="btn-players-list" title="Online Players"><svg class="hud-icon" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20c0-4 2-7 6-7s6 3 6 7m0-5c3 0 5 2 5 5"/></svg><small>Online</small></button>
+        </div>
+      </div>
+
+      <div class="hud-menu-group">
+        <button class="hud-btn hud-menu-trigger" type="button" data-hud-menu="system" aria-expanded="false">
+          <svg class="hud-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></svg><small>ระบบ</small>
+        </button>
+        <div class="hud-menu-popover" data-hud-panel="system" hidden>
+          <button class="hud-btn" id="btn-wiki" title="Wiki"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M3 5c4-2 7-1 9 1v15c-2-2-5-3-9-1V5Zm18 0c-4-2-7-1-9 1v15c2-2 5-3 9-1V5Z"/></svg><small>Wiki</small></button>
+          <button class="hud-btn" id="btn-profile" title="Settings"><svg class="hud-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2m0-12-2 2M8 16l-2 2"/></svg><small>Settings</small></button>
+          <button class="hud-btn" id="btn-admin" title="Admin" style="display: none;"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-3Z"/><path d="m8 12 2.5 2.5L16 9"/></svg><small>Admin</small></button>
+          <button class="hud-btn hud-btn--danger" id="btn-logout" title="Logout"><svg class="hud-icon" viewBox="0 0 24 24"><path d="M10 4H4v16h6m4-4 4-4-4-4m4 4H8"/></svg><small>Logout</small></button>
+        </div>
+      </div>
     </div>
 
     <!-- Stats Panel -->
