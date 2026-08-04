@@ -174,6 +174,7 @@ export class SceneManager {
             initialQuality = isLowEnd ? 'ultra-low' : (isMidRange ? 'medium' : 'high');
             localStorage.setItem('zolos_graphics_quality', initialQuality);
         }
+        this.graphicsQuality = initialQuality;
 
         // Renderer
         const useAntialias = (initialQuality !== 'ultra-low' && initialQuality !== 'low');
@@ -205,7 +206,10 @@ export class SceneManager {
             this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         }
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.3;
+        this.renderer.toneMappingExposure = 1.18;
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this._detailTexture.colorSpace = THREE.SRGBColorSpace;
+        this._detailTexture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
 
         // Clock
         this.clock = new THREE.Clock();
@@ -230,11 +234,11 @@ export class SceneManager {
 
     _setupLights() {
         // Hemisphere light (sky/ground color bleed)
-        this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x3a5a2a, 0.5);
+        this.hemiLight = new THREE.HemisphereLight(0xa9d9ff, 0x355027, 0.82);
         this.scene.add(this.hemiLight);
 
         // Ambient
-        this.ambientLight = new THREE.AmbientLight(0x607090, 0.4);
+        this.ambientLight = new THREE.AmbientLight(0x607090, 0.22);
         this.scene.add(this.ambientLight);
 
         // Directional (sun)
@@ -250,7 +254,13 @@ export class SceneManager {
         this.sunLight.shadow.camera.top = 25;
         this.sunLight.shadow.camera.bottom = -25;
         this.sunLight.shadow.bias = -0.001;
+        this.sunLight.shadow.normalBias = 0.025;
         this.scene.add(this.sunLight);
+
+        // Cool sky fill separates silhouettes without flattening the warm sun.
+        this.skyFillLight = new THREE.DirectionalLight(0x8bc8ff, 0.34);
+        this.skyFillLight.position.set(-18, 12, -14);
+        this.scene.add(this.skyFillLight);
 
         // Warm atmosphere point lights
         const warmLight = new THREE.PointLight(0xff9040, 0.3, 30);
@@ -299,6 +309,7 @@ export class SceneManager {
         this.ambientLight.color.set(config.ambientColor);
         this.sunLight.color.set(config.sunColor);
         this.sunLight.intensity = config.sunIntensity;
+        if (this.skyFillLight) this.skyFillLight.intensity = Math.max(0.18, config.sunIntensity * 0.24);
         this.hemiLight.color.set(config.skyTop);
         this.hemiLight.groundColor.set(config.groundColor);
 
@@ -531,7 +542,10 @@ export class SceneManager {
                 bottomColor: { value: config.skyBottom },
                 horizonColor: { value: config.skyHorizon },
                 offset: { value: 10 },
-                exponent: { value: 0.5 }
+                exponent: { value: 0.5 },
+                sunDirection: { value: new THREE.Vector3(12, 25, 10).normalize() },
+                sunColor: { value: new THREE.Color(0xffe8ad) },
+                hazeStrength: { value: 0.72 }
             },
             vertexShader: `
                 varying vec3 vWorldPosition;
@@ -547,6 +561,9 @@ export class SceneManager {
                 uniform vec3 horizonColor;
                 uniform float offset;
                 uniform float exponent;
+                uniform vec3 sunDirection;
+                uniform vec3 sunColor;
+                uniform float hazeStrength;
                 varying vec3 vWorldPosition;
                 void main() {
                     float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
@@ -554,6 +571,15 @@ export class SceneManager {
                     vec3 sky = mix(horizonColor, topColor, t);
                     float belowH = max(-h * 2.0, 0.0);
                     sky = mix(sky, bottomColor, belowH);
+                    vec3 viewDir = normalize(vWorldPosition);
+                    float sunAmount = max(dot(viewDir, sunDirection), 0.0);
+                    float sunDisc = smoothstep(0.9982, 0.9993, sunAmount);
+                    float sunHalo = pow(sunAmount, 18.0) * hazeStrength;
+                    float horizonGlow = pow(1.0 - abs(clamp(h, -1.0, 1.0)), 5.0) * 0.22;
+                    sky += sunColor * (sunDisc * 1.45 + sunHalo * 0.55 + horizonGlow);
+                    // Very subtle film grain prevents visible gradient banding.
+                    float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                    sky += (grain - 0.5) / 255.0;
                     gl_FragColor = vec4(sky, 1.0);
                 }
             `
@@ -983,35 +1009,42 @@ export class SceneManager {
         const cloudMat = new THREE.MeshLambertMaterial({
             color: 0xffffff,
             transparent: true,
-            opacity: 0.82,
-            flatShading: true,
+            opacity: 0.88,
+            flatShading: false,
         });
 
-        for (let i = 0; i < 8; i++) { // Reduced from 14 for performance
+        const cloudCount = this.graphicsQuality === 'high' ? 10 : this.graphicsQuality === 'medium' ? 7 : 4;
+        for (let i = 0; i < cloudCount; i++) {
             const cloudGroup = new THREE.Group();
 
-            // Build fluffy overlapping box modules (voxel style!)
-            const centerGeo = new THREE.BoxGeometry(4.5, 1.8, 3.2);
+            // Rounded overlapping volumes read like soft fantasy clouds while
+            // preserving the original low draw-call orbit implementation.
+            const centerGeo = new THREE.SphereGeometry(2.2, 10, 7);
             const centerMesh = new THREE.Mesh(centerGeo, cloudMat);
+            centerMesh.scale.set(1.35, 0.62, 0.92);
             cloudGroup.add(centerMesh);
 
-            const sideGeo1 = new THREE.BoxGeometry(2.8, 1.3, 2.4);
+            const sideGeo1 = new THREE.SphereGeometry(1.45, 9, 6);
             const sideMesh1 = new THREE.Mesh(sideGeo1, cloudMat);
-            sideMesh1.position.set(-2.2, -0.2, 0.4);
+            sideMesh1.position.set(-2.2, -0.25, 0.35);
+            sideMesh1.scale.set(1.2, 0.62, 0.9);
             cloudGroup.add(sideMesh1);
 
             const sideMesh2 = new THREE.Mesh(sideGeo1, cloudMat);
-            sideMesh2.position.set(2.2, -0.2, -0.4);
+            sideMesh2.position.set(2.2, -0.25, -0.35);
+            sideMesh2.scale.set(1.2, 0.62, 0.9);
             cloudGroup.add(sideMesh2);
 
-            const topGeo = new THREE.BoxGeometry(2.4, 1.0, 2.0);
+            const topGeo = new THREE.SphereGeometry(1.25, 9, 6);
             const topMesh = new THREE.Mesh(topGeo, cloudMat);
             topMesh.position.set(-0.2, 0.9, -0.2);
+            topMesh.scale.set(1.05, 0.85, 0.9);
             cloudGroup.add(topMesh);
 
-            const frontGeo = new THREE.BoxGeometry(1.8, 0.9, 1.4);
+            const frontGeo = new THREE.SphereGeometry(1.0, 8, 6);
             const frontMesh = new THREE.Mesh(frontGeo, cloudMat);
             frontMesh.position.set(0.6, -0.4, 1.5);
+            frontMesh.scale.set(1.25, 0.58, 0.85);
             cloudGroup.add(frontMesh);
 
             // Orbit path settings
@@ -1137,9 +1170,13 @@ export class SceneManager {
         groundGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         groundGeo.computeVertexNormals();
 
-        const groundMat = new THREE.MeshLambertMaterial({
+        const groundMat = new THREE.MeshStandardMaterial({
             vertexColors: true,
-            map: this._detailTexture
+            map: this._detailTexture,
+            bumpMap: this._detailTexture,
+            bumpScale: 0.055,
+            roughness: 0.91,
+            metalness: 0.0,
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         this.groundMesh = ground;
@@ -1149,10 +1186,12 @@ export class SceneManager {
         this.envObjects.push(ground);
 
         // Path overlays (cut or split to not float over the river)
-        const pathMat = new THREE.MeshLambertMaterial({
+        const pathMat = new THREE.MeshStandardMaterial({
             color: config.pathColor,
             transparent: true,
-            opacity: 0.6
+            opacity: 0.68,
+            roughness: 0.88,
+            metalness: 0,
         });
 
         // Vertical Path Segment 1 (North)
@@ -1370,8 +1409,28 @@ export class SceneManager {
         // --- Grass blade tufts (one InstancedMesh of a thin blade) ---
         const bladeGeo = new THREE.ConeGeometry(0.04, 0.6, 4);
         bladeGeo.translate(0, 0.3, 0); // base at origin so it grows upward
-        const bladeMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-        const BLADES = 900;
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+        const qualityGrass = { 'ultra-low': 260, low: 520, medium: 1050, high: 1800 };
+        const BLADES = qualityGrass[this.graphicsQuality] || 1050;
+        const windUniform = { value: 0 };
+        bladeMat.onBeforeCompile = shader => {
+            shader.uniforms.uGrassTime = windUniform;
+            shader.vertexShader = shader.vertexShader
+                .replace('#include <common>', '#include <common>\nuniform float uGrassTime;')
+                .replace('#include <begin_vertex>', `
+                    #include <begin_vertex>
+                    #ifdef USE_INSTANCING
+                        float rootMask = smoothstep(0.02, 0.58, position.y);
+                        vec3 worldRoot = vec3(instanceMatrix[3].xyz);
+                        float gust = sin(uGrassTime * 1.65 + worldRoot.x * 0.23 + worldRoot.z * 0.17);
+                        float ripple = sin(uGrassTime * 0.72 + worldRoot.x * 0.07 - worldRoot.z * 0.11);
+                        transformed.x += (gust * 0.055 + ripple * 0.035) * rootMask;
+                        transformed.z += ripple * 0.028 * rootMask;
+                    #endif
+                `);
+            bladeMat.userData.shader = shader;
+        };
+        bladeMat.customProgramCacheKey = () => 'zolos-wind-grass-v1';
         const grass = new THREE.InstancedMesh(bladeGeo, bladeMat, BLADES);
         const m = new THREE.Matrix4();
         const q = new THREE.Quaternion();
@@ -1401,12 +1460,13 @@ export class SceneManager {
         this.scene.add(grass);
         this.envObjects.push(grass);
         this.grassDecor = grass;
+        this.grassWindUniform = windUniform;
 
         // --- Wildflowers (small bright heads on short stems) ---
         const flowerColors = [0xff5d7a, 0xffd23f, 0xffffff, 0xb46cff, 0x5db4ff];
         const headGeo = new THREE.SphereGeometry(0.11, 6, 5);
         const flowerMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-        const FLOWERS = 150;
+        const FLOWERS = Math.max(55, Math.round(BLADES / 7));
         const flowers = new THREE.InstancedMesh(headGeo, flowerMat, FLOWERS);
         const stemGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.35, 4);
         stemGeo.translate(0, 0.175, 0);
@@ -4196,6 +4256,7 @@ export class SceneManager {
     // ============ Animate per-frame ============
     updateAnimations(dt) {
         this.time += dt;
+        if (this.grassWindUniform) this.grassWindUniform.value = this.time;
 
         // Animate water waves (disabled temporarily to fix blue screen issue)
         /*
