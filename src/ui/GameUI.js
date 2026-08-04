@@ -1033,18 +1033,23 @@ export class GameUI {
   async loadFishingAlmanacFromDB(characterId) {
     if (!characterId) return;
     this.characterId = characterId;
-    this.almanac = { caught: [], claimed: [] };
+    this.almanac = { caught: [], claimed: [], counts: {} };
     try {
       const localKey = `zolos_almanac_${characterId}`;
       let local = null;
       try { const s = localStorage.getItem(localKey); if (s) local = JSON.parse(s); } catch (e) { }
       const db = await loadFishingAlmanac(characterId);
       // Merge DB + local so nothing is ever lost (union of caught species)
-      const merged = { caught: [], claimed: [] };
+      const merged = { caught: [], claimed: [], counts: {} };
       const caught = new Set([...(db?.caught || []), ...(local?.caught || [])]);
       const claimed = new Set([...(db?.claimed || []), ...(local?.claimed || [])]);
       merged.caught = [...caught];
       merged.claimed = [...claimed];
+      for (const name of caught) {
+        const dbCount = Number(db?.counts?.[name]) || 0;
+        const localCount = Number(local?.counts?.[name]) || 0;
+        merged.counts[name] = Math.max(1, dbCount, localCount);
+      }
       this.almanac = merged;
       localStorage.setItem(localKey, JSON.stringify(merged));
     } catch (e) {
@@ -1081,7 +1086,7 @@ export class GameUI {
   }
 
   _almanacTierCounts() {
-    if (!this.almanac) this.almanac = { caught: [], claimed: [] };
+    if (!this.almanac) this.almanac = { caught: [], claimed: [], counts: {} };
     const caught = new Set(this.almanac.caught);
     const totals = {}, got = {};
     for (const [name, data] of Object.entries(FISH_SPECIES)) {
@@ -1097,8 +1102,16 @@ export class GameUI {
     if (!item || (item.type && item.type !== 'fish')) return;
     const name = item.name || item.item_name;
     if (!name || !FISH_SPECIES[name]) return;
-    if (!this.almanac) this.almanac = { caught: [], claimed: [] };
-    if (this.almanac.caught.includes(name)) return; // already discovered
+    if (!this.almanac) this.almanac = { caught: [], claimed: [], counts: {} };
+    if (!this.almanac.counts) this.almanac.counts = {};
+    const firstDiscovery = !this.almanac.caught.includes(name);
+    this.almanac.counts[name] = (Number(this.almanac.counts[name]) || 0) + 1;
+    if (!firstDiscovery) {
+      this._saveFishingAlmanac();
+      const modal = document.getElementById('almanac-modal');
+      if (modal && modal.style.display !== 'none') this._renderAlmanac();
+      return;
+    }
 
     this.almanac.caught.push(name);
     const rarity = FISH_SPECIES[name].rarity;
@@ -1185,9 +1198,20 @@ export class GameUI {
           box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;}
         #almanac-card .almanac-head{flex:0 0 auto;}
         #almanac-card .almanac-body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+        #almanac-card .almanac-fish-slot{appearance:none;color:inherit;font:inherit;cursor:pointer;transition:transform .16s,border-color .16s,background .16s;}
+        #almanac-card .almanac-fish-slot:hover,#almanac-card .almanac-fish-slot:focus-visible{transform:translateY(-2px);border-color:#69b8ff!important;outline:none;}
+        #almanac-card .almanac-fish-slot.is-selected{border-color:#ffcf4a!important;background:rgba(255,207,74,.12)!important;box-shadow:0 0 16px rgba(255,207,74,.15);}
+        #almanac-card .almanac-detail{display:grid;grid-template-columns:116px minmax(0,1fr);gap:14px;padding:14px;margin-bottom:16px;border:1px solid rgba(103,174,255,.35);border-radius:14px;background:linear-gradient(145deg,rgba(25,54,85,.9),rgba(10,20,36,.94));}
+        #almanac-card .almanac-detail-art{display:grid;place-items:center;min-height:112px;border-radius:12px;background:radial-gradient(circle,rgba(74,163,255,.2),rgba(0,0,0,.15));}
+        #almanac-card .almanac-detail-art .item-visual{width:104px;height:104px;border-radius:18px;}
+        #almanac-card .almanac-sell-player{border:1px solid #59b8ff;border-radius:10px;padding:9px 13px;background:linear-gradient(135deg,#267bd4,#3a9cff);color:#fff;font-weight:800;cursor:pointer;}
+        #almanac-card .almanac-sell-player:disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.7);}
         @media (max-width:768px){
           #almanac-modal{align-items:flex-start;padding:8px 8px 116px;}
           #almanac-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
+          #almanac-card .almanac-detail{grid-template-columns:82px minmax(0,1fr);gap:10px;padding:10px;}
+          #almanac-card .almanac-detail-art{min-height:80px;}
+          #almanac-card .almanac-detail-art .item-visual{width:74px;height:74px;}
         }`;
       document.head.appendChild(st);
     }
@@ -1211,7 +1235,7 @@ export class GameUI {
   _renderAlmanac() {
     const card = document.getElementById('almanac-card');
     if (!card) return;
-    if (!this.almanac) this.almanac = { caught: [], claimed: [] };
+    if (!this.almanac) this.almanac = { caught: [], claimed: [], counts: {} };
     const caught = new Set(this.almanac.caught);
     const claimed = new Set(this.almanac.claimed);
     const { totals, got, caughtTotal, grandTotal } = this._almanacTierCounts();
@@ -1223,6 +1247,23 @@ export class GameUI {
       legendary: { label: 'ตำนาน', color: '#ffcf4a', badge: '🟡' },
     };
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    const selectedName = caught.has(this.selectedAlmanacFish) ? this.selectedAlmanacFish : null;
+    const selectedData = selectedName ? FISH_SPECIES[selectedName] : null;
+    const selectedInventory = selectedName ? this.inventory.find(item => item.item_name === selectedName && item.item_type === 'fish') : null;
+    const lifetimeCaught = selectedName ? Math.max(1, Number(this.almanac.counts?.[selectedName]) || 0) : 0;
+    const ownedCount = Number(selectedInventory?.quantity) || 0;
+    const tierLabel = { common: 'ธรรมดา', uncommon: 'พบไม่บ่อย', rare: 'หายาก', legendary: 'ตำนาน' };
+    const detailPanel = selectedData ? `
+      <section class="almanac-detail" aria-live="polite">
+        <div class="almanac-detail-art">${itemIconMarkup(selectedName, selectedData.emoji || 'ปลา', 'item-visual--fish-detail')}</div>
+        <div style="min-width:0;display:flex;flex-direction:column;gap:7px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><strong style="font-size:18px;color:#f4f8ff;">${esc(selectedName)}</strong><span style="font-size:10px;padding:3px 8px;border-radius:12px;background:rgba(74,163,255,.15);color:#8dccff;">${tierLabel[selectedData.rarity] || esc(selectedData.rarity)}</span></div>
+          <div style="font-size:12px;line-height:1.55;color:#c6d4e2;">${esc(selectedData.desc)}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;"><span style="padding:5px 8px;border-radius:8px;background:rgba(95,221,122,.1);color:#84e99b;">จับสะสมทั้งหมด <b>${lifetimeCaught.toLocaleString()}</b> ตัว</span><span style="padding:5px 8px;border-radius:8px;background:rgba(255,207,74,.1);color:#ffdc78;">มีในกระเป๋า <b>${ownedCount.toLocaleString()}</b> ตัว</span><span style="padding:5px 8px;border-radius:8px;background:rgba(255,255,255,.06);color:#b9c8d8;">ราคา NPC ${Number(selectedData.price || 0).toLocaleString()} z</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:2px;"><button class="almanac-sell-player" data-almanac-sell="${esc(selectedName)}" ${ownedCount < 1 ? 'disabled' : ''}>ขายให้ผู้เล่น</button><span data-almanac-market-price="${esc(selectedName)}" style="font-size:10px;color:#8092a5;">กำลังตรวจราคาตลาด...</span></div>
+        </div>
+      </section>` : '';
 
     let sections = '';
     for (const tier of ['common', 'uncommon', 'rare', 'legendary']) {
@@ -1236,10 +1277,12 @@ export class GameUI {
       const slots = tierFish.map(([name, d]) => {
         const has = caught.has(name);
         return `<div title="${has ? esc(name) + ' — ' + esc(d.desc) : 'ยังไม่ค้นพบ'}"
+          class="almanac-fish-slot${selectedName === name ? ' is-selected' : ''}" data-almanac-fish="${has ? esc(name) : ''}" role="${has ? 'button' : 'presentation'}" tabindex="${has ? '0' : '-1'}"
           style="aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;
           background:${has ? 'rgba(74,163,255,.12)' : 'rgba(255,255,255,.03)'};border:1px solid ${has ? m.color + '66' : 'rgba(255,255,255,.06)'};">
           <div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;${has ? '' : 'filter:grayscale(1);opacity:.3;'}">${has ? itemIconMarkup(name, d.emoji || '🐟', 'item-visual--fish') : '❓'}</div>
           <div style="font-size:8px;text-align:center;line-height:1.1;color:${has ? '#dfe8f2' : '#54606e'};max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${has ? esc(name) : '???'}</div>
+          ${has ? `<div style="font-size:7px;color:#80a9cf;">จับ ${Math.max(1, Number(this.almanac.counts?.[name]) || 0).toLocaleString()}</div>` : ''}
         </div>`;
       }).join('');
 
@@ -1291,7 +1334,7 @@ export class GameUI {
           <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4aa3ff,#5fdd7a);transition:width .3s;"></div>
         </div>
       </div>
-      <div class="almanac-body" style="padding:16px 18px;">${sections}${grandBanner}</div>`;
+      <div class="almanac-body" style="padding:16px 18px;">${detailPanel}${sections}${grandBanner}</div>`;
 
     card.querySelector('#almanac-close').onclick = () => {
       const m = document.getElementById('almanac-modal'); if (m) m.style.display = 'none';
@@ -1300,6 +1343,45 @@ export class GameUI {
     card.querySelectorAll('[data-almanac-claim]').forEach(btn => {
       btn.onclick = () => this._claimAlmanacReward(btn.getAttribute('data-almanac-claim'));
     });
+    card.querySelectorAll('[data-almanac-fish]').forEach(slot => {
+      const selectFish = () => {
+        const name = slot.getAttribute('data-almanac-fish');
+        if (!name) return;
+        this.selectedAlmanacFish = name;
+        this._renderAlmanac();
+      };
+      slot.onclick = selectFish;
+      slot.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectFish(); } };
+    });
+    card.querySelector('[data-almanac-sell]')?.addEventListener('click', event => {
+      this._sellFishFromAlmanac(event.currentTarget.getAttribute('data-almanac-sell'));
+    });
+    if (selectedName) {
+      fetchMarketPriceStats(selectedName).then(stats => {
+        const node = card.querySelector('[data-almanac-market-price]');
+        if (!node || node.getAttribute('data-almanac-market-price') !== selectedName) return;
+        node.textContent = stats?.avgPrice
+          ? `ราคาตลาดเฉลี่ย ${stats.avgPrice.toLocaleString()} Zeny / ตัว`
+          : 'ยังไม่มีข้อมูลราคาตลาด';
+      }).catch(() => {});
+    }
+  }
+
+  async _sellFishFromAlmanac(name) {
+    const item = this.inventory.find(row => row.item_name === name && row.item_type === 'fish' && this._sellableQty(row) > 0);
+    if (!item) {
+      this.addCombatLog('ไม่มีปลาชนิดนี้ในกระเป๋าสำหรับตั้งขาย', 'system');
+      return;
+    }
+    const modal = document.getElementById('almanac-modal');
+    if (modal) modal.style.display = 'none';
+    this.marketTab = 'sell';
+    document.querySelectorAll('.market-tab').forEach(tab => tab.classList.toggle('active', tab.getAttribute('data-tab') === 'sell'));
+    this.selectedMarketItem = item;
+    this._togglePanel('market-panel');
+    await this._renderMarket();
+    this._renderMarketSellInventory();
+    await this._updateMarketSellForm();
   }
 
 
@@ -7204,7 +7286,7 @@ export class GameUI {
         item.stats || {}
       );
 
-      if (listing) {
+      if (listing && !listing._failed) {
         // Deduct from local inventory
         const itemIdx = this.inventory.findIndex(i => i.item_name === item.item_name);
         if (itemIdx >= 0) {
