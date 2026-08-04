@@ -550,7 +550,7 @@
 
 .class-badges-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 7px;
 }
 
@@ -581,7 +581,6 @@
 .class-badge.class-mage { --class-rgb: 176, 103, 255; }
 .class-badge.class-archer { --class-rgb: 92, 222, 139; }
 .class-badge.class-acolyte { --class-rgb: 255, 211, 86; }
-.class-badge.class-thief { --class-rgb: 213, 95, 235; }
 
 .class-art {
   position: relative;

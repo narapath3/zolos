@@ -10,7 +10,7 @@ export class AuthUI {
         this._isRegisterMode = false;
         this._isForgotPwMode = false;
         this._sessionData = null;
-        this._selectedClass = 'novice';
+        this._selectedClass = 'swordman';
 
         // Animated Canvas Background Scene
         this._bgCanvas = new LoginCanvasBg('auth-bg-canvas');
@@ -68,7 +68,7 @@ export class AuthUI {
                 classBadges.forEach(b => b.classList.remove('active'));
                 badge.classList.add('active');
                 classBadges.forEach(b => b.setAttribute('aria-pressed', String(b === badge)));
-                this._selectedClass = badge.getAttribute('data-class') || 'novice';
+                this._selectedClass = badge.getAttribute('data-class') || 'swordman';
             });
         });
 
