@@ -6767,6 +6767,7 @@ a,
 .item-visual {
   position: relative;
   display: inline-grid;
+  flex: 0 0 auto;
   width: 42px;
   height: 42px;
   place-items: center;
@@ -6802,6 +6803,45 @@ a,
 
 .item-visual--emoji > span:first-child { font-size: 24px; }
 .item-visual--detail { width: 72px; height: 72px; border-radius: 15px; }
+
+/* Inventory, NPC buy and NPC sell share the same large preview. The legacy
+   detail-icon box was 40px wide and flex-shrank its 72px child into a tall
+   sliver, which then overflowed over the description. Reserve the real frame
+   size so artwork and copy always occupy separate layout space. */
+#detail-icon,
+#shop-detail-icon,
+#sell-shop-detail-icon {
+  width: 84px;
+  height: 84px;
+  min-width: 84px;
+  flex: 0 0 84px;
+  padding: 5px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+#detail-icon .item-visual--detail,
+#shop-detail-icon .item-visual--detail,
+#sell-shop-detail-icon .item-visual--detail {
+  width: 72px;
+  height: 72px;
+  max-width: none;
+  max-height: none;
+}
+
+#detail-icon + .detail-info-block,
+#shop-detail-icon + .detail-info-block,
+#sell-shop-detail-icon + .detail-info-block {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#detail-icon + .detail-info-block .detail-name,
+#shop-detail-icon + .detail-info-block .detail-name,
+#sell-shop-detail-icon + .detail-info-block .detail-name {
+  overflow-wrap: anywhere;
+}
 .item-visual--equipped { width: 46px; height: 46px; margin: 2px auto; }
 .item-visual--forge-material { width: 25px; height: 25px; border-radius: 6px; flex: 0 0 auto; }
 .item-visual--forge-cell { width: 38px; height: 38px; border-radius: 8px; margin: 0 auto 3px; }
