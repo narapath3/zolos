@@ -542,6 +542,15 @@ export class GameUI {
       }
     }
 
+    // Full-screen boutique overlays must also suppress the floating joystick
+    // and action buttons. Their mobile layer otherwise intercepts every tap.
+    for (const id of ['pet-boutique-modal', 'divine-shop-modal']) {
+      const shopModal = document.getElementById(id);
+      if (!shopModal) continue;
+      const display = shopModal.style.display || window.getComputedStyle(shopModal).display;
+      if (display !== 'none') anyPanelOpen = true;
+    }
+
     if (anyPanelOpen) {
       document.body.classList.add('panels-open');
     } else {
@@ -1123,16 +1132,6 @@ export class GameUI {
       const modal = document.getElementById('almanac-modal');
       if (modal && modal.style.display !== 'none') this._renderAlmanac();
       return;
-    }
-
-    // Dedicated full-screen shops must hide touch controls too; otherwise the
-    // joystick/action layer sits above the cards and makes taps appear broken.
-    for (const id of ['pet-boutique-modal', 'divine-shop-modal']) {
-      const modal = document.getElementById(id);
-      if (modal) {
-        const display = modal.style.display || window.getComputedStyle(modal).display;
-        if (display !== 'none') anyPanelOpen = true;
-      }
     }
 
     this.almanac.caught.push(name);
@@ -5547,7 +5546,7 @@ export class GameUI {
     if (!modal) {
       const style = document.createElement('style');
       style.id = 'pet-boutique-style';
-      style.textContent = `#pet-boutique-modal{position:fixed;inset:0;z-index:1470;display:none;align-items:center;justify-content:center;padding:14px;background:rgba(2,7,20,.9);backdrop-filter:blur(9px);box-sizing:border-box}.pet-boutique{width:min(1040px,96vw);max-height:91dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid #394c70;border-radius:20px;background:#0d1425;box-shadow:0 30px 90px #000}.pet-boutique__hero{position:relative;padding:20px 24px 17px;border-bottom:1px solid #2b3b5b;background:linear-gradient(110deg,#182743,#11192c)}.pet-boutique__hero h2{margin:0;color:#fff;font-size:clamp(20px,3vw,29px);letter-spacing:.04em}.pet-boutique__hero p{margin:5px 0 0;color:#aebed5;font-size:13px}.pet-boutique__close{position:absolute;right:15px;top:14px;width:42px;height:42px;border-radius:11px;border:1px solid #42516d;background:#10172b;color:white;font-size:22px;cursor:pointer}.pet-boutique__wallet{position:absolute;right:70px;top:18px;padding:8px 13px;border-radius:9px;background:#0a1020;color:#ffd76f;font-weight:900}.pet-boutique__grid{padding:14px;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:11px}.pet-card{position:relative;overflow:hidden;border:1px solid #273858;border-radius:14px;background:#111a2d;padding:9px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;text-align:left;color:white;min-width:0}.pet-card:hover,.pet-card:focus-visible{transform:translateY(-2px);border-color:#7faeff;box-shadow:0 12px 26px rgba(0,0,0,.32);outline:none}.pet-card__art{height:150px;border-radius:10px;background:#071020;overflow:hidden}.pet-atlas-portrait{display:block;width:100%;height:100%;background-image:url('/assets/pets/pet-sanctuary-atlas-v1.png');background-repeat:no-repeat;background-size:400% 300%;background-position:var(--pet-x) var(--pet-y)}.pet-card__rarity{position:absolute;left:15px;top:15px;z-index:2;padding:4px 7px;border-radius:6px;background:rgba(5,10,24,.86);font-size:9px;font-weight:900;text-transform:uppercase;color:#ffe79d}.pet-card h3{font-size:14px;margin:9px 0 3px;color:#fff}.pet-card p{height:35px;overflow:hidden;margin:0;color:#aebdd3;font-size:10px;line-height:1.65}.pet-card__foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}.pet-card__price{font-weight:900;color:#ffd567}.pet-card__buy{border:1px solid #5f8dcc;border-radius:8px;padding:8px 11px;background:#2f65a8;color:#fff;font-weight:900;cursor:pointer}.pet-card__buy:disabled{filter:grayscale(1);opacity:.45}@media(max-width:620px){#pet-boutique-modal{padding:6px 6px calc(98px + env(safe-area-inset-bottom));align-items:flex-start}.pet-boutique{width:100%;max-height:calc(100dvh - 108px);border-radius:14px}.pet-boutique__hero{padding:14px}.pet-boutique__hero h2{font-size:19px}.pet-boutique__hero p{font-size:10px;max-width:58%}.pet-boutique__wallet{position:static;display:inline-block;margin-top:8px;font-size:11px}.pet-boutique__grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:7px}.pet-card{padding:6px}.pet-card__art{height:118px}.pet-card p{display:none}.pet-card h3{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pet-card__foot{display:block}.pet-card__price{font-size:11px}.pet-card__buy{width:100%;margin-top:5px;min-height:38px}}`;
+      style.textContent = `#pet-boutique-modal{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;padding:14px;background:rgba(2,7,20,.9);backdrop-filter:blur(9px);box-sizing:border-box;pointer-events:auto!important;touch-action:pan-y}.pet-boutique{position:relative;z-index:1;width:min(1040px,96vw);max-height:91dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid #394c70;border-radius:20px;background:#0d1425;box-shadow:0 30px 90px #000;pointer-events:auto}.pet-boutique__hero{position:relative;padding:20px 24px 17px;border-bottom:1px solid #2b3b5b;background:linear-gradient(110deg,#182743,#11192c)}.pet-boutique__hero h2{margin:0;color:#fff;font-size:clamp(20px,3vw,29px);letter-spacing:.04em}.pet-boutique__hero p{margin:5px 0 0;color:#aebed5;font-size:13px}.pet-boutique__close{position:absolute;right:15px;top:14px;z-index:5;width:48px;height:48px;border-radius:11px;border:1px solid #65789b;background:#10172b;color:white;font-size:25px;cursor:pointer;pointer-events:auto!important;touch-action:manipulation}.pet-boutique__wallet{position:absolute;right:78px;top:18px;padding:8px 13px;border-radius:9px;background:#0a1020;color:#ffd76f;font-weight:900}.pet-boutique__grid{padding:14px;overflow:auto;overscroll-behavior:contain;display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:11px;pointer-events:auto}.pet-card{position:relative;overflow:hidden;border:1px solid #273858;border-radius:14px;background:#111a2d;padding:9px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;text-align:left;color:white;min-width:0;pointer-events:auto;touch-action:manipulation}.pet-card:hover,.pet-card:focus-visible{transform:translateY(-2px);border-color:#7faeff;box-shadow:0 12px 26px rgba(0,0,0,.32);outline:none}.pet-card__art{height:150px;border-radius:10px;background:#071020;overflow:hidden;pointer-events:none}.pet-atlas-portrait{display:block;width:100%;height:100%;background-image:url('/assets/pets/pet-sanctuary-atlas-v1.png');background-repeat:no-repeat;background-size:400% 300%;background-position:var(--pet-x) var(--pet-y)}.pet-card__rarity{position:absolute;left:15px;top:15px;z-index:2;padding:4px 7px;border-radius:6px;background:rgba(5,10,24,.86);font-size:9px;font-weight:900;text-transform:uppercase;color:#ffe79d;pointer-events:none}.pet-card h3{font-size:14px;margin:9px 0 3px;color:#fff}.pet-card p{height:35px;overflow:hidden;margin:0;color:#aebdd3;font-size:10px;line-height:1.65}.pet-card__foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}.pet-card__price{font-weight:900;color:#ffd567}.pet-card__buy{position:relative;z-index:3;border:1px solid #5f8dcc;border-radius:8px;padding:8px 11px;background:#2f65a8;color:#fff;font-weight:900;cursor:pointer;pointer-events:auto!important;touch-action:manipulation}.pet-card__buy:disabled{filter:grayscale(1);opacity:.45}@media(max-width:620px){#pet-boutique-modal{padding:6px 6px calc(98px + env(safe-area-inset-bottom));align-items:flex-start}.pet-boutique{width:100%;max-height:calc(100dvh - 108px);border-radius:14px}.pet-boutique__hero{padding:14px}.pet-boutique__hero h2{font-size:19px}.pet-boutique__hero p{font-size:10px;max-width:58%}.pet-boutique__wallet{position:static;display:inline-block;margin-top:8px;font-size:11px}.pet-boutique__grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:7px}.pet-card{padding:6px}.pet-card__art{height:118px}.pet-card p{display:none}.pet-card h3{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pet-card__foot{display:block}.pet-card__price{font-size:11px}.pet-card__buy{width:100%;margin-top:5px;min-height:42px}}`;
       document.head.appendChild(style);
       modal = document.createElement('div'); modal.id = 'pet-boutique-modal'; document.body.appendChild(modal);
     }
@@ -8029,7 +8028,7 @@ export class GameUI {
       // Ignore if touching an interactive element (buttons, panels, HUD, chat).
       const target = e.target;
       if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
-        target.closest('#hud-bottom') || target.closest('.side-panel') ||
+        target.closest('#hud-bottom') || target.closest('.side-panel') || target.closest('#pet-boutique-modal') ||
         target.closest('.modal-popup') || target.closest('#hud-top') ||
         target.closest('#minimap-container') || target.closest('#target-indicator') ||
         target.closest('#fps-counter') || target.closest('#kill-counter') ||

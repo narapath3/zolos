@@ -31,7 +31,15 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.match(ui, /pet-sanctuary-atlas-v1\.png/);
   assert.doesNotMatch(ui.match(/function petPortraitMarkup[\s\S]*?\n\}/)?.[0] || '', /<svg/);
   assert.ok(fs.existsSync(new URL('../../public/assets/pets/pet-sanctuary-atlas-v1.png', import.meta.url)));
-  assert.match(ui, /pet-boutique-modal', 'divine-shop-modal/);
+  const mobileVisibility = ui.slice(ui.indexOf('updateMobileControlsVisibility() {'), ui.indexOf('// ============ Map Name Update'));
+  const fishStart = ui.indexOf('recordFishCatch(item) {');
+  const fishCatch = ui.slice(fishStart, ui.indexOf('_almanacOwnedCount(', fishStart));
+  assert.ok(mobileVisibility.length > 200);
+  assert.ok(fishCatch.length > 200);
+  assert.match(mobileVisibility, /pet-boutique-modal', 'divine-shop-modal/);
+  assert.doesNotMatch(fishCatch, /anyPanelOpen/);
+  assert.match(ui, /#pet-boutique-modal\{position:fixed;inset:0;z-index:100000/);
+  assert.match(ui, /target\.closest\('#pet-boutique-modal'\)/);
   assert.match(ui, /previousInventory=structuredClone/);
 });
 
