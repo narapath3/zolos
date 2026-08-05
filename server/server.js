@@ -17,6 +17,7 @@ import { startCheatGuard } from './api/cheatGuard.js';
 import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
 import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
 import { ensureOreEconomy } from './api/oreEconomy.js';
+import { ensurePetEconomy, PET_CATALOG } from './api/petEconomy.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -720,6 +721,40 @@ io.on('connection', (socket) => {
             if (message.toLowerCase().includes('no celestial ore')) return reject('ไม่มี Celestial Ore สำหรับแปลง');
             console.error('[Server] Ore conversion failed:', message);
             reject('แปลงแร่ไม่สำเร็จ แร่ยังอยู่ครบ กรุณาลองใหม่');
+        }
+    });
+
+    socket.on('pet_purchase', async (payload) => {
+        const player = trustedSender(socket);
+        const itemName = typeof payload?.itemName === 'string' ? payload.itemName : '';
+        const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+        const reject = (message) => socket.emit('pet_purchase_error', { requestId, itemName, message });
+        if (!player?.verified || !player.characterId || !supabase) {
+            return reject('ไม่สามารถยืนยันตัวละครได้ กรุณาเข้าเกมใหม่');
+        }
+        if (!/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) return reject('รหัสคำสั่งซื้อไม่ถูกต้อง');
+        const catalogPet = PET_CATALOG[itemName];
+        if (!catalogPet) return reject('ไม่พบสัตว์เลี้ยงนี้ในร้าน');
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'pet_purchase', 4, 10000)) {
+            return reject('กดซื้อเร็วเกินไป กรุณารอสักครู่');
+        }
+        try {
+            const { data, error } = await supabase.rpc('purchase_pet', {
+                p_character_id: player.characterId,
+                p_item_name: itemName,
+                p_price: catalogPet.price,
+                p_pet_key: catalogPet.pet,
+                p_idempotency_key: requestId,
+            });
+            if (error || !data) throw error || new Error('empty purchase result');
+            socket.emit('pet_purchase_result', { ...data, requestId });
+        } catch (error) {
+            const message = String(error?.message || '').toLowerCase();
+            if (message.includes('insufficient gold')) return reject('Zeny ไม่พอสำหรับสัตว์เลี้ยงตัวนี้');
+            if (message.includes('pet storage full')) return reject('ช่องเก็บสัตว์เลี้ยงชนิดนี้เต็มแล้ว');
+            console.error('[Server] Pet purchase failed:', error?.message || error);
+            reject('ซื้อสัตว์เลี้ยงไม่สำเร็จ เงินยังไม่ถูกหัก กรุณาลองใหม่');
         }
     });
 
@@ -1548,6 +1583,7 @@ httpServer.listen(PORT, HOST, () => {
                 await seedMonstersIfEmpty();
                 await ensureCardEconomy();
                 await ensureOreEconomy();
+                await ensurePetEconomy();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
         })();

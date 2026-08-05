@@ -14,6 +14,7 @@ let chatCallback = null;
 let cardFusionSocket = null;
 const pendingCardFusions = new Map();
 const pendingOreConversions = new Map();
+const pendingPetPurchases = new Map();
 let clientMeasuredPing = null;
 
 // ============ Client-side profanity filter (mirrors server) ============
@@ -78,6 +79,69 @@ export async function requestOreConversion(characterId, requestId) {
         }, 12000);
         pendingOreConversions.set(requestId, { resolve, reject, timeout });
         socket.emit('ore_convert', { requestId });
+    });
+}
+
+function attachPetPurchaseListeners(socket) {
+    if (socket._zolosPetPurchaseListeners) return;
+    socket._zolosPetPurchaseListeners = true;
+    socket.on('pet_purchase_result', (result) => {
+        const pending = pendingPetPurchases.get(result?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingPetPurchases.delete(result.requestId);
+        pending.resolve(result);
+    });
+    socket.on('pet_purchase_error', (error) => {
+        const pending = pendingPetPurchases.get(error?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingPetPurchases.delete(error.requestId);
+        pending.reject(new Error(error?.message || 'ซื้อสัตว์เลี้ยงไม่สำเร็จ'));
+    });
+}
+
+export async function requestPetPurchase(characterId, itemName, requestId, offlinePet = null) {
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
+        const price = Math.max(1, Number(offlinePet?.price) || 0);
+        const charKey = `char_${characterId}`;
+        const character = localDb.get(charKey);
+        if (!character) throw new Error('ไม่พบข้อมูลตัวละคร');
+        if ((Number(character.gold) || 0) < price) throw new Error('Zeny ไม่พอสำหรับสัตว์เลี้ยงตัวนี้');
+        const receiptKey = `pet_purchase_${characterId}_${requestId}`;
+        const previous = localDb.get(receiptKey);
+        if (previous) return previous;
+        const invKey = `inventory_${characterId}`;
+        const inventory = localDb.get(invKey) || [];
+        let row = inventory.find(i => i.item_name === itemName && i.item_type === 'pet');
+        if (!row) {
+            row = { id: `inv_${requestId}`, character_id: characterId, item_name: itemName, item_type: 'pet', quantity: 0, stats: { instances: [] } };
+            inventory.push(row);
+        }
+        const instances = Array.isArray(row.stats?.instances) ? row.stats.instances : [];
+        if (instances.length >= 200) throw new Error('ช่องเก็บสัตว์เลี้ยงชนิดนี้เต็มแล้ว');
+        const instance = { uid: `pet_${requestId.replace(/[^a-zA-Z0-9]/g, '').slice(-24)}`, name: null, level: 1, xp: 0 };
+        row.stats = { ...(row.stats || {}), instances: [...instances, instance] };
+        row.quantity = row.stats.instances.length;
+        character.gold -= price;
+        localDb.set(invKey, inventory);
+        localDb.set(charKey, character);
+        const result = { item_name: itemName, pet_key: offlinePet?.pet, price, gold: character.gold, quantity: row.quantity, stats: row.stats, instance, requestId };
+        localDb.set(receiptKey, result);
+        return result;
+    }
+
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่');
+    if (pendingPetPurchases.has(requestId)) throw new Error('กำลังดำเนินการคำสั่งซื้อนี้อยู่');
+    attachPetPurchaseListeners(socket);
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingPetPurchases.delete(requestId);
+            reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า เงินจะไม่ถูกหักซ้ำ กรุณาลองใหม่'));
+        }, 12000);
+        pendingPetPurchases.set(requestId, { resolve, reject, timeout });
+        socket.emit('pet_purchase', { itemName, requestId });
     });
 }
 

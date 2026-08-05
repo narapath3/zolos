@@ -1,6 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -5562,17 +5562,26 @@ export class GameUI {
     modal.onclick=e=>{if(e.target===modal)close();};
     const buyEntry=async(entry,button)=>{
         if(!entry||this.character.stats.gold<entry.price)return;
-        const previousGold=this.character.stats.gold;
-        const previousInventory=structuredClone(this.inventory);
-        this.selectedShopItem=entry;
-        const qty=document.getElementById('shop-qty-input');if(qty)qty.value=1;
-        button.disabled=true;button.textContent='กำลังบันทึก…';
-        try { await this._performShopAction(); this.openPetBoutique(); }
+        const itemData=ITEMS[entry.name];
+        const requestId=`pet:${this.characterId}:${Date.now()}:${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`;
+        button.disabled=true;button.textContent='กำลังรับเลี้ยง…';
+        try {
+          const result=await requestPetPurchase(this.characterId,entry.name,requestId,{price:entry.price,pet:itemData.pet});
+          this.character.stats.gold=Number(result.gold);
+          let row=this.inventory.find(i=>i.item_name===entry.name&&i.item_type==='pet');
+          if(!row){row={item_name:entry.name,item_type:'pet',emoji:itemData.emoji,desc:itemData.desc,price:entry.price,rarity:itemData.rarity,quantity:0,stats:{instances:[]}};this.inventory.push(row);}
+          row.quantity=Number(result.quantity)||1;
+          row.stats=result.stats||{instances:result.instance?[result.instance]:[]};
+          this.addCombatLog(`รับเลี้ยง ${entry.name} สำเร็จ (-${Number(result.price).toLocaleString()} Zeny)`,'system');
+          this._purchaseSuccessToast(itemData,entry,1);
+          this.soundManager?.playBuySellSound?.();
+          this.updateHUD(this.character.stats);this.updateStats(this.character.stats);this._renderInventory();
+          this.openPetBoutique();
+        }
         catch(error){
-          this.character.stats.gold=previousGold;this.inventory=previousInventory;
           button.disabled=false;button.textContent='ลองใหม่';
-          this.updateHUD(this.character.stats);this._renderInventory();
-          this.showToast?.('ซื้อไม่สำเร็จ ข้อมูลและเงินยังอยู่ครบ');
+          this.showToast?.(error?.message || 'ซื้อไม่สำเร็จ เงินยังอยู่ครบ');
+          this.addCombatLog(`ซื้อสัตว์เลี้ยงไม่สำเร็จ: ${error?.message || 'กรุณาลองใหม่'}`,'system');
           console.error('[Pet Boutique] Purchase failed:',error);
         }
     };
