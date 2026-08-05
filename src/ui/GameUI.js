@@ -434,6 +434,8 @@ export class GameUI {
     // too so opening any other menu dismisses it.
     const almanac = document.getElementById('almanac-modal');
     if (almanac) almanac.style.display = 'none';
+    const petBoutique = document.getElementById('pet-boutique-modal');
+    if (petBoutique) petBoutique.style.display = 'none';
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     this.updateMobileControlsVisibility();
   }
@@ -1125,6 +1127,16 @@ export class GameUI {
       const modal = document.getElementById('almanac-modal');
       if (modal && modal.style.display !== 'none') this._renderAlmanac();
       return;
+    }
+
+    // Dedicated full-screen shops must hide touch controls too; otherwise the
+    // joystick/action layer sits above the cards and makes taps appear broken.
+    for (const id of ['pet-boutique-modal', 'divine-shop-modal']) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        const display = modal.style.display || window.getComputedStyle(modal).display;
+        if (display !== 'none') anyPanelOpen = true;
+      }
     }
 
     this.almanac.caught.push(name);
@@ -5533,6 +5545,8 @@ export class GameUI {
   }
 
   openPetBoutique() {
+    document.querySelectorAll('.side-panel').forEach(panel => { panel.style.display = 'none'; });
+    if (this._petBoutiqueEscapeHandler) document.removeEventListener('keydown', this._petBoutiqueEscapeHandler);
     let modal = document.getElementById('pet-boutique-modal');
     if (!modal) {
       const style = document.createElement('style');
@@ -5544,11 +5558,31 @@ export class GameUI {
     const gold = Number(this.character?.stats?.gold) || 0;
     modal.innerHTML = `<section class="pet-boutique" role="dialog" aria-modal="true" aria-label="Pet Sanctuary"><header class="pet-boutique__hero"><h2>✦ Pet Sanctuary</h2><p>เพื่อนร่วมทางแห่ง Zolos · เลือกชมสายพันธุ์และรับกลับไปดูแล</p><div class="pet-boutique__wallet">Zeny ${gold.toLocaleString()}</div><button class="pet-boutique__close" aria-label="ปิด">×</button></header><div class="pet-boutique__grid">${PET_SHOP.map(entry=>{const data=ITEMS[entry.name];return `<article class="pet-card" tabindex="0" data-pet="${entry.name}"><span class="pet-card__rarity">${data.rarity}</span><div class="pet-card__art">${petPortraitMarkup(data.pet)}</div><h3>${entry.name.replace(' Pet','')}</h3><p>${data.desc}</p><div class="pet-card__foot"><span class="pet-card__price">${entry.price.toLocaleString()} z</span><button class="pet-card__buy" ${gold<entry.price?'disabled':''}>รับเลี้ยง</button></div></article>`}).join('')}</div></section>`;
     modal.style.display = 'flex'; this.updateMobileControlsVisibility();
-    const close=()=>{modal.style.display='none';this.updateMobileControlsVisibility();};
+    const close=()=>{modal.style.display='none';document.removeEventListener('keydown', onEscape);this._petBoutiqueEscapeHandler=null;this.updateMobileControlsVisibility();};
+    const onEscape=e=>{if(e.key==='Escape')close();};
+    this._petBoutiqueEscapeHandler=onEscape;
+    document.addEventListener('keydown',onEscape);
     modal.querySelector('.pet-boutique__close').onclick=close;
     modal.onclick=e=>{if(e.target===modal)close();};
     modal.querySelectorAll('.pet-card').forEach(card=>{
-      const buy=async()=>{const entry=PET_SHOP.find(x=>x.name===card.dataset.pet);if(!entry||this.character.stats.gold<entry.price)return;this.selectedShopItem=entry;const qty=document.getElementById('shop-qty-input');if(qty)qty.value=1;card.querySelector('.pet-card__buy').disabled=true;await this._performShopAction();this.openPetBoutique();};
+      const buy=async()=>{
+        const entry=PET_SHOP.find(x=>x.name===card.dataset.pet);
+        if(!entry||this.character.stats.gold<entry.price)return;
+        const button=card.querySelector('.pet-card__buy');
+        const previousGold=this.character.stats.gold;
+        const previousInventory=structuredClone(this.inventory);
+        this.selectedShopItem=entry;
+        const qty=document.getElementById('shop-qty-input');if(qty)qty.value=1;
+        button.disabled=true;button.textContent='กำลังบันทึก…';
+        try { await this._performShopAction(); this.openPetBoutique(); }
+        catch(error){
+          this.character.stats.gold=previousGold;this.inventory=previousInventory;
+          button.disabled=false;button.textContent='ลองใหม่';
+          this.updateHUD(this.character.stats);this._renderInventory();
+          this.showToast?.('ซื้อไม่สำเร็จ ข้อมูลและเงินยังอยู่ครบ');
+          console.error('[Pet Boutique] Purchase failed:',error);
+        }
+      };
       card.querySelector('.pet-card__buy').onclick=e=>{e.stopPropagation();buy();};
       card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();buy();}};
     });

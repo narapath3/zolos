@@ -9,6 +9,7 @@ import { buildPet } from './PetModels.js';
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
+export const PET_BOUTIQUE_POSITION = Object.freeze({ x: -10, z: -7 });
 
 // ============ Map Configs ============
 const MAP_CONFIGS = {
@@ -3466,7 +3467,7 @@ export class SceneManager {
         const label=this._makePortalLabel('PET SANCTUARY',new THREE.Color(0xff75bd),'✦ ZOLOS COMPANIONS ✦');
         label.position.y=4.95; label.scale.multiplyScalar(1.12); group.add(label);
         const glow=new THREE.PointLight(0xff8fc9,1.15,10); glow.position.set(0,2.4,0); group.add(glow);
-        group.position.set(10,0,5);
+        group.position.set(PET_BOUTIQUE_POSITION.x, 0, PET_BOUTIQUE_POSITION.z);
         this.scene.add(group); this.envObjects.push(group); this.npcPetMesh=group;
     }
 

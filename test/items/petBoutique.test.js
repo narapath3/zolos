@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ITEMS, PET_SHOP, SHOP_ITEMS, petModelOf } from '../../src/engine/GameData.js';
 import { buildPet } from '../../src/engine/PetModels.js';
+import { PET_BOUTIQUE_POSITION } from '../../src/engine/SceneManager.js';
 
 const scene = fs.readFileSync(new URL('../../src/engine/SceneManager.js', import.meta.url), 'utf8');
 const ui = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
@@ -27,4 +28,18 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.match(ui, /openPetBoutique\(\)/);
   assert.match(ui, /petPortraitMarkup/);
   assert.match(ui, /Pet Sanctuary/);
+  assert.match(ui, /pet-boutique-modal', 'divine-shop-modal/);
+  assert.match(ui, /previousInventory=structuredClone/);
+});
+
+test('pet sanctuary is physically separated from every existing NPC shop', () => {
+  const existing = [
+    { name: 'Kafra', x: -8, z: 5, radius: 2.0 },
+    { name: 'Forge', x: 9, z: 6, radius: 2.0 },
+    { name: 'Sell shop', x: 9.5, z: -4.5, radius: 2.0 },
+  ];
+  for (const shop of existing) {
+    const distance = Math.hypot(PET_BOUTIQUE_POSITION.x - shop.x, PET_BOUTIQUE_POSITION.z - shop.z);
+    assert.ok(distance > 3.4 + shop.radius + 1.5, `${shop.name} is too close (${distance})`);
+  }
 });
