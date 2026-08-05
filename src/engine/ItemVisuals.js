@@ -35,6 +35,12 @@ const FISH_VISUAL_NAMES = [
   'Phoenix Fish', 'Frost Dragon Fish', 'Emperor Fish',
 ];
 
+const PET_ATLAS_ORDER = [
+  'Poring Pet', 'Chick Pet', 'Kitten Pet', 'Puppy Pet',
+  'Sunfox Pet', 'Moss Turtle Pet', 'Owl Pet', 'Cloudling Pet',
+  'Moon Hare Pet', 'Baby Dragon Pet', 'Bloom Fairy Pet', 'Ember Phoenix Pet',
+];
+
 const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 export const ITEM_VISUALS = Object.freeze(Object.fromEntries([
@@ -53,8 +59,16 @@ export function itemIconPath(itemOrName) {
 
 export function itemIconMarkup(itemOrName, fallbackEmoji = '📦', className = '') {
   const name = canonicalItemName(itemOrName);
+  const petIndex = PET_ATLAS_ORDER.indexOf(name);
   const path = itemIconPath(name);
   const safeName = String(name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  if (petIndex >= 0) {
+    const col = petIndex % 4;
+    const row = Math.floor(petIndex / 4);
+    const x = col * 100 / 3;
+    const y = row * 50;
+    return `<span class="item-visual item-visual--pet ${className}" aria-hidden="true"><span class="item-visual__pet-art" style="--pet-x:${x}%;--pet-y:${y}%"></span></span><span class="sr-only">${safeName}</span>`;
+  }
   if (path) {
     return `<span class="item-visual ${className}" aria-hidden="true"><img src="${path}" alt="" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="item-visual__fallback" hidden>${fallbackEmoji}</span></span><span class="sr-only">${safeName}</span>`;
   }

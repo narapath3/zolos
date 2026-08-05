@@ -1512,7 +1512,7 @@ export class GameUI {
           const nm = this._petDisplayName(petItem, inst);
           const named = !!(inst && inst.name);
           slot.innerHTML = `
-            <span>${petItem.emoji}</span>
+            ${itemIconMarkup(petItem, petItem.emoji)}
             <span class="inv-pet-name" style="position:absolute;bottom:1px;left:0;right:0;font-size:8px;font-weight:700;color:${named ? '#e8dcff' : '#8b82ad'};text-align:center;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px;">${this._short(nm)}</span>
             ${isEq ? '<span class="inv-equipped-badge">E</span>' : ''}
           `;
@@ -2864,7 +2864,8 @@ export class GameUI {
     .pi-box{width:100%;max-width:320px;background:linear-gradient(160deg,#231a3a,#12111f);
       border:1px solid rgba(180,150,255,.4);border-radius:18px;padding:20px 18px 14px;text-align:center;
       box-shadow:0 24px 70px rgba(0,0,0,.7);animation:bcPop .2s cubic-bezier(.34,1.56,.64,1);}
-    .pi-emoji{font-size:52px;line-height:1;filter:drop-shadow(0 0 8px rgba(200,160,255,.5));}
+    .pi-emoji{height:150px;display:flex;align-items:center;justify-content:center;margin:-4px -2px 4px;}
+    .pi-emoji .item-visual{width:142px;height:142px;border-radius:20px;border-color:rgba(180,150,255,.5);}
     #pi-name{width:100%;margin:12px 0 6px;padding:10px 12px;text-align:center;font-size:16px;font-weight:800;
       color:#fff;background:rgba(0,0,0,.3);border:1px solid rgba(180,150,255,.35);border-radius:10px;
       font-family:var(--font-ui);}
@@ -2905,7 +2906,7 @@ export class GameUI {
     ov.id = 'pet-inst-overlay';
     ov.innerHTML = `
       <div class="pi-box">
-        <div class="pi-emoji">${item.emoji}</div>
+        <div class="pi-emoji">${itemIconMarkup(item, item.emoji, 'item-visual--pet-profile')}</div>
         <input id="pi-name" maxlength="16" placeholder="ตั้งชื่อน้อง..." value="${(inst.name || '').replace(/"/g, '&quot;')}" />
         <div class="pi-species">${item.item_name.replace(/ Pet$/, '')} · Lv.${lvl}${lvl >= 40 ? ' MAX' : ''} · ${tier}</div>
         <div class="pi-bar"><div class="pi-fill" style="width:${pct}%"></div></div>

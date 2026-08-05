@@ -6871,6 +6871,18 @@ a,
 .item-visual__fallback[hidden] { display: none; }
 
 .item-visual--emoji > span:first-child { font-size: 24px; }
+.item-visual--pet { background:#071020; }
+.item-visual__pet-art {
+  position:absolute;
+  inset:0;
+  display:block;
+  background-image:url('/assets/pets/pet-sanctuary-atlas-v1.png');
+  background-repeat:no-repeat;
+  background-size:400% 300%;
+  background-position:var(--pet-x) var(--pet-y);
+  filter:drop-shadow(0 3px 4px rgba(0,0,0,.42));
+  transform:scale(1.08);
+}
 .item-visual--detail { width: 72px; height: 72px; border-radius: 15px; }
 
 /* Inventory, NPC buy and NPC sell share the same large preview. The legacy

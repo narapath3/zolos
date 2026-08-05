@@ -42,6 +42,8 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.match(ui, /target\.closest\('#pet-boutique-modal'\)/);
   assert.match(ui, /await requestPetPurchase/);
   assert.doesNotMatch(ui.match(/const buyEntry=async\(entry,button\)=>\{[\s\S]*?\n    \};/)?.[0] || '', /_performShopAction/);
+  assert.match(ui, /itemIconMarkup\(petItem, petItem\.emoji\)/);
+  assert.match(ui, /itemIconMarkup\(item, item\.emoji, 'item-visual--pet-profile'\)/);
   assert.match(ui, /class="pet-boutique__detail" aria-live="polite"/);
   assert.match(ui, /card\.onclick=e=>.*selectEntry\(entry,card\)/);
   assert.match(ui, /detailBuy\.onclick=\(\)=>buyEntry\(entry,detailBuy\)/);
