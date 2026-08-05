@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { ITEMS } from './GameData.js';
 import { MAP_TRACKS } from './MapMusicConfig.js';
 import { youtubeBGM } from './YouTubeBGM.js';
+import { buildPet } from './PetModels.js';
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
@@ -289,6 +290,8 @@ export class SceneManager {
         this.npcWeaponMesh = null;
         this.npcHeavenMesh = null;
         this.npcDivineMesh = null;
+        this.npcPetMesh = null;
+        this.petShowcaseModels = [];
         this.clearVendingStalls();
         this.swayingObjects = [];
         this.birds = [];
@@ -356,6 +359,7 @@ export class SceneManager {
             this._createNPC();
             this._createSellNPC();
             this._createWeaponSmithNPC();
+            this._createPetBoutique();
         }
 
         // Perf: point lights must never cast shadows — each would trigger a
@@ -400,6 +404,7 @@ export class SceneManager {
             if (this.arenaBoard) addTree(this.arenaBoard.group);
             addTree(this.npcMesh);
             addTree(this.npcSellMesh);
+            addTree(this.npcPetMesh);
 
             // Visual signature so only pixel-equivalent materials merge together
             const matKey = (m) => [
@@ -493,6 +498,7 @@ export class SceneManager {
         if (this.npcWeaponMesh) list.push(this.npcWeaponMesh);
         if (this.npcHeavenMesh) list.push(this.npcHeavenMesh);
         if (this.npcDivineMesh) list.push(this.npcDivineMesh);
+        if (this.npcPetMesh) list.push(this.npcPetMesh);
         return list;
     }
 
@@ -3415,6 +3421,55 @@ export class SceneManager {
         this.npcMesh = group;
     }
 
+    // Pet Sanctuary: an open-air garden boutique with real companion models on
+    // illuminated pedestals. It is intentionally separate from the item shop.
+    _createPetBoutique() {
+        const group = new THREE.Group();
+        group.userData.isNPC = true;
+        group.userData.npcType = 'pet_boutique';
+        group.userData.collisionRadius = 3.4;
+        const wood = new THREE.MeshStandardMaterial({ color: 0x9a6235, roughness: .72 });
+        const cream = new THREE.MeshStandardMaterial({ color: 0xffedc8, roughness: .8 });
+        const pink = new THREE.MeshStandardMaterial({ color: 0xff79ac, roughness: .55 });
+        const mint = new THREE.MeshStandardMaterial({ color: 0x70e0b4, roughness: .55 });
+        const gold = new THREE.MeshStandardMaterial({ color: 0xffcf5d, emissive: 0x7a3e08, emissiveIntensity: .22, roughness: .35 });
+
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(3.35, 3.55, .24, 16), wood);
+        deck.position.y = .12; deck.receiveShadow = true; group.add(deck);
+        const rug = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.7, .035, 32), cream);
+        rug.position.y = .27; group.add(rug);
+        for (let i = 0; i < 8; i++) {
+            const a = i / 8 * Math.PI * 2;
+            const petal = new THREE.Mesh(new THREE.SphereGeometry(.42, 9, 7), i % 2 ? pink : mint);
+            petal.scale.set(1.35, .18, .68); petal.position.set(Math.cos(a) * 2.2, .3, Math.sin(a) * 2.2); petal.rotation.y = -a;
+            group.add(petal);
+        }
+        // Festival canopy and ribbons create a strong silhouette from afar.
+        [[-2.7,-2.3],[2.7,-2.3],[-2.7,2.3],[2.7,2.3]].forEach(([x,z]) => {
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(.08,.11,3.2,8), wood); post.position.set(x,1.75,z); post.castShadow=true; group.add(post);
+        });
+        const canopy = new THREE.Mesh(new THREE.ConeGeometry(3.8, 1.15, 12, 1, true), new THREE.MeshStandardMaterial({ color: 0xffd675, side: THREE.DoubleSide, roughness: .85 }));
+        canopy.position.y = 3.65; group.add(canopy);
+        for (let i=0;i<12;i++) {
+            const a=i/12*Math.PI*2; const flag=new THREE.Mesh(new THREE.ConeGeometry(.16,.42,3),i%2?pink:mint);
+            flag.position.set(Math.cos(a)*3.15,3.05,Math.sin(a)*3.15); flag.rotation.z=Math.PI; group.add(flag);
+        }
+        const showcased = ['sunfox','cloudling','moon_hare','baby_dragon'];
+        showcased.forEach((key,i) => {
+            const a = (-.75 + i * .5) * Math.PI;
+            const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(.5,.58,.42,12), gold);
+            pedestal.position.set(Math.cos(a)*1.65,.48,Math.sin(a)*1.65); group.add(pedestal);
+            const pet=buildPet(key); if (!pet) return;
+            pet.scale.setScalar(1.45); pet.position.set(pedestal.position.x,.72+(pet.userData.float?.25:0),pedestal.position.z); pet.rotation.y=-a+Math.PI/2;
+            pet.userData.petShowcase=true; pet.userData.phase=i*1.7; group.add(pet); this.petShowcaseModels.push(pet);
+        });
+        const label=this._makePortalLabel('PET SANCTUARY',new THREE.Color(0xff75bd),'✦ ZOLOS COMPANIONS ✦');
+        label.position.y=4.95; label.scale.multiplyScalar(1.12); group.add(label);
+        const glow=new THREE.PointLight(0xff8fc9,1.15,10); glow.position.set(0,2.4,0); group.add(glow);
+        group.position.set(10,0,5);
+        this.scene.add(group); this.envObjects.push(group); this.npcPetMesh=group;
+    }
+
     // ---- Weapon Smith: a blacksmith stall that opens the equipment shop ----
     _createWeaponSmithNPC() {
         const group = new THREE.Group();
@@ -4257,6 +4312,10 @@ export class SceneManager {
     updateAnimations(dt) {
         this.time += dt;
         if (this.grassWindUniform) this.grassWindUniform.value = this.time;
+        for (const pet of this.petShowcaseModels || []) {
+            pet.position.y = .78 + (pet.userData.float ? .25 : 0) + Math.sin(this.time * 2.1 + pet.userData.phase) * .07;
+            pet.rotation.y += dt * .32;
+        }
 
         // Animate water waves (disabled temporarily to fix blue screen issue)
         /*

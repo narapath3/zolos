@@ -107,6 +107,53 @@ export const PET_BUILDERS = {
         g.userData.float = true;
         return g;
     },
+    sunfox: () => {
+        const g = new THREE.Group();
+        g.add(box(0.32, 0.22, 0.46, 0xf29b38, 0, 0.28, 0));
+        g.add(sph(0.18, 0xffb64e, 0, 0.43, 0.25, 10));
+        [-0.1, 0.1].forEach(x => g.add(cone(0.075, 0.2, 0xd96c2f, x, 0.61, 0.23)));
+        eyes(g, 0.46, 0.4, 0.065, 0.03);
+        const tail = sph(0.2, 0xffc76a, 0, 0.35, -0.34, 10); tail.scale.set(0.75, 0.75, 1.6); g.add(tail);
+        g.add(sph(0.1, 0xfff1c2, 0, 0.35, -0.54, 8));
+        g.userData.float = false; return g;
+    },
+    moss_turtle: () => {
+        const g = new THREE.Group();
+        const shell = sph(0.27, 0x4d8b50, 0, 0.25, 0, 12); shell.scale.set(1.25, 0.65, 1); g.add(shell);
+        g.add(sph(0.13, 0x9cc66d, 0, 0.23, 0.3, 9)); eyes(g, 0.26, 0.41, 0.045, 0.025);
+        [-0.2, 0.2].forEach(x => { g.add(sph(0.08, 0x78a95c, x, 0.09, 0.16, 7)); g.add(sph(0.08, 0x78a95c, x, 0.09, -0.16, 7)); });
+        [-0.11, 0, 0.11].forEach(x => g.add(cone(0.045, 0.14, 0x72c86a, x, 0.54, -0.02, 7)));
+        g.userData.float = false; return g;
+    },
+    cloudling: () => {
+        const g = new THREE.Group();
+        [[0,.5,0,.23],[-.18,.48,0,.16],[.18,.48,0,.16],[0,.62,0,.17]].forEach(([x,y,z,r]) => g.add(sph(r, 0xeaf7ff, x, y, z, 10)));
+        eyes(g, 0.54, 0.2, 0.08, 0.035);
+        g.add(sph(0.035, 0x67c8ff, -0.15, 0.22, -0.02, 6)); g.add(sph(0.03, 0xb279ff, 0.12, 0.15, 0.02, 6));
+        g.userData.float = true; return g;
+    },
+    moon_hare: () => {
+        const g = new THREE.Group();
+        g.add(sph(0.22, 0xc9d4f2, 0, 0.3, 0, 11)); g.add(sph(0.16, 0xe3e9ff, 0, 0.48, 0.2, 10));
+        [-0.08, 0.08].forEach(x => { const ear=box(0.1,0.34,0.09,0xd7e0fa,x,0.76,0.16); ear.rotation.z=x<0?-0.1:0.1; g.add(ear); });
+        eyes(g, 0.51, 0.35, 0.065, 0.03); g.add(sph(0.05, 0x9faee0, 0, 0.3, -0.22, 7));
+        g.userData.float = false; return g;
+    },
+    bloom_fairy: () => {
+        const g = new THREE.Group();
+        g.add(sph(0.12, 0xffd4bd, 0, 0.62, 0.08, 9)); g.add(cone(0.18, 0.35, 0xef6fa9, 0, 0.38, 0, 9));
+        [-0.19,0.19].forEach(x => { const w=sph(0.14,0x9cf6dc,x,0.55,-0.05,9); w.scale.set(.45,1.2,.2); w.userData.role='wing'; w.userData.side=x<0?-1:1; g.add(w); });
+        [-0.13,0,0.13].forEach(x => g.add(sph(0.09, 0xff8fc2, x, 0.77, 0, 8)));
+        eyes(g, 0.64, 0.19, 0.04, 0.022); g.userData.float = true; return g;
+    },
+    ember_phoenix: () => {
+        const g = new THREE.Group();
+        g.add(sph(0.18, 0xff7b32, 0, 0.54, 0, 10)); g.add(sph(0.13, 0xffc34c, 0, 0.66, 0.17, 9));
+        eyes(g, 0.69, 0.29, 0.05, 0.025);
+        [-0.25,0.25].forEach(x => { const w=box(0.08,0.38,0.3,0xff9d32,x,0.56,-0.02); w.rotation.z=x<0?.65:-.65; w.userData.role='wing'; w.userData.side=x<0?-1:1; w.userData.baseRotZ=w.rotation.z; g.add(w); });
+        [-0.1,0,0.1].forEach((x,i) => { const t=cone(0.07,0.38,i===1?0xffdc57:0xff6738,x,0.28,-0.14,7); t.rotation.x=Math.PI; g.add(t); });
+        g.userData.float = true; return g;
+    },
 };
 
 // Build a pet group for `key`, or null if unknown.

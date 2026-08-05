@@ -1543,6 +1543,8 @@ export class CharacterManager {
         const MAP = {
             poring: 0xff6fae, chick: 0xffd54a, kitten: 0x9fd0ff,
             puppy: 0xffb060, owl: 0xc9a0ff, baby_dragon: 0x5affc0,
+            sunfox: 0xffa13d, moss_turtle: 0x78d070, cloudling: 0x8edfff,
+            moon_hare: 0xb7c8ff, bloom_fairy: 0xff79c0, ember_phoenix: 0xff6b32,
         };
         return MAP[this.equippedPet] || 0x8fd0ff;
     }

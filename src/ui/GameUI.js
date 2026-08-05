@@ -1,9 +1,23 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
+
+function petPortraitMarkup(key) {
+  const themes = {
+    poring:['#ff7faf','#ffccdf','round'],chick:['#ffd44d','#fff0a0','bird'],kitten:['#8da2bc','#dbe6f2','ears'],puppy:['#a96b38','#f0bd7d','ears'],
+    owl:['#8d65bd','#eadbff','bird'],baby_dragon:['#35c88a','#a2ffe0','dragon'],sunfox:['#f48b2e','#ffe092','ears'],moss_turtle:['#57945c','#bde28a','shell'],
+    cloudling:['#bdeaff','#ffffff','cloud'],moon_hare:['#aebce8','#f5f0ff','hare'],bloom_fairy:['#f06fad','#9effdc','fairy'],ember_phoenix:['#ff5c2e','#ffd753','bird']
+  };
+  const [a,b,kind]=themes[key]||['#74bfff','#dff4ff','round'];
+  const ears=kind==='ears'||kind==='hare'||kind==='dragon'?`<path d="M42 55 52 17 68 58M92 58l16-41 10 40" fill="${a}" stroke="${b}" stroke-width="5"/>`:'';
+  const wings=kind==='bird'||kind==='fairy'||kind==='dragon'?`<path d="M42 82C10 57 8 105 46 111M118 82c32-25 34 23-4 29" fill="${b}" opacity=".9"/>`:'';
+  const shell=kind==='shell'?`<ellipse cx="80" cy="89" rx="54" ry="37" fill="${a}"/><path d="m44 85 18-18 20 18 19-18 18 18-19 17-20-17-19 17z" fill="${b}" opacity=".7"/>`:'';
+  const cloud=kind==='cloud'?`<g fill="${b}"><circle cx="50" cy="88" r="29"/><circle cx="81" cy="68" r="37"/><circle cx="113" cy="89" r="28"/><rect x="48" y="78" width="66" height="38" rx="19"/></g>`:'';
+  return `<svg viewBox="0 0 160 150" aria-hidden="true"><defs><radialGradient id="pg-${key}"><stop stop-color="${b}"/><stop offset="1" stop-color="${a}"/></radialGradient></defs><circle cx="80" cy="78" r="68" fill="${a}" opacity=".12"/>${wings}${ears}${shell||cloud||`<ellipse cx="80" cy="87" rx="48" ry="43" fill="url(#pg-${key})"/>`}<circle cx="64" cy="82" r="6" fill="#17233b"/><circle cx="98" cy="82" r="6" fill="#17233b"/><circle cx="62" cy="80" r="2" fill="white"/><circle cx="96" cy="80" r="2" fill="white"/><path d="M72 99q9 9 18 0" fill="none" stroke="#713d59" stroke-width="4" stroke-linecap="round"/><circle cx="48" cy="96" r="8" fill="#ff8eaa" opacity=".48"/><circle cx="112" cy="96" r="8" fill="#ff8eaa" opacity=".48"/></svg>`;
+}
 import { escapeOnlineText, formatOnlinePlayerMeta } from './OnlinePlayerMeta.js';
 import {
   displayedCharacterUid,
@@ -5516,6 +5530,29 @@ export class GameUI {
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
     this._updateShopTotal();
+  }
+
+  openPetBoutique() {
+    let modal = document.getElementById('pet-boutique-modal');
+    if (!modal) {
+      const style = document.createElement('style');
+      style.id = 'pet-boutique-style';
+      style.textContent = `#pet-boutique-modal{position:fixed;inset:0;z-index:1470;display:none;align-items:center;justify-content:center;padding:14px;background:radial-gradient(circle at 50% 20%,rgba(255,126,186,.2),rgba(2,7,20,.86) 60%);backdrop-filter:blur(9px)}.pet-boutique{width:min(1040px,96vw);max-height:91dvh;display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(255,218,139,.7);border-radius:24px;background:linear-gradient(150deg,rgba(31,31,61,.98),rgba(12,18,39,.98));box-shadow:0 30px 90px #000,0 0 45px rgba(255,106,174,.2)}.pet-boutique__hero{position:relative;padding:20px 24px 17px;overflow:hidden;background:linear-gradient(115deg,rgba(255,119,174,.2),rgba(93,224,190,.13))}.pet-boutique__hero:after{content:'';position:absolute;inset:auto -5% -45px;height:80px;background:radial-gradient(ellipse,#76dba5 0 40%,transparent 43%);opacity:.22}.pet-boutique__hero h2{margin:0;color:#fff2c5;font-size:clamp(20px,3vw,32px);letter-spacing:.04em}.pet-boutique__hero p{margin:5px 0 0;color:#cbd8eb;font-size:13px}.pet-boutique__close{position:absolute;right:15px;top:14px;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:#10172b;color:white;font-size:22px;cursor:pointer}.pet-boutique__wallet{position:absolute;right:70px;top:18px;padding:8px 13px;border-radius:999px;background:rgba(0,0,0,.3);color:#ffd76f;font-weight:900}.pet-boutique__grid{padding:15px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:12px}.pet-card{position:relative;overflow:hidden;border:1px solid rgba(151,183,224,.24);border-radius:18px;background:linear-gradient(160deg,rgba(37,50,82,.95),rgba(18,24,45,.95));padding:11px;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s;text-align:left;color:white}.pet-card:hover,.pet-card:focus-visible{transform:translateY(-4px);border-color:#ffb3d5;box-shadow:0 14px 30px rgba(0,0,0,.36),0 0 18px rgba(255,113,177,.18);outline:none}.pet-card__art{height:142px;border-radius:13px;background:radial-gradient(circle at 50% 25%,rgba(255,255,255,.2),rgba(106,174,255,.05) 54%,rgba(0,0,0,.18));display:grid;place-items:center;overflow:hidden}.pet-card__art svg{height:138px;width:148px;filter:drop-shadow(0 10px 12px rgba(0,0,0,.32))}.pet-card__rarity{position:absolute;left:18px;top:18px;padding:4px 8px;border-radius:999px;background:rgba(5,10,24,.72);font-size:9px;font-weight:900;text-transform:uppercase;color:#ffe79d}.pet-card h3{font-size:14px;margin:10px 0 3px;color:#fff}.pet-card p{height:35px;overflow:hidden;margin:0;color:#aebdd3;font-size:10px;line-height:1.65}.pet-card__foot{display:flex;align-items:center;justify-content:space-between;margin-top:9px}.pet-card__price{font-weight:900;color:#ffd567}.pet-card__buy{border:0;border-radius:9px;padding:8px 11px;background:linear-gradient(135deg,#ff89bd,#70e7c0);color:#182039;font-weight:900;cursor:pointer}.pet-card__buy:disabled{filter:grayscale(1);opacity:.45}@media(max-width:620px){#pet-boutique-modal{padding:7px 7px 108px;align-items:flex-start}.pet-boutique{max-height:calc(100dvh - 116px)}.pet-boutique__hero{padding:15px}.pet-boutique__hero p{max-width:60%}.pet-boutique__wallet{position:static;display:inline-block;margin-top:9px}.pet-boutique__grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:9px}.pet-card{padding:7px}.pet-card__art{height:112px}.pet-card__art svg{height:108px;width:116px}.pet-card p{display:none}.pet-card h3{font-size:11px}.pet-card__foot{display:block}.pet-card__buy{width:100%;margin-top:6px}}`;
+      document.head.appendChild(style);
+      modal = document.createElement('div'); modal.id = 'pet-boutique-modal'; document.body.appendChild(modal);
+    }
+    const gold = Number(this.character?.stats?.gold) || 0;
+    modal.innerHTML = `<section class="pet-boutique" role="dialog" aria-modal="true" aria-label="Pet Sanctuary"><header class="pet-boutique__hero"><h2>✦ Pet Sanctuary</h2><p>เพื่อนร่วมทางแห่ง Zolos · เลือกชมสายพันธุ์และรับกลับไปดูแล</p><div class="pet-boutique__wallet">Zeny ${gold.toLocaleString()}</div><button class="pet-boutique__close" aria-label="ปิด">×</button></header><div class="pet-boutique__grid">${PET_SHOP.map(entry=>{const data=ITEMS[entry.name];return `<article class="pet-card" tabindex="0" data-pet="${entry.name}"><span class="pet-card__rarity">${data.rarity}</span><div class="pet-card__art">${petPortraitMarkup(data.pet)}</div><h3>${entry.name.replace(' Pet','')}</h3><p>${data.desc}</p><div class="pet-card__foot"><span class="pet-card__price">${entry.price.toLocaleString()} z</span><button class="pet-card__buy" ${gold<entry.price?'disabled':''}>รับเลี้ยง</button></div></article>`}).join('')}</div></section>`;
+    modal.style.display = 'flex'; this.updateMobileControlsVisibility();
+    const close=()=>{modal.style.display='none';this.updateMobileControlsVisibility();};
+    modal.querySelector('.pet-boutique__close').onclick=close;
+    modal.onclick=e=>{if(e.target===modal)close();};
+    modal.querySelectorAll('.pet-card').forEach(card=>{
+      const buy=async()=>{const entry=PET_SHOP.find(x=>x.name===card.dataset.pet);if(!entry||this.character.stats.gold<entry.price)return;this.selectedShopItem=entry;const qty=document.getElementById('shop-qty-input');if(qty)qty.value=1;card.querySelector('.pet-card__buy').disabled=true;await this._performShopAction();this.openPetBoutique();};
+      card.querySelector('.pet-card__buy').onclick=e=>{e.stopPropagation();buy();};
+      card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();buy();}};
+    });
+    modal.querySelector('.pet-boutique__close').focus();
   }
 
   // ============ Heaven Merchant (Svarrga) — pickaxe shop + ore→ZOL ============

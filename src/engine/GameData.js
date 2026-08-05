@@ -110,6 +110,12 @@ export const ITEMS = {
     'Puppy Pet': { emoji: '🐶', type: 'pet', pet: 'puppy', rarity: 'rare', desc: 'ลูกสุนัขแสนซื่อสัตย์ กระดิกหางวิ่งตามเจ้าของไม่ห่าง เพื่อนแท้ผู้ผจญภัย', price: 10000 },
     'Owl Pet': { emoji: '🦉', type: 'pet', pet: 'owl', rarity: 'epic', desc: 'นกฮูกผู้รอบรู้ ลอยตามเงียบๆ ดวงตาโตเป็นประกายในยามค่ำคืน', price: 25000 },
     'Baby Dragon Pet': { emoji: '🐉', type: 'pet', pet: 'baby_dragon', rarity: 'legendary', desc: 'มังกรน้อยกำเนิดใหม่ กระพือปีกลอยเคียงข้าง สง่างามราวจ้าวเวหา', price: 60000 },
+    'Sunfox Pet': { emoji: '🦊', type: 'pet', pet: 'sunfox', rarity: 'rare', desc: 'จิ้งจอกสุริยันขนทอง ปลายหางมีแสงอุ่นนำทางนักผจญภัย', price: 18000 },
+    'Moss Turtle Pet': { emoji: '🐢', type: 'pet', pet: 'moss_turtle', rarity: 'rare', desc: 'เต่าน้อยผู้แบกสวนจิ๋วบนกระดอง ใจเย็นและซื่อสัตย์', price: 22000 },
+    'Cloudling Pet': { emoji: '☁️', type: 'pet', pet: 'cloudling', rarity: 'epic', desc: 'ภูตเมฆตัวกลมลอยฟ่อง ทิ้งประกายฝนดาวไว้เบื้องหลัง', price: 42000 },
+    'Moon Hare Pet': { emoji: '🌙', type: 'pet', pet: 'moon_hare', rarity: 'epic', desc: 'กระต่ายจันทราหูยาว ขนสีเงินเปล่งแสงยามค่ำคืน', price: 55000 },
+    'Bloom Fairy Pet': { emoji: '🧚', type: 'pet', pet: 'bloom_fairy', rarity: 'legendary', desc: 'ภูตดอกไม้แห่งพงไพร ปีกแก้วสะท้อนสีรุ้งทุกครั้งที่บิน', price: 95000 },
+    'Ember Phoenix Pet': { emoji: '🔥', type: 'pet', pet: 'ember_phoenix', rarity: 'mythic', desc: 'วิหคเพลิงเกิดใหม่ เปลวไฟไม่เผาเจ้าของและส่องประกายดั่งอาทิตย์', price: 180000 },
 
     // ---- REFINE ORES (แร่ตีบวก) ----
     'Oridecon': { emoji: '🔩', type: 'material', rarity: 'rare', desc: 'แร่ออริดิคอนแข็งแกร่ง ใช้ตีบวกอาวุธให้ทรงพลังยิ่งขึ้น ยิ่งบวกสูงยิ่งใช้มาก', price: 2500 },
@@ -1543,17 +1549,18 @@ export const SHOP_ITEMS = [
     { name: 'Plate Legguards', price: 4200 },
     { name: 'Guardian Wristguard', price: 16000 },
     { name: 'Dragon Greaves', price: 20000 },
-    // ---- Pets (สัตว์เลี้ยง) ----
-    { name: 'Poring Pet', price: 2000 },
-    { name: 'Chick Pet', price: 3000 },
-    { name: 'Kitten Pet', price: 8000 },
-    { name: 'Puppy Pet', price: 10000 },
-    { name: 'Owl Pet', price: 25000 },
-    { name: 'Baby Dragon Pet', price: 60000 },
     // ---- Refine ores (แร่ตีบวก) ----
     { name: 'Oridecon', price: 2500 },
     { name: 'Elunium', price: 2500 }
 ];
+
+// Dedicated Pet Sanctuary catalog. Pets intentionally do not appear in the
+// general Kafra item shop, so the boutique owns discovery and presentation.
+export const PET_SHOP = [
+    'Poring Pet', 'Chick Pet', 'Kitten Pet', 'Puppy Pet', 'Sunfox Pet',
+    'Moss Turtle Pet', 'Owl Pet', 'Cloudling Pet', 'Moon Hare Pet',
+    'Baby Dragon Pet', 'Bloom Fairy Pet', 'Ember Phoenix Pet',
+].map(name => ({ name, price: ITEMS[name].price }));
 
 // The pet model key for a pet item (or null). Used to build the follower mesh.
 export function petModelOf(itemName) {

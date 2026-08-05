@@ -1739,6 +1739,8 @@ function handleMouseInteraction(event) {
             gameUI.openHeavenShop();
         } else if (npcType === 'divine_merchant') {
             gameUI.openDivineZolShop();
+        } else if (npcType === 'pet_boutique') {
+            gameUI.openPetBoutique();
         } else {
             gameUI._togglePanel('shop-panel');
             gameUI._renderShop();
