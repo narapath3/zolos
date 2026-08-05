@@ -6929,6 +6929,11 @@ a,
 .item-visual--forge-result { width: 54px; height: 54px; border-radius: 11px; flex: 0 0 auto; }
 .item-visual--forge-stage { width: 82px; height: 82px; border-radius: 16px; margin: 0 auto; }
 .item-visual.slot-emoji { width: 52px; height: 52px; }
+.item-visual--market { width: 38px; height: 38px; border-radius: 9px; }
+.item-visual--market-row { width: 34px; height: 34px; border-radius: 8px; }
+.market-item-name-cell > .sr-only,
+.slot-icon > .sr-only,
+#market-sell-item-icon > .sr-only { position:absolute; }
 
 /* iPad/tablet landscape: reserve a lane ABOVE the centered menu dock for chat.
    The dock also gets the higher interaction layer, so transparent chat pixels

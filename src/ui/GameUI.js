@@ -7168,8 +7168,9 @@ export class GameUI {
     return owned;
   }
 
-  // Icon markup for a market slot/detail. Card rows carry no emoji, so fall back
-  // to the card's art image (or 🃏) instead of rendering an empty box.
+  // Canonical artwork for every market surface. Inventory rows may contain an
+  // old emoji, but the market must render the same asset used by inventory,
+  // shops and equipment previews. Cards keep their dedicated album art.
   _itemIconHtml(item) {
     if (item && item.item_type === 'card') {
       const card = getCard(item.item_name);
@@ -7178,7 +7179,8 @@ export class GameUI {
       }
       return '🃏';
     }
-    return item && item.emoji ? item.emoji : '📦';
+    const fallback = ITEMS[item?.item_name]?.emoji || item?.emoji || '📦';
+    return itemIconMarkup(item, fallback, 'item-visual--market');
   }
 
   async _renderMarket() {
@@ -7227,7 +7229,7 @@ export class GameUI {
           : listing.item_name;
         row.innerHTML = `
           <div class="market-item-name-cell ${rarityClass}">
-            <span>${itemInfo.emoji}</span>
+            ${itemIconMarkup(listing.item_name, itemInfo.emoji, 'item-visual--market-row')}
             <span class="market-item-name-text" title="${displayName}">${displayName}</span>
           </div>
           <div class="market-item-qty-cell">x${listing.quantity}</div>
