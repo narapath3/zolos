@@ -28,6 +28,9 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.match(ui, /openPetBoutique\(\)/);
   assert.match(ui, /petPortraitMarkup/);
   assert.match(ui, /Pet Sanctuary/);
+  assert.match(ui, /pet-sanctuary-atlas-v1\.png/);
+  assert.doesNotMatch(ui.match(/function petPortraitMarkup[\s\S]*?\n\}/)?.[0] || '', /<svg/);
+  assert.ok(fs.existsSync(new URL('../../public/assets/pets/pet-sanctuary-atlas-v1.png', import.meta.url)));
   assert.match(ui, /pet-boutique-modal', 'divine-shop-modal/);
   assert.match(ui, /previousInventory=structuredClone/);
 });
