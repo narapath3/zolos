@@ -1,6 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, getClientPing } from '../network/GameSync.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -5707,22 +5707,22 @@ export class GameUI {
     const oreItem = this.inventory.find(i => i.item_name === 'Celestial Ore');
     const oreQty = oreItem ? (oreItem.quantity || 0) : 0;
     if (oreQty <= 0) return;
-
-    const gained = oreQty * H.ORE_TO_ZOL;
-    this.character.stats.zol = (Number(this.character.stats.zol) || 0) + gained;
-    oreItem.quantity = 0;
-    const idx = this.inventory.findIndex(i => i.item_name === 'Celestial Ore');
-    if (idx >= 0) this.inventory.splice(idx, 1);
-
-    if (this.characterId) {
-      await saveInventoryItem(this.characterId, 'Celestial Ore', 'material', -oreQty).catch(() => { });
-      if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+    const button = document.getElementById('heaven-convert');
+    if (button) { button.disabled = true; button.textContent = 'กำลังยืนยันกับเซิร์ฟเวอร์…'; }
+    try {
+      const requestId = `ore:${this.characterId}:${Date.now()}:${Math.random().toString(36).slice(2, 9)}`;
+      const result = await requestOreConversion(this.characterId, requestId);
+      this.character.stats.zol = Number(result.zol) || 0;
+      this.inventory = this.inventory.filter(i => i.item_name !== 'Celestial Ore');
+      if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
+      this.addCombatLog(`✨ แปลงแร่ ${result.ore_spent} ก้อน → +${Number(result.zol_gained).toLocaleString()} ZOL (ยอดรวม ${this.character.stats.zol.toLocaleString()})`, 'levelup');
+      this._renderHeavenShop();
+      this._renderInventory();
+      this.updateHUD(this.character.stats);
+    } catch (error) {
+      this.showToast?.(error.message || 'แปลงแร่ไม่สำเร็จ แร่ยังอยู่ครบ');
+      if (button) { button.disabled = false; button.textContent = `✨ แปลงทั้งหมด → +${(oreQty * H.ORE_TO_ZOL).toLocaleString()} ZOL`; }
     }
-    if (this.soundManager && this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
-    this.addCombatLog(`✨ แปลงแร่ ${oreQty} ก้อน → +${gained.toLocaleString()} ZOL (ยอดรวม ${(Number(this.character.stats.zol) || 0).toLocaleString()})`, 'levelup');
-    this._renderHeavenShop();
-    this._renderInventory();
-    this.updateHUD(this.character.stats);
   }
 
   openDivineZolShop() {

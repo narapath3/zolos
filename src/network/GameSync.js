@@ -13,6 +13,7 @@ let socketListenersAttached = false;
 let chatCallback = null;
 let cardFusionSocket = null;
 const pendingCardFusions = new Map();
+const pendingOreConversions = new Map();
 let clientMeasuredPing = null;
 
 // ============ Client-side profanity filter (mirrors server) ============
@@ -34,6 +35,51 @@ function censorText(text) {
 
 /** Return the locally-measured round-trip latency (ms) or null. */
 export function getClientPing() { return clientMeasuredPing; }
+
+function attachOreConversionListeners(socket) {
+    if (socket._zolosOreListeners) return;
+    socket._zolosOreListeners = true;
+    socket.on('ore_conversion_result', (result) => {
+        const pending = pendingOreConversions.get(result?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingOreConversions.delete(result.requestId);
+        pending.resolve(result);
+    });
+    socket.on('ore_conversion_error', (error) => {
+        const pending = pendingOreConversions.get(error?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingOreConversions.delete(error.requestId);
+        pending.reject(new Error(error.message || 'แปลงแร่ไม่สำเร็จ'));
+    });
+}
+
+export async function requestOreConversion(characterId, requestId) {
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
+        const inv = localDb.get(`inventory_${characterId}`) || [];
+        const ore = inv.filter(i => i.item_name === 'Celestial Ore').reduce((n, i) => n + (Number(i.quantity) || 0), 0);
+        if (ore <= 0) throw new Error('ไม่มี Celestial Ore สำหรับแปลง');
+        localDb.set(`inventory_${characterId}`, inv.filter(i => i.item_name !== 'Celestial Ore'));
+        const char = localDb.get(`char_${characterId}`);
+        if (!char) throw new Error('ไม่พบข้อมูลตัวละคร');
+        char.zol = Math.min(2147483647, (Number(char.zol) || 0) + ore * 100);
+        localDb.set(`char_${characterId}`, char);
+        return { ore_spent: ore, zol_gained: ore * 100, zol: char.zol, requestId };
+    }
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่');
+    if (pendingOreConversions.has(requestId)) throw new Error('กำลังแปลงแร่อยู่');
+    attachOreConversionListeners(socket);
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingOreConversions.delete(requestId);
+            reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า แร่ยังไม่ถูกลบ กรุณาลองใหม่'));
+        }, 12000);
+        pendingOreConversions.set(requestId, { resolve, reject, timeout });
+        socket.emit('ore_convert', { requestId });
+    });
+}
 
 let currentUserId = null;
 let currentUsername = 'Adventurer';

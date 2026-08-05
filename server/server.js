@@ -16,6 +16,7 @@ import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startCheatGuard } from './api/cheatGuard.js';
 import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
 import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
+import { ensureOreEconomy } from './api/oreEconomy.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -696,6 +697,29 @@ io.on('connection', (socket) => {
             const trusted = { ...data, _ownerUserId: player.userId, _clientIp: socket._clientIp };
             player.lastSaveData = trusted;
             pendingSaves.set(player.userId, trusted);
+        }
+    });
+
+    socket.on('ore_convert', async (payload) => {
+        const player = trustedSender(socket);
+        const requestId = payload?.requestId;
+        const reject = (message) => socket.emit('ore_conversion_error', { requestId, message });
+        if (!player?.verified || !player.characterId || !supabase) return reject('ไม่สามารถยืนยันตัวละครได้ กรุณาเข้าเกมใหม่');
+        if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) return reject('รหัสคำขอไม่ถูกต้อง');
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'ore_convert', 3, 10000)) return reject('กดเร็วเกินไป กรุณารอสักครู่');
+        try {
+            const { data, error } = await supabase.rpc('convert_celestial_ore_to_zol', {
+                p_character_id: player.characterId,
+                p_idempotency_key: requestId,
+            });
+            if (error) throw error;
+            socket.emit('ore_conversion_result', { ...data, requestId });
+        } catch (error) {
+            const message = String(error?.message || '');
+            if (message.toLowerCase().includes('no celestial ore')) return reject('ไม่มี Celestial Ore สำหรับแปลง');
+            console.error('[Server] Ore conversion failed:', message);
+            reject('แปลงแร่ไม่สำเร็จ แร่ยังอยู่ครบ กรุณาลองใหม่');
         }
     });
 
@@ -1523,6 +1547,7 @@ httpServer.listen(PORT, HOST, () => {
                 await ensureMonsterTables();
                 await seedMonstersIfEmpty();
                 await ensureCardEconomy();
+                await ensureOreEconomy();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
         })();
