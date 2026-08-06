@@ -1480,28 +1480,45 @@ export class CharacterManager {
         if (!key) this.equippedPetUid = null;
         this.petLevel = Math.max(1, Math.floor(level) || 1);
         this.petXp = Math.max(0, xp || 0);
-        if (this.petMesh) {
-            this.mesh.remove(this.petMesh);
-            this.petMesh.traverse(c => {
+        if (this.petScaler) {
+            this.mesh.remove(this.petScaler);
+            this.petScaler.traverse(c => {
                 if (c.geometry) c.geometry.dispose();
                 if (c.material) Array.isArray(c.material) ? c.material.forEach(m => m.dispose()) : c.material.dispose();
             });
+            this.petScaler = null;
             this.petMesh = null;
             this.petParts = null;
         }
         if (!key) return;
         const pet = buildPet(key);
         if (!pet) return;
-        pet.position.set(0.95, 0, -0.15); // beside + slightly behind the hero
-        pet.rotation.y = -0.35;           // angle it to face roughly where the hero looks
-        this.mesh.add(pet);
+        // A size wrapper holds position + a big base scale, so the per-frame
+        // squash/bounce that update() writes to the pet never fights the size.
+        const scaler = new THREE.Group();
+        scaler.position.set(1.05, 0, -0.2);        // beside + slightly behind the hero
+        scaler.scale.setScalar(pet.userData.scale || 1.45); // bigger, more prominent
+        this.mesh.add(scaler);
+        scaler.add(pet);
+        pet.rotation.y = -0.35;                     // face roughly where the hero looks
+        this.petScaler = scaler;
         this.petMesh = pet;
 
-        // Collect animatable parts (flappable wings) once, then build the
-        // level-scaled aura. Higher-level pets look more impressive.
-        const wings = [];
-        pet.traverse(c => { if (c.userData && c.userData.role === 'wing') wings.push(c); });
-        this.petParts = { wings, aura: null, baseY: pet.userData.float ? 0.35 : 0 };
+        // Collect animatable rig parts once (legs/arms/ears/tail/wings/eyes) so
+        // update() can drive a real walk cycle, tail wag and blink without any
+        // per-frame traversal. Then build the level-scaled aura.
+        const parts = { legs: [], arms: [], ears: [], tails: [], wings: [], eyes: [], aura: null, baseY: pet.userData.float ? 0.35 : 0 };
+        pet.traverse(c => {
+            const r = c.userData && c.userData.role;
+            if (r === 'leg') parts.legs.push(c);
+            else if (r === 'arm') parts.arms.push(c);
+            else if (r === 'ear') parts.ears.push(c);
+            else if (r === 'tail') parts.tails.push(c);
+            else if (r === 'wing') parts.wings.push(c);
+            else if (r === 'eye') parts.eyes.push(c);
+        });
+        this.petParts = parts;
+        this._petBlink = { t: -1, next: 1.5 + Math.random() * 2.5 }; // blink scheduler
         this._buildPetAura(this.petLevel);
     }
 
@@ -2541,37 +2558,78 @@ export class CharacterManager {
             this.divineAura.scale.set(pulse, pulse, pulse);
         }
 
-        // Pet idle animation: ground pets bounce with a lively squash/stretch;
-        // floating pets bob, sway and flap. Higher-level pets move a touch
-        // faster and their aura spins/orbits. All rotation/scale only — cheap.
+        // Pet animation: a real rig, not just a bouncing blob. Legged pets trot
+        // (hips swing, body bobs) when their owner is moving and idle-shift when
+        // still; legless pets keep the springy hop; floaters bob and flap. On
+        // top of that every pet wags its tail, bobs its ears and blinks. All
+        // rotation/scale only — cheap enough for a crowd of pets on screen.
         if (this.petMesh) {
+            const P = this.petParts;
             const floats = this.petMesh.userData.float;
+            const legged = P && P.legs.length > 0;
             const t = this.animTimer;
             const speed = 1 + Math.min(this.petLevel, 40) * 0.012; // livelier as it grows
+            const moving = this.state === 'walking' || this.state === 'running';
 
             if (floats) {
                 this.petMesh.position.y = 0.35 + Math.sin(t * 2.4 * speed) * 0.1;
                 this.petMesh.rotation.y = -0.35 + Math.sin(t * 1.3) * 0.16;
                 this.petMesh.rotation.z = Math.sin(t * 2.4 * speed) * 0.06;
                 this.petMesh.scale.set(1, 1, 1);
+            } else if (legged) {
+                // Standing on legs: a small trot-bob when moving, gentle breathing
+                // when idle. The stride itself comes from the hip pivots below.
+                const bob = moving ? Math.abs(Math.sin(t * 8 * speed)) * 0.045 : Math.sin(t * 2 * speed) * 0.01;
+                this.petMesh.position.y = bob;
+                const breathe = moving ? 1 : 1 + Math.sin(t * 2 * speed) * 0.02;
+                this.petMesh.scale.set(1, breathe, 1);
+                this.petMesh.rotation.y = -0.35 + (moving ? 0 : Math.sin(t * 1.6 * speed) * 0.07);
+                this.petMesh.rotation.z = 0;
             } else {
-                // Bouncy hop: |sin| gives a springy up-down; squash on the
-                // ground, stretch at the top of the arc → "ดุ๊กดิ๊ก".
+                // Legless (slime/bunny/cloud on ground): springy hop with
+                // squash/stretch → "ดุ๊กดิ๊ก".
                 const hop = Math.abs(Math.sin(t * 3.4 * speed));
                 this.petMesh.position.y = hop * 0.14;
-                const stretch = 1 + hop * 0.16;
-                const squash = 1 - hop * 0.1;
-                this.petMesh.scale.set(squash, stretch, squash);
+                this.petMesh.scale.set(1 - hop * 0.1, 1 + hop * 0.16, 1 - hop * 0.1);
                 this.petMesh.rotation.y = -0.35 + Math.sin(t * 2.2 * speed) * 0.1;
                 this.petMesh.rotation.z = Math.sin(t * 6.8 * speed) * 0.05; // wiggle
             }
 
-            // Flap any tagged wings.
-            if (this.petParts && this.petParts.wings.length) {
-                const flap = Math.sin(t * (floats ? 9 : 13) * speed) * (floats ? 0.5 : 0.7);
-                for (const w of this.petParts.wings) {
-                    const base = w.userData.baseRotZ || 0;
-                    w.rotation.z = base + flap * (w.userData.side || 1);
+            if (P) {
+                // Legs stride from the hips (diagonal gait via per-leg phase).
+                if (P.legs.length) {
+                    const f = (moving ? 9 : 2.4) * speed;
+                    const amp = moving ? 0.6 : 0.05;
+                    for (const lg of P.legs) lg.rotation.x = Math.sin(t * f + lg.userData.phase) * amp;
+                }
+                // Arms/hands swing counter to the stride.
+                if (P.arms.length) {
+                    const f = (moving ? 9 : 2) * speed;
+                    const amp = moving ? 0.5 : 0.12;
+                    for (const a of P.arms) a.rotation.x = Math.sin(t * f + a.userData.phase) * amp * (a.userData.side || 1);
+                }
+                // Ears/horns bob.
+                for (const ear of P.ears) ear.rotation.x = (ear.userData.baseRotX || 0) + Math.sin(t * (moving ? 7 : 3) * speed + ear.userData.phase) * (moving ? 0.16 : 0.09);
+                // Tail wag (livelier when moving).
+                for (const tl of P.tails) tl.rotation.y = Math.sin(t * (moving ? 8 : 3.2) * speed) * (moving ? 0.5 : 0.32);
+                // Flap any tagged wings.
+                if (P.wings.length) {
+                    const flap = Math.sin(t * (floats ? 9 : 13) * speed) * (floats ? 0.5 : 0.7);
+                    for (const w of P.wings) w.rotation.z = (w.userData.baseRotZ || 0) + flap * (w.userData.side || 1);
+                }
+                // Blink: squash the eyes to a line for ~0.14s, then reschedule.
+                if (P.eyes.length) {
+                    const b = this._petBlink || (this._petBlink = { t: -1, next: 2 });
+                    if (b.t < 0) {
+                        b.next -= dt;
+                        if (b.next <= 0) b.t = 0;
+                    } else {
+                        b.t += dt;
+                        const k = Math.min(1, b.t / 0.14);
+                        const sy = 1 - Math.sin(k * Math.PI) * 0.92; // 1 → ~0.08 → 1
+                        for (const e of P.eyes) e.scale.y = sy;
+                        if (b.t >= 0.14) { b.t = -1; b.next = 1.8 + Math.random() * 3; for (const e of P.eyes) e.scale.y = 1; }
+                    }
                 }
             }
 
