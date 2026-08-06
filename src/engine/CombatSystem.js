@@ -1,6 +1,6 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
-import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS } from './GameData.js';
+import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS, getPetCombat } from './GameData.js';
 
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
@@ -15,6 +15,7 @@ export class CombatSystem {
         this.currentTarget = null;
         this.attackRange = 1.8;
         this.globalCooldown = 0;
+        this.petCooldown = 0; // seconds until the companion's next strike
     }
 
     toggleAutoFarm() {
@@ -268,6 +269,58 @@ export class CombatSystem {
         if (this.globalCooldown <= 0 && this.character.state === 'attacking' && !target) {
             this.character.state = 'idle';
         }
+
+        // ── Pet companion strike ──────────────────────────────────────────────
+        // Independently of the hero's own attacks, an equipped pet auto-strikes
+        // the current target with its signature elemental hit on its own cadence.
+        this.petCooldown = Math.max(0, this.petCooldown - clampedDt);
+        if (target && target.alive && this.character.equippedPet && this.petCooldown <= 0) {
+            const combat = getPetCombat(this.character.equippedPet, this.character.petLevel || 1);
+            if (combat) {
+                const pp = this.character.getPosition();
+                const tp = target.getPosition();
+                const pdx = pp.x - tp.x, pdz = pp.z - tp.z;
+                if (Math.sqrt(pdx * pdx + pdz * pdz) <= combat.range) {
+                    this.petCooldown = combat.cooldown;
+                    this._petStrike(target, combat);
+                }
+            }
+        }
+    }
+
+    // The pet lands its elemental hit on `monster`. Damage flows through the same
+    // server-authoritative / local paths as the hero's own attacks, so shared HP
+    // and rewards stay consistent. Emits a `petAttack` event for the visuals.
+    _petStrike(monster, combat) {
+        if (!monster || !monster.alive) return;
+        const isCritical = Math.random() < combat.crit;
+        let dmg = combat.atk + Math.floor(Math.random() * combat.variance);
+        if (isCritical) dmg = Math.floor(dmg * 1.8);
+
+        if (window.__serverMonsters) {
+            monster.flashHit?.(isCritical);
+            monster._localContributed = true;
+            if (this.onMonsterDamaged) this.onMonsterDamaged(monster.id, dmg, isCritical);
+        } else {
+            const actual = monster.takeDamage(dmg, isCritical);
+            dmg = actual;
+            monster._localContributed = true;
+            if (this.onMonsterDamaged) this.onMonsterDamaged(monster.id, actual);
+            if (!monster.alive) this._onMonsterKilled(monster);
+        }
+
+        this.onEvent({
+            type: 'petAttack',
+            damage: dmg,
+            critical: isCritical,
+            element: combat.element,
+            elementName: combat.elementName,
+            color: combat.color,
+            attackName: combat.attackName,
+            startPos: (this.character.getPetWorldPosition && this.character.getPetWorldPosition()) || this.character.getPosition(),
+            target: monster,
+            targetPos: monster.getPosition(),
+        });
     }
 
     _performAttack(target) {

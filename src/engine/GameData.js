@@ -1568,6 +1568,63 @@ export function petModelOf(itemName) {
     return (it && it.type === 'pet') ? (it.pet || null) : null;
 }
 
+// ============ PET COMBAT (สัตว์เลี้ยงมีพลังโจมตี!) ============
+// Every companion now fights beside its owner. While the owner has a target in
+// range, the pet periodically unleashes its signature elemental strike. Stats
+// differ by species/rarity — rarer pets hit harder, faster, with flashier
+// elements. `atk` is base power at level 1; it grows `per` points per pet level.
+// `color` tints the projectile + damage number; `cd` is seconds between strikes.
+export const ELEMENT_INFO = {
+    neutral: { th: 'ไร้ธาตุ', color: 0xffd8a0 },
+    fire:    { th: 'ไฟ',      color: 0xff6a1e },
+    wind:    { th: 'ลม',      color: 0x8ef0a0 },
+    water:   { th: 'น้ำ',     color: 0x67c8ff },
+    earth:   { th: 'ดิน',     color: 0x9ed86a },
+    holy:    { th: 'ศักดิ์สิทธิ์', color: 0xfff2a8 },
+    nature:  { th: 'ธรรมชาติ', color: 0x9cf6c0 },
+    shadow:  { th: 'เงามืด',   color: 0xb27bff },
+};
+
+export const PET_STATS = {
+    //             rarity        el       atk  per   cd   range crit  attackName (signature move)                     flavor
+    poring:        { rarity: 'common',    element: 'neutral', atk: 6,  per: 1.2, cd: 2.2, range: 6, crit: 0.08, attackName: 'เจลลี่กระแทก',    desc: 'พุ่งตัวเจลลี่เด้งใส่ศัตรูอย่างน่ารักแต่เจ็บ' },
+    chick:         { rarity: 'common',    element: 'wind',    atk: 7,  per: 1.3, cd: 2.0, range: 6, crit: 0.09, attackName: 'จิกสายลม',       desc: 'กระพือปีกยิงขนลมคมกริบใส่เป้าหมาย' },
+    kitten:        { rarity: 'rare',      element: 'neutral', atk: 10, per: 1.8, cd: 1.8, range: 6, crit: 0.11, attackName: 'ตะปบเงา',        desc: 'กระโจนตะปบด้วยกรงเล็บเงาไวปานสายฟ้า' },
+    puppy:         { rarity: 'rare',      element: 'neutral', atk: 11, per: 1.9, cd: 1.9, range: 6, crit: 0.11, attackName: 'งับพลัง',        desc: 'พุ่งเข้างับด้วยพลังซื่อสัตย์เต็มกำลัง' },
+    sunfox:        { rarity: 'rare',      element: 'fire',    atk: 13, per: 2.2, cd: 1.9, range: 7, crit: 0.12, attackName: 'เปลวสุริยะ',     desc: 'สะบัดหางเพลิงยิงลูกไฟสุริยันใส่ศัตรู' },
+    moss_turtle:   { rarity: 'rare',      element: 'earth',   atk: 14, per: 2.1, cd: 2.4, range: 7, crit: 0.10, attackName: 'ยิงหนามพฤกษา',   desc: 'ยิงหนามจากกระดองสวน โจมตีหนักแต่ช้า' },
+    owl:           { rarity: 'epic',      element: 'wind',    atk: 16, per: 2.4, cd: 1.7, range: 7, crit: 0.13, attackName: 'ใบมีดวายุ',      desc: 'กระพือปีกส่งใบมีดลมเฉือนเงียบกริบ' },
+    cloudling:     { rarity: 'epic',      element: 'water',   atk: 17, per: 2.5, cd: 1.7, range: 7, crit: 0.13, attackName: 'สายฝนดารา',      desc: 'เรียกสายฝนดาวพราวระยิบถล่มศัตรู' },
+    moon_hare:     { rarity: 'epic',      element: 'holy',    atk: 18, per: 2.6, cd: 1.6, range: 7, crit: 0.14, attackName: 'จันทรฉาย',       desc: 'ปล่อยลำแสงจันทราศักดิ์สิทธิ์ทะลุทะลวง' },
+    baby_dragon:   { rarity: 'legendary', element: 'fire',    atk: 23, per: 3.2, cd: 1.5, range: 7, crit: 0.15, attackName: 'ลมหายใจมังกร',   desc: 'พ่นลมหายใจเพลิงมังกรเผาผลาญทุกสิ่ง' },
+    bloom_fairy:   { rarity: 'legendary', element: 'nature',  atk: 22, per: 3.0, cd: 1.5, range: 7, crit: 0.15, attackName: 'ละอองภูตพฤกษา', desc: 'โปรยละอองเวทมนตร์ธรรมชาติกัดกร่อนศัตรู' },
+    ember_phoenix: { rarity: 'mythic',    element: 'fire',    atk: 32, per: 4.2, cd: 1.3, range: 8, crit: 0.20, attackName: 'เปลวหงส์อมตะ',   desc: 'ปลดปล่อยเปลวเพลิงหงส์อมตะแผดเผาล้างผลาญ' },
+};
+
+// Resolve a pet's live combat profile at a given level. Returns null for a pet
+// with no combat data. `atk` scales with level; `variance` adds a little roll.
+export function getPetCombat(petKey, level = 1) {
+    const s = PET_STATS[petKey];
+    if (!s) return null;
+    const lv = Math.max(1, Math.floor(level) || 1);
+    const atk = Math.round(s.atk + s.per * (lv - 1));
+    const el = ELEMENT_INFO[s.element] || ELEMENT_INFO.neutral;
+    return {
+        atk,
+        level: lv,
+        element: s.element,
+        elementName: el.th,
+        color: el.color,
+        cooldown: s.cd,
+        range: s.range,
+        crit: s.crit,
+        attackName: s.attackName,
+        desc: s.desc,
+        rarity: s.rarity,
+        variance: Math.max(2, Math.round(atk * 0.2)),
+    };
+}
+
 // ============ FORGE RECIPES ============
 // Weapon Smith crafting: a base weapon + materials (from your bag) + gold →
 // a special forged weapon with high ATK and a signature on-hit effect.

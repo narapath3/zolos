@@ -2331,6 +2331,14 @@ export class CharacterManager {
         return this.mesh ? this.mesh.position : new THREE.Vector3();
     }
 
+    // World position of the summoned pet (for spawning its attack from its body).
+    // Returns null when no pet is out. Falls back to the hero if the mesh isn't
+    // in the scene graph yet.
+    getPetWorldPosition() {
+        if (!this.petScaler) return null;
+        return this.petScaler.getWorldPosition(new THREE.Vector3());
+    }
+
     // Gain experience
     addExp(amount) {
         const expGain = Number(amount) || 0;

@@ -403,6 +403,20 @@ async function initGame(charData) {
                     }
                 }
                 break;
+            case 'petAttack':
+                // The companion hurls its elemental orb at the target, then a
+                // colour-tinted damage number pops on impact.
+                if (particles && event.target) {
+                    particles.spawnPetOrb(event.startPos, event.target, event.color, () => {
+                        particles.spawnHitEffect(event.targetPos, event.critical);
+                        const sp = worldToScreen(event.targetPos, 1.4);
+                        particles.spawnDamageNumber(sp.x, sp.y, event.damage, event.critical ? 'critical-dmg' : 'pet-dmg', event.color);
+                    });
+                }
+                if (gameUI) {
+                    gameUI.addCombatLog(`🐾 ${event.attackName} โจมตี ${event.monsterName || 'ศัตรู'} ${event.damage} หน่วย${event.critical ? ' (คริติคอล!)' : ''}`, 'damage');
+                }
+                break;
             case 'monsterAttack':
                 if (gameUI) gameUI.addCombatLog(`🩸 ${event.monsterName} hits you for ${event.damage} damage`, 'warning');
                 if (particles && event.targetPos) {

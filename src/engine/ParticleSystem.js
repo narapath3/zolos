@@ -223,12 +223,19 @@ export class ParticleSystem {
     }
 
     // Spawn floating damage number (using DOM overlay)
-    spawnDamageNumber(screenX, screenY, text, type = 'player-dmg') {
+    spawnDamageNumber(screenX, screenY, text, type = 'player-dmg', colorHex = null) {
         const el = document.createElement('div');
         el.className = `damage-number ${type}`;
         el.textContent = text;
         el.style.left = `${screenX}px`;
         el.style.top = `${screenY}px`;
+        // Optional inline tint (used by elemental pet strikes so each species'
+        // damage reads in its own colour without needing a CSS class per element).
+        if (colorHex != null) {
+            const c = '#' + (colorHex & 0xffffff).toString(16).padStart(6, '0');
+            el.style.color = c;
+            el.style.textShadow = `0 0 6px ${c}, 0 1px 2px rgba(0,0,0,0.6)`;
+        }
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 1000);
     }
@@ -1226,6 +1233,36 @@ export class ParticleSystem {
                 if (onHit) onHit();
             },
             life: 2.0
+        });
+    }
+
+    // ============ Pet Elemental Orb ============
+    // A colour-tinted orb that flies from the pet to the target and bursts in
+    // its element colour. Reused by every pet species (just pass the colour).
+    spawnPetOrb(startPos, targetMonster, color = 0xffd8a0, onHit = null) {
+        if (!targetMonster) { if (onHit) onHit(); return; }
+        const group = new THREE.Group();
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 10), new THREE.MeshBasicMaterial({ color })));
+        group.add(new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 10), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false })));
+        // sparkly comet tail
+        const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.14, 0.55, 6), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, depthWrite: false }));
+        tail.rotation.x = Math.PI / 2; tail.position.z = -0.32; group.add(tail);
+
+        group.position.copy(startPos);
+        group.position.y += 0.7;
+        this.scene.add(group);
+
+        this.projectiles.push({
+            mesh: group,
+            target: targetMonster,
+            speed: 22,
+            onHit: () => {
+                const p = targetMonster.getPosition ? targetMonster.getPosition() : targetMonster;
+                this._fxBurst(p, color, 16, 5, { life: 0.5, yOff: 0.8 });
+                this._fxRing(p, color, 0.45, 0.06, 0.1, 0.8);
+                if (onHit) onHit();
+            },
+            life: 2.0,
         });
     }
 
