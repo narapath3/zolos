@@ -15,7 +15,7 @@ function petPortraitMarkup(key) {
   return `<span class="pet-atlas-portrait" aria-hidden="true" style="--pet-x:${x}%;--pet-y:${y}%"></span>`;
 }
 import { escapeOnlineText, formatOnlinePlayerMeta } from './OnlinePlayerMeta.js';
-import { petModelMarkup } from '../engine/PetPreview.js';
+import { petModelMarkup, PetLiveViewer } from '../engine/PetPreview.js';
 import {
   displayedCharacterUid,
   isRawCharacterUid,
@@ -5556,7 +5556,7 @@ export class GameUI {
     const gold = Number(this.character?.stats?.gold) || 0;
     modal.innerHTML = `<section class="pet-boutique" role="dialog" aria-modal="true" aria-label="Pet Sanctuary"><header class="pet-boutique__hero"><h2>✦ Pet Sanctuary</h2><p>แตะสัตว์เลี้ยงเพื่อดูรายละเอียด ราคา และรับเลี้ยง</p><div class="pet-boutique__wallet">Zeny ${gold.toLocaleString()}</div><button class="pet-boutique__close" aria-label="ปิด">×</button></header><div class="pet-boutique__body"><div class="pet-boutique__grid">${PET_SHOP.map(entry=>{const data=ITEMS[entry.name];return `<article class="pet-card" tabindex="0" data-pet="${entry.name}"><span class="pet-card__rarity">${data.rarity}</span><div class="pet-card__art">${petModelMarkup(data.pet,320)||petPortraitMarkup(data.pet)}</div><h3>${entry.name.replace(' Pet','')}</h3><div class="pet-card__foot"><span class="pet-card__price">${entry.price.toLocaleString()} z</span><button class="pet-card__buy" ${gold<entry.price?'disabled':''}>เลือก</button></div></article>`}).join('')}</div><aside class="pet-boutique__detail" aria-live="polite"></aside></div></section>`;
     modal.style.display = 'flex'; this.updateMobileControlsVisibility();
-    const close=()=>{modal.style.display='none';document.removeEventListener('keydown', onEscape);this._petBoutiqueEscapeHandler=null;this.updateMobileControlsVisibility();};
+    const close=()=>{modal.style.display='none';document.removeEventListener('keydown', onEscape);this._petBoutiqueEscapeHandler=null;if(this._petViewer)this._petViewer.pause();this.updateMobileControlsVisibility();};
     const onEscape=e=>{if(e.key==='Escape')close();};
     this._petBoutiqueEscapeHandler=onEscape;
     document.addEventListener('keydown',onEscape);
@@ -5596,10 +5596,21 @@ export class GameUI {
       detail.innerHTML=`<button class="pet-detail__back" type="button">← กลับไปเลือกตัวอื่น</button><div class="pet-detail__art">${petModelMarkup(data.pet,560)||petPortraitMarkup(data.pet)}</div><div><span class="pet-detail__rarity">${data.rarity}</span><h3 class="pet-detail__name">${entry.name.replace(' Pet','')}</h3><p class="pet-detail__desc">${data.desc}</p>${combatHtml}<div class="pet-detail__price-row"><span>ราคา</span><strong class="pet-detail__price">${entry.price.toLocaleString()} Zeny</strong></div></div><button class="pet-detail__buy" ${this.character.stats.gold<entry.price?'disabled':''}>${this.character.stats.gold<entry.price?'Zeny ไม่พอ':'รับเลี้ยงตัวนี้'}</button>`;
       const detailBuy=detail.querySelector('.pet-detail__buy');
       detailBuy.onclick=()=>buyEntry(entry,detailBuy);
+      // Live animated 3D of the selected pet (the real in-game model, breathing
+      // + swaying), mounted into the art slot. One shared viewer/context.
+      const art=detail.querySelector('.pet-detail__art');
+      if(art){
+        if(this._petViewer===undefined){ try{ this._petViewer=new PetLiveViewer(); }catch(e){ this._petViewer=null; } }
+        if(this._petViewer){ art.innerHTML=''; this._petViewer.mount(art); this._petViewer.show(data.pet); }
+      }
       // Mobile: the detail is a slide-up sheet over the grid. Tapping a card
       // opens it; the back button returns to the full-height card list.
-      detail.querySelector('.pet-detail__back').onclick=()=>detail.classList.remove('is-open');
+      detail.querySelector('.pet-detail__back').onclick=()=>{detail.classList.remove('is-open');if(this._petViewer)this._petViewer.pause();};
       if(open){detail.classList.add('is-open');detail.scrollTop=0;}else{detail.classList.remove('is-open');}
+      // Run the animation when the detail is actually on-screen (always on
+      // desktop; on mobile only once the sheet is opened) to spare the GPU.
+      const isMobile=matchMedia('(max-width:700px)').matches;
+      if(this._petViewer){ (open||!isMobile)?this._petViewer.resume():this._petViewer.pause(); }
     };
     modal.querySelectorAll('.pet-card').forEach(card=>{
       const entry=PET_SHOP.find(x=>x.name===card.dataset.pet);
