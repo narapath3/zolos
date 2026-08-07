@@ -5168,6 +5168,13 @@ a,
   border-top: 1px solid var(--border);
 }
 
+/* On mobile the bottom HUD (#hud-bottom) is z-index 1700, above the base modal
+   (z-index 500), so it floated over this modal's Save/Cancel footer. Lift the
+   whole Settings & Profile modal above the HUD so its footer is never covered. */
+#profile-editor-modal {
+  z-index: 1800;
+}
+
 /* Settings form selects hover */
 #tab-content-settings .form-select:focus {
   border-color: var(--primary);
