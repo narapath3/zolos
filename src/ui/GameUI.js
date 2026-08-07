@@ -1930,7 +1930,7 @@ export class GameUI {
     if (missing > 0) {
       this.addCombatLog(`⚠️ เซ็ท "${set.name}": มี ${missing} ชิ้นที่ไม่มีในกระเป๋าแล้ว จึงข้ามไป`, 'warning');
     }
-    this._renderLoadoutBar();
+    this._refreshLoadoutBars();
   }
 
   // Save the current outfit as a new set (asks for a name).
@@ -1942,7 +1942,7 @@ export class GameUI {
     sets.push({ id: `ld_${Date.now()}`, name: name.slice(0, 24), slots: this._captureCurrentLoadout() });
     this._saveLoadouts(sets);
     this._equipToast(`บันทึกเซ็ท "${name}" แล้ว`, true);
-    this._renderLoadoutBar();
+    this._refreshLoadoutBars();
   }
 
   _renameLoadout(id) {
@@ -1953,7 +1953,7 @@ export class GameUI {
     if (!name) return;
     set.name = name.slice(0, 24);
     this._saveLoadouts(sets);
-    this._renderLoadoutBar();
+    this._refreshLoadoutBars();
   }
 
   _deleteLoadout(id) {
@@ -1962,7 +1962,7 @@ export class GameUI {
     if (!set) return;
     if (!window.confirm(`ลบเซ็ท "${set.name}"?`)) return;
     this._saveLoadouts(sets.filter(s => s.id !== id));
-    this._renderLoadoutBar();
+    this._refreshLoadoutBars();
   }
 
   // Overwrite an existing set with the current outfit.
@@ -1973,7 +1973,7 @@ export class GameUI {
     set.slots = this._captureCurrentLoadout();
     this._saveLoadouts(sets);
     this._equipToast(`อัปเดตเซ็ท "${set.name}" ตามชุดปัจจุบัน`, true);
-    this._renderLoadoutBar();
+    this._refreshLoadoutBars();
   }
 
   // A couple of representative emoji so each set chip is recognisable at a glance.
@@ -2035,8 +2035,14 @@ export class GameUI {
     bar.className = 'loadout-bar';
     // Sit ABOVE the paper-doll so worn gear + sets are at the very top.
     anchor.parentNode.insertBefore(bar, anchor);
+    this._wireLoadoutBar(bar);
+  }
 
-    // Delegated clicks: wear a set, edit/delete via its tool row, or add a new one.
+  // One delegated click handler per bar element: wear a set, edit/delete via its
+  // tool row, or add a new one. Shared by the Equip-tab bar and the Profile bar.
+  _wireLoadoutBar(bar) {
+    if (!bar || bar._ldWired) return;
+    bar._ldWired = true;
     bar.addEventListener('click', (e) => {
       const tool = e.target.closest('[data-ld-act]');
       if (tool) {
@@ -2054,13 +2060,9 @@ export class GameUI {
     });
   }
 
-  _renderLoadoutBar() {
-    this._ensureLoadoutBar();
-    const bar = document.getElementById('loadout-bar');
-    if (!bar) return;
-    bar.style.display = '';
-    if (!this.character) { bar.innerHTML = ''; return; }
-
+  // The bar's inner markup (title + scrollable chips + add button), shared by
+  // every host surface. `hint` tweaks the subtitle per surface.
+  _loadoutBarInnerHTML(hint) {
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const sets = this._getLoadouts();
@@ -2072,15 +2074,15 @@ export class GameUI {
         <span class="ld-chip-ic">${this._loadoutPreviewIcons(set)}</span>
         <span class="ld-chip-nm">${label}</span>
         <span class="ld-chip-tools">
-          <span data-ld-act="update" data-ld-id="${set.id}" title="บันทึกทับด้วยชุดปัจจุบัน">💾</span>
-          <span data-ld-act="rename" data-ld-id="${set.id}" title="เปลี่ยนชื่อ">✎</span>
-          <span data-ld-act="delete" data-ld-id="${set.id}" title="ลบ">🗑️</span>
+          <span data-ld-act="update" data-ld-id="${esc(set.id)}" title="บันทึกทับด้วยชุดปัจจุบัน">💾</span>
+          <span data-ld-act="rename" data-ld-id="${esc(set.id)}" title="เปลี่ยนชื่อ">✎</span>
+          <span data-ld-act="delete" data-ld-id="${esc(set.id)}" title="ลบ">🗑️</span>
         </span>
       </div>`;
     }).join('');
 
-    bar.innerHTML = `
-      <div class="loadout-bar-title">🎽 เซ็ทชุด <span class="lb-hint">แตะเพื่อสวมทั้งชุด · เลื่อนซ้าย-ขวาดูเพิ่ม</span></div>
+    return `
+      <div class="loadout-bar-title">🎽 เซ็ทชุด <span class="lb-hint">${hint || 'แตะเพื่อสวมทั้งชุด · เลื่อนซ้าย-ขวาดูเพิ่ม'}</span></div>
       <div class="loadout-scroll">
         ${chips}
         <div class="ld-add" title="บันทึกชุดที่ใส่อยู่ตอนนี้เป็นเซ็ทใหม่">
@@ -2089,12 +2091,41 @@ export class GameUI {
       </div>`;
   }
 
+  // Equip-tab bar (above the paper-doll in the inventory panel).
+  _renderLoadoutBar() {
+    this._ensureLoadoutBar();
+    const bar = document.getElementById('loadout-bar');
+    if (!bar) return;
+    bar.style.display = '';
+    if (!this.character) { bar.innerHTML = ''; return; }
+    bar.innerHTML = this._loadoutBarInnerHTML();
+  }
+
+  // Profile-panel bar (top of the "Equipment / อุปกรณ์สวมใส่" section).
+  _renderProfileLoadoutBar() {
+    const bar = document.getElementById('profile-loadout-bar');
+    if (!bar) return;
+    this._ensureLoadoutBar();   // guarantees the shared .loadout-* styles exist
+    bar.className = 'loadout-bar';
+    this._wireLoadoutBar(bar);
+    if (!this.character) { bar.innerHTML = ''; return; }
+    bar.innerHTML = this._loadoutBarInnerHTML();
+  }
+
+  // Re-render whichever loadout bars are in the DOM so the Equip-tab and Profile
+  // surfaces stay in sync after any add/apply/rename/delete/update.
+  _refreshLoadoutBars() {
+    if (this.currentTab === 'equip' && document.getElementById('loadout-bar')) this._renderLoadoutBar();
+    if (document.getElementById('profile-loadout-bar')) this._renderProfileLoadoutBar();
+  }
+
   // Same paper-doll, embedded in the Settings & Profile panel (replaces the old
   // weapon/hat/glasses dropdowns). Tapping any slot opens a picker of items that
   // fit it; equip/unequip applies live.
   _renderProfileEquipDoll() {
     const host = document.getElementById('profile-equip-doll');
     if (!host || !this.character) return;
+    this._renderProfileLoadoutBar(); // outfit sets sit at the top of this section
     this._ensureEquipDoll(); // guarantees the shared .equip-doll styles exist
     host.className = 'equip-doll';
     host.innerHTML = this._dollInnerHTML('แตะช่องเพื่อเลือก/เปลี่ยน/ถอดอุปกรณ์');
