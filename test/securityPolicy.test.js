@@ -64,6 +64,34 @@ test('save snapshots preserve legitimate progression and safe presentation field
   );
 });
 
+test('save snapshots clean and bound outfit loadout presets', () => {
+  const { appearance } = sanitizeSaveUpdates({
+    appearance: {
+      loadouts: [
+        { id: 'a', name: 'Mummy', slots: { weapon: 'Sword', body: 'Cotton Shirt', bogus: 'X' } },
+        { name: 'x'.repeat(50), slots: { hat: null } },
+        'not-an-object',
+      ],
+    },
+  });
+  const sets = appearance.loadouts;
+  // Malformed (non-object) entry dropped; two valid ones kept.
+  assert.equal(sets.length, 2);
+  // Unknown slot key stripped, valid ones kept.
+  assert.deepEqual(sets[0].slots, { weapon: 'Sword', body: 'Cotton Shirt' });
+  assert.equal(sets[0].name, 'Mummy');
+  // Name clamped to 24 chars; missing id backfilled.
+  assert.equal(sets[1].name.length, 24);
+  assert.ok(sets[1].id);
+});
+
+test('save snapshots cap outfit loadout presets at 30', () => {
+  const { appearance } = sanitizeSaveUpdates({
+    appearance: { loadouts: Array.from({ length: 40 }, (_, i) => ({ id: `f${i}`, slots: {} })) },
+  });
+  assert.equal(appearance.loadouts.length, 30);
+});
+
 test('save snapshots allow decreases used by combat and purchases', () => {
   const previous = { hp: 1000, sp: 500, gold: 5000 };
   assert.deepEqual(

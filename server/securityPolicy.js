@@ -41,9 +41,35 @@ function cardCategoryForSocket(slot) {
     return 'armor';
 }
 
+// Outfit presets are client-supplied, so bound them hard: at most 30 sets, each
+// with a short name and a slot map whose keys are real equip slots and whose
+// values are short item-name strings. Anything malformed is dropped, never
+// rejected, so one bad preset can't block the whole appearance save.
+function sanitizeLoadouts(value) {
+    if (!Array.isArray(value)) return [];
+    const out = [];
+    for (const raw of value.slice(0, 30)) {
+        if (!raw || typeof raw !== 'object') continue;
+        const slots = {};
+        if (raw.slots && typeof raw.slots === 'object' && !Array.isArray(raw.slots)) {
+            for (const [slot, name] of Object.entries(raw.slots)) {
+                if (!CARD_SOCKET_SLOTS.has(slot)) continue;
+                slots[slot] = name == null ? null : String(name).slice(0, 64);
+            }
+        }
+        out.push({
+            id: String(raw.id ?? `ld_${out.length}`).slice(0, 40),
+            name: String(raw.name ?? '').slice(0, 24),
+            slots,
+        });
+    }
+    return out;
+}
+
 function sanitizeAppearance(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const appearance = { ...value };
+    if (Object.hasOwn(appearance, 'loadouts')) appearance.loadouts = sanitizeLoadouts(appearance.loadouts);
     if (!Object.hasOwn(appearance, 'cards')) return appearance;
     if (!appearance.cards || typeof appearance.cards !== 'object' || Array.isArray(appearance.cards)) return null;
 

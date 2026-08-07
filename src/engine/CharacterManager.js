@@ -117,6 +117,10 @@ export class CharacterManager {
         // Multi-slot armor: one item per body-part slot, all contributing stats.
         // (head/body/garment/ring/wrist/pants/feet/accessory — see GameData.)
         this.equippedGear = { head: null, body: null, garment: null, ring: null, wrist: null, pants: null, feet: null, accessory: null };
+        // Saved outfit presets ("เซ็ทชุด"): [{ id, name, slots:{slotId:itemName|null} }].
+        // Persisted inside the appearance JSON so they sync across devices, but
+        // kept OUT of getAppearance() so they're never broadcast to other players.
+        this.loadouts = [];
         // Refine level (+N) of the item worn in each slot — scales its bonuses.
         this.equipRefine = { weapon: 0, shield: 0, head: 0, body: 0, garment: 0, ring: 0, wrist: 0, pants: 0, feet: 0, accessory: 0 };
         // Card socketed into each slot (canonical card id or null). Cards add stat
@@ -2542,7 +2546,9 @@ export class CharacterManager {
                 // Full look (pet / refine / cards / every gear slot) as a JSON
                 // blob so OFFLINE players' profiles can render the complete
                 // appearance — the single columns above can't hold all of it.
-                appearance: this.getAppearance()
+                // `loadouts` rides along ONLY on save (not in getAppearance, which
+                // is broadcast) so outfit presets sync across devices privately.
+                appearance: { ...this.getAppearance(), loadouts: Array.isArray(this.loadouts) ? this.loadouts : [] }
             }
         };
     }
@@ -3032,6 +3038,8 @@ export class CharacterManager {
         if (data.weapon) this.equipWeapon(data.weapon);
         if (data.appearance && typeof data.appearance === 'object') {
             this.restoreCardAppearance(data.appearance);
+            // Restore saved outfit presets (synced via the appearance blob).
+            this.loadouts = Array.isArray(data.appearance.loadouts) ? data.appearance.loadouts : [];
         }
 
         // Load game settings — check DB data first, then fallback to localStorage

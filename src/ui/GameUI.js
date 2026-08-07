@@ -1460,9 +1460,14 @@ export class GameUI {
     const doll = document.getElementById('equip-doll');
     if (this.currentTab === 'equip') {
       this._renderEquipDoll();
-    } else if (doll) {
-      doll.style.display = 'none';
-      this.equipSlotFilter = null;
+      this._renderLoadoutBar();
+    } else {
+      if (doll) {
+        doll.style.display = 'none';
+        this.equipSlotFilter = null;
+      }
+      const bar = document.getElementById('loadout-bar');
+      if (bar) bar.style.display = 'none';
     }
 
     const detailBox = document.getElementById('item-detail-box');
@@ -1841,6 +1846,247 @@ export class GameUI {
     doll.style.display = 'grid';
     if (!this.character) { doll.innerHTML = ''; return; }
     doll.innerHTML = this._dollInnerHTML('แตะช่องที่ใส่ของอยู่เพื่อถอด · แตะช่องว่างเพื่อดูไอเทมที่สวมได้');
+  }
+
+  // ===== LOADOUT SETS (PUBG-style outfit presets) =====
+  // A "เซ็ทชุด" is a saved snapshot of what's worn in every EQUIP_SLOTS slot.
+  // Tapping one re-equips the whole outfit at once, so players can switch a
+  // full class/costume build in one tap. Stored per-character in localStorage
+  // (they only reference owned item names — no server state needed).
+
+  _loadoutKey() {
+    return `zolos_loadouts_${this.characterId || 'guest'}`;
+  }
+
+  // Sets live on the character (persisted inside the appearance JSON so they
+  // sync across devices). localStorage is only a local cache/fallback used
+  // before the character has loaded or when offline.
+  _getLoadouts() {
+    const ch = this.character;
+    if (ch && Array.isArray(ch.loadouts)) return ch.loadouts;
+    try {
+      const raw = localStorage.getItem(this._loadoutKey());
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
+  }
+
+  _saveLoadouts(arr) {
+    const list = Array.isArray(arr) ? arr : [];
+    if (this.character) this.character.loadouts = list;
+    // Local cache (instant, survives reload before the DB round-trip / offline).
+    try { localStorage.setItem(this._loadoutKey(), JSON.stringify(list)); }
+    catch { /* localStorage unavailable / full */ }
+    // Persist to the DB so the sets follow the player to other devices. Rides
+    // inside the appearance JSON via saveStatsToDatabase (online or offline).
+    if (this.character && this.characterId && this.character.saveStatsToDatabase) {
+      Promise.resolve()
+        .then(() => this.character.saveStatsToDatabase())
+        .catch(() => { /* best-effort; local cache still holds the sets */ });
+    }
+  }
+
+  // Snapshot the currently-worn item in every slot (name or null).
+  _captureCurrentLoadout() {
+    const slots = {};
+    for (const s of EQUIP_SLOTS) slots[s.id] = this._slotItemName(s.id) || null;
+    return slots;
+  }
+
+  // True if a saved set's slots exactly match what's worn right now.
+  _loadoutIsActive(set) {
+    if (!set || !set.slots) return false;
+    for (const s of EQUIP_SLOTS) {
+      if ((set.slots[s.id] || null) !== (this._slotItemName(s.id) || null)) return false;
+    }
+    return true;
+  }
+
+  // Equip a saved set: bring every slot to match the snapshot. Missing items
+  // (sold/lost) or class-locked weapons are skipped with a heads-up.
+  async _applyLoadout(set) {
+    if (!set || !set.slots || !this.character) return;
+    let missing = 0;
+    for (const s of EQUIP_SLOTS) {
+      const desired = set.slots[s.id] || null;
+      const current = this._slotItemName(s.id) || null;
+      if (desired === current) continue;
+
+      if (desired) {
+        // Equipping auto-swaps out whatever shares the slot.
+        const it = (this.inventory || []).find(i => i.item_name === desired && !(i.stats && i.stats.equipped));
+        if (it) {
+          await this._toggleEquipItem(it);
+        } else if (!(this.inventory || []).some(i => i.item_name === desired)) {
+          missing++;
+        }
+      } else if (current) {
+        // Slot should be empty — take off what's worn there.
+        const it = (this.inventory || []).find(i => i.item_name === current && i.stats && i.stats.equipped);
+        if (it) await this._toggleEquipItem(it);
+      }
+    }
+    this._equipToast(`สวมเซ็ท "${set.name}"`, true);
+    if (missing > 0) {
+      this.addCombatLog(`⚠️ เซ็ท "${set.name}": มี ${missing} ชิ้นที่ไม่มีในกระเป๋าแล้ว จึงข้ามไป`, 'warning');
+    }
+    this._renderLoadoutBar();
+  }
+
+  // Save the current outfit as a new set (asks for a name).
+  _saveCurrentLoadout() {
+    const sets = this._getLoadouts();
+    const dflt = `ชุดที่ ${sets.length + 1}`;
+    const name = (window.prompt('ตั้งชื่อเซ็ทชุดนี้', dflt) || '').trim();
+    if (!name) return; // cancelled
+    sets.push({ id: `ld_${Date.now()}`, name: name.slice(0, 24), slots: this._captureCurrentLoadout() });
+    this._saveLoadouts(sets);
+    this._equipToast(`บันทึกเซ็ท "${name}" แล้ว`, true);
+    this._renderLoadoutBar();
+  }
+
+  _renameLoadout(id) {
+    const sets = this._getLoadouts();
+    const set = sets.find(s => s.id === id);
+    if (!set) return;
+    const name = (window.prompt('เปลี่ยนชื่อเซ็ท', set.name) || '').trim();
+    if (!name) return;
+    set.name = name.slice(0, 24);
+    this._saveLoadouts(sets);
+    this._renderLoadoutBar();
+  }
+
+  _deleteLoadout(id) {
+    const sets = this._getLoadouts();
+    const set = sets.find(s => s.id === id);
+    if (!set) return;
+    if (!window.confirm(`ลบเซ็ท "${set.name}"?`)) return;
+    this._saveLoadouts(sets.filter(s => s.id !== id));
+    this._renderLoadoutBar();
+  }
+
+  // Overwrite an existing set with the current outfit.
+  _updateLoadout(id) {
+    const sets = this._getLoadouts();
+    const set = sets.find(s => s.id === id);
+    if (!set) return;
+    set.slots = this._captureCurrentLoadout();
+    this._saveLoadouts(sets);
+    this._equipToast(`อัปเดตเซ็ท "${set.name}" ตามชุดปัจจุบัน`, true);
+    this._renderLoadoutBar();
+  }
+
+  // A couple of representative emoji so each set chip is recognisable at a glance.
+  _loadoutPreviewIcons(set) {
+    const pick = ['weapon', 'hat', 'body', 'garment']
+      .map(id => set.slots && set.slots[id])
+      .filter(Boolean)
+      .map(name => ITEMS[name]?.emoji)
+      .filter(Boolean)
+      .slice(0, 3);
+    return pick.length ? pick.join('') : '👤';
+  }
+
+  _ensureLoadoutBar() {
+    if (document.getElementById('loadout-bar')) return;
+    const doll = document.getElementById('equip-doll');
+    const grid = document.getElementById('inventory-grid');
+    const anchor = doll || grid;
+    if (!anchor || !anchor.parentNode) return;
+
+    if (!document.getElementById('loadout-bar-styles')) {
+      const st = document.createElement('style');
+      st.id = 'loadout-bar-styles';
+      st.textContent = `
+      .loadout-bar{margin:6px 0 4px;}
+      .loadout-bar-title{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;
+        color:#aeb8d6;letter-spacing:.4px;margin:0 2px 6px;}
+      .loadout-bar-title .lb-hint{font-weight:500;color:#7c88a8;font-size:10px;}
+      .loadout-scroll{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding:2px 2px 8px;
+        scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;}
+      .loadout-scroll::-webkit-scrollbar{height:5px;}
+      .loadout-scroll::-webkit-scrollbar-thumb{background:rgba(120,150,220,.4);border-radius:4px;}
+      .ld-chip{flex:0 0 auto;scroll-snap-align:start;position:relative;min-width:92px;max-width:120px;
+        display:flex;flex-direction:column;gap:3px;padding:8px 10px 7px;border-radius:12px;cursor:pointer;
+        background:linear-gradient(160deg,rgba(30,40,72,.85),rgba(16,20,34,.9));
+        border:1.5px solid rgba(120,140,200,.28);transition:transform .1s,border-color .15s,box-shadow .15s;user-select:none;}
+      @media (hover:hover){.ld-chip:hover{transform:translateY(-2px);border-color:rgba(150,180,255,.6);box-shadow:0 4px 14px rgba(60,90,190,.35);}}
+      .ld-chip:active{transform:translateY(1px);}
+      .ld-chip.active{border-color:#7fe0ff;box-shadow:0 0 12px rgba(127,224,255,.5);}
+      .ld-chip-ic{font-size:20px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));}
+      .ld-chip-nm{font-size:11px;font-weight:700;color:#e8ecff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      .ld-chip.active .ld-chip-nm{color:#bff0ff;}
+      .ld-chip-tools{display:flex;gap:8px;margin-top:1px;}
+      .ld-chip-tools span{font-size:11px;color:#9fb0e0;line-height:1;padding:1px 2px;border-radius:5px;}
+      @media (hover:hover){.ld-chip-tools span:hover{color:#fff;background:rgba(120,150,220,.35);}}
+      .ld-chip-badge{position:absolute;top:4px;right:6px;font-size:9px;color:#7fe0ff;font-weight:800;}
+      .ld-add{flex:0 0 auto;min-width:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+        padding:8px 10px;border-radius:12px;cursor:pointer;border:1.5px dashed rgba(130,160,230,.45);
+        background:rgba(20,26,46,.5);color:#aeb8d6;transition:border-color .15s,color .15s,background .15s;}
+      @media (hover:hover){.ld-add:hover{border-color:#8fd0ff;color:#fff;background:rgba(40,60,110,.5);}}
+      .ld-add .ld-add-ic{font-size:20px;line-height:1;}
+      .ld-add .ld-add-lb{font-size:10.5px;font-weight:700;}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const bar = document.createElement('div');
+    bar.id = 'loadout-bar';
+    bar.className = 'loadout-bar';
+    // Sit ABOVE the paper-doll so worn gear + sets are at the very top.
+    anchor.parentNode.insertBefore(bar, anchor);
+
+    // Delegated clicks: wear a set, edit/delete via its tool row, or add a new one.
+    bar.addEventListener('click', (e) => {
+      const tool = e.target.closest('[data-ld-act]');
+      if (tool) {
+        e.stopPropagation();
+        const id = tool.getAttribute('data-ld-id');
+        const act = tool.getAttribute('data-ld-act');
+        if (act === 'rename') this._renameLoadout(id);
+        else if (act === 'delete') this._deleteLoadout(id);
+        else if (act === 'update') this._updateLoadout(id);
+        return;
+      }
+      if (e.target.closest('.ld-add')) { this._saveCurrentLoadout(); return; }
+      const chip = e.target.closest('.ld-chip');
+      if (chip) this._applyLoadout(this._getLoadouts().find(s => s.id === chip.getAttribute('data-ld-id')));
+    });
+  }
+
+  _renderLoadoutBar() {
+    this._ensureLoadoutBar();
+    const bar = document.getElementById('loadout-bar');
+    if (!bar) return;
+    bar.style.display = '';
+    if (!this.character) { bar.innerHTML = ''; return; }
+
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const sets = this._getLoadouts();
+    const chips = sets.map(set => {
+      const active = this._loadoutIsActive(set);
+      const label = esc(this._short ? this._short(set.name) : set.name);
+      return `<div class="ld-chip${active ? ' active' : ''}" data-ld-id="${esc(set.id)}" title="แตะเพื่อสวมทั้งเซ็ท">
+        ${active ? '<span class="ld-chip-badge">● ใส่อยู่</span>' : ''}
+        <span class="ld-chip-ic">${this._loadoutPreviewIcons(set)}</span>
+        <span class="ld-chip-nm">${label}</span>
+        <span class="ld-chip-tools">
+          <span data-ld-act="update" data-ld-id="${set.id}" title="บันทึกทับด้วยชุดปัจจุบัน">💾</span>
+          <span data-ld-act="rename" data-ld-id="${set.id}" title="เปลี่ยนชื่อ">✎</span>
+          <span data-ld-act="delete" data-ld-id="${set.id}" title="ลบ">🗑️</span>
+        </span>
+      </div>`;
+    }).join('');
+
+    bar.innerHTML = `
+      <div class="loadout-bar-title">🎽 เซ็ทชุด <span class="lb-hint">แตะเพื่อสวมทั้งชุด · เลื่อนซ้าย-ขวาดูเพิ่ม</span></div>
+      <div class="loadout-scroll">
+        ${chips}
+        <div class="ld-add" title="บันทึกชุดที่ใส่อยู่ตอนนี้เป็นเซ็ทใหม่">
+          <span class="ld-add-ic">＋</span><span class="ld-add-lb">บันทึกชุดปัจจุบัน</span>
+        </div>
+      </div>`;
   }
 
   // Same paper-doll, embedded in the Settings & Profile panel (replaces the old
