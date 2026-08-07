@@ -26,6 +26,14 @@ import {
 import { migrateLegacyCards } from '../cards/CardMigration.js';
 import { getCard } from '../cards/CardCatalog.js';
 
+// Maps each skill id to a line-art glyph in the #ic-* SVG sprite (index.html),
+// so the skill bar shows clean professional icons instead of emoji.
+const SKILL_GLYPHS = {
+  bash: 'ic-bash', heal: 'ic-heal', magnumBreak: 'ic-magnum',
+  endure: 'ic-shield', fireBolt: 'ic-fire', frostNova: 'ic-frost',
+  energyCoat: 'ic-orb', doubleStrafe: 'ic-arrow', arrowShower: 'ic-arrows',
+  concentration: 'ic-target', holyLight: 'ic-holy', blessing: 'ic-bless',
+};
 
 export class GameUI {
   constructor(character = null, soundManager = null, combatSystem = null) {
@@ -8194,6 +8202,22 @@ export class GameUI {
   }
 
   // Paint the 3 skill slots (desktop bar + mobile buttons) from the active job.
+  // Clean line-art glyph (from the #ic-* SVG sprite) for each skill, tinted with
+  // the skill's own colour. Falls back to the emoji if a skill has no glyph.
+  _skillIconHTML(id, skill) {
+    const glyph = SKILL_GLYPHS[id];
+    if (!glyph) return null;
+    const hex = '#' + ((skill.color >>> 0) & 0xffffff).toString(16).padStart(6, '0');
+    return `<svg class="skill-glyph" style="color:${hex}"><use href="#${glyph}" /></svg>`;
+  }
+
+  _paintSkillIcon(iconEl, id, skill) {
+    if (!iconEl) return;
+    const html = this._skillIconHTML(id, skill);
+    if (html) iconEl.innerHTML = html;
+    else iconEl.textContent = skill.emoji; // graceful fallback
+  }
+
   renderSkillBar() {
     if (!this.character || !this.character.getSkills) return;
     const ids = this.character.getSkills();
@@ -8205,8 +8229,7 @@ export class GameUI {
       slot.style.display = skill ? '' : 'none';
       if (!skill) return;
       slot.title = `[${i + 1}] ${skill.name}`;
-      const icon = slot.querySelector('.skill-icon');
-      if (icon) icon.textContent = skill.emoji;
+      this._paintSkillIcon(slot.querySelector('.skill-icon'), id, skill);
       const overlay = slot.querySelector('.skill-cooldown-overlay');
       if (overlay) overlay.id = `cooldown-${id}`;
     });
@@ -8220,7 +8243,7 @@ export class GameUI {
       if (!skill) continue;
       btn.title = skill.name;
       const icon = btn.querySelector('.btn-icon') || btn.querySelector('.skill-icon') || btn.querySelector('span');
-      if (icon) icon.textContent = skill.emoji;
+      this._paintSkillIcon(icon, id, skill);
       // Mobile buttons use .mobile-cooldown-overlay. Re-point its id to the CURRENT
       // skill every render so the cooldown clock tracks the right skill after a
       // job change (the hard-coded ids in index.html are only the defaults).

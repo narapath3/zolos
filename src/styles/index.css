@@ -2477,6 +2477,57 @@ a,
 
 .skill-icon {
   font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Line-art skill glyphs (replaced the old emoji icons for a cleaner, more
+   professional HUD). Shapes are drawn with currentColor so each skill can be
+   tinted independently; a soft dark shadow keeps them legible over the world. */
+.skill-glyph {
+  width: 24px;
+  height: 24px;
+  /* Beat the global `svg { max-width: 100% }`, which otherwise collapses the
+     icon to 0 inside the shrink-to-fit skill button. */
+  max-width: none;
+  flex: 0 0 auto;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.55));
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.mobile-action-btn .btn-icon .skill-glyph {
+  width: clamp(20px, 3.6vw, 26px);
+  height: clamp(20px, 3.6vw, 26px);
+}
+
+/* Per-skill accent colours */
+.skill-slot[data-skill="bash"] .skill-glyph,
+.skill-btn[data-skill="bash"] .skill-glyph {
+  color: #ffcf6a;
+}
+
+.skill-slot[data-skill="heal"] .skill-glyph,
+.skill-btn[data-skill="heal"] .skill-glyph {
+  color: #55e08a;
+}
+
+.skill-slot[data-skill="magnumBreak"] .skill-glyph,
+.skill-btn[data-skill="magnumBreak"] .skill-glyph {
+  color: #ff7a4d;
+}
+
+/* A gentle coloured glow on hover/press ties the icon to its element. */
+.skill-slot:hover .skill-glyph,
+.skill-slot:active .skill-glyph,
+.skill-btn:active .skill-glyph {
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 5px currentColor);
 }
 
 .skill-cooldown-overlay {
