@@ -8317,7 +8317,13 @@ export class GameUI {
     let joystickStartTime = 0;
     let startX = 0;
     let startY = 0;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = 1;
     const maxRadius = 45; // Max knob movement radius in pixels
+    const getPinchDistance = (touches) => Math.hypot(
+      touches[0].clientX - touches[1].clientX,
+      touches[0].clientY - touches[1].clientY
+    );
 
     // Hide joystick container by default (floating mode)
     container.style.opacity = '0';
@@ -8358,6 +8364,26 @@ export class GameUI {
     const handleStart = (e) => {
       // Only active if the mobile control pad is visible on screen (responsive check)
       if (window.getComputedStyle(pad).display === 'none') return;
+
+      // Two fingers on the world canvas are reserved for camera pinch-zoom.
+      // Cancel any movement started by the first finger so zooming cannot make
+      // the hero walk at the same time.
+      if ((e.touches && e.touches.length >= 2) || window.__zolosPinching) {
+        if (e.touches && e.touches.length >= 2 && !window.__zolosPinching) {
+          pinchStartDistance = getPinchDistance(e.touches);
+          pinchStartZoom = window.sceneManager?.cameraZoom || 1;
+          window.__zolosPinching = true;
+        }
+        joystickActive = false;
+        tapCandidate = false;
+        joystickTouchId = null;
+        knob.style.transform = 'translate(0px, 0px)';
+        hideJoystick();
+        const inputManager = this.character ? this.character.inputManager : null;
+        if (inputManager) inputManager.setJoystickInput(0, 0);
+        e.preventDefault();
+        return;
+      }
 
       // Mouse fallback: only the left button drives movement/tap. Right-click is
       // reserved for the camera-rotate / view-profile gesture (see main.js), so
@@ -8414,6 +8440,14 @@ export class GameUI {
     };
 
     const handleMove = (e) => {
+      if (window.__zolosPinching) {
+        if (e.touches && e.touches.length >= 2 && pinchStartDistance > 0) {
+          const distance = getPinchDistance(e.touches);
+          window.sceneManager?.setCameraZoom?.(pinchStartZoom * pinchStartDistance / distance);
+        }
+        e.preventDefault();
+        return;
+      }
       if (!joystickActive) return;
       e.preventDefault();
 
@@ -8456,6 +8490,14 @@ export class GameUI {
     };
 
     const handleEnd = (e) => {
+      if (window.__zolosPinching) {
+        if (!e.touches || e.touches.length < 2) {
+          window.__zolosPinching = false;
+          pinchStartDistance = 0;
+        }
+        e.preventDefault();
+        return;
+      }
       if (!joystickActive && !tapCandidate) return;
 
       // Find the touch coordinates that ended
@@ -8513,6 +8555,30 @@ export class GameUI {
     window.addEventListener('touchstart', handleStart, { passive: false });
     window.addEventListener('touchmove', handleMove, { passive: false });
     window.addEventListener('touchend', handleEnd, { passive: false });
+    window.addEventListener('touchcancel', handleEnd, { passive: false });
+
+    // Safari/iOS also exposes native gesture events for pinch. Supporting this
+    // path makes zoom reliable even when WebKit coalesces the underlying touch
+    // sequence before the regular touchmove handler sees both fingers.
+    const gameCanvas = document.getElementById('game-canvas');
+    let gestureStartZoom = 1;
+    if (gameCanvas) {
+      gameCanvas.addEventListener('gesturestart', (e) => {
+        gestureStartZoom = window.sceneManager?.cameraZoom || 1;
+        window.__zolosPinching = true;
+        e.preventDefault();
+      }, { passive: false });
+      gameCanvas.addEventListener('gesturechange', (e) => {
+        const scale = Number(e.scale) || 1;
+        window.sceneManager?.setCameraZoom?.(gestureStartZoom / scale);
+        e.preventDefault();
+      }, { passive: false });
+      gameCanvas.addEventListener('gestureend', (e) => {
+        window.__zolosPinching = false;
+        pinchStartDistance = 0;
+        e.preventDefault();
+      }, { passive: false });
+    }
 
     // Desktop/mouse fallback (for browser mobile simulation mode)
     window.addEventListener('mousedown', handleStart);

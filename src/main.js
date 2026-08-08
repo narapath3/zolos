@@ -18,7 +18,7 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-08-04.53 (smooth-character-load)';
+const BUILD_VERSION = '2026-08-08.54 (mobile-pinch-zoom)';
 window.ZOLOS_BUILD = BUILD_VERSION;
 
 // Notify + offer reload when a newer build is deployed while this tab is open

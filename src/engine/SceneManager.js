@@ -4167,15 +4167,34 @@ export class SceneManager {
         // Use stableY (baseY) for camera Y to avoid bounce-induced shake
         const followY = stableY !== undefined ? stableY : targetPos.y;
 
-        const targetCamX = targetPos.x + offsetX;
-        const targetCamY = followY + offsetY;
-        const targetCamZ = targetPos.z + offsetZ;
+        // Smooth the point the camera looks at as well as the camera itself.
+        // Previously camera.position lagged behind the player while lookAt()
+        // snapped to the player's newest X/Z every frame. That continually
+        // changed the camera pitch while walking and made the whole scene appear
+        // to bob up/down even though followY itself was stable.
+        if (!this._followFocus) {
+            this._followFocus = new THREE.Vector3(targetPos.x, followY, targetPos.z);
+        }
+        const focusDx = targetPos.x - this._followFocus.x;
+        const focusDz = targetPos.z - this._followFocus.z;
+        // A warp/map change should snap instead of slowly flying across the map.
+        if ((focusDx * focusDx + focusDz * focusDz) > 625) {
+            this._followFocus.set(targetPos.x, followY, targetPos.z);
+        } else {
+            this._followFocus.x += focusDx * smoothing;
+            this._followFocus.y += (followY - this._followFocus.y) * smoothing;
+            this._followFocus.z += focusDz * smoothing;
+        }
+
+        const targetCamX = this._followFocus.x + offsetX;
+        const targetCamY = this._followFocus.y + offsetY;
+        const targetCamZ = this._followFocus.z + offsetZ;
 
         this.camera.position.x += (targetCamX - this.camera.position.x) * smoothing;
         this.camera.position.y += (targetCamY - this.camera.position.y) * smoothing;
         this.camera.position.z += (targetCamZ - this.camera.position.z) * smoothing;
 
-        this.camera.lookAt(targetPos.x, followY, targetPos.z);
+        this.camera.lookAt(this._followFocus);
         this._weatherFocus = { x: targetPos.x, z: targetPos.z }; // rain follows the player
     }
 
@@ -4188,6 +4207,13 @@ export class SceneManager {
         
         // Clamp to min/max
         this.cameraZoom = Math.max(this.minZoom, Math.min(this.maxZoom, newZoom));
+    }
+
+    // Continuous zoom used by mobile pinch gestures. Keeping the clamp here
+    // guarantees touch and mouse controls share exactly the same zoom range.
+    setCameraZoom(zoom) {
+        if (!Number.isFinite(zoom)) return;
+        this.cameraZoom = Math.max(this.minZoom, Math.min(this.maxZoom, zoom));
     }
 
     // Rotate the follow camera around the player (right-drag). deltaYaw is in
