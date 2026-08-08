@@ -237,7 +237,6 @@ export class CombatSystem {
 
                 if (this.globalCooldown <= 0) {
                     // Set attacking state only right when we attack
-                    this.character.state = 'attacking';
                     this._performAttack(target);
                     this.globalCooldown = this.character.getAttackCooldown();
                 } else {
@@ -330,6 +329,7 @@ export class CombatSystem {
         const weaponClass = this.character.getWeaponClass
             ? this.character.getWeaponClass()
             : (this.character.isRanged() ? 'bow' : 'melee');
+        this.character.triggerAttack?.(weaponClass);
 
         if (weaponClass === 'bow' || weaponClass === 'gun' || weaponClass === 'acolyte' || weaponClass === 'magic') {
             // Ranged/Projectile: spawn projectile or vertical effect; damage resolves on hit (see main.js)

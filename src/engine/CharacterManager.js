@@ -20,6 +20,57 @@ function clampToWorld(pos) {
     pos.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.z));
 }
 
+const damp = (current, target, sharpness, dt) =>
+    THREE.MathUtils.lerp(current, target, 1 - Math.exp(-sharpness * Math.max(0, dt)));
+
+export function sampleLocomotionPose(state, phase, blend = 1) {
+    const running = state === 'running';
+    const moving = state === 'walking' || running;
+    const weight = moving ? Math.max(0, Math.min(1, blend)) : 0;
+    const stride = Math.sin(phase);
+    const contact = Math.abs(Math.cos(phase));
+    const amp = (running ? 0.82 : 0.5) * weight;
+    return {
+        leftLegX: stride * amp,
+        rightLegX: -stride * amp,
+        leftArmX: -stride * amp * (running ? 0.72 : 0.58),
+        rightArmX: stride * amp * (running ? 0.72 : 0.58),
+        bob: contact * (running ? 0.105 : 0.055) * weight,
+        lean: (running ? 0.13 : 0.035) * weight,
+        sway: Math.sin(phase * 0.5) * (running ? 0.045 : 0.025) * weight,
+    };
+}
+
+export function sampleAttackPose(style, progress) {
+    const p = Math.max(0, Math.min(1, progress));
+    // Three readable beats: anticipation, very fast strike/release, recovery.
+    const anticipation = Math.min(1, p / 0.28);
+    const strike = p < 0.28 ? 0 : Math.min(1, (p - 0.28) / 0.2);
+    const recovery = p < 0.48 ? 0 : Math.min(1, (p - 0.48) / 0.52);
+    const active = (1 - recovery);
+    if (style === 'bow') {
+        return { rightX: -1.25 * active, rightZ: -0.25, leftX: -1.28 * active, leftZ: 0.38, bodyLean: 0.03, recoil: strike * active * 0.08 };
+    }
+    if (style === 'gun') {
+        const kick = Math.sin(strike * Math.PI) * active;
+        return { rightX: -1.42 * active + kick * 0.22, rightZ: -0.08, leftX: -1.0 * active, leftZ: 0.18, bodyLean: -kick * 0.06, recoil: kick * 0.08 };
+    }
+    if (style === 'magic' || style === 'acolyte') {
+        const cast = Math.sin(Math.min(1, p / 0.58) * Math.PI) * active;
+        return { rightX: -1.55 * cast, rightZ: -0.5 * cast, leftX: -1.2 * cast, leftZ: 0.5 * cast, bodyLean: -0.04 * cast, recoil: cast * 0.1 };
+    }
+    const windup = anticipation * (1 - strike);
+    const cut = strike * active;
+    return {
+        rightX: (-1.25 * windup) + (1.05 * cut),
+        rightZ: (-0.72 * windup) + (0.48 * cut),
+        leftX: -0.3 * active,
+        leftZ: 0.22 * active,
+        bodyLean: (0.08 * windup) - (0.14 * cut),
+        recoil: Math.sin(strike * Math.PI) * active * 0.12,
+    };
+}
+
 function splitGraphemes(text) {
     const value = String(text ?? '');
     if (typeof Intl?.Segmenter === 'function') {
@@ -77,6 +128,11 @@ export class CharacterManager {
         this.gender = 'male'; // 'male' | 'female' — female gets long hair
         this.animTimer = 0;
         this.attackTimer = 0;
+        this.attackAnimElapsed = 1;
+        this.attackAnimDuration = 0.62;
+        this.attackAnimStyle = 'melee';
+        this.locomotionPhase = 0;
+        this.locomotionBlend = 0;
         this.attackCooldown = 1.0; // seconds between attacks
         this.target = null;
         this.moveSpeed = 5.5;
@@ -2300,7 +2356,10 @@ export class CharacterManager {
 
             // Rotate to face movement direction
             const targetRotation = Math.atan2(dir.x, dir.z);
-            this.mesh.rotation.y = targetRotation;
+            let turn = targetRotation - this.mesh.rotation.y;
+            while (turn > Math.PI) turn -= Math.PI * 2;
+            while (turn < -Math.PI) turn += Math.PI * 2;
+            this.mesh.rotation.y += turn * (1 - Math.exp(-14 * dt));
 
             // Set walking state
             this.state = this.moveSpeed > 5 ? 'running' : 'walking';
@@ -2321,7 +2380,10 @@ export class CharacterManager {
             clampToWorld(this.mesh.position);
 
             const targetRotation = Math.atan2(dirX, dirZ);
-            this.mesh.rotation.y = targetRotation;
+            let turn = targetRotation - this.mesh.rotation.y;
+            while (turn > Math.PI) turn -= Math.PI * 2;
+            while (turn < -Math.PI) turn += Math.PI * 2;
+            this.mesh.rotation.y += turn * (1 - Math.exp(-16 * dt));
 
             this.state = this.moveSpeed > 5 ? 'running' : 'walking';
             return true;
@@ -2695,31 +2757,25 @@ export class CharacterManager {
         // Expire temporary ATK/DEF buffs
         this.updateBuffs(dt);
 
-        // Idle bobbing
-        if (this.state === 'idle') {
-            this.mesh.position.y = this.baseY + Math.sin(this.animTimer * 2) * 0.05;
-            this.leftArm.rotation.x = Math.sin(this.animTimer * 1.5) * 0.1;
-            this.rightArm.rotation.x = Math.sin(this.animTimer * 1.5 + Math.PI) * 0.1;
-            this.leftLeg.rotation.x = 0;
-            this.rightLeg.rotation.x = 0;
-        }
-
-        // Walking animation
-        if (this.state === 'walking') {
-            this.mesh.position.y = this.baseY + Math.abs(Math.sin(this.animTimer * 8)) * 0.08;
-            this.leftLeg.rotation.x = Math.sin(this.animTimer * 8) * 0.5;
-            this.rightLeg.rotation.x = Math.sin(this.animTimer * 8 + Math.PI) * 0.5;
-            this.leftArm.rotation.x = Math.sin(this.animTimer * 8 + Math.PI) * 0.3;
-            this.rightArm.rotation.x = Math.sin(this.animTimer * 8) * 0.3;
-        }
-
-        // Running animation (faster legs, more bounce)
-        if (this.state === 'running') {
-            this.mesh.position.y = this.baseY + Math.abs(Math.sin(this.animTimer * 14)) * 0.12;
-            this.leftLeg.rotation.x = Math.sin(this.animTimer * 14) * 0.8;
-            this.rightLeg.rotation.x = Math.sin(this.animTimer * 14 + Math.PI) * 0.8;
-            this.leftArm.rotation.x = Math.sin(this.animTimer * 14 + Math.PI) * 0.5;
-            this.rightArm.rotation.x = Math.sin(this.animTimer * 14) * 0.5;
+        // Smooth locomotion blending. The previous implementation snapped from
+        // idle to a sine-wave walk, making the hero look weightless. Phase is
+        // advanced from the real movement mode and all limbs ease into/out of it.
+        if (this.state === 'idle' || this.state === 'walking' || this.state === 'running' || this.state === 'attacking') {
+            const moving = this.state === 'walking' || this.state === 'running';
+            this.locomotionBlend = damp(this.locomotionBlend, moving ? 1 : 0, moving ? 10 : 7, dt);
+            const cadence = this.state === 'running' ? 12.5 : 8.2;
+            this.locomotionPhase += dt * cadence * Math.max(0.18, this.locomotionBlend);
+            const pose = sampleLocomotionPose(this.state, this.locomotionPhase, this.locomotionBlend);
+            const breathe = Math.sin(this.animTimer * 2.1) * 0.018 * (1 - this.locomotionBlend);
+            this.mesh.position.y = damp(this.mesh.position.y, this.baseY + pose.bob + breathe, 18, dt);
+            this.leftLeg.rotation.x = damp(this.leftLeg.rotation.x, pose.leftLegX, 18, dt);
+            this.rightLeg.rotation.x = damp(this.rightLeg.rotation.x, pose.rightLegX, 18, dt);
+            this.leftArm.rotation.x = damp(this.leftArm.rotation.x, pose.leftArmX, 16, dt);
+            this.rightArm.rotation.x = damp(this.rightArm.rotation.x, pose.rightArmX, 16, dt);
+            this.leftArm.rotation.z = damp(this.leftArm.rotation.z, -pose.sway, 12, dt);
+            this.rightArm.rotation.z = damp(this.rightArm.rotation.z, pose.sway, 12, dt);
+            this.body.rotation.x = damp(this.body.rotation.x, pose.lean, 10, dt);
+            this.body.rotation.z = damp(this.body.rotation.z, pose.sway * 0.6, 10, dt);
         }
 
         // Swimming animation (sink lower, breaststroke arms, kicking legs)
@@ -2773,25 +2829,33 @@ export class CharacterManager {
             this.rodLiftTimer = Math.max(0, this.rodLiftTimer - dt);
         }
 
-        // Attack animation
-        if (this.state === 'attacking') {
-            const t = (this.animTimer % 0.5) / 0.5;
-            if (t < 0.3) {
-                this.rightArm.rotation.x = -t * 5;
-                this.rightArm.rotation.z = -t * 2;
-            } else if (t < 0.6) {
-                this.rightArm.rotation.x = -1.5 + (t - 0.3) * 8;
-                this.rightArm.rotation.z = -0.6 + (t - 0.3) * 3;
-            } else {
-                this.rightArm.rotation.x = 0.9 - (t - 0.6) * 2.25;
-                this.rightArm.rotation.z = 0.3 - (t - 0.6) * 0.75;
-            }
+        // Timeline-based attack: anticipation → hit/release → recovery. It keeps
+        // playing even if combat returns the logical state to idle between hits.
+        if (this.attackAnimElapsed < this.attackAnimDuration) {
+            this.attackAnimElapsed = Math.min(this.attackAnimDuration, this.attackAnimElapsed + dt);
+            const p = this.attackAnimElapsed / this.attackAnimDuration;
+            const pose = sampleAttackPose(this.attackAnimStyle, p);
+            this.rightArm.rotation.x = damp(this.rightArm.rotation.x, pose.rightX, 28, dt);
+            this.rightArm.rotation.z = damp(this.rightArm.rotation.z, pose.rightZ, 28, dt);
+            this.leftArm.rotation.x = damp(this.leftArm.rotation.x, pose.leftX, 24, dt);
+            this.leftArm.rotation.z = damp(this.leftArm.rotation.z, pose.leftZ, 24, dt);
+            this.body.rotation.x = damp(this.body.rotation.x, pose.bodyLean, 20, dt);
+            this.mesh.position.y = damp(this.mesh.position.y, this.baseY + pose.recoil, 24, dt);
+            if (this.attackAnimElapsed >= this.attackAnimDuration && this.state === 'attacking') this.state = 'idle';
         }
 
         // Removed old HP regen in favor of Step 7 logic above
 
         // Play time tracker
         this.stats.play_time += dt;
+    }
+
+    triggerAttack(style = null) {
+        const resolved = style || this.getWeaponClass?.() || 'melee';
+        this.attackAnimStyle = resolved === 'thief' ? 'melee' : resolved;
+        this.attackAnimDuration = resolved === 'gun' ? 0.42 : (resolved === 'bow' ? 0.72 : 0.62);
+        this.attackAnimElapsed = 0;
+        this.state = 'attacking';
     }
 
     // Trigger the fishing-rod yank animation.
@@ -2865,8 +2929,7 @@ export class CharacterManager {
         }
 
         // Set state for animation swing
-        this.state = 'attacking';
-        this.animTimer = 0;
+        this.triggerAttack(this.getWeaponClass?.() || 'magic');
 
         // Deduct SP and set cooldown
         this.stats.sp -= skill.spCost;

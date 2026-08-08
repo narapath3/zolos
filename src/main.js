@@ -1101,6 +1101,11 @@ async function initGame(charData) {
                     rp.lastAseq = p.aseq; // first sighting: arm, don't fire a sound
                 } else if (p.aseq !== rp.lastAseq) {
                     rp.lastAseq = p.aseq;
+                    const remoteAttackStyle = p.wsc === 'lightning' ? 'magic'
+                        : p.wsc === 'shadowslash' ? 'melee'
+                            : p.wsc === 'holyorb' ? 'acolyte'
+                                : (p.wsc || 'melee');
+                    rp.character?.triggerAttack?.(remoteAttackStyle);
                     const me = character.getPosition();
                     const dx = (p.x ?? me.x) - me.x;
                     const dz = (p.z ?? me.z) - me.z;
@@ -2069,7 +2074,7 @@ function updateDuelCombat(dt) {
         character.mesh.rotation.y = Math.atan2(dx, dz);
         if (duelState.cooldown <= 0) {
             duelState.cooldown = character.getAttackCooldown();
-            character.state = 'attacking';
+            character.triggerAttack?.(character.getWeaponClass?.() || 'melee');
             const isCritical = Math.random() < 0.1;
             let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 5);
             if (isCritical) dmg = Math.floor(dmg * 1.8);
@@ -2460,11 +2465,10 @@ function updateBossCombat(dt) {
 
     // In range → keep the attack animation running continuously (the arm loops
     // its swing while state stays 'attacking'; CombatSystem no longer resets it).
-    character.state = 'attacking';
-
     bossSwingCd = Math.max(0, bossSwingCd - dt);
     if (bossSwingCd > 0) return;
     bossSwingCd = character.getAttackCooldown();
+    character.triggerAttack?.(character.getWeaponClass?.() || 'melee');
 
     // ----- Land a hit with spectacular feedback -----
     const isCrit = Math.random() < 0.14;
