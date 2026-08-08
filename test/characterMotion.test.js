@@ -9,9 +9,14 @@ const mainSource = fs.readFileSync(new URL('../src/main.js', import.meta.url), '
 test('walk and run poses carry weight and use opposing limbs', () => {
   const walk = sampleLocomotionPose('walking', Math.PI / 2, 1);
   const run = sampleLocomotionPose('running', Math.PI / 2, 1);
+  const walkStep = sampleLocomotionPose('walking', 0, 1);
+  const runStep = sampleLocomotionPose('running', 0, 1);
   assert.ok(walk.leftLegX > 0 && walk.rightLegX < 0);
   assert.ok(walk.leftArmX < 0 && walk.rightArmX > 0);
+  assert.notEqual(walk.leftLegZ, walk.rightLegZ);
+  assert.ok(walkStep.leftLegY > 0.35 || walkStep.rightLegY > 0.35);
   assert.ok(Math.abs(run.leftLegX) > Math.abs(walk.leftLegX));
+  assert.ok(Math.max(runStep.leftLegY, runStep.rightLegY) > Math.max(walkStep.leftLegY, walkStep.rightLegY));
   assert.ok(run.lean > walk.lean);
 });
 

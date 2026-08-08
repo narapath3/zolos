@@ -28,14 +28,24 @@ export function sampleLocomotionPose(state, phase, blend = 1) {
     const moving = state === 'walking' || running;
     const weight = moving ? Math.max(0, Math.min(1, blend)) : 0;
     const stride = Math.sin(phase);
-    const contact = Math.abs(Math.cos(phase));
+    const leftLift = Math.max(0, -Math.cos(phase)) * weight;
+    const rightLift = Math.max(0, Math.cos(phase)) * weight;
+    const stepPulse = Math.abs(Math.sin(phase * 2));
     const amp = (running ? 0.82 : 0.5) * weight;
+    const travel = (running ? 0.18 : 0.11) * weight;
+    const liftHeight = running ? 0.17 : 0.1;
     return {
         leftLegX: stride * amp,
         rightLegX: -stride * amp,
         leftArmX: -stride * amp * (running ? 0.72 : 0.58),
         rightArmX: stride * amp * (running ? 0.72 : 0.58),
-        bob: contact * (running ? 0.105 : 0.055) * weight,
+        leftLegY: 0.35 + leftLift * liftHeight,
+        rightLegY: 0.35 + rightLift * liftHeight,
+        leftLegZ: stride * travel,
+        rightLegZ: -stride * travel,
+        leftFootLift: leftLift,
+        rightFootLift: rightLift,
+        bob: stepPulse * (running ? 0.065 : 0.032) * weight,
         lean: (running ? 0.13 : 0.035) * weight,
         sway: Math.sin(phase * 0.5) * (running ? 0.045 : 0.025) * weight,
     };
@@ -1000,10 +1010,21 @@ export class CharacterManager {
         this.leftLeg.castShadow = true;
         this.mesh.add(this.leftLeg);
 
+        const footGeo = new THREE.CapsuleGeometry(0.095, 0.16, 4, 8);
+        const footMat = new THREE.MeshStandardMaterial({ color: 0x302a35, roughness: 0.9 });
+        this.leftFoot = new THREE.Mesh(footGeo, footMat);
+        this.leftFoot.rotation.x = Math.PI / 2;
+        this.leftFoot.position.set(0, -0.25, 0.09);
+        this.leftFoot.scale.set(1.05, 1, 0.85);
+        this.leftLeg.add(this.leftFoot);
+
         this.rightLeg = new THREE.Mesh(legGeo, legMat);
         this.rightLeg.position.set(0.15, 0.35, 0);
         this.rightLeg.castShadow = true;
         this.mesh.add(this.rightLeg);
+        this.rightFoot = this.leftFoot.clone();
+        this.rightFoot.material = footMat.clone();
+        this.rightLeg.add(this.rightFoot);
 
         // Shadow disc
         const shadowGeo = new THREE.CircleGeometry(0.5, 16);
@@ -1707,7 +1728,7 @@ export class CharacterManager {
     // scale mail all look different. Rebuilt whenever gear changes.
     _disposeMesh(m) {
         if (!m) return;
-        this.mesh.remove(m);
+        if (m.parent) m.parent.remove(m);
         m.traverse?.(c => {
             if (c.geometry) c.geometry.dispose();
             if (c.material) Array.isArray(c.material) ? c.material.forEach(x => x.dispose()) : c.material.dispose();
@@ -1965,24 +1986,29 @@ export class CharacterManager {
         if (g.feet) {
             const grp = new THREE.Group();
             const mat = lambert(this._gearColor(g.feet, 0x6b4a2a));
-            [-0.15, 0.15].forEach(x => {
+            [-1, 1].forEach(side => {
+                const x = side * 0.15;
+                const footRig = new THREE.Group();
+                footRig.userData.legSide = side < 0 ? 'left' : 'right';
+                footRig.position.set(x, 0.35, 0);
                 const boot = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.32), mat);
-                boot.position.set(x, 0.22, 0.02); grp.add(boot);
+                boot.position.set(0, -0.13, 0.02); footRig.add(boot);
                 const toe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.12, 0.14), mat);
-                toe.position.set(x, 0.1, 0.2); grp.add(toe);
+                toe.position.set(0, -0.25, 0.2); footRig.add(toe);
                 if (g.feet === 'Speed Boots') {
-                    [-1, 1].forEach(side => {
+                    [-1, 1].forEach(wingSide => {
                         const wing = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.2, 5), lambert(0xc9efff, { emissive: 0x4a9dc8, emissiveIntensity: 0.35 }));
-                        wing.position.set(x + side * 0.13, 0.23, 0.02); wing.rotation.z = side * 0.8; grp.add(wing);
+                        wing.position.set(wingSide * 0.13, -0.12, 0.02); wing.rotation.z = wingSide * 0.8; footRig.add(wing);
                     });
                 }
                 if (g.feet === 'Dragon Greaves') {
                     const claw = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.18, 5), lambert(this._gearAccent(g.feet)));
-                    claw.position.set(x, 0.12, 0.3); claw.rotation.x = Math.PI / 2; grp.add(claw);
+                    claw.position.set(0, -0.23, 0.3); claw.rotation.x = Math.PI / 2; footRig.add(claw);
                 } else if (g.feet === 'Worldwalker Greaves') {
                     const halo = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.022, 6, 18), additive(0x4aeaff));
-                    halo.position.set(x, 0.1, 0.03); halo.rotation.x = Math.PI / 2; grp.add(halo);
+                    halo.position.set(0, -0.25, 0.03); halo.rotation.x = Math.PI / 2; footRig.add(halo);
                 }
+                grp.add(footRig);
             });
             this.mesh.add(grp); this.gearMeshes.feet = grp;
         }
@@ -2770,12 +2796,25 @@ export class CharacterManager {
             this.mesh.position.y = damp(this.mesh.position.y, this.baseY + pose.bob + breathe, 18, dt);
             this.leftLeg.rotation.x = damp(this.leftLeg.rotation.x, pose.leftLegX, 18, dt);
             this.rightLeg.rotation.x = damp(this.rightLeg.rotation.x, pose.rightLegX, 18, dt);
+            this.leftLeg.position.y = damp(this.leftLeg.position.y, pose.leftLegY, 20, dt);
+            this.rightLeg.position.y = damp(this.rightLeg.position.y, pose.rightLegY, 20, dt);
+            this.leftLeg.position.z = damp(this.leftLeg.position.z, pose.leftLegZ, 20, dt);
+            this.rightLeg.position.z = damp(this.rightLeg.position.z, pose.rightLegZ, 20, dt);
             this.leftArm.rotation.x = damp(this.leftArm.rotation.x, pose.leftArmX, 16, dt);
             this.rightArm.rotation.x = damp(this.rightArm.rotation.x, pose.rightArmX, 16, dt);
             this.leftArm.rotation.z = damp(this.leftArm.rotation.z, -pose.sway, 12, dt);
             this.rightArm.rotation.z = damp(this.rightArm.rotation.z, pose.sway, 12, dt);
             this.body.rotation.x = damp(this.body.rotation.x, pose.lean, 10, dt);
             this.body.rotation.z = damp(this.body.rotation.z, pose.sway * 0.6, 10, dt);
+            const feetGear = this.gearMeshes?.feet;
+            if (feetGear) {
+                for (const rig of feetGear.children) {
+                    const leg = rig.userData.legSide === 'left' ? this.leftLeg : this.rightLeg;
+                    if (!leg) continue;
+                    rig.position.copy(leg.position);
+                    rig.rotation.copy(leg.rotation);
+                }
+            }
         }
 
         // Swimming animation (sink lower, breaststroke arms, kicking legs)
