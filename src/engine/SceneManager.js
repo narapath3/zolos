@@ -541,7 +541,8 @@ export class SceneManager {
 
     // ============ Sky Dome ============
     _createSkyDome(config) {
-        const cloudOctaves = (this.graphicsQuality === 'ultra-low' || this.graphicsQuality === 'low') ? 3 : 5;
+        const proceduralClouds = (this.graphicsQuality === 'medium' || this.graphicsQuality === 'high') ? 1 : 0;
+        const cloudOctaves = this.graphicsQuality === 'high' ? 3 : 2;
         const skyGeo = new THREE.SphereGeometry(100, 32, 20);
         const skyMat = new THREE.ShaderMaterial({
             side: THREE.BackSide,
@@ -567,6 +568,7 @@ export class SceneManager {
                 }
             `,
             fragmentShader: `
+                #define PROCEDURAL_CLOUDS ${proceduralClouds}
                 uniform vec3 topColor;
                 uniform vec3 bottomColor;
                 uniform vec3 horizonColor;
@@ -612,11 +614,12 @@ export class SceneManager {
                     float sunHalo = pow(sunAmount, 18.0) * hazeStrength;
                     float horizonGlow = pow(1.0 - abs(clamp(h, -1.0, 1.0)), 5.0) * 0.22;
                     sky += sunColor * (sunDisc * 1.45 + sunHalo * 0.55 + horizonGlow);
-                    vec2 cloudUv = vec2(atan(viewDir.z, viewDir.x) * 1.35, viewDir.y * 3.2);
+                    #if PROCEDURAL_CLOUDS == 1
+                    vec2 cloudUv = vec2(atan(viewDir.z, viewDir.x) * 1.18, viewDir.y * 2.9);
                     vec2 wind = vec2(skyTime * 0.0042, skyTime * 0.0011);
-                    float broad = skyFbm(cloudUv * 2.15 + wind);
-                    float detail = skyFbm(cloudUv * 5.1 - wind * 1.7 + broad * 1.4);
-                    float cloudField = broad * 0.76 + detail * 0.24;
+                    float broad = skyFbm(cloudUv * 2.0 + wind);
+                    float detail = skyNoise(cloudUv * 5.0 - wind * 1.4 + broad);
+                    float cloudField = broad * 0.84 + detail * 0.16;
                     float cloudMask = smoothstep(cloudCover, cloudCover + 0.14, cloudField);
                     cloudMask *= smoothstep(-0.08, 0.16, viewDir.y);
                     float underside = smoothstep(cloudCover, cloudCover + 0.32, cloudField);
@@ -626,6 +629,7 @@ export class SceneManager {
                     float silverLining = pow(sunAmount, 9.0) * smoothstep(0.04, 0.72, cloudMask);
                     cloudColor += sunColor * silverLining * 0.85;
                     sky = mix(sky, cloudColor, cloudMask * 0.88);
+                    #endif
                     // Very subtle film grain prevents visible gradient banding.
                     float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
                     sky += (grain - 0.5) / 255.0;
