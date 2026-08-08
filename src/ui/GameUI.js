@@ -8285,7 +8285,13 @@ export class GameUI {
       this,
       this.soundManager,
       this.particles || window.particles,
-      (skillType, hitTarget, dmg) => {
+      (skillType, hitTarget, dmg, hitMeta = {}) => {
+        if (hitMeta.serverOwned && hitTarget && typeof hitTarget.id === 'string' && dmg > 0) {
+          // Server-owned monsters are render-only locally. Send skill damage via
+          // CombatSystem's authoritative hit callback, exactly like a normal hit.
+          this.combatSystem?.onMonsterDamaged?.(hitTarget.id, dmg, !!hitMeta.isCritical);
+          return;
+        }
         // Handle monster death if this skill killed it
         if (hitTarget && !hitTarget.alive) {
           if (this.combatSystem) {

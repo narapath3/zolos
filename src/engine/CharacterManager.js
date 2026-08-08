@@ -2502,9 +2502,8 @@ export class CharacterManager {
     // Resolve every player-originated hit through catalog card effects. Combat
     // and skills call this shared path so execute, lifesteal, and kill restores
     // cannot drift apart.
-    applyCardDamage(target, damage, isCritical = false) {
-        if (!target || typeof target.takeDamage !== 'function') return 0;
-
+    resolveCardDamage(target, damage, isCritical = false) {
+        if (!target) return { damage: 0, execute: false, effects: this.getCardEffects() };
         const targetStats = target.data || target.stats || {};
         const targetHp = Number(target.hp ?? targetStats.hp) || 0;
         const targetMaxHp = Number(target.maxHp ?? targetStats.max_hp) || 1;
@@ -2518,6 +2517,13 @@ export class CharacterManager {
             targetHpRatio: targetHp / targetMaxHp,
             targetHp,
         }, effects);
+        return { damage: Math.max(1, Math.floor(outcome.damage)), execute: outcome.execute, effects };
+    }
+
+    applyCardDamage(target, damage, isCritical = false) {
+        if (!target || typeof target.takeDamage !== 'function') return 0;
+        const outcome = this.resolveCardDamage(target, damage, isCritical);
+        const effects = outcome.effects;
         const options = { ignoreDefense: outcome.execute };
         const actualDmg = target.data
             ? target.takeDamage(outcome.damage, isCritical, options)
@@ -3002,7 +3008,18 @@ export class CharacterManager {
             }
 
             const finalDmg = roll(this.stats.atk * skill.damageMultiplier, 0.1);
-            const actualDmg = this.applyCardDamage(currentTarget, finalDmg);
+            const serverOwned = typeof window !== 'undefined' && window.__serverMonsters
+                && currentTarget?.data && typeof currentTarget.id === 'string';
+            // Render-only monsters intentionally reject local takeDamage(). In
+            // server mode compute the trusted-looking hit locally for feedback,
+            // then let GameUI relay it through the same mon_hit path as attacks.
+            const actualDmg = serverOwned
+                ? this.resolveCardDamage(currentTarget, finalDmg).damage
+                : this.applyCardDamage(currentTarget, finalDmg);
+            if (serverOwned) {
+                currentTarget.flashHit?.(false);
+                currentTarget._localContributed = true;
+            }
 
             if (window.duelState && currentTarget.stats) {
                 import('../network/GameSync.js').then(({ sendDuelHit }) => {
@@ -3023,7 +3040,7 @@ export class CharacterManager {
                 }
             }
 
-            if (effectCallback) effectCallback(skillId, currentTarget, actualDmg);
+            if (effectCallback) effectCallback(skillId, currentTarget, actualDmg, { serverOwned, isCritical: false });
 
         } else if (skill.type === 'physical_aoe' || skill.type === 'magic_aoe') {
             // NOTE: this used to read skill.radius, which no skill defines — the
@@ -3056,9 +3073,14 @@ export class CharacterManager {
                 monsterManager.monsters.forEach(m => {
                     if (m.alive && m.mesh.position.distanceTo(this.mesh.position) <= radius) {
                         const finalDmg = roll(dmgBase, 0.2);
-                        const actualDmg = this.applyCardDamage(m, finalDmg);
+                        const serverOwned = typeof window !== 'undefined' && window.__serverMonsters
+                            && m?.data && typeof m.id === 'string';
+                        const actualDmg = serverOwned
+                            ? this.resolveCardDamage(m, finalDmg).damage
+                            : this.applyCardDamage(m, finalDmg);
+                        if (serverOwned) { m.flashHit?.(false); m._localContributed = true; }
                         hits++;
-                        if (effectCallback) effectCallback(skillId, m, actualDmg);
+                        if (effectCallback) effectCallback(skillId, m, actualDmg, { serverOwned, isCritical: false });
                     }
                 });
             }
