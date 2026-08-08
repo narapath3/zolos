@@ -541,6 +541,7 @@ export class SceneManager {
 
     // ============ Sky Dome ============
     _createSkyDome(config) {
+        const cloudOctaves = (this.graphicsQuality === 'ultra-low' || this.graphicsQuality === 'low') ? 3 : 5;
         const skyGeo = new THREE.SphereGeometry(100, 32, 20);
         const skyMat = new THREE.ShaderMaterial({
             side: THREE.BackSide,
@@ -552,7 +553,10 @@ export class SceneManager {
                 exponent: { value: 0.5 },
                 sunDirection: { value: new THREE.Vector3(12, 25, 10).normalize() },
                 sunColor: { value: new THREE.Color(0xffe8ad) },
-                hazeStrength: { value: 0.72 }
+                hazeStrength: { value: 0.72 },
+                skyTime: { value: 0 },
+                cloudCover: { value: 0.58 },
+                cloudBrightness: { value: 1.0 }
             },
             vertexShader: `
                 varying vec3 vWorldPosition;
@@ -571,7 +575,31 @@ export class SceneManager {
                 uniform vec3 sunDirection;
                 uniform vec3 sunColor;
                 uniform float hazeStrength;
+                uniform float skyTime;
+                uniform float cloudCover;
+                uniform float cloudBrightness;
                 varying vec3 vWorldPosition;
+                float skyHash(vec2 p) {
+                    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+                }
+                float skyNoise(vec2 p) {
+                    vec2 i = floor(p);
+                    vec2 f = fract(p);
+                    f = f * f * (3.0 - 2.0 * f);
+                    return mix(mix(skyHash(i), skyHash(i + vec2(1.0, 0.0)), f.x),
+                               mix(skyHash(i + vec2(0.0, 1.0)), skyHash(i + vec2(1.0, 1.0)), f.x), f.y);
+                }
+                float skyFbm(vec2 p) {
+                    float value = 0.0;
+                    float amplitude = 0.52;
+                    mat2 turn = mat2(0.80, -0.60, 0.60, 0.80);
+                    for (int i = 0; i < ${cloudOctaves}; i++) {
+                        value += amplitude * skyNoise(p);
+                        p = turn * p * 2.03 + vec2(17.1, 9.2);
+                        amplitude *= 0.5;
+                    }
+                    return value;
+                }
                 void main() {
                     float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
                     float t = max(pow(max(h, 0.0), exponent), 0.0);
@@ -584,6 +612,20 @@ export class SceneManager {
                     float sunHalo = pow(sunAmount, 18.0) * hazeStrength;
                     float horizonGlow = pow(1.0 - abs(clamp(h, -1.0, 1.0)), 5.0) * 0.22;
                     sky += sunColor * (sunDisc * 1.45 + sunHalo * 0.55 + horizonGlow);
+                    vec2 cloudUv = vec2(atan(viewDir.z, viewDir.x) * 1.35, viewDir.y * 3.2);
+                    vec2 wind = vec2(skyTime * 0.0042, skyTime * 0.0011);
+                    float broad = skyFbm(cloudUv * 2.15 + wind);
+                    float detail = skyFbm(cloudUv * 5.1 - wind * 1.7 + broad * 1.4);
+                    float cloudField = broad * 0.76 + detail * 0.24;
+                    float cloudMask = smoothstep(cloudCover, cloudCover + 0.14, cloudField);
+                    cloudMask *= smoothstep(-0.08, 0.16, viewDir.y);
+                    float underside = smoothstep(cloudCover, cloudCover + 0.32, cloudField);
+                    vec3 cloudShadow = mix(vec3(0.34, 0.43, 0.55), horizonColor, 0.22);
+                    vec3 cloudLight = mix(vec3(0.92, 0.96, 1.0), sunColor, 0.28) * cloudBrightness;
+                    vec3 cloudColor = mix(cloudShadow, cloudLight, underside);
+                    float silverLining = pow(sunAmount, 9.0) * smoothstep(0.04, 0.72, cloudMask);
+                    cloudColor += sunColor * silverLining * 0.85;
+                    sky = mix(sky, cloudColor, cloudMask * 0.88);
                     // Very subtle film grain prevents visible gradient banding.
                     float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
                     sky += (grain - 0.5) / 255.0;
@@ -4339,6 +4381,7 @@ export class SceneManager {
     updateAnimations(dt) {
         this.time += dt;
         if (this.grassWindUniform) this.grassWindUniform.value = this.time;
+        if (this.skyMat?.uniforms?.skyTime) this.skyMat.uniforms.skyTime.value = this.time;
         for (const pet of this.petShowcaseModels || []) {
             pet.position.y = .78 + (pet.userData.float ? .25 : 0) + Math.sin(this.time * 2.1 + pet.userData.phase) * .07;
             pet.rotation.y += dt * .32;
