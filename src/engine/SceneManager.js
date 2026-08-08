@@ -286,6 +286,10 @@ export class SceneManager {
         this.oreNodes = [];
         this.waterMesh = null;
         this.cloudSprites = [];
+        this.waterfalls = [];
+        this.floatingIslands = [];
+        this.auroraMat = null;
+        this.fantasyMoon = null;
         this.npcMesh = null;
         this.npcSellMesh = null;
         this.npcWeaponMesh = null;
@@ -347,6 +351,11 @@ export class SceneManager {
             this._createGrassDecor(config);
             this._createPvpArena();
             this._createArenaLeaderboard();
+            // Fantasy scenery: distant peaks, a cascading waterfall, floating
+            // sky islands, a soft moon and drifting aurora ribbons.
+            this._createDistantMountains(config);
+            this._createWaterfall(config);
+            this._createFantasySky(config);
         }
 
         this._createPortals(mapId);
@@ -2140,6 +2149,333 @@ export class SceneManager {
 
         // --- Signpost near spawn ---
         this._createSignpost(2.5, 2.5);
+    }
+
+    // ============ Distant Fantasy Mountains ============
+    // A ring of layered peaks encircling the field just inside the sky dome.
+    // Aerial perspective is faked by tinting far peaks toward the sky horizon
+    // colour and letting the scene fog blend their bases into the sky.
+    _createDistantMountains(config) {
+        const group = new THREE.Group();
+        const skyHi = config.skyTop.clone();
+        const skyLo = config.skyHorizon.clone();
+
+        // Build one jagged peak from a stack of low-poly cones.
+        const makePeak = (radius, height, tint, snow) => {
+            const peak = new THREE.Group();
+            const rockCol = skyLo.clone().lerp(new THREE.Color(0x2c3550), tint);
+            const bodyGeo = new THREE.ConeGeometry(radius, height, 6, 1);
+            // Rough the silhouette so peaks don't read as perfect cones.
+            const pos = bodyGeo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+                const y = pos.getY(i);
+                if (y < height * 0.45) {
+                    const j = 0.12 + Math.random() * 0.22;
+                    pos.setX(i, pos.getX(i) * (1 + j));
+                    pos.setZ(i, pos.getZ(i) * (1 + j));
+                }
+            }
+            bodyGeo.computeVertexNormals();
+            const body = new THREE.Mesh(
+                bodyGeo,
+                new THREE.MeshLambertMaterial({ color: rockCol, fog: true })
+            );
+            body.position.y = height / 2;
+            peak.add(body);
+
+            // Snow / glacier cap catching sky light.
+            if (snow) {
+                const capGeo = new THREE.ConeGeometry(radius * 0.44, height * 0.32, 6, 1);
+                const capCol = skyHi.clone().lerp(new THREE.Color(0xffffff), 0.55);
+                const cap = new THREE.Mesh(
+                    capGeo,
+                    new THREE.MeshLambertMaterial({ color: capCol, fog: true })
+                );
+                cap.position.y = height * 0.86;
+                peak.add(cap);
+            }
+            return peak;
+        };
+
+        // Two rings: a taller, hazier back layer and a nearer front layer.
+        const rings = [
+            { count: 10, radius: 88, minH: 30, maxH: 52, size: 14, tint: 0.85, jitter: 10 },
+            { count: 14, radius: 70, minH: 18, maxH: 34, size: 11, tint: 0.55, jitter: 8 },
+        ];
+        rings.forEach((ring, layer) => {
+            for (let i = 0; i < ring.count; i++) {
+                const a = (i / ring.count) * Math.PI * 2 + layer * 0.3;
+                const r = ring.radius + (Math.random() - 0.5) * ring.jitter;
+                const h = ring.minH + Math.random() * (ring.maxH - ring.minH);
+                const peak = makePeak(ring.size * (0.8 + Math.random() * 0.5), h, ring.tint, true);
+                peak.position.set(Math.cos(a) * r, -2, Math.sin(a) * r);
+                peak.rotation.y = Math.random() * Math.PI;
+                group.add(peak);
+            }
+        });
+
+        this.scene.add(group);
+        this.envObjects.push(group);
+    }
+
+    // ============ Waterfall ============
+    // A cliff at the west end of the river with a cascading sheet of water,
+    // a glowing plunge pool, rising mist and floating light motes.
+    _createWaterfall(config) {
+        const group = new THREE.Group();
+        const baseX = -33, baseZ = -8;      // west end, aligned with the river
+        const cliffH = 13, sheetW = 4.2;
+        group.position.set(baseX, 0, baseZ);
+
+        // --- Cliff face (stacked rough boulders) ---
+        const cliffMat = new THREE.MeshLambertMaterial({ color: 0x5c5a5e });
+        for (let i = 0; i < 7; i++) {
+            const s = 2.6 + Math.random() * 1.6;
+            const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), cliffMat);
+            rock.position.set(
+                (Math.random() - 0.5) * 3.2,
+                i * 2.0,
+                -2.2 + (Math.random() - 0.5) * 1.2
+            );
+            rock.rotation.set(Math.random(), Math.random(), Math.random());
+            rock.castShadow = true;
+            rock.receiveShadow = true;
+            group.add(rock);
+        }
+        // Flank walls to frame the falling water
+        [-1, 1].forEach(side => {
+            const wall = new THREE.Mesh(new THREE.DodecahedronGeometry(3.4, 0), cliffMat);
+            wall.position.set(side * (sheetW * 0.62), cliffH * 0.5, -1.6);
+            wall.scale.set(0.7, cliffH / 5, 1.1);
+            wall.rotation.y = Math.random();
+            wall.castShadow = true;
+            group.add(wall);
+        });
+
+        // --- Falling water sheet (scrolling texture, scrolls downward) ---
+        const fallTex = this._createWaterTexture();
+        fallTex.repeat.set(1.5, 4);
+        const fallMat = new THREE.MeshBasicMaterial({
+            map: fallTex,
+            color: 0xbfe6ff,
+            transparent: true,
+            opacity: 0.82,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            fog: true,
+        });
+        const sheet = new THREE.Mesh(new THREE.PlaneGeometry(sheetW, cliffH), fallMat);
+        sheet.position.set(0, cliffH / 2, -0.9);
+        group.add(sheet);
+        // A second, brighter inner sheet for depth
+        const sheet2 = sheet.clone();
+        sheet2.material = fallMat.clone();
+        sheet2.material.color = new THREE.Color(0xffffff);
+        sheet2.material.opacity = 0.4;
+        sheet2.scale.set(0.6, 1, 1);
+        sheet2.position.z = -0.85;
+        group.add(sheet2);
+        this.waterfalls.push({ tex: fallTex, tex2: sheet2.material.map });
+
+        // --- Foam crest at the lip ---
+        const crest = new THREE.Mesh(
+            new THREE.CylinderGeometry(sheetW * 0.55, sheetW * 0.55, 0.5, 10, 1, true),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })
+        );
+        crest.position.set(0, cliffH - 0.2, -0.9);
+        crest.scale.z = 0.4;
+        group.add(crest);
+
+        // --- Plunge pool (glowing disc + foam ring) ---
+        const pool = new THREE.Mesh(
+            new THREE.CircleGeometry(3.6, 24),
+            new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.6 })
+        );
+        pool.rotation.x = -Math.PI / 2;
+        pool.position.set(0, 0.02, 0.4);
+        group.add(pool);
+        const foam = new THREE.Mesh(
+            new THREE.RingGeometry(0.4, 1.6, 20),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+        );
+        foam.rotation.x = -Math.PI / 2;
+        foam.position.set(0, 0.05, 0.1);
+        group.add(foam);
+        const poolLight = new THREE.PointLight(0x9fe0ff, 0.8, 14);
+        poolLight.position.set(0, 1.2, 0.2);
+        group.add(poolLight);
+
+        // --- Rising mist (points that float up and reset) ---
+        const mistN = this.graphicsQuality === 'low' ? 40 : 90;
+        const mPos = new Float32Array(mistN * 3);
+        const mData = [];
+        for (let i = 0; i < mistN; i++) {
+            const mx = (Math.random() - 0.5) * sheetW;
+            const my = Math.random() * 4;
+            const mz = -0.4 + Math.random() * 1.4;
+            mPos.set([mx, my, mz], i * 3);
+            mData.push({ x: mx, baseZ: mz, speed: 0.5 + Math.random() * 0.9, top: 3.5 + Math.random() * 2 });
+        }
+        const mistGeo = new THREE.BufferGeometry();
+        mistGeo.setAttribute('position', new THREE.BufferAttribute(mPos, 3));
+        const mist = new THREE.Points(mistGeo, new THREE.PointsMaterial({
+            color: 0xeaf6ff, size: 0.9, transparent: true, opacity: 0.35,
+            depthWrite: false, sizeAttenuation: true,
+        }));
+        group.add(mist);
+        this.waterfalls[this.waterfalls.length - 1].mist = { geo: mistGeo, data: mData };
+
+        this.scene.add(group);
+        this.envObjects.push(group);
+    }
+
+    // ============ Fantasy Sky: floating islands, moon, aurora ============
+    _createFantasySky(config) {
+        const hq = this.graphicsQuality !== 'low';
+
+        // --- Soft moon: a glowing billboarded disc high in the sky ---
+        const moonGroup = new THREE.Group();
+        const moon = new THREE.Mesh(
+            new THREE.SphereGeometry(6, 24, 16),
+            new THREE.MeshBasicMaterial({ color: 0xf6f2ff, fog: false })
+        );
+        moonGroup.add(moon);
+        // Layered halo
+        for (let i = 0; i < 3; i++) {
+            const halo = new THREE.Mesh(
+                new THREE.SphereGeometry(6 + (i + 1) * 2.4, 20, 12),
+                new THREE.MeshBasicMaterial({ color: 0xbcd6ff, transparent: true, opacity: 0.12 - i * 0.03, fog: false, depthWrite: false, side: THREE.BackSide })
+            );
+            moonGroup.add(halo);
+        }
+        moonGroup.position.set(-46, 58, -70);
+        this.scene.add(moonGroup);
+        this.envObjects.push(moonGroup);
+        this.fantasyMoon = moonGroup;
+
+        // --- Aurora ribbons: additive band high on the sky dome ---
+        if (hq) {
+            const auroraGeo = new THREE.CylinderGeometry(94, 94, 46, 48, 1, true, 0, Math.PI * 1.5);
+            const auroraMat = new THREE.ShaderMaterial({
+                transparent: true,
+                depthWrite: false,
+                side: THREE.BackSide,
+                blending: THREE.AdditiveBlending,
+                fog: false,
+                uniforms: { auroraTime: { value: 0 } },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec2 vUv;
+                    uniform float auroraTime;
+                    void main() {
+                        float band = sin(vUv.x * 22.0 + auroraTime * 0.6) * 0.5 + 0.5;
+                        band *= sin(vUv.x * 9.0 - auroraTime * 0.35) * 0.5 + 0.5;
+                        float curtain = smoothstep(0.15, 0.55, vUv.y) * (1.0 - smoothstep(0.6, 1.0, vUv.y));
+                        float wave = sin(vUv.x * 40.0 + auroraTime) * 0.06;
+                        curtain *= smoothstep(0.0, 0.4, vUv.y + wave);
+                        vec3 green = vec3(0.25, 0.95, 0.6);
+                        vec3 violet = vec3(0.55, 0.4, 0.95);
+                        vec3 col = mix(green, violet, vUv.y + sin(vUv.x * 6.0 + auroraTime * 0.2) * 0.2);
+                        float a = curtain * band * 0.5;
+                        gl_FragColor = vec4(col * a, a);
+                    }
+                `,
+            });
+            const aurora = new THREE.Mesh(auroraGeo, auroraMat);
+            aurora.position.y = 34;
+            aurora.rotation.y = 0.6;
+            this.scene.add(aurora);
+            this.envObjects.push(aurora);
+            this.auroraMat = auroraMat;
+        }
+
+        // --- Floating islands drifting over the field ---
+        const islandCount = hq ? 3 : 2;
+        const spots = [
+            { x: 30, y: 26, z: -34, s: 1.4 },
+            { x: -38, y: 32, z: 18, s: 1.7 },
+            { x: 14, y: 22, z: 40, s: 1.1 },
+        ];
+        for (let i = 0; i < islandCount; i++) {
+            const spot = spots[i];
+            const island = this._createFloatingIsland(spot.s);
+            island.position.set(spot.x, spot.y, spot.z);
+            island.userData = { baseY: spot.y, phase: Math.random() * Math.PI * 2, spin: 0.02 + Math.random() * 0.03 };
+            this.scene.add(island);
+            this.envObjects.push(island);
+            this.floatingIslands.push(island);
+        }
+    }
+
+    // A single low-poly floating island: rocky underside, grass top, a couple
+    // of small trees and a thin trailing water strand.
+    _createFloatingIsland(scale = 1) {
+        const g = new THREE.Group();
+
+        // Rocky underside (inverted, tapering cone cluster)
+        const rockMat = new THREE.MeshLambertMaterial({ color: 0x6b5a4a });
+        // toNonIndexed() keeps this cone's attribute layout consistent with the
+        // non-indexed dodecahedron chunks so the static geometry batcher can
+        // merge them (mixed indexed/non-indexed geometry fails to merge).
+        const under = new THREE.Mesh(new THREE.ConeGeometry(3.2, 5, 7).toNonIndexed(), rockMat);
+        under.position.y = -2.4;
+        under.rotation.x = Math.PI;
+        g.add(under);
+        for (let i = 0; i < 3; i++) {
+            const chunk = new THREE.Mesh(new THREE.DodecahedronGeometry(1 + Math.random(), 0), rockMat);
+            chunk.position.set((Math.random() - 0.5) * 3, -1.2 - Math.random() * 2, (Math.random() - 0.5) * 3);
+            g.add(chunk);
+        }
+
+        // Grass top
+        const top = new THREE.Mesh(
+            new THREE.CylinderGeometry(3.4, 3.0, 1.0, 9),
+            new THREE.MeshLambertMaterial({ color: 0x4aaa46 })
+        );
+        top.position.y = 0.1;
+        g.add(top);
+        const rim = new THREE.Mesh(
+            new THREE.CylinderGeometry(3.42, 3.42, 0.28, 9),
+            new THREE.MeshLambertMaterial({ color: 0x6cc35a })
+        );
+        rim.position.y = 0.6;
+        g.add(rim);
+
+        // A couple of tiny conifers
+        for (let i = 0; i < 2; i++) {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.16, 0.8, 5),
+                new THREE.MeshLambertMaterial({ color: 0x6a4a2a })
+            );
+            trunk.position.y = 0.4;
+            tree.add(trunk);
+            const foliage = new THREE.Mesh(
+                new THREE.ConeGeometry(0.7, 1.6, 6),
+                new THREE.MeshLambertMaterial({ color: 0x2f7d3a })
+            );
+            foliage.position.y = 1.4;
+            tree.add(foliage);
+            tree.position.set((Math.random() - 0.5) * 3.4, 0.7, (Math.random() - 0.5) * 3.4);
+            g.add(tree);
+        }
+
+        // Thin trailing water strand off one edge
+        const strand = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.5, 4.5),
+            new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide })
+        );
+        strand.position.set(2.4, -2, 0.6);
+        g.add(strand);
+
+        g.scale.setScalar(scale);
+        return g;
     }
 
     // ============ Tree Types ============
@@ -4612,6 +4948,42 @@ export class SceneManager {
                 if (u.glow) u.glow.intensity = pulse * 1.2;
                 if (u.crystals) u.crystals.forEach((c, i) => { c.position.y = 0.9 + Math.sin(t * 3 + i) * 0.06; });
             });
+        }
+
+        // Waterfall: scroll the falling sheets downward and float the mist up
+        if (this.waterfalls && this.waterfalls.length) {
+            for (const wf of this.waterfalls) {
+                if (wf.tex) wf.tex.offset.y -= dt * 0.9;
+                if (wf.tex2) wf.tex2.offset.y -= dt * 1.3;
+                if (wf.mist) {
+                    const pos = wf.mist.geo.attributes.position;
+                    const data = wf.mist.data;
+                    for (let i = 0; i < data.length; i++) {
+                        const d = data[i];
+                        let y = pos.getY(i) + d.speed * dt;
+                        if (y > d.top) y = 0;
+                        pos.setXYZ(i, d.x + Math.sin(this.time * 0.8 + i) * 0.2, y, d.baseZ);
+                    }
+                    pos.needsUpdate = true;
+                }
+            }
+        }
+
+        // Floating sky islands: gentle bob + slow spin
+        if (this.floatingIslands) {
+            this.floatingIslands.forEach(isle => {
+                const u = isle.userData;
+                isle.position.y = u.baseY + Math.sin(this.time * 0.4 + u.phase) * 0.8;
+                isle.rotation.y += u.spin * dt;
+            });
+        }
+
+        // Aurora ribbons drift
+        if (this.auroraMat) this.auroraMat.uniforms.auroraTime.value = this.time;
+
+        // Moon faces the camera (billboard the halo group softly)
+        if (this.fantasyMoon && this.camera) {
+            this.fantasyMoon.lookAt(this.camera.position);
         }
 
         // Animate fishing bobber & line
