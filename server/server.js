@@ -13,6 +13,7 @@ import { createApiRouter } from './api/index.js';
 import { createAdminRouter } from './api/admin.js';
 import * as ipMonitor from './api/ipMonitor.js';
 import { startSnapshotScheduler } from './api/statSnapshots.js';
+import { startMarketExpiryScheduler } from './api/marketExpiry.js';
 import { startCheatGuard } from './api/cheatGuard.js';
 import { ensureMonsterTables, seedMonstersIfEmpty, ensurePronteraMountainExpansion } from './api/monstersConfig.js';
 import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
@@ -1574,6 +1575,7 @@ httpServer.listen(PORT, HOST, () => {
     // Daily player-movement snapshots (self-host DB only).
     if (USE_LOCAL_DB) {
         startSnapshotScheduler().catch(e => console.error('[Snapshot] scheduler failed:', e.message));
+        startMarketExpiryScheduler({ io }).catch(e => console.error('[MarketExpiry] scheduler failed:', e.message));
         startCheatGuard().catch(e => console.error('[CheatGuard] scheduler failed:', e.message));
         // World-monster config (Phase 1): create + seed tables from GameData.
         // Phase 2: if WORLD_MONSTERS is on, start the authoritative engine.

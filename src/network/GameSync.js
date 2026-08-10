@@ -2282,7 +2282,6 @@ export async function openVendingStall(characterId, ownerName, shopName, appeara
             shop_name: (shopName || 'ร้านค้า').slice(0, 24),
             slot,
             appearance: appearance || {},
-            updated_at: new Date().toISOString(),
         };
         const { error } = await supabase.from('vending_stalls').upsert(row, { onConflict: 'user_id' });
         if (error) throw error;

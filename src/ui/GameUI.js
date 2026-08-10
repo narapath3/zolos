@@ -6745,7 +6745,7 @@ export class GameUI {
       bodyColor: app.bodyColor, hairColor: app.hairColor, pantsColor: app.pantsColor, gender: app.gender,
     });
     if (res.ok) {
-      this.addCombatLog(`🏪✨ เปิดแผง "${name}" ที่ถนนตลาดแล้ว! (ช่องที่ ${res.slot + 1}) — ตั้งขายของในแท็บนี้ได้เลย`, 'levelup');
+      this.addCombatLog(`🏪✨ เปิดแผง "${name}" ที่ถนนตลาดแล้ว! (ช่องที่ ${res.slot + 1}) — ร้านมีอายุ 48 ชั่วโมง ครบกำหนดจะคืนสินค้าทั้งหมดเข้ากระเป๋าและเก็บแผงอัตโนมัติ`, 'levelup');
       if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
       if (window.stallManager) window.stallManager.refresh();
     } else if (res.reason === 'full') {

@@ -2,6 +2,7 @@
 // JWT-verified user id as the first argument (replacing auth.uid()).
 import { query } from './db.js';
 import { httpErr } from './auth.js';
+import { cleanupExpiredVendingStalls } from './marketExpiry.js';
 
 // name -> ordered arg names the CLIENT supplies (p_user_id is prepended from JWT)
 const RPCS = {
@@ -18,6 +19,10 @@ export async function callRpc(fn, body, userId) {
     const argNames = RPCS[fn];
     if (!argNames) throw httpErr(404, `unknown rpc: ${fn}`);
     if (!userId) throw httpErr(401, 'auth required');
+
+    // Enforce the deadline again at the purchase boundary. This closes the tiny
+    // gap between the exact 48-hour mark and the next scheduled cleanup tick.
+    if (fn === 'buy_market_item') await cleanupExpiredVendingStalls();
 
     const params = [userId, ...argNames.map(n => (body && body[n] !== undefined) ? body[n] : null)];
     const placeholders = params.map((_, i) => `$${i + 1}`).join(',');

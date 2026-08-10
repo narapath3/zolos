@@ -153,6 +153,17 @@ export async function runQuery(spec, userId) {
             const row = sanitizeWrite(policy, v, cols);
             // stamp/verify ownership
             await enforceInsertOwnership(policy, row, userId);
+            // Stall lifetime is server-authoritative. updated_at is deliberately
+            // absent from the client writable list so a modified client cannot
+            // extend a shop by forging its clock.
+            if (table === 'vending_stalls' && cols.has('updated_at')) {
+                row.updated_at = new Date().toISOString();
+                const { rowCount } = await query(
+                    'SELECT 1 FROM characters WHERE id = $1 AND user_id = $2',
+                    [row.character_id, userId],
+                );
+                if (!rowCount) throw httpErr(403, 'not your character');
+            }
             // generate a text primary key where the table has no DB default
             if (policy.genId && (row.id === undefined || row.id === null) && cols.has('id')) {
                 row.id = policy.genId();
