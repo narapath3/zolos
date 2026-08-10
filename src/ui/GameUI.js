@@ -5060,6 +5060,10 @@ export class GameUI {
           this.character.gameSettings.graphics_quality = q;
           this.character.saveStatsToDatabase();
         }
+        // Scene density, instancing and composer passes are constructed at map
+        // startup. Reload immediately so the selected tier is fully applied,
+        // rather than presenting an unchanged scene until the next visit.
+        setTimeout(() => window.location.reload(), 450);
       });
     }
 

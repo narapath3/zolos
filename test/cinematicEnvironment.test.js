@@ -38,6 +38,12 @@ test('high quality adds restrained cinematic post-processing', () => {
   assert.match(sceneSource, /if \(this\.composer\) this\.composer\.render\(\)/);
 });
 
+test('auto quality resolves to a real render tier and exposes the live build badge', () => {
+  assert.match(sceneSource, /if \(initialQuality === 'auto'\)/);
+  assert.match(sceneSource, /WORLD_REMASTER_VERSION = '2026\.08\.10-R2'/);
+  assert.match(sceneSource, /WORLD REMASTER/);
+});
+
 test('explorable ridge uses fractured rock volumes instead of cone mountains', () => {
   assert.match(sceneSource, /Interlocking fractured boulders/);
   assert.match(sceneSource, /new THREE\.DodecahedronGeometry\(1, 1\)/);

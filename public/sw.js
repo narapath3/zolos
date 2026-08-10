@@ -11,7 +11,7 @@
  *  - Cross-origin requests (Supabase, the Socket.io server, YouTube, fonts)
  *    are never intercepted.
  */
-const CACHE = 'zolos-cache-v1';
+const CACHE = 'zolos-cache-v2-world-remaster';
 const CORE = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
