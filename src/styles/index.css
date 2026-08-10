@@ -2830,9 +2830,6 @@ a,
 .wiki-item-portrait{--monster-color:#5d6b86;border-radius:10px;background:linear-gradient(145deg,#27334a,#101725)}.wiki-item-portrait i{position:absolute;inset:3px;border:1px solid rgba(255,255,255,.12);border-radius:7px}
 @keyframes wikiBossPulse{50%{filter:brightness(1.25);transform:scale(1.04)}}
 
-#zolos-build-stamp{position:fixed;right:4px;top:28px;z-index:9999;pointer-events:none;padding:3px 7px;border:1px solid rgba(255,215,82,.32);border-radius:5px;background:rgba(4,10,18,.72);color:#ffe38a;font:600 9px "Chakra Petch",sans-serif;letter-spacing:.02em;box-shadow:0 3px 12px rgba(0,0,0,.35);white-space:nowrap;opacity:1;transform:translateY(0);transition:opacity 1s ease,transform 1s ease}
-#zolos-build-stamp.is-hiding{opacity:0;transform:translateY(-8px)}
-@media(max-width:600px){#zolos-build-stamp{top:27px;font-size:8px;max-width:48vw;overflow:hidden;text-overflow:ellipsis}}
 
 .wiki-slot-name {
   font-size: 7px;

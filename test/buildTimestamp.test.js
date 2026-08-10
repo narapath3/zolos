@@ -12,11 +12,9 @@ test('every build injects a production timestamp into code and HTML', () => {
   assert.match(vite, /name: 'zolos-build-time'/);
 });
 
-test('players see latest deploy time in Thai time and update notices', () => {
-  assert.match(main, /อัปเดตล่าสุด/);
+test('deploy time stays available for diagnostics and update notices without a startup badge', () => {
   assert.match(main, /timeZone: 'Asia\/Bangkok'/);
   assert.match(updater, /zolos-build-time/);
   assert.match(updater, /showUpdateBanner\(latest\.buildTime\)/);
-  assert.match(main, /classList\.add\('is-hiding'\)/);
-  assert.match(main, /stamp\.remove\(\)/);
+  assert.doesNotMatch(main, /zolos-build-stamp/);
 });

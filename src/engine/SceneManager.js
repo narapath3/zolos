@@ -14,7 +14,6 @@ import { buildPet } from './PetModels.js';
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
 export const PET_BOUTIQUE_POSITION = Object.freeze({ x: -10, z: -7 });
-export const WORLD_REMASTER_VERSION = '2026.08.10-R2';
 
 // ============ Map Configs ============
 const MAP_CONFIGS = {
@@ -251,28 +250,9 @@ export class SceneManager {
 
         // Build world
         this.loadMap('prontera');
-        this._showRemasterBadge();
 
         // Resize handling
         window.addEventListener('resize', () => this._onResize());
-    }
-
-    _showRemasterBadge() {
-        if (document.getElementById('zolos-remaster-badge')) return;
-        const badge = document.createElement('div');
-        badge.id = 'zolos-remaster-badge';
-        badge.textContent = `WORLD REMASTER • ${WORLD_REMASTER_VERSION} • ${this.graphicsQuality.toUpperCase()} • ${window.ZOLOS_BUILD_LABEL || ''}`;
-        Object.assign(badge.style, {
-            position: 'fixed', top: '12px', left: '50%', transform: 'translateX(-50%)',
-            zIndex: '10002', padding: '7px 14px', borderRadius: '999px',
-            border: '1px solid rgba(255,220,94,.8)', color: '#fff3b0',
-            background: 'rgba(12,24,30,.88)', boxShadow: '0 6px 24px rgba(0,0,0,.45)',
-            font: '600 11px "Chakra Petch", sans-serif', letterSpacing: '.08em',
-            pointerEvents: 'none', transition: 'opacity .8s ease',
-        });
-        document.body.appendChild(badge);
-        setTimeout(() => { badge.style.opacity = '0'; }, 12000);
-        setTimeout(() => badge.remove(), 13000);
     }
 
     _setupLights() {

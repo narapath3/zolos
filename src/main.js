@@ -24,19 +24,6 @@ window.ZOLOS_BUILD_LABEL = new Intl.DateTimeFormat('th-TH', {
     timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'medium',
 }).format(new Date(BUILD_VERSION));
 
-function mountBuildTimestamp() {
-    if (document.getElementById('zolos-build-stamp')) return;
-    const stamp = document.createElement('div');
-    stamp.id = 'zolos-build-stamp';
-    stamp.textContent = `อัปเดตล่าสุด ${window.ZOLOS_BUILD_LABEL}`;
-    stamp.title = `Production build: ${BUILD_VERSION}`;
-    document.body.appendChild(stamp);
-    setTimeout(() => stamp.classList.add('is-hiding'), 6500);
-    setTimeout(() => stamp.remove(), 7600);
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBuildTimestamp);
-else mountBuildTimestamp();
-
 // Notify + offer reload when a newer build is deployed while this tab is open
 import('./engine/UpdateChecker.js').then(({ startUpdateChecker }) => startUpdateChecker());
 // PWA: register the service worker + wire the "Install app" button
