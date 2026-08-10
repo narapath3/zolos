@@ -18,8 +18,22 @@
 
 // Build version banner — bump BUILD_VERSION on notable fixes so we can
 // instantly tell from the console which bundle a client is running.
-const BUILD_VERSION = '2026-08-08.54 (mobile-pinch-zoom)';
+const BUILD_VERSION = __ZOLOS_BUILD_TIME__;
 window.ZOLOS_BUILD = BUILD_VERSION;
+window.ZOLOS_BUILD_LABEL = new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'medium',
+}).format(new Date(BUILD_VERSION));
+
+function mountBuildTimestamp() {
+    if (document.getElementById('zolos-build-stamp')) return;
+    const stamp = document.createElement('div');
+    stamp.id = 'zolos-build-stamp';
+    stamp.textContent = `อัปเดตล่าสุด ${window.ZOLOS_BUILD_LABEL}`;
+    stamp.title = `Production build: ${BUILD_VERSION}`;
+    document.body.appendChild(stamp);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBuildTimestamp);
+else mountBuildTimestamp();
 
 // Notify + offer reload when a newer build is deployed while this tab is open
 import('./engine/UpdateChecker.js').then(({ startUpdateChecker }) => startUpdateChecker());

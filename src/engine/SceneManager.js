@@ -261,7 +261,7 @@ export class SceneManager {
         if (document.getElementById('zolos-remaster-badge')) return;
         const badge = document.createElement('div');
         badge.id = 'zolos-remaster-badge';
-        badge.textContent = `WORLD REMASTER • ${WORLD_REMASTER_VERSION} • ${this.graphicsQuality.toUpperCase()}`;
+        badge.textContent = `WORLD REMASTER • ${WORLD_REMASTER_VERSION} • ${this.graphicsQuality.toUpperCase()} • ${window.ZOLOS_BUILD_LABEL || ''}`;
         Object.assign(badge.style, {
             position: 'fixed', top: '12px', left: '50%', transform: 'translateX(-50%)',
             zIndex: '10002', padding: '7px 14px', borderRadius: '999px',

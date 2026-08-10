@@ -36,13 +36,14 @@ async function fetchLatestBundle() {
         if (!res.ok) return null;
         const html = await res.text();
         const m = html.match(BUNDLE_RE);
-        return m ? m[1] : null;
+        const timeMatch = html.match(/<meta[^>]+name=["']zolos-build-time["'][^>]+content=["']([^"']+)["']/i);
+        return m ? { bundle: m[1], buildTime: timeMatch ? timeMatch[1] : null } : null;
     } catch {
         return null; // offline / network blip — ignore, try again later
     }
 }
 
-function showUpdateBanner() {
+function showUpdateBanner(buildTime = null) {
     if (bannerShown) return;
     bannerShown = true;
 
@@ -70,6 +71,14 @@ function showUpdateBanner() {
       <button id="zolos-update-reload">🔄 โหลดใหม่</button>
       <button id="zolos-update-later">ภายหลัง</button>
     `;
+    if (buildTime) {
+        const latestLabel = new Intl.DateTimeFormat('th-TH', {
+            timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'medium',
+        }).format(new Date(buildTime));
+        const time = document.createElement('small');
+        time.textContent = ` อัปเดตเมื่อ ${latestLabel}`;
+        bar.querySelector('span')?.appendChild(time);
+    }
     document.body.appendChild(bar);
 
     document.getElementById('zolos-update-reload').addEventListener('click', () => {
@@ -84,9 +93,9 @@ function showUpdateBanner() {
 async function check() {
     if (bannerShown || !currentBundle) return;
     const latest = await fetchLatestBundle();
-    if (latest && latest !== currentBundle) {
+    if (latest && latest.bundle !== currentBundle) {
         console.log(`[Zolos] 🔔 New build detected (${latest} vs running ${currentBundle})`);
-        showUpdateBanner();
+        showUpdateBanner(latest.buildTime);
         if (intervalId) clearInterval(intervalId);
     }
 }
