@@ -22,6 +22,24 @@ const SPAWN_RANGE = 12;
 const PRONTERA_SPAWN_RANGE = 50;
 const RESPAWN_TIME = 3;
 
+let sharedMonsterSkinTexture = null;
+function getMonsterSkinTexture() {
+    if (sharedMonsterSkinTexture) return sharedMonsterSkinTexture;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#888'; ctx.fillRect(0, 0, 96, 96);
+    for (let i = 0; i < 900; i++) {
+        const shade = 105 + Math.floor(Math.random() * 70);
+        ctx.fillStyle = `rgba(${shade},${shade},${shade},${0.12 + Math.random() * 0.28})`;
+        ctx.beginPath(); ctx.arc(Math.random() * 96, Math.random() * 96, 0.4 + Math.random() * 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    sharedMonsterSkinTexture = new THREE.CanvasTexture(canvas);
+    sharedMonsterSkinTexture.wrapS = sharedMonsterSkinTexture.wrapT = THREE.RepeatWrapping;
+    sharedMonsterSkinTexture.repeat.set(2.5, 2.5);
+    return sharedMonsterSkinTexture;
+}
+
 export function resolveMonsterDamage(amount, defense = 0, { ignoreDefense = false } = {}) {
     const incoming = Math.max(0, Number(amount) || 0);
     if (ignoreDefense) return incoming;
@@ -95,7 +113,11 @@ class Monster {
                 metalness: metalness,
                 transparent: transparent,
                 opacity: opacity,
-                flatShading: false
+                flatShading: false,
+                bumpMap: getMonsterSkinTexture(),
+                bumpScale: 0.018 * size,
+                emissive: new THREE.Color(colorHex).multiplyScalar(0.035),
+                emissiveIntensity: 0.12,
             });
         };
 
@@ -800,7 +822,17 @@ class Monster {
             const pupilR = new THREE.Mesh(eyeGeo, eyeMat);
             pupilR.position.set(0, 0, 0.05 * size);
             eyeR.add(pupilR);
+
+            // Tiny catchlights make even the smallest creatures feel alive.
+            const shineGeo = new THREE.SphereGeometry(0.014 * size, 6, 6);
+            const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const shineL = new THREE.Mesh(shineGeo, shineMat);
+            shineL.position.set(-0.018 * size, 0.022 * size, 0.047 * size);
+            pupilL.add(shineL);
+            pupilR.add(shineL.clone());
         }
+
+        this._addRemasterAura(size, color);
 
         // HP bar above monster
         const hpBarBg = new THREE.Mesh(
@@ -858,6 +890,24 @@ class Monster {
             this.mesh.position.y = -0.3;
         }
         this.scene.add(this.mesh);
+    }
+
+    _addRemasterAura(size, color) {
+        const familyColors = { undead: 0x9b5cff, demon: 0xff365f, dragon: 0x42cfff, construct: 0xffc857, aquatic: 0x28cfff, plant: 0x72e36b, insect: 0xd9ef62, beast: 0xff9b52, slime: color };
+        const auraColor = familyColors[this.data.family] || color;
+        const elite = this.data.isElite || this.data.isBoss || this.data.hp >= 2500;
+        const ring = new THREE.Mesh(new THREE.RingGeometry(size * 0.36, size * (elite ? 0.66 : 0.54), 28), new THREE.MeshBasicMaterial({ color: auraColor, transparent: true, opacity: elite ? 0.34 : 0.10, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.025;
+        this.mesh.add(ring); this._remasterAura = ring;
+        if (elite) {
+            const moteGeo = new THREE.BufferGeometry();
+            const moteCount = this.data.isBoss ? 14 : 8;
+            const positions = new Float32Array(moteCount * 3);
+            for (let i = 0; i < moteCount; i++) { const a = i / moteCount * Math.PI * 2; positions[i * 3] = Math.cos(a) * size * (0.45 + (i % 3) * 0.08); positions[i * 3 + 1] = size * (0.15 + (i % 5) * 0.13); positions[i * 3 + 2] = Math.sin(a) * size * (0.45 + (i % 3) * 0.08); }
+            moteGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            this._remasterMotes = new THREE.Points(moteGeo, new THREE.PointsMaterial({ color: auraColor, size: Math.max(0.035, size * 0.055), transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
+            this.mesh.add(this._remasterMotes);
+        }
     }
 
     _updateDangerLabel(playerLevel) {
@@ -948,6 +998,8 @@ class Monster {
     _updateServerRendered(dt, camera) {
         this.animTimer += dt;
         this.hitFlash = Math.max(0, this.hitFlash - dt);
+        if (this._remasterAura) this._remasterAura.rotation.z += dt * 0.32;
+        if (this._remasterMotes) this._remasterMotes.rotation.y -= dt * 0.48;
 
         // Interpolate toward the latest server position (~10 Hz snapshots).
         if (this._srvTargetX !== undefined) {
@@ -1017,6 +1069,8 @@ class Monster {
 
         this.animTimer += dt;
         this.hitFlash = Math.max(0, this.hitFlash - dt);
+        if (this._remasterAura) this._remasterAura.rotation.z += dt * 0.32;
+        if (this._remasterMotes) this._remasterMotes.rotation.y -= dt * 0.48;
 
         // Bounce animation
         const bounce = Math.abs(Math.sin(this.animTimer * 2.5)) * 0.1;

@@ -8710,6 +8710,18 @@ export class GameUI {
     this._renderWikiDetail();
   }
 
+  _wikiMonsterPortrait(monster, large = false) {
+    const hex = `#${Number(monster.color || 0x808080).toString(16).padStart(6, '0')}`;
+    const family = monster.family || (monster.waterOnly ? 'aquatic' : 'unknown');
+    const flags = `${monster.isBoss ? ' boss' : ''}${monster.isElite ? ' elite' : ''}`;
+    return `<span class="wiki-monster-portrait ${large ? 'large' : ''}${flags}" style="--monster-color:${hex}" data-family="${family}"><i class="wiki-monster-horn left"></i><i class="wiki-monster-horn right"></i><i class="wiki-monster-body"><b></b><b></b></i><em>${monster.emoji || '👾'}</em></span>`;
+  }
+
+  _wikiItemPortrait(item, large = false) {
+    const rarity = item.rarity || 'common';
+    return `<span class="wiki-item-portrait ${large ? 'large' : ''} rarity-${rarity}"><em>${item.emoji || '📦'}</em><i></i></span>`;
+  }
+
   // How-to-play guide with the game's real formulas (kept in sync with
   // GameData/CombatSystem/CharacterManager). Static reference content.
   _guideHTML() {
@@ -8809,7 +8821,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
         slot.innerHTML = `
-          <span class="wiki-slot-emoji">${monster.emoji || '👾'}</span>
+          ${this._wikiMonsterPortrait(monster)}
           <span class="wiki-slot-name">${monster.name}</span>
         `;
         slot.title = monster.name;
@@ -8834,7 +8846,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
         slot.innerHTML = `
-          <span class="wiki-slot-emoji">${item.emoji || '🐟'}</span>
+          ${this._wikiItemPortrait(item)}
           <span class="wiki-slot-name">${key}</span>
         `;
         slot.title = key;
@@ -8859,7 +8871,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
         slot.innerHTML = `
-          <span class="wiki-slot-emoji">${item.emoji || '📦'}</span>
+          ${this._wikiItemPortrait(item)}
           <span class="wiki-slot-name">${key}</span>
         `;
         slot.title = key;
@@ -8899,7 +8911,7 @@ export class GameUI {
       if (!monster) return;
 
       // Determine map area
-      let mapArea = 'Prontera Field';
+      let mapArea = monster.environment === 'mountain' ? 'Prontera Mountain Farm ⛰️' : 'Prontera Field';
       if (PAYON_MONSTERS[key]) mapArea = 'Payon Forest 🌲';
       else if (GLAST_MONSTERS[key]) mapArea = 'Glast Heim 🏰';
       else if (MJOLNIR_MONSTERS[key]) mapArea = 'Mjolnir Mountains ⛰️';
@@ -8940,17 +8952,18 @@ export class GameUI {
       const envName = envDict[monster.environment] || monster.environment || 'Unknown';
       content.innerHTML = `
         <div class="detail-row">
-          <span class="detail-icon" style="background:${monster.color}22">${monster.emoji || '👾'}</span>
+          ${this._wikiMonsterPortrait(monster, true)}
           <div class="detail-info-block">
             <div class="wiki-detail-title">${monster.name}</div>
-            <div class="detail-type" style="color:#ff6080">Monster (Lv.${approxLevel})</div>
+            <div class="detail-type" style="color:#ff6080">${monster.isBoss ? 'WORLD BOSS' : monster.isElite ? 'ELITE MONSTER' : 'MONSTER'} • Lv.${approxLevel}</div>
           </div>
         </div>
         <div class="detail-desc" style="margin-top:8px">
           HP: ${monster.hp} | ATK: ${monster.atk} | DEF: ${monster.def}<br />
           EXP Gain: ${monster.exp} | Zeny: ${goldText}<br />
           Area: ${mapArea}<br />
-          Environment: ${envName}
+          Environment: ${envName}<br />
+          Family: ${(monster.family || 'unknown').toUpperCase()} • Visual: Remaster R3
         </div>
         ${dropHtml}
       `;
@@ -8993,7 +9006,7 @@ export class GameUI {
 
       content.innerHTML = `
         <div class="detail-row">
-          <span class="detail-icon">${item.emoji || '📦'}</span>
+          ${this._wikiItemPortrait(item, true)}
           <div class="detail-info-block">
             <div class="wiki-detail-title color-${item.rarity || 'common'}">${key}</div>
             <div class="detail-type color-${item.rarity || 'common'}">${item.type.toUpperCase()} (${item.rarity || 'common'})</div>
@@ -9001,7 +9014,8 @@ export class GameUI {
         </div>
         <div class="detail-desc" style="margin-top:8px">
           ${item.desc}<br />
-          <span style="color:#d0d040">Zeny Price: ${item.price}z</span>
+          <span style="color:#d0d040">Zeny Price: ${item.price ?? 0}z</span><br />
+          <span style="color:#8fcfff">Latest catalog • ${String(item.type || 'item').toUpperCase()} • ${String(item.rarity || 'common').toUpperCase()}</span>
         </div>
         ${statsHtml}
         ${droppedByHtml}

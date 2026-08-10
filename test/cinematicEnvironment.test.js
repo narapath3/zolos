@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const sceneSource = fs.readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+const monsterSource = fs.readFileSync(new URL('../src/engine/MonsterManager.js', import.meta.url), 'utf8');
 
 test('sky dome renders performance-tiered animated procedural clouds', () => {
   assert.match(sceneSource, /const proceduralClouds = .*\? 1 : 0/);
@@ -62,4 +63,11 @@ test('bridge deck stays above water and exposes its walkable surface', () => {
   assert.match(sceneSource, /return 0\.60/);
   assert.match(sceneSource, /group\.position\.set\(x, 0\.25, z\)/);
   assert.doesNotMatch(sceneSource, /group\.position\.set\(x, this\.getTerrainHeight\(x, z\), z\);\s*this\.scene\.add\(group\);\s*this\.envObjects\.push\(group\);\s*}\s*\/\/ ============ Environment/);
+});
+
+test('all monsters receive remastered skin, catchlights and tier effects', () => {
+  assert.match(monsterSource, /getMonsterSkinTexture\(\)/);
+  assert.match(monsterSource, /this\._addRemasterAura\(size, color\)/);
+  assert.match(monsterSource, /Tiny catchlights/);
+  assert.match(monsterSource, /this\.data\.isBoss \? 14 : 8/);
 });
