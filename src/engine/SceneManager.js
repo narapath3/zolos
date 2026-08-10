@@ -2,6 +2,10 @@
 // Upgraded: Lush world with water, varied trees, sky dome, portals, NPC
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ITEMS } from './GameData.js';
 import { MAP_TRACKS } from './MapMusicConfig.js';
 import { youtubeBGM } from './YouTubeBGM.js';
@@ -213,6 +217,11 @@ export class SceneManager {
         this._detailTexture.colorSpace = THREE.SRGBColorSpace;
         this._detailTexture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
 
+        // A restrained cinematic finish for capable machines. Bloom is kept
+        // deliberately subtle: it gives portals, water spray and magic a soft
+        // photographic falloff without washing out the readable RO palette.
+        this._setupPostProcessing();
+
         // Clock
         this.clock = new THREE.Clock();
 
@@ -236,11 +245,11 @@ export class SceneManager {
 
     _setupLights() {
         // Hemisphere light (sky/ground color bleed)
-        this.hemiLight = new THREE.HemisphereLight(0xa9d9ff, 0x355027, 0.82);
+        this.hemiLight = new THREE.HemisphereLight(0xc4e6ff, 0x557044, 1.05);
         this.scene.add(this.hemiLight);
 
         // Ambient
-        this.ambientLight = new THREE.AmbientLight(0x607090, 0.22);
+        this.ambientLight = new THREE.AmbientLight(0x91a5bd, 0.36);
         this.scene.add(this.ambientLight);
 
         // Directional (sun)
@@ -250,17 +259,17 @@ export class SceneManager {
         this.sunLight.castShadow = (savedQuality !== 'ultra-low');
         this.sunLight.shadow.mapSize.set(1024, 1024); // Reduced from 2048 for performance
         this.sunLight.shadow.camera.near = 0.5;
-        this.sunLight.shadow.camera.far = 80;
-        this.sunLight.shadow.camera.left = -25;
-        this.sunLight.shadow.camera.right = 25;
-        this.sunLight.shadow.camera.top = 25;
-        this.sunLight.shadow.camera.bottom = -25;
+        this.sunLight.shadow.camera.far = 180;
+        this.sunLight.shadow.camera.left = -72;
+        this.sunLight.shadow.camera.right = 72;
+        this.sunLight.shadow.camera.top = 72;
+        this.sunLight.shadow.camera.bottom = -72;
         this.sunLight.shadow.bias = -0.001;
         this.sunLight.shadow.normalBias = 0.025;
         this.scene.add(this.sunLight);
 
         // Cool sky fill separates silhouettes without flattening the warm sun.
-        this.skyFillLight = new THREE.DirectionalLight(0x8bc8ff, 0.34);
+        this.skyFillLight = new THREE.DirectionalLight(0xa8d7ff, 0.52);
         this.skyFillLight.position.set(-18, 12, -14);
         this.scene.add(this.skyFillLight);
 
@@ -556,7 +565,7 @@ export class SceneManager {
     _createSkyDome(config) {
         const proceduralClouds = (this.graphicsQuality === 'medium' || this.graphicsQuality === 'high') ? 1 : 0;
         const cloudOctaves = this.graphicsQuality === 'high' ? 3 : 2;
-        const skyGeo = new THREE.SphereGeometry(100, 32, 20);
+        const skyGeo = new THREE.SphereGeometry(180, 40, 24);
         const skyMat = new THREE.ShaderMaterial({
             side: THREE.BackSide,
             uniforms: {
@@ -1204,11 +1213,17 @@ export class SceneManager {
                 const grassColor = baseColor.clone().lerp(altColor, 0.4);
                 color = sandColor.lerp(grassColor, t);
             } else if (x < -6 && z < -6) {
-                // Cave Zone: Dark charcoal gray
-                color = new THREE.Color(0x282828).lerp(new THREE.Color(0x1a1a1a), (Math.sin(x) * Math.cos(z) * 0.5 + 0.5));
+                // Mossy cave highland. Keep it readable in every weather state;
+                // cave props provide the darkness instead of a pitch-black floor.
+                const caveNoise = Math.sin(x * 0.31) * Math.cos(z * 0.27) * 0.5 + 0.5;
+                color = new THREE.Color(0x344634).lerp(new THREE.Color(0x596044), caveNoise);
             } else if (x > 6 && z > 6) {
-                // Mountain Zone: Stony rocky brown-gray
-                color = new THREE.Color(0x6e655b).lerp(new THREE.Color(0x4f4941), (Math.sin(x) * Math.cos(z) * 0.5 + 0.5));
+                // RO-like alpine meadow: grass dominates with warm earth and
+                // occasional stone patches instead of one flat grey quadrant.
+                const meadow = Math.sin(x * 0.22 + 1.1) * Math.cos(z * 0.25 - 0.6) * 0.5 + 0.5;
+                const detail = Math.sin(x * 0.91) * Math.cos(z * 0.77) * 0.5 + 0.5;
+                color = new THREE.Color(0x477e3f).lerp(new THREE.Color(0x79a452), meadow);
+                if (detail > 0.72) color.lerp(new THREE.Color(0x91806a), (detail - 0.72) * 1.8);
             } else {
                 // Standard paths and fields color blending
                 if (Math.abs(x) < 2.0 || Math.abs(z) < 2.0) {
@@ -1227,8 +1242,8 @@ export class SceneManager {
             }
 
             // Vignette shading on outer edges (lighter than before = more vibrant)
-            const edgeFade = Math.max(0, 1 - distFromCenter / (size * 0.4));
-            color.multiplyScalar(0.74 + edgeFade * 0.42);
+            const edgeFade = Math.max(0, 1 - distFromCenter / (size * 0.48));
+            color.multiplyScalar(0.92 + edgeFade * 0.18);
 
             colors.push(color.r, color.g, color.b);
         }
@@ -1243,6 +1258,8 @@ export class SceneManager {
             bumpScale: 0.055,
             roughness: 0.91,
             metalness: 0.0,
+            emissive: 0x10180d,
+            emissiveIntensity: 0.12,
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         this.groundMesh = ground;
@@ -1466,8 +1483,8 @@ export class SceneManager {
             if (Math.abs(z - riverZ) < 8.5) return false;      // river + banks
             if (this.isInArena && this.isInArena(x, z, 1)) return false;
             if (Math.abs(x) < 2.2 || Math.abs(z) < 2.2) return false; // paths
-            if (x > 6 && z > 6) return false;                  // mountain
-            if (x < -6 && z < -6) return false;                // cave
+            // The expanded mountain and cave highlands are walkable meadows;
+            // ground cover keeps them from becoming empty black quadrants.
             return true;
         };
 
@@ -1477,7 +1494,7 @@ export class SceneManager {
         const bladeGeo = new THREE.ConeGeometry(0.04, 0.6, 4);
         bladeGeo.translate(0, 0.3, 0); // base at origin so it grows upward
         const bladeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
-        const qualityGrass = { 'ultra-low': 260, low: 520, medium: 1050, high: 1800 };
+        const qualityGrass = { 'ultra-low': 380, low: 760, medium: 1500, high: 2500 };
         const BLADES = qualityGrass[this.graphicsQuality] || 1050;
         const windUniform = { value: 0 };
         bladeMat.onBeforeCompile = shader => {
@@ -1506,8 +1523,8 @@ export class SceneManager {
         let placed = 0, attempts = 0;
         while (placed < BLADES && attempts < BLADES * 6) {
             attempts++;
-            const x = (Math.random() - 0.5) * 60;
-            const z = (Math.random() - 0.5) * 60;
+            const x = (Math.random() - 0.5) * 102;
+            const z = (Math.random() - 0.5) * 102;
             if (!okSpot(x, z)) continue;
             const s = 0.7 + Math.random() * 0.9;         // height variation
             eul.set((Math.random() - 0.5) * 0.4, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.4);
@@ -1542,8 +1559,8 @@ export class SceneManager {
         placed = 0; attempts = 0;
         while (placed < FLOWERS && attempts < FLOWERS * 8) {
             attempts++;
-            const x = (Math.random() - 0.5) * 58;
-            const z = (Math.random() - 0.5) * 58;
+            const x = (Math.random() - 0.5) * 100;
+            const z = (Math.random() - 0.5) * 100;
             if (!okSpot(x, z)) continue;
             const gy = groundH(x, z);
             m.compose(new THREE.Vector3(x, gy, z), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
@@ -2070,6 +2087,11 @@ export class SceneManager {
             [16, -6], [-17, -4], [6, 16], [-10, -16], [14, 13],
             [-17, 10], [7, -17], [-5, -14], [17, -14], [-14, -12],
             [18, 3], [-6, 18], [4, -19], [-19, -7], [11, 18],
+            // Expanded field groves keep the outer walkable area alive.
+            [-42, -34], [-35, -44], [-24, -42], [-44, -20],
+            [-41, 18], [-34, 35], [-22, 44], [2, 46],
+            [18, -43], [34, -39], [44, -25], [46, -8],
+            [-47, 4], [7, -47], [31, 48], [48, 8],
         ];
 
         treePositions.forEach(([x, z], idx) => {
@@ -2162,16 +2184,27 @@ export class SceneManager {
     // than under the player, preserving the game's flat locomotion model.
     _createExplorableMountainBiome(config) {
         const group = new THREE.Group();
-        const rockMat = new THREE.MeshStandardMaterial({ color: 0x665f58, roughness: 0.92 });
-        const rockLightMat = new THREE.MeshStandardMaterial({ color: 0x8d8174, roughness: 0.88 });
-        const mossMat = new THREE.MeshLambertMaterial({ color: 0x477d46 });
-        const trailMat = new THREE.MeshStandardMaterial({ color: 0xa98b63, roughness: 0.94 });
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x796957, roughness: 0.94, flatShading: true });
+        const rockLightMat = new THREE.MeshStandardMaterial({ color: 0xa48d70, roughness: 0.9, flatShading: true });
+        const mossMat = new THREE.MeshLambertMaterial({ color: 0x68a653 });
+        const trailMat = new THREE.MeshStandardMaterial({ color: 0xb69a6c, roughness: 0.94 });
 
         // Curved stepping trail from the old field into the highland clearing.
         const trail = [
             [11, 12], [15, 16], [19, 20], [23, 24], [27, 29],
             [31, 34], [35, 38], [39, 41], [43, 43],
         ];
+        for (let i = 0; i < trail.length - 1; i++) {
+            const [ax, az] = trail[i];
+            const [bx, bz] = trail[i + 1];
+            const dx = bx - ax, dz = bz - az;
+            const length = Math.hypot(dx, dz) + 1.3;
+            const segment = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.09, length), trailMat);
+            segment.position.set((ax + bx) * 0.5, 0.035, (az + bz) * 0.5);
+            segment.rotation.y = Math.atan2(dx, dz);
+            segment.receiveShadow = true;
+            group.add(segment);
+        }
         trail.forEach(([x, z], i) => {
             const slab = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.45, 0.16, 9), trailMat);
             slab.position.set(x, 0.05 + Math.sin(i * 0.8) * 0.03, z);
@@ -2185,22 +2218,51 @@ export class SceneManager {
         const ridge = [
             [17, 49, 4.8, 8], [24, 52, 5.6, 10], [33, 53, 6.4, 12],
             [43, 52, 5.7, 10], [51, 47, 5.2, 9], [53, 37, 5.8, 11],
-            [52, 27, 4.8, 8], [48, 19, 4.1, 7], [19, 35, 3.6, 6],
+            [52, 27, 4.8, 8], [48, 19, 4.1, 7], [17, 44, 3.6, 6],
         ];
         ridge.forEach(([x, z, r, h], i) => {
-            const peak = new THREE.Mesh(
-                new THREE.ConeGeometry(r, h, 7), i % 2 ? rockMat : rockLightMat
-            );
-            peak.position.set(x, h / 2 - 0.15, z);
-            peak.rotation.y = i * 0.83;
-            peak.scale.z = 0.72 + (i % 3) * 0.12;
-            peak.castShadow = true;
-            peak.receiveShadow = true;
-            group.add(peak);
+            const ridgeRotation = i * 0.83;
+            const ridgeDepth = 0.72 + (i % 3) * 0.12;
 
-            const moss = new THREE.Mesh(new THREE.ConeGeometry(r * 0.72, h * 0.24, 7), mossMat);
-            moss.position.set(x, h * 0.86, z);
-            moss.rotation.y = peak.rotation.y;
+            // Interlocking fractured boulders produce ledges, shoulders and
+            // crevices instead of a primitive cone silhouette.
+            for (let piece = 0; piece < 4; piece++) {
+                const side = piece === 0 ? 0 : (piece - 2) * r * 0.36;
+                const pieceHeight = h * (piece === 0 ? 0.58 : 0.33 + (piece % 2) * 0.11);
+                const crag = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(1, 1),
+                    (i + piece) % 2 ? rockMat : rockLightMat
+                );
+                crag.scale.set(
+                    r * (piece === 0 ? 0.5 : 0.3),
+                    pieceHeight,
+                    r * (piece === 0 ? 0.4 : 0.25) * ridgeDepth
+                );
+                crag.position.set(
+                    x + Math.cos(ridgeRotation) * side,
+                    pieceHeight * 0.72 - 0.3,
+                    z + Math.sin(ridgeRotation) * side
+                );
+                crag.rotation.set(0.04 * (piece - 1), ridgeRotation + piece * 0.37, 0.06 * (piece - 2));
+                crag.castShadow = true;
+                crag.receiveShadow = true;
+                group.add(crag);
+            }
+
+            // Broad grassy foot blends each formation into the meadow instead
+            // of leaving a harsh rock volume planted on flat ground.
+            const apron = new THREE.Mesh(
+                new THREE.CylinderGeometry(r * 1.08, r * 1.28, 0.5, 9), mossMat
+            );
+            apron.position.set(x, 0.18, z);
+            apron.scale.z = ridgeDepth;
+            apron.rotation.y = ridgeRotation;
+            group.add(apron);
+
+            const moss = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), mossMat);
+            moss.scale.set(r * 0.42, h * 0.09, r * 0.31 * ridgeDepth);
+            moss.position.set(x - r * 0.08, h * 0.74, z + r * 0.05);
+            moss.rotation.y = ridgeRotation;
             group.add(moss);
         });
 
@@ -2265,6 +2327,27 @@ export class SceneManager {
         this.envObjects.push(group);
     }
 
+    _setupPostProcessing() {
+        this.composer = null;
+        if (this.graphicsQuality !== 'high') return;
+
+        const container = this.canvas.parentElement;
+        const width = container?.clientWidth || window.innerWidth;
+        const height = container?.clientHeight || window.innerHeight;
+        this.composer = new EffectComposer(this.renderer);
+        this.composer.setSize(width, height);
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+        this.bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(width, height),
+            0.18,
+            0.32,
+            0.88
+        );
+        this.composer.addPass(this.bloomPass);
+        this.composer.addPass(new OutputPass());
+    }
+
     // ============ Distant Fantasy Mountains ============
     // A ring of layered peaks encircling the field just inside the sky dome.
     // Aerial perspective is faked by tinting far peaks toward the sky horizon
@@ -2274,38 +2357,40 @@ export class SceneManager {
         const skyHi = config.skyTop.clone();
         const skyLo = config.skyHorizon.clone();
 
-        // Build one jagged peak from a stack of low-poly cones.
+        // Build one weathered massif from overlapping irregular rock volumes.
+        // Breaking the silhouette into shoulders and crags avoids the old
+        // single-cone look, while shared materials keep batching inexpensive.
         const makePeak = (radius, height, tint, snow) => {
             const peak = new THREE.Group();
             const rockCol = skyLo.clone().lerp(new THREE.Color(0x2c3550), tint);
-            const bodyGeo = new THREE.ConeGeometry(radius, height, 6, 1);
-            // Rough the silhouette so peaks don't read as perfect cones.
-            const pos = bodyGeo.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-                const y = pos.getY(i);
-                if (y < height * 0.45) {
-                    const j = 0.12 + Math.random() * 0.22;
-                    pos.setX(i, pos.getX(i) * (1 + j));
-                    pos.setZ(i, pos.getZ(i) * (1 + j));
-                }
+            const rockMat = new THREE.MeshStandardMaterial({
+                color: rockCol, roughness: 0.94, metalness: 0, fog: true,
+            });
+            const cragCount = 5;
+            for (let i = 0; i < cragCount; i++) {
+                const central = i === 0;
+                const crag = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), rockMat);
+                const lateral = central ? 0 : (i - 2.5) * radius * 0.31;
+                const cragHeight = height * (central ? 0.62 : 0.34 + Math.random() * 0.22);
+                crag.scale.set(
+                    radius * (central ? 0.54 : 0.3 + Math.random() * 0.18),
+                    cragHeight,
+                    radius * (central ? 0.42 : 0.24 + Math.random() * 0.15)
+                );
+                crag.position.set(lateral, cragHeight * 0.72 - 1, (Math.random() - 0.5) * radius * 0.3);
+                crag.rotation.set((Math.random() - 0.5) * 0.12, Math.random() * Math.PI, (Math.random() - 0.5) * 0.16);
+                peak.add(crag);
             }
-            bodyGeo.computeVertexNormals();
-            const body = new THREE.Mesh(
-                bodyGeo,
-                new THREE.MeshLambertMaterial({ color: rockCol, fog: true })
-            );
-            body.position.y = height / 2;
-            peak.add(body);
 
             // Snow / glacier cap catching sky light.
             if (snow) {
-                const capGeo = new THREE.ConeGeometry(radius * 0.44, height * 0.32, 6, 1);
                 const capCol = skyHi.clone().lerp(new THREE.Color(0xffffff), 0.55);
-                const cap = new THREE.Mesh(
-                    capGeo,
-                    new THREE.MeshLambertMaterial({ color: capCol, fog: true })
-                );
-                cap.position.y = height * 0.86;
+                const cap = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), new THREE.MeshStandardMaterial({
+                    color: capCol, roughness: 0.82, metalness: 0, fog: true,
+                }));
+                cap.scale.set(radius * 0.3, height * 0.12, radius * 0.25);
+                cap.position.y = height * 0.93;
+                cap.rotation.z = -0.08;
                 peak.add(cap);
             }
             return peak;
@@ -2313,8 +2398,8 @@ export class SceneManager {
 
         // Two rings: a taller, hazier back layer and a nearer front layer.
         const rings = [
-            { count: 10, radius: 88, minH: 30, maxH: 52, size: 14, tint: 0.85, jitter: 10 },
-            { count: 14, radius: 70, minH: 18, maxH: 34, size: 11, tint: 0.55, jitter: 8 },
+            { count: 12, radius: 148, minH: 38, maxH: 64, size: 18, tint: 0.78, jitter: 12 },
+            { count: 16, radius: 122, minH: 24, maxH: 43, size: 14, tint: 0.45, jitter: 10 },
         ];
         rings.forEach((ring, layer) => {
             for (let i = 0; i < ring.count; i++) {
@@ -4769,6 +4854,7 @@ export class SceneManager {
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(w, h);
+        if (this.composer) this.composer.setSize(w, h);
         
         // Ensure the canvas style also matches to prevent any scaling issues
         this.canvas.style.width = w + 'px';
@@ -4780,7 +4866,8 @@ export class SceneManager {
     }
 
     render() {
-        this.renderer.render(this.scene, this.camera);
+        if (this.composer) this.composer.render();
+        else this.renderer.render(this.scene, this.camera);
     }
 
     // Follow a target position (camera follows player)
