@@ -290,6 +290,8 @@ export class SceneManager {
         this.floatingIslands = [];
         this.auroraMat = null;
         this.fantasyMoon = null;
+        this.celestialMotes = null;
+        this.waterfallButterflies = [];
         this.npcMesh = null;
         this.npcSellMesh = null;
         this.npcWeaponMesh = null;
@@ -410,6 +412,7 @@ export class SceneManager {
             (this.birds || []).forEach(addTree);           // circling birds
             addTree(this.birdFlock && this.birdFlock.group); // passing flock
             addTree(this.waterMesh);                       // water texture scrolls
+            (this.waterfallButterflies || []).forEach(addTree); // butterflies orbit waterfall
             addTree(this._arenaGroup);                     // arena has flames/banners
             if (this.arenaBoard) addTree(this.arenaBoard.group);
             addTree(this.npcMesh);
@@ -2218,6 +2221,52 @@ export class SceneManager {
         this.envObjects.push(group);
     }
 
+    _createWaterfallButterflies(baseX, baseZ) {
+        // --- Jewel butterflies orbit the flowers and spray. They are separate
+        // scene roots so the static geometry batcher can leave them animated. ---
+        const wingGeo = new THREE.PlaneGeometry(0.34, 0.22);
+        const butterflyColors = [0x6fe8ff, 0xff8bd8, 0xffdd67, 0xa98cff, 0x7dffae];
+        const butterflyCount = this.graphicsQuality === 'ultra-low' ? 3 : 7;
+        for (let i = 0; i < butterflyCount; i++) {
+            const butterfly = new THREE.Group();
+            const body = new THREE.Mesh(
+                new THREE.CapsuleGeometry(0.035, 0.16, 3, 5),
+                new THREE.MeshBasicMaterial({ color: 0x30243b })
+            );
+            body.rotation.x = Math.PI / 2;
+            butterfly.add(body);
+
+            const wingMat = new THREE.MeshBasicMaterial({
+                color: butterflyColors[i % butterflyColors.length],
+                transparent: true, opacity: 0.88, side: THREE.DoubleSide,
+                depthWrite: false, blending: THREE.AdditiveBlending,
+            });
+            const leftPivot = new THREE.Group();
+            const rightPivot = new THREE.Group();
+            const leftWing = new THREE.Mesh(wingGeo, wingMat);
+            const rightWing = new THREE.Mesh(wingGeo, wingMat);
+            leftWing.position.x = -0.18;
+            rightWing.position.x = 0.18;
+            rightWing.scale.x = -1;
+            leftPivot.add(leftWing);
+            rightPivot.add(rightWing);
+            butterfly.add(leftPivot, rightPivot);
+
+            butterfly.userData = {
+                centerX: baseX + (i % 2 ? 2.7 : -2.7),
+                centerZ: baseZ + 0.8 + (i % 3) * 0.7,
+                baseY: 1.2 + (i % 4) * 0.7,
+                radius: 0.8 + (i % 3) * 0.45,
+                speed: 0.55 + i * 0.07,
+                phase: i * 0.91,
+                leftPivot, rightPivot,
+            };
+            this.scene.add(butterfly);
+            this.envObjects.push(butterfly);
+            this.waterfallButterflies.push(butterfly);
+        }
+    }
+
     // ============ Waterfall ============
     // A cliff at the west end of the river with a cascading sheet of water,
     // a glowing plunge pool, rising mist and floating light motes.
@@ -2252,6 +2301,62 @@ export class SceneManager {
             group.add(wall);
         });
 
+        // --- Lush summit forest: silhouettes make the waterfall feel like it
+        // belongs to a living mountain instead of an isolated rock wall. ---
+        const trunkMat = new THREE.MeshLambertMaterial({ color: 0x4a321d });
+        const pineMats = [0x174f35, 0x236b42, 0x31834d].map(color =>
+            new THREE.MeshLambertMaterial({ color })
+        );
+        const summitTrees = [
+            [-3.5, 12.2, -2.1, 1.15], [-1.9, 14.0, -2.6, 0.9],
+            [2.0, 13.8, -2.5, 1.0], [3.7, 11.8, -2.0, 1.25],
+            [-5.0, 9.4, -2.8, 0.82], [5.1, 9.0, -2.6, 0.86],
+        ];
+        summitTrees.forEach(([x, y, z, s], i) => {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 1.5, 6), trunkMat);
+            trunk.position.y = 0.75;
+            tree.add(trunk);
+            for (let tier = 0; tier < 3; tier++) {
+                const crown = new THREE.Mesh(
+                    new THREE.ConeGeometry((0.95 - tier * 0.16) * s, 1.65 * s, 7),
+                    pineMats[(i + tier) % pineMats.length]
+                );
+                crown.position.y = 1.45 + tier * 0.62 * s;
+                tree.add(crown);
+            }
+            tree.position.set(x, y, z);
+            tree.scale.setScalar(s);
+            tree.rotation.y = i * 1.37;
+            group.add(tree);
+        });
+
+        // Flowering ledges and hanging vines soften the cliff face. Petals are
+        // intentionally oversized enough to remain readable from the field.
+        const vineMat = new THREE.MeshLambertMaterial({ color: 0x277044 });
+        const flowerCols = [0xff79b8, 0xffd45e, 0xb994ff, 0xffffff, 0x67d9ff];
+        const ledges = [
+            [-3.0, 9.2, -0.45], [3.1, 8.3, -0.35], [-2.7, 5.8, -0.3],
+            [2.8, 4.8, -0.25], [-2.2, 2.6, -0.1], [2.35, 2.1, 0.0],
+        ];
+        ledges.forEach(([x, y, z], i) => {
+            const vine = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.055, 1.4 + (i % 3) * 0.45, 5),
+                vineMat
+            );
+            vine.position.set(x, y - 0.65, z);
+            vine.rotation.z = (i % 2 ? 1 : -1) * 0.12;
+            group.add(vine);
+            for (let p = 0; p < 4; p++) {
+                const bloom = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.16 + (p % 2) * 0.04, 7, 5),
+                    new THREE.MeshLambertMaterial({ color: flowerCols[(i + p) % flowerCols.length] })
+                );
+                bloom.position.set(x + (p - 1.5) * 0.28, y + Math.sin(p * 2.1) * 0.16, z + 0.18);
+                group.add(bloom);
+            }
+        });
+
         // --- Falling water sheet (scrolling texture, scrolls downward) ---
         const fallTex = this._createWaterTexture();
         fallTex.repeat.set(1.5, 4);
@@ -2276,6 +2381,21 @@ export class SceneManager {
         sheet2.position.z = -0.85;
         group.add(sheet2);
         this.waterfalls.push({ tex: fallTex, tex2: sheet2.material.map });
+
+        // Two narrow side cascades break up the single flat water curtain.
+        [-1, 1].forEach((side, i) => {
+            const ribbon = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.72, cliffH * 0.72),
+                new THREE.MeshBasicMaterial({
+                    map: fallTex, color: i ? 0xb8ebff : 0xe4f7ff,
+                    transparent: true, opacity: 0.48, side: THREE.DoubleSide,
+                    depthWrite: false, fog: true,
+                })
+            );
+            ribbon.position.set(side * 2.65, cliffH * 0.42, -0.15);
+            ribbon.rotation.z = side * 0.045;
+            group.add(ribbon);
+        });
 
         // --- Foam crest at the lip ---
         const crest = new THREE.Mesh(
@@ -2305,6 +2425,22 @@ export class SceneManager {
         poolLight.position.set(0, 1.2, 0.2);
         group.add(poolLight);
 
+        // A subtle prismatic arc in the spray. TorusGeometry provides a clean
+        // fantasy-game rainbow without relying on an external texture.
+        const rainbowColors = [0xff5b68, 0xffa34d, 0xffe36a, 0x66dc8a, 0x63b8ff, 0x9b78ff];
+        const rainbow = new THREE.Group();
+        rainbowColors.forEach((color, i) => {
+            const arc = new THREE.Mesh(
+                new THREE.TorusGeometry(3.9 - i * 0.16, 0.075, 6, 36, Math.PI),
+                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.42, depthWrite: false, fog: true })
+            );
+            arc.rotation.z = Math.PI;
+            rainbow.add(arc);
+        });
+        rainbow.position.set(0, 1.0, 1.15);
+        rainbow.rotation.x = -0.12;
+        group.add(rainbow);
+
         // --- Rising mist (points that float up and reset) ---
         const mistN = this.graphicsQuality === 'low' ? 40 : 90;
         const mPos = new Float32Array(mistN * 3);
@@ -2327,6 +2463,7 @@ export class SceneManager {
 
         this.scene.add(group);
         this.envObjects.push(group);
+        this._createWaterfallButterflies(baseX, baseZ);
     }
 
     // ============ Fantasy Sky: floating islands, moon, aurora ============
@@ -2352,6 +2489,36 @@ export class SceneManager {
         this.scene.add(moonGroup);
         this.envObjects.push(moonGroup);
         this.fantasyMoon = moonGroup;
+
+        // --- Celestial pollen / tiny stars: fills otherwise empty sky space
+        // with depth while remaining translucent enough for daytime weather. ---
+        const moteCount = hq ? 150 : 70;
+        const motePos = new Float32Array(moteCount * 3);
+        const moteCols = new Float32Array(moteCount * 3);
+        const gold = new THREE.Color(0xffe6a3);
+        const blue = new THREE.Color(0xa9dcff);
+        for (let i = 0; i < moteCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 34 + Math.random() * 52;
+            motePos[i * 3] = Math.cos(angle) * radius;
+            motePos[i * 3 + 1] = 14 + Math.random() * 48;
+            motePos[i * 3 + 2] = Math.sin(angle) * radius;
+            const c = gold.clone().lerp(blue, Math.random());
+            moteCols.set([c.r, c.g, c.b], i * 3);
+        }
+        const moteGeo = new THREE.BufferGeometry();
+        moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+        moteGeo.setAttribute('color', new THREE.BufferAttribute(moteCols, 3));
+        const moteMat = new THREE.PointsMaterial({
+            size: hq ? 0.32 : 0.4, vertexColors: true, transparent: true,
+            opacity: 0.58, depthWrite: false, blending: THREE.AdditiveBlending,
+            fog: false, sizeAttenuation: true,
+        });
+        const motes = new THREE.Points(moteGeo, moteMat);
+        motes.frustumCulled = false;
+        this.scene.add(motes);
+        this.envObjects.push(motes);
+        this.celestialMotes = motes;
 
         // --- Aurora ribbons: additive band high on the sky dome ---
         if (hq) {
@@ -4980,6 +5147,28 @@ export class SceneManager {
 
         // Aurora ribbons drift
         if (this.auroraMat) this.auroraMat.uniforms.auroraTime.value = this.time;
+
+        // Slow parallax and a soft twinkle keep the sky feeling alive.
+        if (this.celestialMotes) {
+            this.celestialMotes.rotation.y = this.time * 0.012;
+            this.celestialMotes.material.opacity = 0.44 + Math.sin(this.time * 0.7) * 0.14;
+        }
+
+        // Butterflies weave through the flower ledges with independent wingbeats.
+        for (const butterfly of this.waterfallButterflies || []) {
+            const u = butterfly.userData;
+            const a = this.time * u.speed + u.phase;
+            butterfly.position.set(
+                u.centerX + Math.cos(a) * u.radius,
+                u.baseY + Math.sin(a * 1.7) * 0.48 + Math.sin(a * 3.1) * 0.12,
+                u.centerZ + Math.sin(a) * u.radius * 0.65
+            );
+            butterfly.rotation.y = -a + Math.PI * 0.5;
+            butterfly.rotation.z = Math.sin(a * 1.7) * 0.12;
+            const flap = 0.3 + Math.sin(this.time * 14 + u.phase) * 0.95;
+            u.leftPivot.rotation.y = flap;
+            u.rightPivot.rotation.y = -flap;
+        }
 
         // Moon faces the camera (billboard the halo group softly)
         if (this.fantasyMoon && this.camera) {
