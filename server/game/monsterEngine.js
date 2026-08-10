@@ -303,7 +303,7 @@ async function killMonster(world, m, mapId) {
         try {
             const { rows } = await query(
                 `UPDATE public.characters
-                 SET gold = gold + $2,
+                 SET gold = LEAST(COALESCE(gold, 0) + $2, 500000000),
                      total_kills = COALESCE(total_kills, 0) + 1
                  WHERE id = $1
                  RETURNING gold, total_kills`,
@@ -317,6 +317,7 @@ async function killMonster(world, m, mapId) {
                     name: def.name,
                     exp: def.exp || 0,
                     gold,
+                    gold_total: Number(committed.gold) || 0,
                     total_kills: Number(committed.total_kills) || 0,
                 });
             }

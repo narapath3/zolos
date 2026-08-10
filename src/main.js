@@ -605,7 +605,12 @@ async function initGame(charData) {
         if (payload.exp) combatSystem.onEvent({ type: 'expGain', amount: payload.exp, targetPos: pos });
         if (leveled) combatSystem.onEvent({ type: 'levelUp', level: character.stats.level });
         if (payload.gold) {
-            character.stats.gold += payload.gold;
+            // The database caps Gold at 500M. Adopt its committed balance so a
+            // capped account cannot drift above the constraint and poison later
+            // reward/save transactions.
+            character.stats.gold = Number.isFinite(Number(payload.gold_total))
+                ? Number(payload.gold_total)
+                : character.stats.gold + payload.gold;
             combatSystem.onEvent({ type: 'goldGain', amount: payload.gold, targetPos: pos });
         }
         if (character.equippedPet && character.addPetXp) {
