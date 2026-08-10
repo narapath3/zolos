@@ -624,6 +624,15 @@ export class SceneManager {
         return height;
     }
 
+    getWalkableHeight(x, z) {
+        // The bridge is an elevated walkable surface; do not reuse the carved
+        // riverbed height or characters will visually sink through its deck.
+        if (this.currentMap === 'prontera' && Math.abs(x) < 1.8 && z >= -10 && z <= 6) {
+            return 0.60;
+        }
+        return this.getTerrainHeight(x, z);
+    }
+
     // ============ Sky Dome ============
     _createSkyDome(config) {
         const proceduralClouds = (this.graphicsQuality === 'medium' || this.graphicsQuality === 'high') ? 1 : 0;
@@ -1784,7 +1793,9 @@ export class SceneManager {
             });
         });
 
-        group.position.set(x, this.getTerrainHeight(x, z), z);
+        // Riverbed is -1.3 at the centre, but the bridge must align with both
+        // grassy banks. Deck top = group 0.25 + plank centre 0.28 + half 0.07.
+        group.position.set(x, 0.25, z);
         this.scene.add(group);
         this.envObjects.push(group);
     }

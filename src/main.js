@@ -2753,7 +2753,7 @@ function stepWorld(dt) {
     } else {
         // Follow the playable hill surface; CharacterManager smooths the mesh
         // toward baseY, producing a natural walk up/down the slope.
-        character.baseY = 1.2 + sceneManager.getTerrainHeight(
+        character.baseY = 1.2 + sceneManager.getWalkableHeight(
             character.mesh.position.x,
             character.mesh.position.z
         );

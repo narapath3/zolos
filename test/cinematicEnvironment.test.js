@@ -56,3 +56,10 @@ test('mountain biome is a physically climbable farming plateau', () => {
   assert.match(sceneSource, /eased \* 6\.2/);
   assert.match(sceneSource, /child\.position\.y \+= this\.getTerrainHeight/);
 });
+
+test('bridge deck stays above water and exposes its walkable surface', () => {
+  assert.match(sceneSource, /getWalkableHeight\(x, z\)/);
+  assert.match(sceneSource, /return 0\.60/);
+  assert.match(sceneSource, /group\.position\.set\(x, 0\.25, z\)/);
+  assert.doesNotMatch(sceneSource, /group\.position\.set\(x, this\.getTerrainHeight\(x, z\), z\);\s*this\.scene\.add\(group\);\s*this\.envObjects\.push\(group\);\s*}\s*\/\/ ============ Environment/);
+});
