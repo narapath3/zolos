@@ -110,6 +110,10 @@ function sanitizeProgressionValue(key, value, previous, elapsedMs) {
 
     const prior = boundedInteger(previous?.[key], rule.min, rule.max);
     if (prior === null) return next;
+    // Kill totals are now incremented by the authoritative monster engine. A
+    // periodic client snapshot captured just before a kill must never be able to
+    // overwrite the newer database value with its stale lower counter.
+    if (key === 'total_kills' && next < prior) return null;
     if (next <= prior) return next;
 
     const elapsedMinutes = Math.max(1, Math.min(60, Number(elapsedMs) / 60_000 || 1));

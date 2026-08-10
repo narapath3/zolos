@@ -593,6 +593,14 @@ async function initGame(charData) {
     window.onMonReward = (payload) => {
         if (!character || !combatSystem || !payload) return;
         const pos = character.getPosition();
+        // Server owns the counter. Assign its committed total instead of doing
+        // ++ locally, which also makes duplicate/out-of-order packets harmless.
+        if (Number.isFinite(Number(payload.total_kills))) {
+            character.stats.total_kills = Math.max(
+                Number(character.stats.total_kills) || 0,
+                Number(payload.total_kills),
+            );
+        }
         const leveled = character.addExp(payload.exp || 0);
         if (payload.exp) combatSystem.onEvent({ type: 'expGain', amount: payload.exp, targetPos: pos });
         if (leveled) combatSystem.onEvent({ type: 'levelUp', level: character.stats.level });

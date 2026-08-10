@@ -297,10 +297,35 @@ async function killMonster(world, m, mapId) {
     for (const [cid] of contributors) {
         const gold = (def.gold_min || 0) + Math.floor(Math.random() * ((def.gold_max || 0) - (def.gold_min || 0) + 1));
         const sock = socketForChar(cid);
-        if (sock) sock.emit('mon_reward', { id: m.id, type: m.type, name: def.name, exp: def.exp || 0, gold });
-        // Persist gold/exp authoritatively so it survives even if the client
-        // never sends its next save (best-effort; ignore failures).
-        query('UPDATE public.characters SET gold = gold + $2 WHERE id = $1', [cid, gold]).catch(() => {});
+        // A contributor receives exactly one kill for this monster life. Commit
+        // it before notifying the client and return the authoritative total so
+        // delayed/replayed socket packets can never double-count on the HUD.
+        try {
+            const { rows } = await query(
+                `UPDATE public.characters
+                 SET gold = gold + $2,
+                     total_kills = COALESCE(total_kills, 0) + 1
+                 WHERE id = $1
+                 RETURNING gold, total_kills`,
+                [cid, gold],
+            );
+            const committed = rows[0];
+            if (sock && committed) {
+                sock.emit('mon_reward', {
+                    id: m.id,
+                    type: m.type,
+                    name: def.name,
+                    exp: def.exp || 0,
+                    gold,
+                    total_kills: Number(committed.total_kills) || 0,
+                });
+            }
+        } catch (error) {
+            // Do not emit a reward receipt whose kill was not committed. The
+            // monster itself still dies and respawns, while the DB error remains
+            // visible for operators instead of silently losing progression.
+            console.error(`[MonEngine] reward persistence failed for ${cid}:`, error.message);
+        }
     }
 
     // Item drops → top-damage contributor.
