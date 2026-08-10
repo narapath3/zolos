@@ -17,4 +17,6 @@ test('players see latest deploy time in Thai time and update notices', () => {
   assert.match(main, /timeZone: 'Asia\/Bangkok'/);
   assert.match(updater, /zolos-build-time/);
   assert.match(updater, /showUpdateBanner\(latest\.buildTime\)/);
+  assert.match(main, /classList\.add\('is-hiding'\)/);
+  assert.match(main, /stamp\.remove\(\)/);
 });

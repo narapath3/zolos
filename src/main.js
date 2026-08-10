@@ -31,6 +31,8 @@ function mountBuildTimestamp() {
     stamp.textContent = `อัปเดตล่าสุด ${window.ZOLOS_BUILD_LABEL}`;
     stamp.title = `Production build: ${BUILD_VERSION}`;
     document.body.appendChild(stamp);
+    setTimeout(() => stamp.classList.add('is-hiding'), 6500);
+    setTimeout(() => stamp.remove(), 7600);
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBuildTimestamp);
 else mountBuildTimestamp();
