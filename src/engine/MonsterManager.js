@@ -1,6 +1,7 @@
 // Monster Manager — Monster spawning, AI, and management
 import * as THREE from 'three';
 import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster, getWaterSpawnTable } from './GameData.js';
+import { upgradeMonsterAnatomy, animateMonsterRig, addSpeciesArtDetails } from './MonsterAnatomy.js';
 
 // Reference level used for the SHARED world spawn tables. Fixed (not the local
 // player's level) so every player — whatever their level — builds the exact
@@ -63,7 +64,7 @@ function getDailySeed() {
     return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
 }
 
-class Monster {
+export class Monster {
     constructor(scene, type, position) {
         this.scene = scene;
         this.type = type;
@@ -802,6 +803,28 @@ class Monster {
             glowEyes(0xff2060, 0.6, 0.09, 0.19, 0.045);
         }
 
+        this._professionalRig = upgradeMonsterAnatomy({
+            THREE,
+            type: this.type,
+            family: this.data.family,
+            size,
+            bodyMesh: this.bodyMesh,
+            bodyMat,
+            createMat,
+            put,
+            hideBody,
+        });
+
+        this._speciesArt = addSpeciesArtDetails({
+            THREE,
+            type: this.type,
+            size,
+            bodyMesh: this.bodyMesh,
+            bodyMat,
+            createMat,
+            put,
+        });
+
         // Eyes (attached to main bodyMesh so they squish/bounce with slimes)
         if (!ownEyes) {
             const eyeGeo = new THREE.SphereGeometry(0.05 * size, 8, 8);
@@ -1021,6 +1044,7 @@ class Monster {
         this.bodyMesh.scale.y = 1 + bounce * 0.5;
         this.bodyMesh.scale.x = 1 - bounce * 0.15;
         this.bodyMesh.scale.z = 1 - bounce * 0.15;
+        animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this.hitFlash > 0);
 
         this._applyHitFlash();
 
@@ -1247,6 +1271,8 @@ class Monster {
         } else if (!aggroActive) {
             this.isMoving = false;
         }
+
+        animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this.hitFlash > 0);
 
         // Billboard HP bar to camera (throttled: update every 3rd frame)
         if (camera) {
