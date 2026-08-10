@@ -19,6 +19,7 @@ import { getCardOverrides } from '../api/cardEconomy.js';
 
 const TICK_MS = 100;               // 10 Hz simulation + broadcast
 const SPAWN_RANGE = 12;            // matches client MonsterManager
+const PRONTERA_SPAWN_RANGE = 50;   // expanded field + explorable mountain
 const RESPAWN_MS = 4000;
 const AGGRO_MS = 8000;             // how long a hit keeps a monster hunting
 const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
@@ -45,11 +46,24 @@ const inArena = (mapId, x, z) => {
     const dx = x - (-14), dz = z - 14;
     return dx * dx + dz * dz < 7.5 * 7.5;
 };
-function pickLandPos(mapId) {
+function pickLandPos(mapId, environment = 'ground') {
     for (let i = 0; i < 60; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const d = 4 + Math.random() * (SPAWN_RANGE - 4);
-        const x = Math.cos(a) * d, z = Math.sin(a) * d;
+        let x, z;
+        if (mapId === 'prontera' && environment === 'mountain') {
+            x = 17 + Math.random() * 31;
+            z = 17 + Math.random() * 31;
+        } else if (mapId === 'prontera' && environment === 'cave') {
+            x = -17 - Math.random() * 31;
+            z = -17 - Math.random() * 31;
+        } else {
+            const range = mapId === 'prontera' ? PRONTERA_SPAWN_RANGE : SPAWN_RANGE;
+            const a = Math.random() * Math.PI * 2;
+            const d = 4 + Math.random() * (range - 4);
+            x = Math.cos(a) * d;
+            z = Math.sin(a) * d;
+            if (mapId === 'prontera' && environment === 'ground'
+                && ((x > 6 && z > 6) || (x < -6 && z < -6))) continue;
+        }
         if (!isWaterAt(x, z) && !inArena(mapId, x, z)) return { x, z };
     }
     return { x: (Math.random() - 0.5) * 16, z: -8 - Math.random() * 6 };
@@ -92,7 +106,7 @@ function weightedPick(entries) {
 function makeMonster(id, type, isWater) {
     const def = cfg.defs.get(type);
     const hp = def ? def.hp : 100;
-    const pos = isWater ? pickWaterPos() : pickLandPos(id.mapId);
+    const pos = isWater ? pickWaterPos() : pickLandPos(id.mapId, def?.environment || 'ground');
     return {
         id: id.str, type, isWater,
         x: pos.x, z: pos.z, rot: Math.random() * Math.PI * 2,
@@ -186,8 +200,9 @@ function stepMonster(m, mapId, now, dtSec) {
         let tx = m.spawnX + Math.cos(a) * d;
         let tz = m.spawnZ + Math.sin(a) * d;
         if (!m.isWater && inArena(mapId, tx, tz)) { tx = m.spawnX; tz = m.spawnZ; }
-        m.targetX = Math.max(-SPAWN_RANGE, Math.min(SPAWN_RANGE, tx));
-        m.targetZ = Math.max(-SPAWN_RANGE, Math.min(SPAWN_RANGE, tz));
+        const roamRange = mapId === 'prontera' ? PRONTERA_SPAWN_RANGE : SPAWN_RANGE;
+        m.targetX = Math.max(-roamRange, Math.min(roamRange, tx));
+        m.targetZ = Math.max(-roamRange, Math.min(roamRange, tz));
     }
     const dx = m.targetX - m.x, dz = m.targetZ - m.z;
     const dist = Math.hypot(dx, dz);
@@ -233,7 +248,7 @@ function respawnMonster(m, mapId) {
     const spawns = (cfg.spawnsByMap.get(mapId) || []).filter(s => !!s.is_water === m.isWater);
     if (spawns.length) m.type = weightedPick(spawns).monster_type;
     const def = cfg.defs.get(m.type);
-    const pos = m.isWater ? pickWaterPos() : pickLandPos(mapId);
+    const pos = m.isWater ? pickWaterPos() : pickLandPos(mapId, def?.environment || 'ground');
     m.x = pos.x; m.z = pos.z; m.spawnX = pos.x; m.spawnZ = pos.z;
     m.hp = m.maxHp = def ? def.hp : 100;
     m.alive = true; m.respawnAt = 0;

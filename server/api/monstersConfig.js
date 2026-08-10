@@ -140,6 +140,31 @@ export async function seedMonstersIfEmpty() {
     return true;
 }
 
+// Idempotent live-world upgrade for the expanded Prontera mountain. Existing
+// admin-tuned rows are preserved; only missing spawn entries are added.
+export async function ensurePronteraMountainExpansion() {
+    const mountainSpawns = [
+        ['bigfoot', 10],
+        ['nine_tail', 7],
+        ['harpy', 6],
+        ['gargoyle', 4],
+    ];
+    for (const [type, weight] of mountainSpawns) {
+        await query(
+            `INSERT INTO public.map_spawns (map_id,monster_type,weight,min_level,is_water)
+             VALUES ('prontera',$1,$2,1,false)
+             ON CONFLICT (map_id,monster_type) DO NOTHING`,
+            [type, weight]
+        );
+    }
+    await query(
+        `INSERT INTO public.map_config (map_id,land_count,water_count)
+         VALUES ('prontera',18,4)
+         ON CONFLICT (map_id) DO UPDATE
+         SET land_count = GREATEST(public.map_config.land_count, EXCLUDED.land_count)`
+    );
+}
+
 // ---- world version (bumped on every admin edit; used by the engine + clients
 // to know config changed) ----
 export async function getWorldVersion() {

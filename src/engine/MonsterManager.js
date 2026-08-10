@@ -16,8 +16,10 @@ function hashStr(str) {
 }
 
 const MAX_MONSTERS = 12;
+const PRONTERA_MONSTERS = 18;
 const MAX_WATER_MONSTERS = 4;
 const SPAWN_RANGE = 12;
+const PRONTERA_SPAWN_RANGE = 50;
 const RESPAWN_TIME = 3;
 
 export function resolveMonsterDamage(amount, defense = 0, { ignoreDefense = false } = {}) {
@@ -1149,8 +1151,8 @@ class Monster {
 
             // Keep in bounds
             if (this.wanderTarget) {
-                this.wanderTarget.x = THREE.MathUtils.clamp(this.wanderTarget.x, -SPAWN_RANGE, SPAWN_RANGE);
-                this.wanderTarget.z = THREE.MathUtils.clamp(this.wanderTarget.z, -SPAWN_RANGE, SPAWN_RANGE);
+                this.wanderTarget.x = THREE.MathUtils.clamp(this.wanderTarget.x, -PRONTERA_SPAWN_RANGE, PRONTERA_SPAWN_RANGE);
+                this.wanderTarget.z = THREE.MathUtils.clamp(this.wanderTarget.z, -PRONTERA_SPAWN_RANGE, PRONTERA_SPAWN_RANGE);
             }
         }
 
@@ -1342,18 +1344,26 @@ export class MonsterManager {
         const environment = monsterData ? monsterData.environment : 'ground';
 
         if (environment === 'water') {
-            const rx = -20 + useRng() * 40;
+            const waterRange = this.mapId === 'prontera' ? 48 : 20;
+            const rx = -waterRange + useRng() * waterRange * 2;
             const riverZ = Math.sin(rx * 0.08) * 10 - 2;
             const rz = riverZ + (useRng() - 0.5) * 4;
             return new THREE.Vector3(rx, 0, rz);
         }
 
         let pos = new THREE.Vector3(0, 0, 0);
+        const spawnRange = this.mapId === 'prontera' ? PRONTERA_SPAWN_RANGE : SPAWN_RANGE;
 
         for (let attempt = 0; attempt < 50; attempt++) {
-            const angle = useRng() * Math.PI * 2;
-            const dist = 4 + useRng() * (SPAWN_RANGE - 4);
-            pos.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+            if (this.mapId === 'prontera' && environment === 'mountain') {
+                pos.set(17 + useRng() * 31, 0, 17 + useRng() * 31);
+            } else if (this.mapId === 'prontera' && environment === 'cave') {
+                pos.set(-17 - useRng() * 31, 0, -17 - useRng() * 31);
+            } else {
+                const angle = useRng() * Math.PI * 2;
+                const dist = 4 + useRng() * (spawnRange - 4);
+                pos.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
+            }
 
             if (this.sceneManager) {
                 // Never spawn inside the PVP arena keep-out zone
@@ -1374,7 +1384,7 @@ export class MonsterManager {
         // Relax constraints if no exact match found
         for (let attempt = 0; attempt < 20; attempt++) {
             const angle = useRng() * Math.PI * 2;
-            const dist = 4 + useRng() * (SPAWN_RANGE - 4);
+            const dist = 4 + useRng() * (spawnRange - 4);
             pos.set(Math.cos(angle) * dist, 0, Math.sin(angle) * dist);
             if (this.sceneManager) {
                 if (!this.sceneManager.isInWater(pos)) return pos;
@@ -1406,7 +1416,7 @@ export class MonsterManager {
         // on the map that day, regardless of their level. (playerLevel is
         // intentionally ignored here so no two players ever see different mobs.)
         const rng = createSeededRng((getDailySeed() ^ hashStr(this.mapId || 'prontera')) | 0);
-        const count = MAX_MONSTERS; // fixed count for consistency across clients
+        const count = this.mapId === 'prontera' ? PRONTERA_MONSTERS : MAX_MONSTERS;
 
         // Full, level-independent spawn table for this map.
         const spawnTable = getSpawnTable(SHARED_SPAWN_LEVEL, this.mapId);

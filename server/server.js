@@ -14,7 +14,7 @@ import { createAdminRouter } from './api/admin.js';
 import * as ipMonitor from './api/ipMonitor.js';
 import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startCheatGuard } from './api/cheatGuard.js';
-import { ensureMonsterTables, seedMonstersIfEmpty } from './api/monstersConfig.js';
+import { ensureMonsterTables, seedMonstersIfEmpty, ensurePronteraMountainExpansion } from './api/monstersConfig.js';
 import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
 import { ensureOreEconomy } from './api/oreEconomy.js';
 import { ensurePetEconomy, PET_CATALOG } from './api/petEconomy.js';
@@ -1581,6 +1581,7 @@ httpServer.listen(PORT, HOST, () => {
             try {
                 await ensureMonsterTables();
                 await seedMonstersIfEmpty();
+                await ensurePronteraMountainExpansion();
                 await ensureCardEconomy();
                 await ensureOreEconomy();
                 await ensurePetEconomy();

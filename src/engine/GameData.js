@@ -1708,6 +1708,12 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
     if (playerLevel >= 9) table.push({ type: 'drops', weight: 12 });
     if (playerLevel >= 12) table.push({ type: 'deviruchi', weight: 8 });
     if (playerLevel >= 16) table.push({ type: 'ghostring', weight: 3 }); // Boss rare spawn
+    // North-east highland biome: unusual mountain creatures live far beyond
+    // the starter field and are positioned there by the environment spawner.
+    table.push({ type: 'bigfoot', weight: 10 });
+    table.push({ type: 'nine_tail', weight: 7 });
+    table.push({ type: 'harpy', weight: 6 });
+    table.push({ type: 'gargoyle', weight: 4 });
 
     return table;
 }

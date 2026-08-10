@@ -11,10 +11,10 @@ import {
     resolveOutgoingCardEffects,
 } from '../cards/CardEffects.js';
 
-// Walkable half-extent. The ground is a 70x70 plane centred at the origin
-// (see SceneManager._createGround), so keep the player just inside the ±35 edge
+// Walkable half-extent. Prontera is a 110x110 field including the mountain
+// expansion; keep the player just inside the ±55 edge
 // so they can't walk off the map into the void.
-const WORLD_HALF = 34;
+const WORLD_HALF = 54;
 function clampToWorld(pos) {
     pos.x = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.x));
     pos.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.z));

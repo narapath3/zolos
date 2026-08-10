@@ -351,6 +351,7 @@ export class SceneManager {
         this._arenaGroup = null;
         if (mapId === 'prontera') {
             this._createGrassDecor(config);
+            this._createExplorableMountainBiome(config);
             this._createPvpArena();
             this._createArenaLeaderboard();
             // Fantasy scenery: distant peaks, a cascading waterfall, floating
@@ -1144,8 +1145,8 @@ export class SceneManager {
     // ============ Ground ============
     _createGround(config) {
         // Main textured ground with vertex colors
-        const size = 70;
-        const segments = 60;
+        const size = this.currentMap === 'prontera' ? 110 : 70;
+        const segments = this.currentMap === 'prontera' ? 90 : 60;
         const groundGeo = new THREE.PlaneGeometry(size, size, segments, segments);
 
         // Add vertex colors for terrain variation
@@ -1288,7 +1289,8 @@ export class SceneManager {
     // ============ Water ============
     _createWater(config) {
         // Large river water plane centered around z = -2, length 80, width 32
-        const waterGeo = new THREE.PlaneGeometry(80, 40, 80, 30);
+        const riverLength = this.currentMap === 'prontera' ? 116 : 80;
+        const waterGeo = new THREE.PlaneGeometry(riverLength, 40, this.currentMap === 'prontera' ? 110 : 80, 30);
         const waterTex = this._createWaterTexture();
         // Flowing water: scroll the caustic texture along the river each frame
         waterTex.wrapS = THREE.RepeatWrapping;
@@ -2152,6 +2154,115 @@ export class SceneManager {
 
         // --- Signpost near spawn ---
         this._createSignpost(2.5, 2.5);
+    }
+
+    // ============ Explorable Mountain Biome ============
+    // A walkable north-east expansion connected to the main field by a broad
+    // flower-lined trail. Tall rock formations sit around the perimeter rather
+    // than under the player, preserving the game's flat locomotion model.
+    _createExplorableMountainBiome(config) {
+        const group = new THREE.Group();
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x665f58, roughness: 0.92 });
+        const rockLightMat = new THREE.MeshStandardMaterial({ color: 0x8d8174, roughness: 0.88 });
+        const mossMat = new THREE.MeshLambertMaterial({ color: 0x477d46 });
+        const trailMat = new THREE.MeshStandardMaterial({ color: 0xa98b63, roughness: 0.94 });
+
+        // Curved stepping trail from the old field into the highland clearing.
+        const trail = [
+            [11, 12], [15, 16], [19, 20], [23, 24], [27, 29],
+            [31, 34], [35, 38], [39, 41], [43, 43],
+        ];
+        trail.forEach(([x, z], i) => {
+            const slab = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.45, 0.16, 9), trailMat);
+            slab.position.set(x, 0.05 + Math.sin(i * 0.8) * 0.03, z);
+            slab.scale.set(1.35, 1, 0.82);
+            slab.rotation.y = i * 0.47;
+            slab.receiveShadow = true;
+            group.add(slab);
+        });
+
+        // Mountain walls define the vista while leaving a broad walkable basin.
+        const ridge = [
+            [17, 49, 4.8, 8], [24, 52, 5.6, 10], [33, 53, 6.4, 12],
+            [43, 52, 5.7, 10], [51, 47, 5.2, 9], [53, 37, 5.8, 11],
+            [52, 27, 4.8, 8], [48, 19, 4.1, 7], [19, 35, 3.6, 6],
+        ];
+        ridge.forEach(([x, z, r, h], i) => {
+            const peak = new THREE.Mesh(
+                new THREE.ConeGeometry(r, h, 7), i % 2 ? rockMat : rockLightMat
+            );
+            peak.position.set(x, h / 2 - 0.15, z);
+            peak.rotation.y = i * 0.83;
+            peak.scale.z = 0.72 + (i % 3) * 0.12;
+            peak.castShadow = true;
+            peak.receiveShadow = true;
+            group.add(peak);
+
+            const moss = new THREE.Mesh(new THREE.ConeGeometry(r * 0.72, h * 0.24, 7), mossMat);
+            moss.position.set(x, h * 0.86, z);
+            moss.rotation.y = peak.rotation.y;
+            group.add(moss);
+        });
+
+        // Pine and sakura groves frame the clearing and create distinct pockets.
+        const grove = [
+            [22, 31, 'pine'], [20, 40, 'pine'], [27, 46, 'cherry'],
+            [34, 47, 'pine'], [42, 47, 'cherry'], [47, 40, 'pine'],
+            [47, 30, 'pine'], [40, 25, 'cherry'], [30, 26, 'pine'],
+            [25, 36, 'cherry'], [37, 32, 'pine'], [44, 35, 'cherry'],
+        ];
+        grove.forEach(([x, z, type]) => this._createTree(x, z, type));
+
+        // Dense alpine flowers, glowing crystals and small boulders reward
+        // exploration without obstructing combat movement.
+        const flowerSpots = [
+            [18, 18], [21, 22], [24, 28], [28, 33], [31, 37], [35, 41],
+            [39, 43], [44, 42], [46, 37], [43, 31], [37, 28], [30, 29],
+            [23, 39], [29, 45], [38, 47], [48, 33],
+        ];
+        flowerSpots.forEach(([x, z], i) => {
+            for (let p = 0; p < 4; p++) {
+                this._createFlower(x + Math.cos(p * 1.57 + i) * 0.55, z + Math.sin(p * 1.57 + i) * 0.55);
+            }
+            if (i % 3 === 0) this._createRock(x + 1.1, z - 0.6, 0.35 + (i % 2) * 0.18);
+        });
+
+        const crystalMat = new THREE.MeshStandardMaterial({
+            color: 0x86e8ff, emissive: 0x287fb8, emissiveIntensity: 0.8,
+            roughness: 0.22, metalness: 0.18,
+        });
+        [[26, 43], [36, 36], [45, 27], [47, 45]].forEach(([x, z], i) => {
+            const cluster = new THREE.Group();
+            for (let c = 0; c < 3; c++) {
+                const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.35 + c * 0.12, 0), crystalMat);
+                crystal.scale.y = 2.1 + c * 0.35;
+                crystal.position.set((c - 1) * 0.42, 0.55 + c * 0.12, Math.sin(c * 2) * 0.22);
+                crystal.rotation.z = (c - 1) * 0.18;
+                cluster.add(crystal);
+            }
+            cluster.position.set(x, 0, z);
+            cluster.rotation.y = i * 1.2;
+            group.add(cluster);
+        });
+
+        // Summit lookout landmark at the end of the trail.
+        const lookout = new THREE.Mesh(
+            new THREE.CylinderGeometry(4.1, 4.55, 0.42, 18),
+            new THREE.MeshStandardMaterial({ color: 0x858487, roughness: 0.86 })
+        );
+        lookout.position.set(43, 0.2, 43);
+        lookout.receiveShadow = true;
+        group.add(lookout);
+        const rune = new THREE.Mesh(
+            new THREE.TorusGeometry(2.8, 0.08, 7, 36),
+            new THREE.MeshBasicMaterial({ color: 0x8ae9ff, transparent: true, opacity: 0.72 })
+        );
+        rune.rotation.x = Math.PI / 2;
+        rune.position.set(43, 0.44, 43);
+        group.add(rune);
+
+        this.scene.add(group);
+        this.envObjects.push(group);
     }
 
     // ============ Distant Fantasy Mountains ============
