@@ -593,6 +593,37 @@ export class SceneManager {
         return collided;
     }
 
+    // Shared playable terrain height. The north-east mountain rises smoothly
+    // from the field into a broad farming plateau, so locomotion never needs
+    // stairs or teleport tricks and every system can stand on the same surface.
+    getTerrainHeight(x, z) {
+        let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
+        if (this.currentMap !== 'prontera') return height;
+
+        const riverCenter = Math.sin(x * 0.08) * 10 - 2;
+        const distToRiver = Math.abs(z - riverCenter);
+        if (distToRiver < 7.0) {
+            const t = distToRiver / 7.0;
+            height = -1.3 * (1.0 - t * t);
+        } else if (distToRiver < 10.0) {
+            const t = (distToRiver - 7.0) / 3.0;
+            height += 0.35 * Math.sin(t * Math.PI);
+        }
+
+        // 26-unit foothill radius, 14-unit summit radius. This creates a long
+        // gentle approach from the existing trail and a large combat-safe top.
+        const mountainDistance = Math.hypot(x - 36, z - 36);
+        if (x > 8 && z > 8 && mountainDistance < 26) {
+            const climb = THREE.MathUtils.clamp((26 - mountainDistance) / 12, 0, 1);
+            const eased = climb * climb * (3 - 2 * climb);
+            const summitRoll = climb > 0.92
+                ? Math.sin(x * 0.36) * Math.cos(z * 0.31) * 0.22
+                : 0;
+            height += eased * 6.2 + summitRoll;
+        }
+        return height;
+    }
+
     // ============ Sky Dome ============
     _createSkyDome(config) {
         const proceduralClouds = (this.graphicsQuality === 'medium' || this.graphicsQuality === 'high') ? 1 : 0;
@@ -1211,20 +1242,7 @@ export class SceneManager {
             const riverZ = Math.sin(x * 0.08) * 10 - 2;
             const distToRiver = Math.abs(z - riverZ);
 
-            // Base noise height
-            let height = Math.sin(x * 0.3) * Math.cos(z * 0.3) * 0.15;
-
-            // Carve riverbed and build river banks
-            if (distToRiver < 7.0) {
-                // Smooth valley drop down to -1.3
-                const t = distToRiver / 7.0; // 0 (center) to 1 (bank)
-                height = -1.3 * (1.0 - t * t);
-            } else if (distToRiver < 10.0) {
-                // Raised bank ridge sloping down to ground
-                const t = (distToRiver - 7.0) / 3.0; // 0 to 1
-                const bankSwell = 0.35 * Math.sin(t * Math.PI);
-                height += bankSwell;
-            }
+            const height = this.getTerrainHeight(x, z);
 
             positions.setZ(i, height);
 
@@ -1766,7 +1784,7 @@ export class SceneManager {
             });
         });
 
-        group.position.set(x, 0, z);
+        group.position.set(x, this.getTerrainHeight(x, z), z);
         this.scene.add(group);
         this.envObjects.push(group);
     }
@@ -2354,6 +2372,12 @@ export class SceneManager {
         rune.rotation.x = Math.PI / 2;
         rune.position.set(43, 0.44, 43);
         group.add(rune);
+
+        // Raise biome-owned paths, crags, crystals and the lookout onto the
+        // deformed terrain. Trees/flowers/rocks use getTerrainHeight directly.
+        for (const child of group.children) {
+            child.position.y += this.getTerrainHeight(child.position.x, child.position.z);
+        }
 
         this.scene.add(group);
         this.envObjects.push(group);
@@ -3062,7 +3086,7 @@ export class SceneManager {
         const shade = 0x5a + Math.floor(Math.random() * 0x20);
         const mat = new THREE.MeshLambertMaterial({ color: new THREE.Color(shade / 255, shade / 255, (shade + 0x10) / 255) });
         const rock = new THREE.Mesh(geo, mat);
-        rock.position.set(x, s * 0.4, z);
+        rock.position.set(x, this.getTerrainHeight(x, z) + s * 0.4, z);
         rock.rotation.set(Math.random(), Math.random(), 0);
         rock.castShadow = true;
         rock.receiveShadow = true;
@@ -3137,7 +3161,7 @@ export class SceneManager {
         center.scale.y = 0.6;
         group.add(center);
 
-        group.position.set(x, 0, z);
+        group.position.set(x, this.getTerrainHeight(x, z), z);
         const scale = 0.8 + Math.random() * 0.5;
         group.scale.setScalar(scale);
         this.scene.add(group);

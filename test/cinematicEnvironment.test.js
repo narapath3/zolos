@@ -49,3 +49,10 @@ test('explorable ridge uses fractured rock volumes instead of cone mountains', (
   assert.match(sceneSource, /new THREE\.DodecahedronGeometry\(1, 1\)/);
   assert.doesNotMatch(sceneSource, /new THREE\.ConeGeometry\(r, h, 7\)/);
 });
+
+test('mountain biome is a physically climbable farming plateau', () => {
+  assert.match(sceneSource, /getTerrainHeight\(x, z\)/);
+  assert.match(sceneSource, /Math\.hypot\(x - 36, z - 36\)/);
+  assert.match(sceneSource, /eased \* 6\.2/);
+  assert.match(sceneSource, /child\.position\.y \+= this\.getTerrainHeight/);
+});

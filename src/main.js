@@ -2751,7 +2751,12 @@ function stepWorld(dt) {
         character.moveSpeed = 2.2;
         character.baseY = -0.5; // Partially submerged, visible while swimming
     } else {
-        character.baseY = 1.2; // Default ground height
+        // Follow the playable hill surface; CharacterManager smooths the mesh
+        // toward baseY, producing a natural walk up/down the slope.
+        character.baseY = 1.2 + sceneManager.getTerrainHeight(
+            character.mesh.position.x,
+            character.mesh.position.z
+        );
         // Reset to normal speed when not in water
         if (character.state === 'swimming') {
             character.state = 'idle';

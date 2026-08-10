@@ -1288,7 +1288,8 @@ export class MonsterManager {
             // a DIFFERENT type — rebuild it (this is a respawn, not a brand-new mob).
             if (m && m.type !== s.t) { this._removeServerMonster(m); m = null; }
             if (!m) {
-                const pos = new THREE.Vector3(s.x, 0, s.z);
+                const terrainY = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
+                const pos = new THREE.Vector3(s.x, terrainY, s.z);
                 m = new Monster(this.scene, s.t, pos);
                 m.id = s.id;
                 m._serverControlled = true;
@@ -1300,7 +1301,10 @@ export class MonsterManager {
             if (revived) {
                 m.alive = true;
                 m.mesh.visible = true;
-                if (m.mesh) m.mesh.position.set(s.x, m.isWaterMonster ? -0.3 : 0, s.z);
+                if (m.mesh) {
+                    const terrainY = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
+                    m.mesh.position.set(s.x, m.isWaterMonster ? -0.3 : terrainY, s.z);
+                }
             }
             // Spawn glow on ANY respawn — whether the id revived in place or came
             // back as a new type — but NOT while the map is first being filled
@@ -1314,6 +1318,9 @@ export class MonsterManager {
             }
             m.setServerHp(s.hp, s.mhp);
             m.setServerTarget(s.x, s.z, s.r);
+            if (!m.isWaterMonster && m.mesh) {
+                m.mesh.position.y = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
+            }
         }
         // After the first snapshot the map is populated; from here on every new
         // or revived monster is a genuine respawn worth a glow.

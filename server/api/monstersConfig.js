@@ -148,6 +148,7 @@ export async function ensurePronteraMountainExpansion() {
         ['nine_tail', 7],
         ['harpy', 6],
         ['gargoyle', 4],
+        ['stone_golem', 3],
     ];
     for (const [type, weight] of mountainSpawns) {
         await query(
@@ -159,7 +160,7 @@ export async function ensurePronteraMountainExpansion() {
     }
     await query(
         `INSERT INTO public.map_config (map_id,land_count,water_count)
-         VALUES ('prontera',18,4)
+         VALUES ('prontera',24,4)
          ON CONFLICT (map_id) DO UPDATE
          SET land_count = GREATEST(public.map_config.land_count, EXCLUDED.land_count)`
     );
