@@ -1361,12 +1361,19 @@ export class MonsterManager {
     applyServerState(payload) {
         if (!this.serverMode || !payload || !Array.isArray(payload.mons)) return;
         if (!this._srvById) this._srvById = new Map();
+        const snapshotIds = new Set(payload.mons.map(s => s && s.id).filter(Boolean));
         for (const s of payload.mons) {
             let m = this._srvById.get(s.id);
             let spawnedNew = false;
             // A respawn usually rerolls the monster type, so the id comes back as
             // a DIFFERENT type — rebuild it (this is a respawn, not a brand-new mob).
             if (m && m.type !== s.t) { this._removeServerMonster(m); m = null; }
+            // A pre-death snapshot can arrive after mon_dead. Never let that
+            // stale packet revive the corpse: a genuine same-type respawn is
+            // accepted only after at least one complete snapshot omitted its id.
+            if (m && !m.alive && m._awaitingServerRespawn && !m._seenAbsentSinceDeath) {
+                continue;
+            }
             if (!m) {
                 const terrainY = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
                 const pos = new THREE.Vector3(s.x, terrainY, s.z);
@@ -1380,6 +1387,8 @@ export class MonsterManager {
             const revived = !m.alive;
             if (revived) {
                 m.alive = true;
+                m._awaitingServerRespawn = false;
+                m._seenAbsentSinceDeath = false;
                 m.mesh.visible = true;
                 if (m.mesh) {
                     const terrainY = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
@@ -1402,6 +1411,20 @@ export class MonsterManager {
                 m.mesh.position.y = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
             }
         }
+
+        // mon_state is a complete map snapshot. Reconcile omissions as deaths
+        // too, so a dropped mon_dead event cannot leave a visible invincible
+        // monster on the client. The omitted frame also acts as the respawn
+        // generation barrier used above to reject out-of-order stale packets.
+        for (const [id, m] of this._srvById.entries()) {
+            if (snapshotIds.has(id)) continue;
+            if (m.alive) {
+                m.alive = false;
+                if (m.mesh) m.mesh.visible = false;
+                m._awaitingServerRespawn = true;
+            }
+            if (m._awaitingServerRespawn) m._seenAbsentSinceDeath = true;
+        }
         // After the first snapshot the map is populated; from here on every new
         // or revived monster is a genuine respawn worth a glow.
         this._initialSpawnDone = true;
@@ -1413,6 +1436,8 @@ export class MonsterManager {
         const m = this._srvById && this._srvById.get(id);
         if (!m || !m.alive) return null;
         m.alive = false;
+        m._awaitingServerRespawn = true;
+        m._seenAbsentSinceDeath = false;
         if (m.mesh) m.mesh.visible = false;
         return m;
     }
