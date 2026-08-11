@@ -16,8 +16,8 @@ const HERO_GEAR = {
 
 export function getShowcaseAction(time, phase = 0, duration = 10) {
   const progress = ((time + phase) % duration) / duration;
-  if (progress < 0.24) return { state: 'walking', travel: progress / 0.24 };
-  if (progress < 0.48) return { state: 'running', travel: (progress - 0.24) / 0.24 };
+  if (progress < 0.24) return { state: 'walking', travel: (progress / 0.24) * 0.34 };
+  if (progress < 0.48) return { state: 'running', travel: 0.34 + ((progress - 0.24) / 0.24) * 0.66 };
   if (progress < 0.64) return { state: 'attacking', attack: (progress - 0.48) / 0.16 };
   if (progress < 0.76) return { state: 'idle', travel: 1 };
   return { state: 'walking', travel: 1 - (progress - 0.76) / 0.24 };
@@ -54,8 +54,8 @@ export class LoginShowcase3D {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // This canvas has no ground receiver; shadow maps only add GPU stalls here.
+    this.renderer.shadowMap.enabled = false;
 
     this.scene = new THREE.Scene();
     this.scene.background = null;
@@ -66,8 +66,10 @@ export class LoginShowcase3D {
 
     this._onResize = this._onResize.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
+    this._onVisibilityChange = this._onVisibilityChange.bind(this);
     window.addEventListener('resize', this._onResize);
     window.addEventListener('pointermove', this._onPointerMove, { passive: true });
+    document.addEventListener('visibilitychange', this._onVisibilityChange);
     this._onResize();
     this.isReady = true;
     document.getElementById('auth-screen')?.classList.add('auth-has-live-game-art');
@@ -127,6 +129,7 @@ export class LoginShowcase3D {
       hero.showcaseHome = new THREE.Vector3(...config.position);
       hero.showcaseApproach = new THREE.Vector3(...config.approach);
       hero.showcaseMoveTarget = new THREE.Vector3();
+      hero.showcaseDesired = new THREE.Vector3(...config.position);
       hero.mesh.position.fromArray(config.position);
       hero.mesh.rotation.y = 0;
       hero.mesh.scale.setScalar(config.scale);
@@ -211,6 +214,10 @@ export class LoginShowcase3D {
     this.pointer.y = (event.clientY / window.innerHeight - 0.5) * 2;
   }
 
+  _onVisibilityChange() {
+    if (!document.hidden && this.isRunning) this.clock.getDelta();
+  }
+
   _onResize() {
     if (!this.renderer) return;
     const width = Math.max(1, this.canvas.clientWidth || window.innerWidth);
@@ -218,6 +225,7 @@ export class LoginShowcase3D {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     const portrait = this.camera.aspect < 0.8;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, portrait ? 1.08 : 1.28));
     this.cameraBase = { x: portrait ? 0 : 0.4, y: portrait ? 5.2 : 4.5 };
     this.camera.position.set(this.cameraBase.x, this.cameraBase.y, portrait ? 17.5 : 15.5);
     this.camera.lookAt(portrait ? 0 : 0.3, 1.35, -1.1);
@@ -233,6 +241,10 @@ export class LoginShowcase3D {
 
   _loop = () => {
     if (!this.isRunning) return;
+    if (document.hidden) {
+      this.animationFrameId = requestAnimationFrame(this._loop);
+      return;
+    }
     const dt = Math.min(this.clock.getDelta(), 0.04);
     const t = this.clock.elapsedTime;
     const musicTime = this.soundtrack && !this.soundtrack.paused ? this.soundtrack.currentTime : 0;
@@ -262,12 +274,13 @@ export class LoginShowcase3D {
       if (mvPhase === 'party') {
         const beat = t * (2.1 + index * 0.08) + index * 1.4;
         hero.state = Math.sin(beat) > 0.25 ? 'running' : 'walking';
-        hero.mesh.position.set(
+        hero.showcaseDesired.set(
           config.position[0] + Math.sin(beat * 0.52) * 1.05,
           config.position[1] + Math.abs(Math.sin(beat)) * 0.13,
           config.position[2] + Math.cos(beat * 0.44) * 0.65,
         );
-        hero.mesh.rotation.y = beat + Math.sin(beat * 0.6) * 0.5;
+        hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
+        hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, beat + Math.sin(beat * 0.6) * 0.5, 1 - Math.exp(-dt * 6));
         hero.attackAnimElapsed = hero.attackAnimDuration;
         hero.update(dt);
         return;
@@ -276,14 +289,15 @@ export class LoginShowcase3D {
         const p = THREE.MathUtils.clamp(finaleProgress, 0, 1);
         if (index === 0) {
           hero.state = 'running';
-          hero.mesh.position.set(THREE.MathUtils.lerp(-3.45, 3.45, p), 0.15 + Math.sin(t * 8) * 0.04, -1.0);
-          hero.mesh.rotation.y = Math.PI / 2;
+          hero.showcaseDesired.set(THREE.MathUtils.lerp(-3.45, 3.45, p), 0.15 + Math.sin(t * 8) * 0.04, -1.0);
+          hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.PI / 2, 1 - Math.exp(-dt * 7));
         } else {
           const side = index === 1 ? -1 : 1;
           hero.state = 'walking';
-          hero.mesh.position.set(side * (4.6 + (index - 1) * 0.55), 0.08 + Math.abs(Math.sin(t * 3.4 + index)) * 0.16, -0.5 + index * 0.35);
-          hero.mesh.rotation.y = Math.sin(t * 2.1 + index) * 0.55;
+          hero.showcaseDesired.set(side * (4.6 + (index - 1) * 0.55), 0.08 + Math.abs(Math.sin(t * 3.4 + index)) * 0.16, -0.5 + index * 0.35);
+          hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.sin(t * 2.1 + index) * 0.55, 1 - Math.exp(-dt * 7));
         }
+        hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
         hero.attackAnimElapsed = hero.attackAnimDuration;
         hero.update(dt);
         return;
@@ -298,18 +312,21 @@ export class LoginShowcase3D {
         approach.copy(target.mesh.position).add(away);
       }
       const travel = action.travel ?? 1;
-      hero.mesh.position.lerpVectors(home, approach, THREE.MathUtils.smoothstep(travel, 0, 1));
-      hero.mesh.position.y += Math.sin(t * 1.4 + index) * 0.018;
+      hero.showcaseDesired.lerpVectors(home, approach, THREE.MathUtils.smoothstep(travel, 0, 1));
+      hero.showcaseDesired.y += Math.sin(t * 1.4 + index) * 0.018;
+      hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 9));
       const lookAt = action.state === 'walking' && travel < 0.1 ? approach : (target?.mesh.position || approach);
-      hero.mesh.rotation.y = Math.atan2(lookAt.x - hero.mesh.position.x, lookAt.z - hero.mesh.position.z);
+      const desiredFacing = Math.atan2(lookAt.x - hero.mesh.position.x, lookAt.z - hero.mesh.position.z);
+      hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, desiredFacing, 1 - Math.exp(-dt * 10));
       hero.state = action.state;
       hero.attackAnimElapsed = action.state === 'attacking'
         ? Math.min(hero.attackAnimDuration, (action.attack || 0) * hero.attackAnimDuration)
         : hero.attackAnimDuration;
       hero.update(dt);
     });
-    this.camera.position.x += ((this.cameraBase.x + this.pointer.x * 0.22) - this.camera.position.x) * 0.025;
-    this.camera.position.y += ((this.cameraBase.y - this.pointer.y * 0.1) - this.camera.position.y) * 0.025;
+    const cameraDamp = 1 - Math.exp(-dt * 2.2);
+    this.camera.position.x += ((this.cameraBase.x + this.pointer.x * 0.22) - this.camera.position.x) * cameraDamp;
+    this.camera.position.y += ((this.cameraBase.y - this.pointer.y * 0.1) - this.camera.position.y) * cameraDamp;
     this.camera.lookAt(0.3 + this.pointer.x * 0.08, 1.35, -1.1);
     this.renderer.render(this.scene, this.camera);
     this.animationFrameId = requestAnimationFrame(this._loop);
@@ -325,6 +342,7 @@ export class LoginShowcase3D {
     this.stop();
     window.removeEventListener('resize', this._onResize);
     window.removeEventListener('pointermove', this._onPointerMove);
+    document.removeEventListener('visibilitychange', this._onVisibilityChange);
     this.scene?.traverse((node) => {
       node.geometry?.dispose?.();
       const materials = Array.isArray(node.material) ? node.material : [node.material];

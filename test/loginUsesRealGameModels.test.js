@@ -34,11 +34,20 @@ test('showcase actors patrol, run, attack and idle on independent timelines', as
   const states = new Set(Array.from({ length: 100 }, (_, i) => getShowcaseAction(i / 10, 0, 10).state));
   assert.deepEqual(states, new Set(['walking', 'running', 'attacking', 'idle']));
   assert.match(scene, /animateMonsterRig\(monster\._professionalRig/);
-  assert.match(scene, /hero\.mesh\.position\.lerpVectors/);
+  assert.match(scene, /hero\.showcaseDesired\.lerpVectors/);
   assert.match(scene, /monster\.showcaseHome/);
   assert.equal(getLoginMvPhase(90.9, 180), 'combat');
   assert.equal(getLoginMvPhase(91, 180), 'party');
   assert.equal(getLoginMvPhase(162, 180), 'finale');
+  const beforeRun = getShowcaseAction(2.399, 0, 10).travel;
+  const afterRun = getShowcaseAction(2.401, 0, 10).travel;
+  assert.ok(Math.abs(afterRun - beforeRun) < 0.01, 'walk-to-run travel must remain continuous');
+});
+
+test('login motion uses frame-rate independent damping and avoids unused shadow maps', () => {
+  assert.match(scene, /1 - Math\.exp\(-dt \* 9\)/);
+  assert.match(scene, /this\.renderer\.shadowMap\.enabled = false/);
+  assert.match(scene, /document\.hidden/);
 });
 
 test('soundtrack finale writes ZOLOS ONLINE progressively with game actors', () => {
