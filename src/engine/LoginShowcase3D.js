@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { CharacterManager } from './CharacterManager.js';
 import { Monster } from './MonsterManager.js';
+import environmentDesktopUrl from '../assets/login_environment_ro_desktop_v1.jpg';
+import environmentMobileUrl from '../assets/login_environment_ro_mobile_v1.jpg';
 
 const HERO_GEAR = {
   head: 'Celestial Sovereign Helm',
@@ -44,6 +46,7 @@ export class LoginShowcase3D {
     this.scene.background = new THREE.Color(0x79b9da);
     this.scene.fog = new THREE.Fog(0x9bc7d8, 13, 34);
     this.camera = new THREE.PerspectiveCamera(37, 1, 0.1, 80);
+    this.environmentTextures = {};
     this._buildLighting();
     this._buildWorld();
     this._buildCast();
@@ -214,10 +217,28 @@ export class LoginShowcase3D {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     const portrait = this.camera.aspect < 0.8;
+    this._loadEnvironmentBackground(portrait);
     this.cameraBase = { x: portrait ? 0 : 0.4, y: portrait ? 5.2 : 4.5 };
     this.camera.position.set(this.cameraBase.x, this.cameraBase.y, portrait ? 17.5 : 15.5);
     this.camera.lookAt(portrait ? 0 : 0.3, 1.35, -1.1);
     this.camera.updateProjectionMatrix();
+  }
+
+  _loadEnvironmentBackground(portrait) {
+    const key = portrait ? 'mobile' : 'desktop';
+    if (this.environmentTextures[key]) {
+      this.scene.background = this.environmentTextures[key];
+      return;
+    }
+    const url = portrait ? environmentMobileUrl : environmentDesktopUrl;
+    new THREE.TextureLoader().load(url, (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      this.environmentTextures[key] = texture;
+      const nowPortrait = this.camera.aspect < 0.8;
+      if ((nowPortrait ? 'mobile' : 'desktop') === key) this.scene.background = texture;
+    });
   }
 
   start() {
@@ -273,5 +294,6 @@ export class LoginShowcase3D {
       materials.forEach((material) => material?.dispose?.());
     });
     this.renderer?.dispose();
+    Object.values(this.environmentTextures || {}).forEach((texture) => texture.dispose());
   }
 }

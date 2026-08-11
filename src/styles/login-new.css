@@ -24,7 +24,7 @@
   position: absolute;
   inset: -20px;
   z-index: 0;
-  background-image: url('/src/assets/login_bg_desktop_v2.webp');
+  background-image: url('/src/assets/login_environment_ro_desktop_v1.jpg');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -43,7 +43,7 @@
 /* Art-directed portrait artwork avoids destructively cropping desktop key art. */
 @media (orientation: portrait) {
   .auth-bg-img {
-    background-image: url('/src/assets/login_bg_mobile_v2.webp');
+    background-image: url('/src/assets/login_environment_ro_mobile_v1.jpg');
     background-position: center center;
   }
 }

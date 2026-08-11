@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const scene = fs.readFileSync(new URL('../src/engine/LoginShowcase3D.js', import.meta.url), 'utf8');
 const auth = fs.readFileSync(new URL('../src/ui/AuthUI.js', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../src/styles/login-new.css', import.meta.url), 'utf8');
 
 test('login showcase imports the exact runtime hero and monster builders', () => {
   assert.match(scene, /import \{ CharacterManager \} from '\.\/CharacterManager\.js'/);
@@ -32,4 +33,14 @@ test('login key art presents a four-job party with distinct divine weapons', () 
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {
   assert.match(auth, /new LoginShowcase3D\('auth-bg-canvas'\)/);
   assert.doesNotMatch(auth, /new LoginCanvasBg/);
+});
+
+test('AI environment art is limited to responsive scenery behind real models', () => {
+  assert.match(scene, /login_environment_ro_desktop_v1\.jpg/);
+  assert.match(scene, /login_environment_ro_mobile_v1\.jpg/);
+  assert.match(scene, /this\.scene\.background = texture/);
+  assert.match(css, /login_environment_ro_desktop_v1\.jpg/);
+  assert.match(css, /login_environment_ro_mobile_v1\.jpg/);
+  assert.ok(fs.existsSync(new URL('../src/assets/login_environment_ro_desktop_v1.jpg', import.meta.url)));
+  assert.ok(fs.existsSync(new URL('../src/assets/login_environment_ro_mobile_v1.jpg', import.meta.url)));
 });
