@@ -1,6 +1,7 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
+import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -55,6 +56,8 @@ export class GameUI {
     this.selectedItemName = null;
     this.cardAlbum = null;
     this.cardDropRevealQueue = [];
+    this.adventureJournal = createAdventureJournal();
+    this._journalSaveTimer = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -8701,13 +8704,49 @@ export class GameUI {
       });
     }
 
-    this.currentWikiTab = 'guide';
+    this.currentWikiTab = 'journal';
     this.selectedWikiItem = null;
   }
 
   _renderWiki() {
     this._renderWikiList();
     this._renderWikiDetail();
+  }
+
+  async loadAdventureJournalFromDB(characterId) {
+    if (!characterId) return;
+    this.characterId = characterId;
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(`zolos_adventure_journal_${characterId}`) || 'null'); } catch { /* ignore */ }
+    const remote = await loadAdventureJournal(characterId);
+    this.adventureJournal = sanitizeAdventureJournal(remote || local);
+    this._renderWiki();
+  }
+
+  _saveAdventureJournalSoon() {
+    if (!this.characterId) return;
+    localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
+    clearTimeout(this._journalSaveTimer);
+    this._journalSaveTimer = setTimeout(() => saveAdventureJournal(this.characterId, this.adventureJournal), 700);
+  }
+
+  _journalHTML() {
+    const summary = summarizeJournal(this.adventureJournal, getAllMonsters());
+    const nextDiscoveries = summary.entries.filter(row => !row.entry.kills).slice(0, 4);
+    const recent = summary.entries.filter(row => row.entry.lastDefeatedAt)
+      .sort((a, b) => String(b.entry.lastDefeatedAt).localeCompare(String(a.entry.lastDefeatedAt))).slice(0, 5);
+    const cards = [
+      ['ค้นพบมอนสเตอร์', `${summary.discovered}/${summary.totalSpecies}`, `${summary.discoveryPercent}%`, '#65d9ff'],
+      ['จำนวนที่กำจัด', summary.totalKills.toLocaleString(), 'ทั้งหมด', '#ff8f6b'],
+      ['Bronze Mastery', summary.tierCounts.bronze, '10 kills', '#cd7f32'],
+      ['Silver Mastery', summary.tierCounts.silver, '50 kills', '#c7d2df'],
+      ['Gold Mastery', summary.tierCounts.gold, '200 kills', '#ffd65a'],
+    ];
+    return `<div class="journal-hero"><div><small>ADVENTURE JOURNAL</small><h2>Monster Codex</h2><p>ออกสำรวจ กำจัด และเชี่ยวชาญมอนสเตอร์ทุกสายพันธุ์</p></div><div class="journal-ring" style="--pct:${summary.discoveryPercent * 3.6}deg"><b>${summary.discoveryPercent}%</b><span>DISCOVERED</span></div></div>
+      <div class="journal-stat-grid">${cards.map(([label,value,note,color]) => `<div class="journal-stat" style="--accent:${color}"><span>${label}</span><b>${value}</b><small>${note}</small></div>`).join('')}</div>
+      <div class="journal-section"><h4>Mastery Path</h4><div class="journal-mastery-path"><span class="bronze">10 ⚔ Bronze</span><i></i><span class="silver">50 ⚔ Silver</span><i></i><span class="gold">200 ⚔ Gold</span></div></div>
+      <div class="journal-columns"><div class="journal-section"><h4>พบล่าสุด</h4>${recent.length ? recent.map(row => `<button class="journal-row" data-monster-key="${row.monster.key}">${this._wikiMonsterPortrait(row.monster)}<span><b>${row.monster.name}</b><small>${row.entry.kills} kills • ${masteryForKills(row.entry.kills).label}</small></span></button>`).join('') : '<p class="journal-empty">ยังไม่มีบันทึก ออกไปกำจัดมอนสเตอร์ตัวแรกกันเลย!</p>'}</div>
+      <div class="journal-section"><h4>ยังไม่ค้นพบ</h4>${nextDiscoveries.length ? nextDiscoveries.map(row => `<button class="journal-row undiscovered" data-monster-key="${row.monster.key}">${this._wikiMonsterPortrait(row.monster)}<span><b>???</b><small>${row.monster.environment || 'unknown'} habitat</small></span></button>`).join('') : '<p class="journal-empty">ค้นพบครบทุกสายพันธุ์แล้ว!</p>'}</div></div>`;
   }
 
   _wikiMonsterPortrait(monster, large = false) {
@@ -8791,6 +8830,23 @@ export class GameUI {
     const guideEl = document.getElementById('wiki-guide');
     const mainC = document.querySelector('.wiki-main-container');
     const searchBox = document.querySelector('.wiki-search-box');
+    const journalEl = document.getElementById('adventure-journal');
+    if (this.currentWikiTab === 'journal') {
+      if (journalEl) {
+        journalEl.style.display = 'block';
+        journalEl.innerHTML = this._journalHTML();
+        journalEl.querySelectorAll('[data-monster-key]').forEach(el => el.addEventListener('click', () => {
+          this.currentWikiTab = 'monsters'; this.selectedWikiItem = el.dataset.monsterKey;
+          document.querySelectorAll('.wiki-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'monsters'));
+          this._renderWikiList(); this._renderWikiDetail();
+        }));
+      }
+      if (guideEl) guideEl.style.display = 'none';
+      if (mainC) mainC.style.display = 'none';
+      if (searchBox) searchBox.style.display = 'none';
+      return;
+    }
+    if (journalEl) journalEl.style.display = 'none';
     if (this.currentWikiTab === 'guide') {
       if (guideEl) { guideEl.style.display = 'block'; if (!guideEl.dataset.built) { guideEl.innerHTML = this._guideHTML(); guideEl.dataset.built = '1'; } }
       if (mainC) mainC.style.display = 'none';
@@ -8822,7 +8878,7 @@ export class GameUI {
         }
         slot.innerHTML = `
           ${this._wikiMonsterPortrait(monster)}
-          <span class="wiki-slot-name">${monster.name}</span>
+          <span class="wiki-slot-name">${monster.name}<small>${getMonsterJournalEntry(this.adventureJournal, { key, ...monster }).kills} kills</small></span>
         `;
         slot.title = monster.name;
         slot.addEventListener('click', () => {
@@ -8942,6 +8998,9 @@ export class GameUI {
       // Calculate an approximate level based on stats since it's not explicitly in DB
       const approxLevel = Math.max(1, Math.floor(monster.hp / 20) + Math.floor(monster.atk / 4));
       const goldText = (typeof monster.gold === 'object') ? (monster.gold.min + ' - ' + monster.gold.max) : monster.gold;
+      const journalEntry = getMonsterJournalEntry(this.adventureJournal, { key, ...monster });
+      const mastery = masteryForKills(journalEntry.kills);
+      const masteryPct = mastery.next ? Math.min(100, journalEntry.kills / mastery.next.kills * 100) : 100;
 
       const envDict = {
         water: 'Water Zone / แหล่งน้ำ 🌊',
@@ -8964,6 +9023,11 @@ export class GameUI {
           Area: ${mapArea}<br />
           Environment: ${envName}<br />
           Family: ${(monster.family || 'unknown').toUpperCase()} • Visual: Remaster R3
+        </div>
+        <div class="monster-mastery-card" style="--mastery-color:${mastery.color}">
+          <div><span>MONSTER MASTERY</span><b>${mastery.label}</b><em>${journalEntry.kills} kills</em></div>
+          <div class="mastery-progress"><i style="width:${masteryPct}%"></i></div>
+          <small>${mastery.next ? `อีก ${mastery.remaining} ตัว เพื่อปลดล็อก ${mastery.next.label}` : 'เชี่ยวชาญสูงสุดแล้ว'}</small>
         </div>
         ${dropHtml}
       `;
@@ -9033,6 +9097,13 @@ export class GameUI {
 
   handleMonsterKill(monsterName) {
     this.killStreak++;
+    this.incrementQuestProgress('hunt', monsterName);
+    const result = recordMonsterDefeat(this.adventureJournal, monsterName);
+    this.adventureJournal = result.journal;
+    this._saveAdventureJournalSoon();
+    if (result.firstDiscovery) this.addCombatLog(`📔 Monster Codex: ค้นพบ ${monsterName}!`, 'loot');
+    if (result.tierUnlocked) this.addCombatLog(`🏅 ${monsterName} ถึงระดับ ${masteryForKills(result.entry.kills).label} Mastery!`, 'levelup');
+    if (this.currentWikiTab === 'journal' || this.currentWikiTab === 'monsters') this._renderWiki();
     const streaks = [10, 20, 50, 100, 200, 500];
     if (streaks.includes(this.killStreak)) {
       // Broadcast to others via socket

@@ -885,6 +885,44 @@ export async function loadFishingAlmanac(characterId) {
     }
 }
 
+// ============ Adventure Journal / Monster Codex ============
+// Kept in the existing system-inventory channel so this feature works without
+// a schema migration and follows the character across devices.
+export async function saveAdventureJournal(characterId, journalData) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        localDb.set(`adventure_journal_${characterId}`, journalData);
+        return;
+    }
+    try {
+        const { data: existing } = await supabase.from('inventory').select('id')
+            .eq('character_id', characterId).eq('item_name', 'adventure_journal')
+            .eq('item_type', 'system').maybeSingle();
+        if (existing) {
+            await supabase.from('inventory').update({ stats: journalData }).eq('id', existing.id);
+        } else {
+            await supabase.from('inventory').insert({ character_id: characterId, item_name: 'adventure_journal', item_type: 'system', quantity: 1, stats: journalData });
+        }
+    } catch (e) {
+        console.error('[GameSync] Failed to save adventure journal:', e);
+    }
+}
+
+export async function loadAdventureJournal(characterId) {
+    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        return localDb.get(`adventure_journal_${characterId}`) || null;
+    }
+    try {
+        const { data, error } = await supabase.from('inventory').select('stats')
+            .eq('character_id', characterId).eq('item_name', 'adventure_journal')
+            .eq('item_type', 'system').maybeSingle();
+        if (error) throw error;
+        return data?.stats || null;
+    } catch (e) {
+        console.error('[GameSync] Failed to load adventure journal:', e);
+        return null;
+    }
+}
+
 // ============ Login Streak (Daily Rewards) ============
 // Stored as a system inventory item, same pattern as the fishing almanac.
 // Shape: { streak: number, lastClaim: 'YYYY-MM-DD' }
