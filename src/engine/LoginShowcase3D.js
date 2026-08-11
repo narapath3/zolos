@@ -62,8 +62,8 @@ export class LoginShowcase3D {
     this.camera = new THREE.PerspectiveCamera(37, 1, 0.1, 80);
     this._buildLighting();
     this._buildCast();
-    this._buildFinaleTitle();
     this._buildZolosFirework();
+    this._buildCelebrationBursts();
 
     this._onResize = this._onResize.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
@@ -166,41 +166,6 @@ export class LoginShowcase3D {
     this.soundtrack = audio || null;
   }
 
-  _buildFinaleTitle() {
-    const label = 'ZOLOS ONLINE';
-    this.finaleTitle = new THREE.Group();
-    this.finaleTitle.position.set(0, 3.45, -3.8);
-    this.finaleLetters = [];
-    const spacing = 0.58;
-    const startX = -((label.length - 1) * spacing) / 2;
-    [...label].forEach((letter, index) => {
-      if (letter === ' ') return;
-      const canvas = document.createElement('canvas');
-      canvas.width = 128; canvas.height = 160;
-      const ctx = canvas.getContext('2d');
-      const gradient = ctx.createLinearGradient(0, 20, 0, 145);
-      gradient.addColorStop(0, '#fffbd0');
-      gradient.addColorStop(0.46, '#ffd34f');
-      gradient.addColorStop(1, '#ff8a24');
-      ctx.font = '900 106px Arial Black, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineWidth = 14; ctx.strokeStyle = 'rgba(22,45,95,.92)';
-      ctx.shadowColor = '#50e8ff'; ctx.shadowBlur = 18;
-      ctx.strokeText(letter, 64, 84); ctx.fillStyle = gradient; ctx.fillText(letter, 64, 84);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
-      const sprite = new THREE.Sprite(material);
-      sprite.position.x = startX + index * spacing;
-      sprite.scale.set(0.62, 0.78, 1);
-      sprite.renderOrder = 50;
-      sprite.userData.letterIndex = index;
-      this.finaleTitle.add(sprite);
-      this.finaleLetters.push(sprite);
-    });
-    this.scene.add(this.finaleTitle);
-  }
-
   _buildZolosFirework() {
     const glyphs = {
       Z: ['11111', '00010', '00100', '01000', '10000', '10000', '11111'],
@@ -237,6 +202,55 @@ export class LoginShowcase3D {
     this.scene.add(this.zolosFirework);
   }
 
+  _buildCelebrationBursts() {
+    const shellColors = [[0x54efff, 0xffffff], [0xffd34d, 0xff7ac8], [0x9b78ff, 0x65f0a5]];
+    this.celebrationBursts = shellColors.map((palette, shell) => {
+      const count = 32;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const vectors = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 + shell * 0.42;
+        const speed = 1.35 + (i % 5) * 0.11;
+        vectors[i * 3] = Math.cos(angle) * speed;
+        vectors[i * 3 + 1] = Math.sin(angle) * speed;
+        vectors[i * 3 + 2] = Math.sin(i * 2.17) * 0.24;
+        const color = new THREE.Color(palette[i % palette.length]);
+        colors[i * 3] = color.r; colors[i * 3 + 1] = color.g; colors[i * 3 + 2] = color.b;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      const points = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.15, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
+      points.userData.vectors = vectors;
+      points.userData.originX = [-3.35, 0, 3.35][shell];
+      points.userData.originY = [4.25, 5.2, 4.35][shell];
+      points.renderOrder = 48;
+      this.scene.add(points);
+      return points;
+    });
+  }
+
+  _updateCelebrationBursts(loopTime, time) {
+    this.celebrationBursts?.forEach((burst, shell) => {
+      const age = (loopTime - (2.1 + shell * 1.45)) / 4.2;
+      const active = age >= 0 && age <= 1;
+      burst.material.opacity = active ? Math.sin(age * Math.PI) * (0.72 + Math.sin(time * 22 + shell) * 0.22) : 0;
+      if (!active) return;
+      const positions = burst.geometry.attributes.position;
+      const vectors = burst.userData.vectors;
+      const expansion = 0.25 + age * 2.35;
+      for (let i = 0; i < positions.count; i++) {
+        positions.setXYZ(i,
+          burst.userData.originX + vectors[i * 3] * expansion,
+          burst.userData.originY + vectors[i * 3 + 1] * expansion - age * age * 1.25,
+          -2.9 + vectors[i * 3 + 2] * expansion);
+      }
+      positions.needsUpdate = true;
+      burst.material.size = 0.11 + Math.sin(time * 18 + shell) * 0.035;
+    });
+  }
+
   _updateZolosFirework(progress, time) {
     if (!this.zolosFirework) return;
     const p = THREE.MathUtils.clamp(progress, 0, 1);
@@ -261,16 +275,6 @@ export class LoginShowcase3D {
       }
     }
     positions.needsUpdate = true;
-  }
-
-  _setFinaleProgress(progress) {
-    const written = THREE.MathUtils.clamp(progress, 0, 1) * 12;
-    this.finaleLetters.forEach((sprite) => {
-      const reveal = THREE.MathUtils.clamp(written - sprite.userData.letterIndex, 0, 1);
-      sprite.material.opacity = reveal;
-      const pop = 0.72 + reveal * 0.28;
-      sprite.scale.set(0.62 * pop, 0.78 * pop, 1);
-    });
   }
 
   _onPointerMove(event) {
@@ -316,10 +320,9 @@ export class LoginShowcase3D {
     const finaleStart = Number.isFinite(this.soundtrack?.duration) ? Math.max(91, this.soundtrack.duration - 18) : Infinity;
     const finaleProgress = mvPhase === 'finale' ? (musicTime - finaleStart) / 12 : 0;
     const mvLoop = musicTime % 16;
-    const repeatingTitleProgress = THREE.MathUtils.clamp((mvLoop - 5.5) / 5.5, 0, 1);
-    this._setFinaleProgress(mvPhase === 'finale' ? Math.max(finaleProgress, repeatingTitleProgress) : repeatingTitleProgress);
     // Launch from the opening bars and repeat throughout the soundtrack.
     this._updateZolosFirework(mvLoop / 8, t);
+    this._updateCelebrationBursts(mvLoop, t);
     this.monsters.forEach((monster, index) => {
       const home = monster.showcaseHome;
       const party = mvPhase !== 'combat';
