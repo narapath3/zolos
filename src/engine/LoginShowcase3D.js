@@ -98,7 +98,7 @@ export class LoginShowcase3D {
       {
         job: 'swordsman', gender: 'male', weapon: 'Solaris Edge', shield: 'Aegis Prime',
         hat: 'Crown of the First Light', gear: HERO_GEAR, pet: 'ember_phoenix',
-        colors: [0x174f9b, 0xf2c14e, 0x172b59], position: [-6.2, 0, 1.0], approach: [-2.6, 0, 0.1], scale: 1.38, style: 'melee', phase: 0, duration: 9.8, target: 0,
+        colors: [0x174f9b, 0xf2c14e, 0x172b59], position: [-4.9, 0, 1.0], approach: [-3.9, 0, 0.45], scale: 1.38, style: 'melee', phase: 0, duration: 14.5, target: 0,
       },
       {
         job: 'archer', gender: 'female', weapon: 'Chronos Bow', hat: 'Ranger Hood',
@@ -315,10 +315,11 @@ export class LoginShowcase3D {
     const mvPhase = getLoginMvPhase(musicTime, this.soundtrack?.duration);
     const finaleStart = Number.isFinite(this.soundtrack?.duration) ? Math.max(91, this.soundtrack.duration - 18) : Infinity;
     const finaleProgress = mvPhase === 'finale' ? (musicTime - finaleStart) / 12 : 0;
-    this._setFinaleProgress(finaleProgress);
-    // The firework is the centrepiece of the MV, so it launches at 01:31 and
-    // remains as a complete, readable ZOLOS constellation until the song loops.
-    this._updateZolosFirework(musicTime >= 91 ? (musicTime - 91) / 8 : 0, t);
+    const mvLoop = musicTime % 16;
+    const repeatingTitleProgress = THREE.MathUtils.clamp((mvLoop - 5.5) / 5.5, 0, 1);
+    this._setFinaleProgress(mvPhase === 'finale' ? Math.max(finaleProgress, repeatingTitleProgress) : repeatingTitleProgress);
+    // Launch from the opening bars and repeat throughout the soundtrack.
+    this._updateZolosFirework(mvLoop / 8, t);
     this.monsters.forEach((monster, index) => {
       const home = monster.showcaseHome;
       const party = mvPhase !== 'combat';
@@ -330,7 +331,8 @@ export class LoginShowcase3D {
       monster.mesh.position.x = x;
       monster.mesh.position.z = z;
       monster.mesh.position.y = Math.max(home.y, home.y + Math.abs(Math.sin(t * (party ? 3.8 : 1.7 + index * 0.12) + index)) * (party ? 0.18 : 0.055));
-      monster.mesh.rotation.y = Math.atan2(dx, dz);
+      const monsterLooksAtCamera = ((t + index * 0.7) % 4.8) < 1.35;
+      monster.mesh.rotation.y = monsterLooksAtCamera ? 0 : Math.atan2(dx, dz);
       monster.mesh.rotation.z = Math.sin(t * 1.5 + index) * 0.025;
       monster.animTimer += dt;
       monster.isMoving = true;
@@ -338,18 +340,18 @@ export class LoginShowcase3D {
     });
     this.heroes.forEach((hero, index) => {
       const config = hero.userData;
+      const repeatingCast = index === 2 && mvLoop < 8;
+      if (repeatingCast) {
+        hero.state = 'attacking';
+        hero.showcaseDesired.set(0.8, 0.08, -0.8);
+        hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
+        hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, 0, 1 - Math.exp(-dt * 9));
+        hero.attackAnimElapsed = (mvLoop % hero.attackAnimDuration);
+        hero.update(dt);
+        return;
+      }
       if (mvPhase === 'party') {
         const beat = t * (2.1 + index * 0.08) + index * 1.4;
-        const openingCast = index === 2 && musicTime >= 91 && musicTime < 100;
-        if (openingCast) {
-          hero.state = 'attacking';
-          hero.showcaseDesired.set(0.8, 0.08, -0.8);
-          hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
-          hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.PI, 1 - Math.exp(-dt * 8));
-          hero.attackAnimElapsed = ((musicTime - 91) % hero.attackAnimDuration);
-          hero.update(dt);
-          return;
-        }
         hero.state = Math.sin(beat) > 0.25 ? 'running' : 'walking';
         hero.showcaseDesired.set(
           config.position[0] + Math.sin(beat * 0.52) * 1.05,
@@ -358,7 +360,7 @@ export class LoginShowcase3D {
         );
         hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
         const lookBeat = Math.floor((musicTime - 91) * 1.7 + index) % 4;
-        const partyFacing = [-1.15, -0.35, 0.45, 1.2][lookBeat];
+        const partyFacing = [0, -0.38, 0, 0.42][lookBeat];
         hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, partyFacing, 1 - Math.exp(-dt * 8));
         hero.attackAnimElapsed = hero.attackAnimDuration;
         hero.update(dt);
@@ -395,12 +397,16 @@ export class LoginShowcase3D {
         const away = approach.clone().sub(target.mesh.position).setY(0).normalize().multiplyScalar(offset);
         approach.copy(target.mesh.position).add(away);
       }
+      // Keep the lead swordsman framed near the foreground instead of making
+      // him cross the whole login screen on every combat cycle.
+      if (index === 0) approach.sub(home).clampLength(0, 1.2).add(home);
       const travel = action.travel ?? 1;
       hero.showcaseDesired.lerpVectors(home, approach, THREE.MathUtils.smoothstep(travel, 0, 1));
       hero.showcaseDesired.y += Math.sin(t * 1.4 + index) * 0.018;
       hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 9));
       const lookAt = action.state === 'walking' && travel < 0.1 ? approach : (target?.mesh.position || approach);
-      const desiredFacing = Math.atan2(lookAt.x - hero.mesh.position.x, lookAt.z - hero.mesh.position.z);
+      const looksAtCamera = ((t + index * 0.8) % 4.2) < 1.5;
+      const desiredFacing = looksAtCamera ? 0 : Math.atan2(lookAt.x - hero.mesh.position.x, lookAt.z - hero.mesh.position.z);
       hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, desiredFacing, 1 - Math.exp(-dt * 10));
       hero.state = action.state;
       hero.attackAnimElapsed = action.state === 'attacking'

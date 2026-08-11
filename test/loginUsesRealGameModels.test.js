@@ -52,7 +52,7 @@ test('login motion uses frame-rate independent damping and avoids unused shadow 
 
 test('soundtrack finale writes ZOLOS ONLINE progressively with game actors', () => {
   assert.match(scene, /const label = 'ZOLOS ONLINE'/);
-  assert.match(scene, /_setFinaleProgress\(finaleProgress\)/);
+  assert.match(scene, /repeatingTitleProgress/);
   assert.match(scene, /this\.soundtrack\.currentTime/);
   assert.match(auth, /this\._bgCanvas\.setSoundtrack\(this\._bgm\)/);
 });
@@ -63,10 +63,13 @@ test('login monsters hide both health bar layers and magic bursts into ZOLOS', (
   assert.match(scene, /const word = 'ZOLOS'/);
   assert.match(scene, /_updateZolosFirework/);
   assert.match(scene, /index === 2 && p < 0\.38/);
-  assert.match(scene, /musicTime >= 91 \? \(musicTime - 91\) \/ 8/);
+  assert.match(scene, /const mvLoop = musicTime % 16/);
+  assert.match(scene, /_updateZolosFirework\(mvLoop \/ 8/);
   assert.match(scene, /size: 0\.2/);
-  assert.match(scene, /musicTime < 100/);
+  assert.match(scene, /repeatingCast = index === 2 && mvLoop < 8/);
   assert.doesNotMatch(scene, /p > 0\.88 \? \(1 - p\)/);
+  assert.match(scene, /monsterLooksAtCamera/);
+  assert.match(scene, /looksAtCamera \? 0/);
 });
 
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {
