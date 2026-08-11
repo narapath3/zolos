@@ -2,6 +2,7 @@ import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNI
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
+import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -8692,7 +8693,7 @@ export class GameUI {
         tab.classList.add('active');
         this.currentWikiTab = tab.getAttribute('data-tab');
         this.selectedWikiItem = null;
-        this._renderWikiList();
+        this._renderWiki();
       });
     });
 
@@ -8711,6 +8712,7 @@ export class GameUI {
   _renderWiki() {
     this._renderWikiList();
     this._renderWikiDetail();
+    hydrateMonsterPortraits(document.getElementById('wiki-panel') || document);
   }
 
   async loadAdventureJournalFromDB(characterId) {
@@ -8749,11 +8751,12 @@ export class GameUI {
       <div class="journal-section"><h4>ยังไม่ค้นพบ</h4>${nextDiscoveries.length ? nextDiscoveries.map(row => `<button class="journal-row undiscovered" data-monster-key="${row.monster.key}">${this._wikiMonsterPortrait(row.monster)}<span><b>???</b><small>${row.monster.environment || 'unknown'} habitat</small></span></button>`).join('') : '<p class="journal-empty">ค้นพบครบทุกสายพันธุ์แล้ว!</p>'}</div></div>`;
   }
 
-  _wikiMonsterPortrait(monster, large = false) {
+  _wikiMonsterPortrait(monster, large = false, monsterKey = '') {
     const hex = `#${Number(monster.color || 0x808080).toString(16).padStart(6, '0')}`;
     const family = monster.family || (monster.waterOnly ? 'aquatic' : 'unknown');
     const flags = `${monster.isBoss ? ' boss' : ''}${monster.isElite ? ' elite' : ''}`;
-    return `<span class="wiki-monster-portrait ${large ? 'large' : ''}${flags}" style="--monster-color:${hex}" data-family="${family}"><i class="wiki-monster-horn left"></i><i class="wiki-monster-horn right"></i><i class="wiki-monster-body"><b></b><b></b></i><em>${monster.emoji || '👾'}</em></span>`;
+    const key = monsterKey || monster.key || '';
+    return `<span class="wiki-monster-portrait ${large ? 'large' : ''}${flags}" style="--monster-color:${hex}" data-family="${family}"><i class="wiki-model-fallback"></i><img data-monster-model="${key}" alt="โมเดล ${monster.name || 'monster'}" loading="lazy"></span>`;
   }
 
   _wikiItemPortrait(item, large = false) {
@@ -8844,6 +8847,7 @@ export class GameUI {
       if (guideEl) guideEl.style.display = 'none';
       if (mainC) mainC.style.display = 'none';
       if (searchBox) searchBox.style.display = 'none';
+      queueMicrotask(() => hydrateMonsterPortraits(journalEl));
       return;
     }
     if (journalEl) journalEl.style.display = 'none';
@@ -8877,7 +8881,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
         slot.innerHTML = `
-          ${this._wikiMonsterPortrait(monster)}
+          ${this._wikiMonsterPortrait(monster, false, key)}
           <span class="wiki-slot-name">${monster.name}<small>${getMonsterJournalEntry(this.adventureJournal, { key, ...monster }).kills} kills</small></span>
         `;
         slot.title = monster.name;
@@ -8944,6 +8948,7 @@ export class GameUI {
       document.getElementById('wiki-detail-placeholder').style.display = 'block';
       document.getElementById('wiki-detail-content').style.display = 'none';
     }
+    queueMicrotask(() => hydrateMonsterPortraits(listContainer));
   }
 
   _renderWikiDetail() {
@@ -9011,7 +9016,7 @@ export class GameUI {
       const envName = envDict[monster.environment] || monster.environment || 'Unknown';
       content.innerHTML = `
         <div class="detail-row">
-          ${this._wikiMonsterPortrait(monster, true)}
+          ${this._wikiMonsterPortrait(monster, true, key)}
           <div class="detail-info-block">
             <div class="wiki-detail-title">${monster.name}</div>
             <div class="detail-type" style="color:#ff6080">${monster.isBoss ? 'WORLD BOSS' : monster.isElite ? 'ELITE MONSTER' : 'MONSTER'} • Lv.${approxLevel}</div>
@@ -9031,6 +9036,7 @@ export class GameUI {
         </div>
         ${dropHtml}
       `;
+      queueMicrotask(() => hydrateMonsterPortraits(content));
     } else {
       const item = ITEMS[key];
       if (!item) return;
