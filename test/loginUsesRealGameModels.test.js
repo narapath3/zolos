@@ -63,6 +63,10 @@ test('login monsters hide both health bar layers and magic bursts into ZOLOS', (
   assert.match(scene, /const word = 'ZOLOS'/);
   assert.match(scene, /_updateZolosFirework/);
   assert.match(scene, /index === 2 && p < 0\.38/);
+  assert.match(scene, /musicTime >= 91 \? \(musicTime - 91\) \/ 8/);
+  assert.match(scene, /size: 0\.2/);
+  assert.match(scene, /musicTime < 100/);
+  assert.doesNotMatch(scene, /p > 0\.88 \? \(1 - p\)/);
 });
 
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {

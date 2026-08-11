@@ -210,13 +210,13 @@ export class LoginShowcase3D {
     };
     const word = 'ZOLOS';
     const targets = [];
-    let cursor = -4.15;
+    let cursor = -3.46;
     for (const letter of word) {
       const rows = glyphs[letter];
       rows.forEach((row, y) => [...row].forEach((on, x) => {
-        if (on === '1') targets.push(cursor + x * 0.18, 4.65 - y * 0.18, -3.15);
+        if (on === '1') targets.push(cursor + x * 0.25, 5.15 - y * 0.25, -2.8);
       }));
-      cursor += 1.08;
+      cursor += 1.48;
     }
     const count = targets.length / 3;
     const positions = new Float32Array(count * 3);
@@ -230,7 +230,7 @@ export class LoginShowcase3D {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    const material = new THREE.PointsMaterial({ size: 0.12, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    const material = new THREE.PointsMaterial({ size: 0.2, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, sizeAttenuation: true });
     this.zolosFirework = new THREE.Points(geometry, material);
     this.zolosFirework.renderOrder = 49;
     this.zolosFireworkTargets = new Float32Array(targets);
@@ -241,7 +241,9 @@ export class LoginShowcase3D {
     if (!this.zolosFirework) return;
     const p = THREE.MathUtils.clamp(progress, 0, 1);
     const positions = this.zolosFirework.geometry.attributes.position;
-    this.zolosFirework.material.opacity = p <= 0 ? 0 : Math.min(1, p * 7) * (p > 0.88 ? (1 - p) / 0.12 : 1);
+    // Keep the completed word fully visible through the MV instead of fading
+    // before players have time to read it.
+    this.zolosFirework.material.opacity = p <= 0 ? 0 : Math.min(1, p * 7);
     for (let i = 0; i < positions.count; i++) {
       const phase = i * 1.618;
       if (p < 0.3) {
@@ -314,7 +316,9 @@ export class LoginShowcase3D {
     const finaleStart = Number.isFinite(this.soundtrack?.duration) ? Math.max(91, this.soundtrack.duration - 18) : Infinity;
     const finaleProgress = mvPhase === 'finale' ? (musicTime - finaleStart) / 12 : 0;
     this._setFinaleProgress(finaleProgress);
-    this._updateZolosFirework(mvPhase === 'finale' ? (musicTime - finaleStart) / 7 : 0, t);
+    // The firework is the centrepiece of the MV, so it launches at 01:31 and
+    // remains as a complete, readable ZOLOS constellation until the song loops.
+    this._updateZolosFirework(musicTime >= 91 ? (musicTime - 91) / 8 : 0, t);
     this.monsters.forEach((monster, index) => {
       const home = monster.showcaseHome;
       const party = mvPhase !== 'combat';
@@ -336,6 +340,16 @@ export class LoginShowcase3D {
       const config = hero.userData;
       if (mvPhase === 'party') {
         const beat = t * (2.1 + index * 0.08) + index * 1.4;
+        const openingCast = index === 2 && musicTime >= 91 && musicTime < 100;
+        if (openingCast) {
+          hero.state = 'attacking';
+          hero.showcaseDesired.set(0.8, 0.08, -0.8);
+          hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
+          hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.PI, 1 - Math.exp(-dt * 8));
+          hero.attackAnimElapsed = ((musicTime - 91) % hero.attackAnimDuration);
+          hero.update(dt);
+          return;
+        }
         hero.state = Math.sin(beat) > 0.25 ? 'running' : 'walking';
         hero.showcaseDesired.set(
           config.position[0] + Math.sin(beat * 0.52) * 1.05,
