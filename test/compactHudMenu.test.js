@@ -19,6 +19,13 @@ test('bottom dock exposes five primary actions and groups all legacy actions', (
   }
 });
 
+test('Adventure Journal belongs to the adventure menu, not system settings', () => {
+  const adventure = hud.match(/data-hud-panel="adventure"[\s\S]*?<\/div>/)?.[0] || '';
+  const system = hud.match(/data-hud-panel="system"[\s\S]*?<\/div>/)?.[0] || '';
+  assert.match(adventure, /id="btn-wiki"/);
+  assert.doesNotMatch(system, /id="btn-wiki"/);
+});
+
 test('bottom dock uses SVG icons instead of emoji glyphs', () => {
   assert.equal((hud.match(/class="hud-icon"/g) || []).length, 17);
   assert.doesNotMatch(hud, /[🎒🃏🌀⚖🏆💬👥📖📜🎁🐟⚙🛡🚪]/u);
