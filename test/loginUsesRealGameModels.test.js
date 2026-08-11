@@ -26,8 +26,7 @@ test('login key art presents a four-job party with distinct divine weapons', () 
   for (const job of ['swordsman', 'archer', 'mage', 'priest']) assert.match(scene, new RegExp(`job: '${job}'`));
   for (const weapon of ['Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod']) assert.match(scene, new RegExp(weapon));
   assert.match(scene, /this\.heroes = cast\.map/);
-  assert.match(scene, /this\.manaField/);
-  assert.match(scene, /this\.lightBeams/);
+  assert.doesNotMatch(scene, /this\.manaField|this\.lightBeams/);
 });
 
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {
@@ -35,12 +34,13 @@ test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor',
   assert.doesNotMatch(auth, /new LoginCanvasBg/);
 });
 
-test('AI environment art is limited to responsive scenery behind real models', () => {
-  assert.match(scene, /login_environment_ro_desktop_v1\.jpg/);
-  assert.match(scene, /login_environment_ro_mobile_v1\.jpg/);
-  assert.match(scene, /this\.scene\.background = texture/);
+test('AI environment art stays in CSS while WebGL renders only game actors', () => {
+  assert.match(scene, /alpha: true/);
+  assert.match(scene, /this\.scene\.background = null/);
+  assert.doesNotMatch(scene, /_buildWorld|CircleGeometry\(24|DodecahedronGeometry|TextureLoader/);
   assert.match(css, /login_environment_ro_desktop_v1\.jpg/);
   assert.match(css, /login_environment_ro_mobile_v1\.jpg/);
+  assert.match(css, /auth-has-live-game-art \.auth-bg-img \{[\s\S]*?opacity: 1/);
   assert.ok(fs.existsSync(new URL('../src/assets/login_environment_ro_desktop_v1.jpg', import.meta.url)));
   assert.ok(fs.existsSync(new URL('../src/assets/login_environment_ro_mobile_v1.jpg', import.meta.url)));
 });

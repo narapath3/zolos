@@ -33,10 +33,9 @@
   pointer-events: none;
 }
 
-/* The painted image is fallback-only. Once the real game renderer is ready,
-   keep just a faint colour bed behind the opaque WebGL scene. */
+/* Environment art remains visible behind the transparent game-model canvas. */
 #auth-screen.auth-has-live-game-art .auth-bg-img {
-  opacity: 0;
+  opacity: 1;
   animation: none;
 }
 
