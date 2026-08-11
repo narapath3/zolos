@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CharacterManager } from './CharacterManager.js';
 import { Monster } from './MonsterManager.js';
+import { animateMonsterRig } from './MonsterAnatomy.js';
 
 const HERO_GEAR = {
   head: 'Celestial Sovereign Helm',
@@ -12,6 +13,15 @@ const HERO_GEAR = {
   ring: 'Eternity Ring',
   accessory: 'Heart of Cosmos',
 };
+
+export function getShowcaseAction(time, phase = 0, duration = 10) {
+  const progress = ((time + phase) % duration) / duration;
+  if (progress < 0.24) return { state: 'walking', travel: progress / 0.24 };
+  if (progress < 0.48) return { state: 'running', travel: (progress - 0.24) / 0.24 };
+  if (progress < 0.64) return { state: 'attacking', attack: (progress - 0.48) / 0.16 };
+  if (progress < 0.76) return { state: 'idle', travel: 1 };
+  return { state: 'walking', travel: 1 - (progress - 0.76) / 0.24 };
+}
 
 /**
  * Login key art rendered from the exact runtime character and monster builders.
@@ -77,22 +87,22 @@ export class LoginShowcase3D {
       {
         job: 'swordsman', gender: 'male', weapon: 'Solaris Edge', shield: 'Aegis Prime',
         hat: 'Crown of the First Light', gear: HERO_GEAR, pet: 'ember_phoenix',
-        colors: [0x174f9b, 0xf2c14e, 0x172b59], position: [-4.7, 0, 0.5], facing: 0.52, scale: 1.38, style: 'melee', phase: 0,
+        colors: [0x174f9b, 0xf2c14e, 0x172b59], position: [-6.2, 0, 1.0], approach: [-2.6, 0, 0.1], scale: 1.38, style: 'melee', phase: 0, duration: 9.8, target: 0,
       },
       {
         job: 'archer', gender: 'female', weapon: 'Chronos Bow', hat: 'Ranger Hood',
         gear: { body: 'Valkyrie Armor', garment: 'Shadow Garment', wrist: 'Guardian Wristguard', pants: 'Leather Pants', feet: 'Dragon Greaves', ring: 'Glow Ring', accessory: 'Gold Earring' }, pet: 'moon_hare',
-        colors: [0x256d4a, 0xc86b3c, 0x173e35], position: [-7.0, 0, -2.1], facing: 0.72, scale: 1.08, style: 'bow', phase: 0.42,
+        colors: [0x256d4a, 0xc86b3c, 0x173e35], position: [-8.0, 0, -2.4], approach: [-5.8, 0, -3.2], scale: 1.08, style: 'bow', phase: 2.7, duration: 11.4, target: 5,
       },
       {
         job: 'mage', gender: 'female', weapon: 'Genesis Staff', hat: 'Wizard Hat', glasses: 'Oracle Lens',
         gear: { body: 'Dragon Scale Mail', garment: 'Odin Garment', wrist: 'Steel Bracer', pants: 'Astral Legguards', feet: 'Worldwalker Greaves', ring: 'Eternity Ring', accessory: 'Heart of Cosmos' }, pet: 'bloom_fairy',
-        colors: [0x6d3ca8, 0xd9e5ff, 0x27184f], position: [5.35, 0, -1.8], facing: -0.6, scale: 1.16, style: 'magic', phase: 0.8,
+        colors: [0x6d3ca8, 0xd9e5ff, 0x27184f], position: [6.4, 0, -2.0], approach: [4.0, 0, -3.7], scale: 1.16, style: 'magic', phase: 5.2, duration: 12.2, target: 2,
       },
       {
         job: 'priest', gender: 'male', weapon: 'Seraph Rod', shield: 'Golden Shield', hat: 'Crown',
         gear: { body: 'Empyrean Plate', garment: 'Odin Garment', wrist: 'Titan Bracers', pants: 'Plate Legguards', feet: 'Speed Boots', ring: 'Silver Ring', accessory: 'Gold Earring' }, pet: 'cloudling',
-        colors: [0xf2e5bb, 0xc98b45, 0x66562d], position: [7.25, 0, 0.35], facing: -0.78, scale: 1.05, style: 'magic', phase: 1.2,
+        colors: [0xf2e5bb, 0xc98b45, 0x66562d], position: [8.1, 0, 1.2], approach: [6.8, 0, 2.0], scale: 1.05, style: 'magic', phase: 7.4, duration: 10.8, target: 3,
       },
     ];
     this.heroes = cast.map((config, index) => {
@@ -106,8 +116,11 @@ export class LoginShowcase3D {
         pet: config.pet, petLevel: 28 + index * 4,
       });
       hero.userData = config;
+      hero.showcaseHome = new THREE.Vector3(...config.position);
+      hero.showcaseApproach = new THREE.Vector3(...config.approach);
+      hero.showcaseMoveTarget = new THREE.Vector3();
       hero.mesh.position.fromArray(config.position);
-      hero.mesh.rotation.y = config.facing;
+      hero.mesh.rotation.y = 0;
       hero.mesh.scale.setScalar(config.scale);
       if (hero.nameSprite) hero.nameSprite.visible = false;
       hero.state = 'attacking';
@@ -124,12 +137,14 @@ export class LoginShowcase3D {
       ['poring', new THREE.Vector3(-1.8, 0, 2.5), 0.74, -0.3],
       ['bigfoot', new THREE.Vector3(-8.8, 0, -4.1), 0.72, 0.65],
     ];
-    this.monsters = lineup.map(([type, position, scale, facing]) => {
+    this.monsters = lineup.map(([type, position, scale, facing], index) => {
       const monster = new Monster(this.scene, type, position);
       monster.mesh.scale.multiplyScalar(scale);
       monster.mesh.rotation.y = facing;
       if (monster.nameSprite) monster.nameSprite.visible = false;
       if (monster.hpBarGroup) monster.hpBarGroup.visible = false;
+      monster.showcaseHome = position.clone();
+      monster.showcasePhase = index;
       return monster;
     });
   }
@@ -163,16 +178,43 @@ export class LoginShowcase3D {
     if (!this.isRunning) return;
     const dt = Math.min(this.clock.getDelta(), 0.04);
     const t = this.clock.elapsedTime;
+    this.monsters.forEach((monster, index) => {
+      const home = monster.showcaseHome;
+      const speed = 0.28 + index * 0.035;
+      const x = home.x + Math.sin(t * speed + index * 1.7) * (0.34 + index % 2 * 0.16);
+      const z = home.z + Math.cos(t * speed * 0.82 + index) * (0.22 + index % 3 * 0.08);
+      const dx = x - monster.mesh.position.x;
+      const dz = z - monster.mesh.position.z;
+      monster.mesh.position.x = x;
+      monster.mesh.position.z = z;
+      monster.mesh.position.y = Math.max(home.y, home.y + Math.sin(t * (1.7 + index * 0.12) + index) * 0.055);
+      monster.mesh.rotation.y = Math.atan2(dx, dz);
+      monster.mesh.rotation.z = Math.sin(t * 1.5 + index) * 0.025;
+      monster.animTimer += dt;
+      monster.isMoving = true;
+      animateMonsterRig(monster._professionalRig, monster.animTimer, true, false);
+    });
     this.heroes.forEach((hero, index) => {
       const config = hero.userData;
-      const cycle = (t + config.phase) % (2.35 + index * 0.18);
-      hero.attackAnimElapsed = cycle < 0.72 ? cycle : 1;
+      const action = getShowcaseAction(t, config.phase, config.duration);
+      const target = this.monsters[config.target];
+      const home = hero.showcaseHome;
+      const approach = hero.showcaseMoveTarget.copy(hero.showcaseApproach);
+      if (target && (action.state === 'running' || action.state === 'attacking' || action.state === 'idle')) {
+        const offset = config.job === 'archer' || config.job === 'mage' || config.job === 'priest' ? 2.0 : 0.9;
+        const away = approach.clone().sub(target.mesh.position).setY(0).normalize().multiplyScalar(offset);
+        approach.copy(target.mesh.position).add(away);
+      }
+      const travel = action.travel ?? 1;
+      hero.mesh.position.lerpVectors(home, approach, THREE.MathUtils.smoothstep(travel, 0, 1));
+      hero.mesh.position.y += Math.sin(t * 1.4 + index) * 0.018;
+      const lookAt = action.state === 'walking' && travel < 0.1 ? approach : (target?.mesh.position || approach);
+      hero.mesh.rotation.y = Math.atan2(lookAt.x - hero.mesh.position.x, lookAt.z - hero.mesh.position.z);
+      hero.state = action.state;
+      hero.attackAnimElapsed = action.state === 'attacking'
+        ? Math.min(hero.attackAnimDuration, (action.attack || 0) * hero.attackAnimDuration)
+        : hero.attackAnimDuration;
       hero.update(dt);
-      hero.mesh.position.set(config.position[0], config.position[1] + Math.sin(t * 1.4 + index) * 0.025, config.position[2]);
-    });
-    this.monsters.forEach((monster, index) => {
-      monster.mesh.position.y = Math.max(0, Math.sin(t * (1.7 + index * 0.12) + index) * 0.06);
-      monster.mesh.rotation.z = Math.sin(t * 1.5 + index) * 0.025;
     });
     this.camera.position.x += ((this.cameraBase.x + this.pointer.x * 0.22) - this.camera.position.x) * 0.025;
     this.camera.position.y += ((this.cameraBase.y - this.pointer.y * 0.1) - this.camera.position.y) * 0.025;

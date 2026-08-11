@@ -29,6 +29,15 @@ test('login key art presents a four-job party with distinct divine weapons', () 
   assert.doesNotMatch(scene, /this\.manaField|this\.lightBeams/);
 });
 
+test('showcase actors patrol, run, attack and idle on independent timelines', async () => {
+  const { getShowcaseAction } = await import('../src/engine/LoginShowcase3D.js');
+  const states = new Set(Array.from({ length: 100 }, (_, i) => getShowcaseAction(i / 10, 0, 10).state));
+  assert.deepEqual(states, new Set(['walking', 'running', 'attacking', 'idle']));
+  assert.match(scene, /animateMonsterRig\(monster\._professionalRig/);
+  assert.match(scene, /hero\.mesh\.position\.lerpVectors/);
+  assert.match(scene, /monster\.showcaseHome/);
+});
+
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {
   assert.match(auth, /new LoginShowcase3D\('auth-bg-canvas'\)/);
   assert.doesNotMatch(auth, /new LoginCanvasBg/);
