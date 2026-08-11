@@ -38,6 +38,19 @@ test('players can zoom, disable fog, and cannot walk through shop colliders', as
     assert.match(main, /sceneManager\.resolvePlayerCollisions\(character\.mesh\.position/);
 });
 
+test('vending street leaves a walkable aisle between every pair of stalls', async () => {
+    const scene = await readFile(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+
+    assert.match(scene, /const STALL_SPACING = 5\.25/);
+    assert.match(scene, /\(slot - 3\.5\) \* STALL_SPACING/);
+    assert.equal((scene.match(/group\.userData\.collisionRadius = 1\.55/g) || []).length, 2);
+
+    const spacing = 5.25;
+    const stallRadius = 1.55;
+    const playerRadius = 0.42;
+    assert.ok(spacing - (2 * (stallRadius + playerRadius)) >= 1.25);
+});
+
 test('priest cooldowns remain per-skill and respawn restores the owner mesh', async () => {
     const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
     assert.match(character, /this\.cooldowns\[skillId\] = skill\.cooldown/);

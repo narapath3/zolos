@@ -4406,7 +4406,11 @@ export class SceneManager {
         if (this.currentMap !== 'prontera') return;
 
         const AWNING_COLORS = [0xd94a4a, 0x3a8ad9, 0x3fae5a, 0xd9a03a, 0x9a5ad9, 0xd95a9a, 0x3ab8b0, 0xb8763a];
-        const SLOT_X = [-14, -10, -6, -2, 2, 6, 10, 14];
+        // Keep a real pedestrian aisle between neighbouring 3.2-unit awnings.
+        // The old 4-unit spacing made the two player collision envelopes overlap,
+        // so entering the visual gap could pin the character between both stalls.
+        const STALL_SPACING = 5.25;
+        const SLOT_X = Array.from({ length: 8 }, (_, slot) => (slot - 3.5) * STALL_SPACING);
         // South side of town — the winding river tops out at z ≈ +8, the PvP
         // arena at (-14,14) reaches z ≈ 20, portals sit at x = ±25. z = 22
         // keeps the whole street clear of all of them.
@@ -4427,6 +4431,7 @@ export class SceneManager {
             }
             const group = new THREE.Group();
             group.userData.isStall = true;
+            group.userData.collisionRadius = 1.55;
             group.userData.stall = stall;
 
             const awningColor = AWNING_COLORS[slot];
@@ -4546,6 +4551,7 @@ export class SceneManager {
     _buildEmptyStallStand(slot, x, z) {
         const group = new THREE.Group();
         group.userData.isStall = true;
+        group.userData.collisionRadius = 1.55;
         group.userData.stall = { empty: true, slot };
 
         const wood = new THREE.MeshLambertMaterial({ color: 0x6a5236 });
