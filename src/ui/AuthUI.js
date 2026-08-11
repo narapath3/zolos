@@ -1,5 +1,5 @@
 import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount, getDeterministicGuestName, isPlaceholderName, sendPasswordResetEmail } from '../network/SupabaseClient.js';
-import { LoginCanvasBg } from '../engine/LoginCanvasBg.js';
+import { LoginShowcase3D } from '../engine/LoginShowcase3D.js';
 
 export class AuthUI {
     constructor(onAuthSuccess) {
@@ -13,7 +13,7 @@ export class AuthUI {
         this._selectedClass = 'swordman';
 
         // Animated Canvas Background Scene
-        this._bgCanvas = new LoginCanvasBg('auth-bg-canvas');
+        this._bgCanvas = new LoginShowcase3D('auth-bg-canvas');
         if (this._bgCanvas) this._bgCanvas.start();
 
         // BGM initialization

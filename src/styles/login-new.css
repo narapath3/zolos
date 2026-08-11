@@ -33,6 +33,13 @@
   pointer-events: none;
 }
 
+/* The painted image is fallback-only. Once the real game renderer is ready,
+   keep just a faint colour bed behind the opaque WebGL scene. */
+#auth-screen.auth-has-live-game-art .auth-bg-img {
+  opacity: 0;
+  animation: none;
+}
+
 /* Art-directed portrait artwork avoids destructively cropping desktop key art. */
 @media (orientation: portrait) {
   .auth-bg-img {
@@ -63,6 +70,7 @@
   height: 100%;
   z-index: 1;
   pointer-events: none;
+  filter: saturate(1.06) contrast(1.03);
 }
 
 /* ---- Cinematic Background Layers ---- */
