@@ -12,10 +12,6 @@ export class AuthUI {
         this._sessionData = null;
         this._selectedClass = 'swordman';
 
-        // Animated Canvas Background Scene
-        this._bgCanvas = new LoginShowcase3D('auth-bg-canvas');
-        if (this._bgCanvas) this._bgCanvas.start();
-
         // BGM initialization
         this._bgm = new Audio('/assets/ZOLOSOnline.mp3');
         this._bgm.loop = true;
@@ -23,6 +19,13 @@ export class AuthUI {
         this._bgmPlayed = false;
         this._bgmMuted = false;
         this._autoplayTrigger = null;
+
+        // The live game-model MV follows the real soundtrack timeline.
+        this._bgCanvas = new LoginShowcase3D('auth-bg-canvas');
+        if (this._bgCanvas) {
+            this._bgCanvas.setSoundtrack(this._bgm);
+            this._bgCanvas.start();
+        }
 
         this._pingInterval = null;
         this._pingEl = null;

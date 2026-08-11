@@ -30,12 +30,22 @@ test('login key art presents a four-job party with distinct divine weapons', () 
 });
 
 test('showcase actors patrol, run, attack and idle on independent timelines', async () => {
-  const { getShowcaseAction } = await import('../src/engine/LoginShowcase3D.js');
+  const { getShowcaseAction, getLoginMvPhase } = await import('../src/engine/LoginShowcase3D.js');
   const states = new Set(Array.from({ length: 100 }, (_, i) => getShowcaseAction(i / 10, 0, 10).state));
   assert.deepEqual(states, new Set(['walking', 'running', 'attacking', 'idle']));
   assert.match(scene, /animateMonsterRig\(monster\._professionalRig/);
   assert.match(scene, /hero\.mesh\.position\.lerpVectors/);
   assert.match(scene, /monster\.showcaseHome/);
+  assert.equal(getLoginMvPhase(90.9, 180), 'combat');
+  assert.equal(getLoginMvPhase(91, 180), 'party');
+  assert.equal(getLoginMvPhase(162, 180), 'finale');
+});
+
+test('soundtrack finale writes ZOLOS ONLINE progressively with game actors', () => {
+  assert.match(scene, /const label = 'ZOLOS ONLINE'/);
+  assert.match(scene, /_setFinaleProgress\(finaleProgress\)/);
+  assert.match(scene, /this\.soundtrack\.currentTime/);
+  assert.match(auth, /this\._bgCanvas\.setSoundtrack\(this\._bgm\)/);
 });
 
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {

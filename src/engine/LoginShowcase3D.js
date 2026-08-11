@@ -23,6 +23,13 @@ export function getShowcaseAction(time, phase = 0, duration = 10) {
   return { state: 'walking', travel: 1 - (progress - 0.76) / 0.24 };
 }
 
+export function getLoginMvPhase(currentTime, duration) {
+  const time = Math.max(0, Number(currentTime) || 0);
+  const total = Number(duration);
+  if (Number.isFinite(total) && total > 30 && time >= Math.max(91, total - 18)) return time >= total - 18 ? 'finale' : 'party';
+  return time >= 91 ? 'party' : 'combat';
+}
+
 /**
  * Login key art rendered from the exact runtime character and monster builders.
  * No painted stand-ins: equipment changes and monster remasters automatically
@@ -55,6 +62,7 @@ export class LoginShowcase3D {
     this.camera = new THREE.PerspectiveCamera(37, 1, 0.1, 80);
     this._buildLighting();
     this._buildCast();
+    this._buildFinaleTitle();
 
     this._onResize = this._onResize.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
@@ -149,6 +157,55 @@ export class LoginShowcase3D {
     });
   }
 
+  setSoundtrack(audio) {
+    this.soundtrack = audio || null;
+  }
+
+  _buildFinaleTitle() {
+    const label = 'ZOLOS ONLINE';
+    this.finaleTitle = new THREE.Group();
+    this.finaleTitle.position.set(0, 3.45, -3.8);
+    this.finaleLetters = [];
+    const spacing = 0.58;
+    const startX = -((label.length - 1) * spacing) / 2;
+    [...label].forEach((letter, index) => {
+      if (letter === ' ') return;
+      const canvas = document.createElement('canvas');
+      canvas.width = 128; canvas.height = 160;
+      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 20, 0, 145);
+      gradient.addColorStop(0, '#fffbd0');
+      gradient.addColorStop(0.46, '#ffd34f');
+      gradient.addColorStop(1, '#ff8a24');
+      ctx.font = '900 106px Arial Black, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 14; ctx.strokeStyle = 'rgba(22,45,95,.92)';
+      ctx.shadowColor = '#50e8ff'; ctx.shadowBlur = 18;
+      ctx.strokeText(letter, 64, 84); ctx.fillStyle = gradient; ctx.fillText(letter, 64, 84);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+      const sprite = new THREE.Sprite(material);
+      sprite.position.x = startX + index * spacing;
+      sprite.scale.set(0.62, 0.78, 1);
+      sprite.renderOrder = 50;
+      sprite.userData.letterIndex = index;
+      this.finaleTitle.add(sprite);
+      this.finaleLetters.push(sprite);
+    });
+    this.scene.add(this.finaleTitle);
+  }
+
+  _setFinaleProgress(progress) {
+    const written = THREE.MathUtils.clamp(progress, 0, 1) * 12;
+    this.finaleLetters.forEach((sprite) => {
+      const reveal = THREE.MathUtils.clamp(written - sprite.userData.letterIndex, 0, 1);
+      sprite.material.opacity = reveal;
+      const pop = 0.72 + reveal * 0.28;
+      sprite.scale.set(0.62 * pop, 0.78 * pop, 1);
+    });
+  }
+
   _onPointerMove(event) {
     this.pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
     this.pointer.y = (event.clientY / window.innerHeight - 0.5) * 2;
@@ -178,16 +235,22 @@ export class LoginShowcase3D {
     if (!this.isRunning) return;
     const dt = Math.min(this.clock.getDelta(), 0.04);
     const t = this.clock.elapsedTime;
+    const musicTime = this.soundtrack && !this.soundtrack.paused ? this.soundtrack.currentTime : 0;
+    const mvPhase = getLoginMvPhase(musicTime, this.soundtrack?.duration);
+    const finaleStart = Number.isFinite(this.soundtrack?.duration) ? Math.max(91, this.soundtrack.duration - 18) : Infinity;
+    const finaleProgress = mvPhase === 'finale' ? (musicTime - finaleStart) / 12 : 0;
+    this._setFinaleProgress(finaleProgress);
     this.monsters.forEach((monster, index) => {
       const home = monster.showcaseHome;
-      const speed = 0.28 + index * 0.035;
-      const x = home.x + Math.sin(t * speed + index * 1.7) * (0.34 + index % 2 * 0.16);
-      const z = home.z + Math.cos(t * speed * 0.82 + index) * (0.22 + index % 3 * 0.08);
+      const party = mvPhase !== 'combat';
+      const speed = party ? 1.25 + index * 0.08 : 0.28 + index * 0.035;
+      const x = home.x + Math.sin(t * speed + index * 1.7) * (party ? 0.72 : 0.34 + index % 2 * 0.16);
+      const z = home.z + Math.cos(t * speed * 0.82 + index) * (party ? 0.48 : 0.22 + index % 3 * 0.08);
       const dx = x - monster.mesh.position.x;
       const dz = z - monster.mesh.position.z;
       monster.mesh.position.x = x;
       monster.mesh.position.z = z;
-      monster.mesh.position.y = Math.max(home.y, home.y + Math.sin(t * (1.7 + index * 0.12) + index) * 0.055);
+      monster.mesh.position.y = Math.max(home.y, home.y + Math.abs(Math.sin(t * (party ? 3.8 : 1.7 + index * 0.12) + index)) * (party ? 0.18 : 0.055));
       monster.mesh.rotation.y = Math.atan2(dx, dz);
       monster.mesh.rotation.z = Math.sin(t * 1.5 + index) * 0.025;
       monster.animTimer += dt;
@@ -196,6 +259,35 @@ export class LoginShowcase3D {
     });
     this.heroes.forEach((hero, index) => {
       const config = hero.userData;
+      if (mvPhase === 'party') {
+        const beat = t * (2.1 + index * 0.08) + index * 1.4;
+        hero.state = Math.sin(beat) > 0.25 ? 'running' : 'walking';
+        hero.mesh.position.set(
+          config.position[0] + Math.sin(beat * 0.52) * 1.05,
+          config.position[1] + Math.abs(Math.sin(beat)) * 0.13,
+          config.position[2] + Math.cos(beat * 0.44) * 0.65,
+        );
+        hero.mesh.rotation.y = beat + Math.sin(beat * 0.6) * 0.5;
+        hero.attackAnimElapsed = hero.attackAnimDuration;
+        hero.update(dt);
+        return;
+      }
+      if (mvPhase === 'finale') {
+        const p = THREE.MathUtils.clamp(finaleProgress, 0, 1);
+        if (index === 0) {
+          hero.state = 'running';
+          hero.mesh.position.set(THREE.MathUtils.lerp(-3.45, 3.45, p), 0.15 + Math.sin(t * 8) * 0.04, -1.0);
+          hero.mesh.rotation.y = Math.PI / 2;
+        } else {
+          const side = index === 1 ? -1 : 1;
+          hero.state = 'walking';
+          hero.mesh.position.set(side * (4.6 + (index - 1) * 0.55), 0.08 + Math.abs(Math.sin(t * 3.4 + index)) * 0.16, -0.5 + index * 0.35);
+          hero.mesh.rotation.y = Math.sin(t * 2.1 + index) * 0.55;
+        }
+        hero.attackAnimElapsed = hero.attackAnimDuration;
+        hero.update(dt);
+        return;
+      }
       const action = getShowcaseAction(t, config.phase, config.duration);
       const target = this.monsters[config.target];
       const home = hero.showcaseHome;
