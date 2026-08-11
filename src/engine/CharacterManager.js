@@ -1789,21 +1789,57 @@ export class CharacterManager {
     _updateDivineAura() {
         if (!this.mesh) return;
         if (this.divineAura) { this._disposeMesh(this.divineAura); this.divineAura = null; }
+        if (this.auraRing) this.auraRing.visible = true;
         const divineNames = new Set(['Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod', 'Empyrean Plate', 'Wings of Aeon', 'Aegis Prime', 'Crown of the First Light', 'Oracle Lens', 'Titan Bracers', 'Astral Legguards', 'Worldwalker Greaves', 'Eternity Ring', 'Heart of Cosmos', 'Celestial Sovereign Helm']);
         const equipped = [this.equippedWeapon, this.equippedShield, this.equippedHat, this.equippedGlasses, ...Object.values(this.equippedGear || {})];
         const count = equipped.filter(name => divineNames.has(name)).length;
         if (!count) return;
         const group = new THREE.Group();
-        const additive = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-        const floorCyan = new THREE.Mesh(new THREE.TorusGeometry(0.78, 0.045, 8, 40), additive(0x54eaff, 0.85));
-        floorCyan.rotation.x = Math.PI / 2; floorCyan.position.y = 0.04; group.add(floorCyan);
-        const floorGold = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.025, 8, 32), additive(0xffd85a, 0.85));
-        floorGold.rotation.x = Math.PI / 2; floorGold.position.y = 0.055; group.add(floorGold);
-        const halo = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.035, 8, 40), additive(0xffef9d, 0.75));
-        halo.position.set(0, 1.25, -0.28); group.add(halo);
+        const crisp = (color, opacity = 0.9) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.NormalBlending, depthWrite: false, depthTest: true, side: THREE.DoubleSide });
+        const hasAeonWings = equipped.includes('Wings of Aeon');
+
+        // Wings of Aeon should read as celestial wings, not another stack of
+        // floor circles. Each side has a luminous spine and layered tapered
+        // feathers, all opaque enough to keep their silhouette sharp.
+        if (hasAeonWings) {
+            if (this.auraRing) this.auraRing.visible = false;
+            const wings = new THREE.Group();
+            wings.position.set(0, 1.18, -0.2);
+            const featherGeo = new THREE.ConeGeometry(0.075, 0.72, 5);
+            const spineGeo = new THREE.CylinderGeometry(0.018, 0.035, 1.22, 6);
+            const featherMats = [crisp(0xf4fdff, 0.96), crisp(0x72eaff, 0.92), crisp(0xffe684, 0.88)];
+            const wingSides = [];
+            for (const side of [-1, 1]) {
+                const wing = new THREE.Group();
+                wing.position.x = side * 0.16;
+                wing.rotation.z = side * -0.2;
+                const spine = new THREE.Mesh(spineGeo, crisp(0xeaffff, 0.95));
+                spine.position.set(side * 0.32, 0.18, 0);
+                spine.rotation.z = side * -0.72;
+                wing.add(spine);
+                for (let i = 0; i < 7; i++) {
+                    const long = 0.68 + i * 0.085;
+                    const feather = new THREE.Mesh(featherGeo, featherMats[i % featherMats.length]);
+                    feather.scale.set(1 + i * 0.055, long / 0.72, 0.72);
+                    feather.position.set(side * (0.34 + i * 0.105), 0.35 - i * 0.115, -0.015 * i);
+                    feather.rotation.z = side * (-0.5 - i * 0.055);
+                    feather.rotation.x = side * 0.025;
+                    wing.add(feather);
+                }
+                const crownFeather = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.88, 5), crisp(0xffffff, 0.98));
+                crownFeather.position.set(side * 0.48, 0.58, 0.01);
+                crownFeather.rotation.z = side * -0.62;
+                wing.add(crownFeather);
+                wings.add(wing);
+                wingSides.push(wing);
+            }
+            group.add(wings);
+            group.userData.wings = wings;
+            group.userData.wingSides = wingSides;
+        }
         const orbit = new THREE.Group(); orbit.position.y = 1.05;
         for (let i = 0; i < Math.min(6, 3 + count); i++) {
-            const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.055 + count * 0.004), additive(i % 2 ? 0xffdc62 : 0x60efff, 0.95));
+            const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.045 + count * 0.003), crisp(i % 2 ? 0xffdc62 : 0x60efff, 0.92));
             const angle = i / Math.min(6, 3 + count) * Math.PI * 2;
             gem.position.set(Math.cos(angle) * 0.82, (i % 2) * 0.22, Math.sin(angle) * 0.82); orbit.add(gem);
         }
@@ -2663,10 +2699,15 @@ export class CharacterManager {
             this.auraRing.scale.set(s, s, 1);
         }
         if (this.divineAura) {
-            this.divineAura.rotation.y += dt * 0.65;
             const orbit = this.divineAura.userData.orbit;
             if (orbit) { orbit.rotation.y -= dt * 1.8; orbit.rotation.z = Math.sin(this.animTimer * 1.5) * 0.08; }
-            const pulse = (this.divineAura.userData.power || 1) * (1 + Math.sin(this.animTimer * 3) * 0.045);
+            const wingSides = this.divineAura.userData.wingSides;
+            if (wingSides) {
+                const flap = Math.sin(this.animTimer * 2.4) * 0.055;
+                wingSides[0].rotation.y = -0.12 - flap;
+                wingSides[1].rotation.y = 0.12 + flap;
+            }
+            const pulse = (this.divineAura.userData.power || 1) * (1 + Math.sin(this.animTimer * 3) * 0.012);
             this.divineAura.scale.set(pulse, pulse, pulse);
         }
 
