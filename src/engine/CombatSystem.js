@@ -2,6 +2,21 @@
 import * as THREE from 'three';
 import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS, getPetCombat } from './GameData.js';
 
+export function buildAutoSearchWaypoints({ halfExtent = 46, step = 11, isBlocked = () => false } = {}) {
+    const points = [];
+    let row = 0;
+    for (let z = -halfExtent; z <= halfExtent; z += step, row++) {
+        const xs = [];
+        for (let x = -halfExtent; x <= halfExtent; x += step) xs.push(x);
+        if (row % 2) xs.reverse();
+        for (const x of xs) {
+            const point = new THREE.Vector3(x, 0, z);
+            if (!isBlocked(point)) points.push(point);
+        }
+    }
+    return points;
+}
+
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
         this.character = characterManager;
@@ -16,6 +31,12 @@ export class CombatSystem {
         this.attackRange = 1.8;
         this.globalCooldown = 0;
         this.petCooldown = 0; // seconds until the companion's next strike
+        this.autoSearchWaypoints = [];
+        this.autoSearchIndex = 0;
+        this.autoSearchTarget = null;
+        this.autoSearchStuckTime = 0;
+        this.autoSearchLastPosition = null;
+        this.autoSearchMap = null;
     }
 
     toggleAutoFarm() {
@@ -23,9 +44,65 @@ export class CombatSystem {
         this.autoFarm = !this.autoFarm;
         if (!this.autoFarm) {
             this.currentTarget = null;
+            this._resetAutoSearch();
             this.character.state = 'idle';
         }
         return this.autoFarm;
+    }
+
+    _resetAutoSearch() {
+        this.autoSearchTarget = null;
+        this.autoSearchStuckTime = 0;
+        this.autoSearchLastPosition = null;
+    }
+
+    _canSearchCurrentMap() {
+        const map = this.sceneManager?.currentMap || window.sceneManager?.currentMap || '';
+        return map !== 'svarrga' && map !== 'pvp_arena';
+    }
+
+    _nextAutoSearchTarget() {
+        const map = this.sceneManager?.currentMap || window.sceneManager?.currentMap || '';
+        if (this.autoSearchMap !== map) {
+            this.autoSearchMap = map;
+            this.autoSearchWaypoints = [];
+            this.autoSearchIndex = 0;
+        }
+        if (!this.autoSearchWaypoints.length) {
+            this.autoSearchWaypoints = buildAutoSearchWaypoints({
+                isBlocked: point => !!this.sceneManager?.isInWater?.(point),
+            });
+            // Begin near the player's current location, then sweep the whole map.
+            const pos = this.character.getPosition();
+            let nearest = 0, nearestDistance = Infinity;
+            this.autoSearchWaypoints.forEach((point, index) => {
+                const distance = point.distanceToSquared(pos);
+                if (distance < nearestDistance) { nearestDistance = distance; nearest = index; }
+            });
+            this.autoSearchIndex = nearest;
+        } else {
+            this.autoSearchIndex = (this.autoSearchIndex + 1) % this.autoSearchWaypoints.length;
+        }
+        this.autoSearchTarget = this.autoSearchWaypoints[this.autoSearchIndex]?.clone() || null;
+        this.autoSearchStuckTime = 0;
+        this.autoSearchLastPosition = this.character.getPosition().clone();
+    }
+
+    _updateAutoSearch(dt) {
+        if (!this._canSearchCurrentMap()) return false;
+        if (!this.autoSearchTarget) this._nextAutoSearchTarget();
+        if (!this.autoSearchTarget) return false;
+        const pos = this.character.getPosition();
+        const dx = pos.x - this.autoSearchTarget.x, dz = pos.z - this.autoSearchTarget.z;
+        if (dx * dx + dz * dz < 1.3) this._nextAutoSearchTarget();
+        if (!this.autoSearchTarget) return false;
+
+        const moved = this.autoSearchLastPosition ? pos.distanceToSquared(this.autoSearchLastPosition) : 1;
+        this.autoSearchStuckTime = moved < 0.0025 ? this.autoSearchStuckTime + dt : 0;
+        if (this.autoSearchStuckTime > 2.5) this._nextAutoSearchTarget();
+        this.autoSearchLastPosition = pos.clone();
+        this.character.moveToward(this.autoSearchTarget, dt);
+        return true;
     }
 
     toggleFishing() {
@@ -210,6 +287,7 @@ export class CombatSystem {
         }
 
         if (target && target.alive) {
+            this._resetAutoSearch();
             // Ensure character target is synced for UI target lock in AUTO mode
             if (this.autoFarm && !this.character.targetMonster) {
                 this.character.targetMonster = target;
@@ -256,10 +334,10 @@ export class CombatSystem {
             // Reset Target reference if we had any
             this.currentTarget = null;
 
-            // Fix C: Handle case where AUTO finds no monster target
-            // Ensure character returns to idle state when no target is found, 
-            // especially during autoFarm to prevent getting stuck in 'walking' or 'attacking' state
-            if (this.character.state === 'attacking' || this.character.state === 'walking' || this.character.state === 'running') {
+            // No monster within the local scan radius: sweep the map until one
+            // enters range, then the normal target/attack path takes over.
+            const searching = this.autoFarm && this._updateAutoSearch(clampedDt);
+            if (!searching && (this.character.state === 'attacking' || this.character.state === 'walking' || this.character.state === 'running')) {
                 this.character.state = 'idle';
             }
         }
