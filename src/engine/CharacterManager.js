@@ -1057,18 +1057,20 @@ export class CharacterManager {
     _createAuraRing() {
         if (this.auraRing) { this.mesh.remove(this.auraRing); this.auraRing = null; }
         const col = this._auraColor();
-        const glow = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+        // Keep persistent effects edge-defined. Large additive transparent
+        // surfaces wash the ground and character into a soft, eye-straining
+        // haze, especially on mobile displays.
+        const crisp = (c, o) => new THREE.MeshBasicMaterial({
+            color: c, transparent: true, opacity: o, side: THREE.DoubleSide,
+            depthWrite: false, depthTest: true, blending: THREE.NormalBlending,
+        });
         const grp = new THREE.Group();
-        // Soft radiant floor pool (kept low-opacity so overdraw stays cheap).
-        const pool = new THREE.Mesh(new THREE.CircleGeometry(0.9, 28), glow(col, 0.16));
-        pool.userData.noSpin = true;
-        grp.add(pool);
-        grp.add(new THREE.Mesh(new THREE.RingGeometry(0.72, 0.9, 40), glow(col, 0.7)));    // outer ring
-        const whiteRing = new THREE.Mesh(new THREE.RingGeometry(0.44, 0.52, 32), glow(0xffffff, 0.5)); // inner ring
+        grp.add(new THREE.Mesh(new THREE.RingGeometry(0.79, 0.9, 48), crisp(col, 0.9))); // outer ring
+        const whiteRing = new THREE.Mesh(new THREE.RingGeometry(0.47, 0.515, 40), crisp(0xffffff, 0.72)); // inner ring
         whiteRing.userData.keepWhite = true;
         grp.add(whiteRing);
         const spokeGeo = new THREE.PlaneGeometry(0.07, 0.26);
-        const spokeMat = glow(col, 0.5);
+        const spokeMat = crisp(col, 0.72);
         for (let i = 0; i < 6; i++) {
             const a = (i / 6) * Math.PI * 2;
             const spoke = new THREE.Mesh(spokeGeo, spokeMat);
@@ -1673,10 +1675,10 @@ export class CharacterManager {
 
         // Ground halo ring (tier 1+): a thin glowing torus that spins.
         const ringR = 0.34 + tier * 0.05;
-        const ringGeo = new THREE.TorusGeometry(ringR, 0.02 + tier * 0.006, 8, 24);
+        const ringGeo = new THREE.TorusGeometry(ringR, 0.016 + tier * 0.004, 8, 32);
         const ringMat = new THREE.MeshBasicMaterial({
-            color, transparent: true, opacity: 0.55 + tier * 0.06,
-            blending: THREE.AdditiveBlending, depthWrite: false,
+            color, transparent: true, opacity: 0.78 + tier * 0.04,
+            blending: THREE.NormalBlending, depthWrite: false, depthTest: true,
         });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = Math.PI / 2;
@@ -1693,8 +1695,8 @@ export class CharacterManager {
                 const s = new THREE.Mesh(
                     new THREE.SphereGeometry(0.035 + tier * 0.006, 6, 6),
                     new THREE.MeshBasicMaterial({
-                        color, transparent: true, opacity: 0.9,
-                        blending: THREE.AdditiveBlending, depthWrite: false,
+                        color, transparent: true, opacity: 0.92,
+                        blending: THREE.NormalBlending, depthWrite: false, depthTest: true,
                     })
                 );
                 s.userData.phase = (i / count) * Math.PI * 2;
@@ -1705,16 +1707,18 @@ export class CharacterManager {
             }
         }
 
-        // Radiant body glow (tier 3+): a soft additive shell that breathes.
+        // Tier 3+ gets a second crisp signature ring. A transparent sphere used
+        // here previously veiled the pet model and made its silhouette blurry.
         if (tier >= 3) {
             const glow = new THREE.Mesh(
-                new THREE.SphereGeometry(floats ? 0.34 : 0.3, 10, 10),
+                new THREE.TorusGeometry(ringR * 0.72, 0.012 + tier * 0.002, 6, 28),
                 new THREE.MeshBasicMaterial({
-                    color, transparent: true, opacity: 0.16 + (tier - 3) * 0.06,
-                    blending: THREE.AdditiveBlending, depthWrite: false,
+                    color, transparent: true, opacity: 0.58 + (tier - 3) * 0.08,
+                    blending: THREE.NormalBlending, depthWrite: false, depthTest: true,
                 })
             );
-            glow.position.y = floats ? 0.5 : 0.26;
+            glow.rotation.x = Math.PI / 2;
+            glow.position.y = groundY + 0.006;
             this.petMesh.add(glow);
             aura.glow = glow;
         }
@@ -2655,7 +2659,7 @@ export class CharacterManager {
         // Spin the aura ring + gentle breathing pulse (rotation only — cheap).
         if (this.auraRing) {
             this.auraRing.rotation.z += dt * 0.7;
-            const s = 1 + Math.sin(this.animTimer * 2.2) * 0.05;
+            const s = 1 + Math.sin(this.animTimer * 2.2) * 0.018;
             this.auraRing.scale.set(s, s, 1);
         }
         if (this.divineAura) {
@@ -2746,7 +2750,7 @@ export class CharacterManager {
             if (aura) {
                 if (aura.ring) {
                     aura.ring.rotation.z += dt * 1.6;
-                    aura.ring.material.opacity = (0.5 + Math.sin(t * 3) * 0.1);
+                    aura.ring.material.opacity = (0.84 + Math.sin(t * 3) * 0.035);
                 }
                 if (aura.sparkles) {
                     for (const s of aura.sparkles) {
@@ -2759,8 +2763,9 @@ export class CharacterManager {
                     }
                 }
                 if (aura.glow) {
-                    const g = 1 + Math.sin(t * 3.5) * 0.08;
-                    aura.glow.scale.set(g, g, g);
+                    aura.glow.rotation.z -= dt * 1.05;
+                    const g = 1 + Math.sin(t * 3.5) * 0.018;
+                    aura.glow.scale.set(g, g, 1);
                 }
             }
 
