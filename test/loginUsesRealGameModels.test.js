@@ -17,7 +17,16 @@ test('hero advertises only gear that exists in the live game', () => {
   for (const item of ['Solaris Edge', 'Aegis Prime', 'Celestial Sovereign Helm', 'Empyrean Plate', 'Wings of Aeon', 'Titan Bracers', 'Astral Legguards', 'Worldwalker Greaves']) {
     assert.match(scene, new RegExp(item));
   }
-  assert.match(scene, /pet: 'ember_phoenix', petLevel: 40/);
+  assert.match(scene, /pet: 'ember_phoenix'/);
+  assert.match(scene, /petLevel: 28 \+ index \* 4/);
+});
+
+test('login key art presents a four-job party with distinct divine weapons', () => {
+  for (const job of ['swordsman', 'archer', 'mage', 'priest']) assert.match(scene, new RegExp(`job: '${job}'`));
+  for (const weapon of ['Solaris Edge', 'Chronos Bow', 'Genesis Staff', 'Seraph Rod']) assert.match(scene, new RegExp(weapon));
+  assert.match(scene, /this\.heroes = cast\.map/);
+  assert.match(scene, /this\.manaField/);
+  assert.match(scene, /this\.lightBeams/);
 });
 
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {

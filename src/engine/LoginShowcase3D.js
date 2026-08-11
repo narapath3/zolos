@@ -111,29 +111,86 @@ export class LoginShowcase3D {
       mountain.position.set(-25 + i * 5, 2.8, -22 - (i % 2) * 4);
       this.scene.add(mountain);
     }
+
+    // Cinematic mana field: real-time particles and tall spell-light blades,
+    // built from the same Three.js primitives used by combat effects.
+    const particleCount = 150;
+    const positions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 24;
+      positions[i * 3 + 1] = 0.3 + Math.random() * 7;
+      positions[i * 3 + 2] = -10 + Math.random() * 15;
+    }
+    const manaGeo = new THREE.BufferGeometry();
+    manaGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.manaField = new THREE.Points(manaGeo, new THREE.PointsMaterial({
+      color: 0xbcefff, size: 0.055, transparent: true, opacity: 0.78,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    this.scene.add(this.manaField);
+
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0x8de9ff, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    this.lightBeams = [];
+    for (const [x, z, tilt] of [[-6, -5, -0.28], [5.4, -7, 0.22], [0, -11, -0.08]]) {
+      const beam = new THREE.Mesh(new THREE.ConeGeometry(1.1, 10, 5, 1, true), beamMat.clone());
+      beam.position.set(x, 5, z);
+      beam.rotation.z = tilt;
+      this.scene.add(beam);
+      this.lightBeams.push(beam);
+    }
   }
 
   _buildCast() {
-    this.hero = new CharacterManager(this.scene);
-    this.hero.stats.job = 'swordsman';
-    this.hero.applyAppearance({
-      job: 'swordsman', gender: 'male', bodyColor: 0x174f9b, hairColor: 0xf2c14e, pantsColor: 0x172b59,
-      weapon: 'Solaris Edge', shield: 'Aegis Prime', hat: 'Crown of the First Light',
-      gear: HERO_GEAR, pet: 'ember_phoenix', petLevel: 40,
+    const cast = [
+      {
+        job: 'swordsman', gender: 'male', weapon: 'Solaris Edge', shield: 'Aegis Prime',
+        hat: 'Crown of the First Light', gear: HERO_GEAR, pet: 'ember_phoenix',
+        colors: [0x174f9b, 0xf2c14e, 0x172b59], position: [-4.7, 0, 0.5], facing: 0.52, scale: 1.38, style: 'melee', phase: 0,
+      },
+      {
+        job: 'archer', gender: 'female', weapon: 'Chronos Bow', hat: 'Ranger Hood',
+        gear: { body: 'Valkyrie Armor', garment: 'Shadow Garment', wrist: 'Guardian Wristguard', pants: 'Leather Pants', feet: 'Dragon Greaves', ring: 'Glow Ring', accessory: 'Gold Earring' }, pet: 'moon_hare',
+        colors: [0x256d4a, 0xc86b3c, 0x173e35], position: [-7.0, 0, -2.1], facing: 0.72, scale: 1.08, style: 'bow', phase: 0.42,
+      },
+      {
+        job: 'mage', gender: 'female', weapon: 'Genesis Staff', hat: 'Wizard Hat', glasses: 'Oracle Lens',
+        gear: { body: 'Dragon Scale Mail', garment: 'Odin Garment', wrist: 'Steel Bracer', pants: 'Astral Legguards', feet: 'Worldwalker Greaves', ring: 'Eternity Ring', accessory: 'Heart of Cosmos' }, pet: 'bloom_fairy',
+        colors: [0x6d3ca8, 0xd9e5ff, 0x27184f], position: [5.35, 0, -1.8], facing: -0.6, scale: 1.16, style: 'magic', phase: 0.8,
+      },
+      {
+        job: 'priest', gender: 'male', weapon: 'Seraph Rod', shield: 'Golden Shield', hat: 'Crown',
+        gear: { body: 'Empyrean Plate', garment: 'Odin Garment', wrist: 'Titan Bracers', pants: 'Plate Legguards', feet: 'Speed Boots', ring: 'Silver Ring', accessory: 'Gold Earring' }, pet: 'cloudling',
+        colors: [0xf2e5bb, 0xc98b45, 0x66562d], position: [7.25, 0, 0.35], facing: -0.78, scale: 1.05, style: 'magic', phase: 1.2,
+      },
+    ];
+    this.heroes = cast.map((config, index) => {
+      const hero = new CharacterManager(this.scene);
+      const [bodyColor, hairColor, pantsColor] = config.colors;
+      hero.stats.job = config.job;
+      hero.applyAppearance({
+        job: config.job, gender: config.gender, bodyColor, hairColor, pantsColor,
+        weapon: config.weapon, shield: config.shield || null, hat: config.hat,
+        glasses: config.glasses || null, gear: config.gear,
+        pet: config.pet, petLevel: 28 + index * 4,
+      });
+      hero.userData = config;
+      hero.mesh.position.fromArray(config.position);
+      hero.mesh.rotation.y = config.facing;
+      hero.mesh.scale.setScalar(config.scale);
+      if (hero.nameSprite) hero.nameSprite.visible = false;
+      hero.state = 'attacking';
+      hero.attackAnimStyle = config.style;
+      return hero;
     });
-    this.hero.mesh.position.set(-3.7, 0, 0.2);
-    this.hero.mesh.rotation.y = 0.48;
-    this.hero.mesh.scale.setScalar(1.38);
-    if (this.hero.nameSprite) this.hero.nameSprite.visible = false;
-    this.hero.state = 'attacking';
-    this.hero.attackAnimStyle = 'melee';
+    this.hero = this.heroes[0];
 
     const lineup = [
-      ['deviruchi', new THREE.Vector3(4.9, 0, -0.6), 1.08, -0.5],
-      ['nine_tail', new THREE.Vector3(6.8, 0, -2.7), 0.88, -0.72],
-      ['ghostring', new THREE.Vector3(2.8, 0.35, -3.7), 0.82, -0.2],
-      ['savage', new THREE.Vector3(7.7, 0, 1.5), 0.72, -0.9],
-      ['poring', new THREE.Vector3(1.9, 0, 2.1), 0.74, -0.3],
+      ['deviruchi', new THREE.Vector3(2.9, 0, -0.4), 1.08, -0.5],
+      ['nine_tail', new THREE.Vector3(7.8, 0, -4.2), 0.8, -0.72],
+      ['ghostring', new THREE.Vector3(2.4, 0.35, -4.6), 0.82, -0.2],
+      ['savage', new THREE.Vector3(8.8, 0, 2.4), 0.68, -0.9],
+      ['poring', new THREE.Vector3(-1.8, 0, 2.5), 0.74, -0.3],
+      ['bigfoot', new THREE.Vector3(-8.8, 0, -4.1), 0.72, 0.65],
     ];
     this.monsters = lineup.map(([type, position, scale, facing]) => {
       const monster = new Monster(this.scene, type, position);
@@ -174,12 +231,24 @@ export class LoginShowcase3D {
     if (!this.isRunning) return;
     const dt = Math.min(this.clock.getDelta(), 0.04);
     const t = this.clock.elapsedTime;
-    this.hero.attackAnimElapsed = (t % 2.8) < 0.72 ? (t % 0.72) : 1;
-    this.hero.update(dt);
-    this.hero.mesh.position.set(-3.7, Math.sin(t * 1.4) * 0.025, 0.2);
+    this.heroes.forEach((hero, index) => {
+      const config = hero.userData;
+      const cycle = (t + config.phase) % (2.35 + index * 0.18);
+      hero.attackAnimElapsed = cycle < 0.72 ? cycle : 1;
+      hero.update(dt);
+      hero.mesh.position.set(config.position[0], config.position[1] + Math.sin(t * 1.4 + index) * 0.025, config.position[2]);
+    });
     this.monsters.forEach((monster, index) => {
       monster.mesh.position.y = Math.max(0, Math.sin(t * (1.7 + index * 0.12) + index) * 0.06);
       monster.mesh.rotation.z = Math.sin(t * 1.5 + index) * 0.025;
+    });
+    if (this.manaField) {
+      this.manaField.rotation.y = t * 0.018;
+      this.manaField.position.y = Math.sin(t * 0.35) * 0.16;
+    }
+    this.lightBeams?.forEach((beam, index) => {
+      beam.material.opacity = 0.075 + Math.sin(t * 0.7 + index * 2) * 0.025;
+      beam.rotation.y = t * (index % 2 ? -0.025 : 0.02);
     });
     this.camera.position.x += ((this.cameraBase.x + this.pointer.x * 0.22) - this.camera.position.x) * 0.025;
     this.camera.position.y += ((this.cameraBase.y - this.pointer.y * 0.1) - this.camera.position.y) * 0.025;
