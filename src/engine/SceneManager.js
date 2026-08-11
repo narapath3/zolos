@@ -906,10 +906,10 @@ export class SceneManager {
 
         // Preset atmospheres. Colors are hex; lights are intensities.
         this._weatherPresets = {
-            sunny:  { emoji: '☀️', label: 'แดดออก',   fog: 0.010, fogCol: 0x8fc7e8, sunCol: 0xffe8c0, sun: 1.5, amb: 0.40, skyTop: 0x3a7bd5, skyHor: 0xbfe3f5, rain: false, blossom: false, sunVis: true },
-            spring: { emoji: '🌸', label: 'ใบไม้ผลิ',  fog: 0.010, fogCol: 0xbfe6c8, sunCol: 0xfff0d0, sun: 1.4, amb: 0.45, skyTop: 0x67b7e8, skyHor: 0xf2dcea, rain: false, blossom: true,  sunVis: true },
-            cloudy: { emoji: '☁️', label: 'เมฆมาก',    fog: 0.018, fogCol: 0x9aa6b0, sunCol: 0xd8dce0, sun: 0.7, amb: 0.55, skyTop: 0x8b98a6, skyHor: 0xc2cad0, rain: false, blossom: false, sunVis: false },
-            rain:   { emoji: '🌧️', label: 'ฝนตก',      fog: 0.030, fogCol: 0x5c6670, sunCol: 0xaeb6c0, sun: 0.5, amb: 0.55, skyTop: 0x4a535c, skyHor: 0x707a84, rain: true,  blossom: false, sunVis: false },
+            sunny:  { icon: 'sunny', label: 'แดดออก',   fog: 0.010, fogCol: 0x8fc7e8, sunCol: 0xffe8c0, sun: 1.5, amb: 0.40, skyTop: 0x3a7bd5, skyHor: 0xbfe3f5, rain: false, blossom: false, sunVis: true },
+            spring: { icon: 'spring', label: 'ใบไม้ผลิ',  fog: 0.010, fogCol: 0xbfe6c8, sunCol: 0xfff0d0, sun: 1.4, amb: 0.45, skyTop: 0x67b7e8, skyHor: 0xf2dcea, rain: false, blossom: true,  sunVis: true },
+            cloudy: { icon: 'cloudy', label: 'เมฆมาก',    fog: 0.018, fogCol: 0x9aa6b0, sunCol: 0xd8dce0, sun: 0.7, amb: 0.55, skyTop: 0x8b98a6, skyHor: 0xc2cad0, rain: false, blossom: false, sunVis: false },
+            rain:   { icon: 'rain', label: 'ฝนตก',      fog: 0.030, fogCol: 0x5c6670, sunCol: 0xaeb6c0, sun: 0.5, amb: 0.55, skyTop: 0x4a535c, skyHor: 0x707a84, rain: true,  blossom: false, sunVis: false },
         };
         this._weatherOrder = ['sunny', 'spring', 'cloudy', 'rain'];
         // Each preset lasts this long; the whole cycle repeats. Weather is
@@ -979,7 +979,7 @@ export class SceneManager {
         if (this._rain) this._rain.mesh.visible = p.rain;
         if (this._blossom) this._blossom.mesh.visible = p.blossom;
         if (this.sunMesh) this.sunMesh.visible = p.sunVis;
-        if (this._weatherEl) this._weatherEl.textContent = `${p.emoji} ${p.label}`;
+        if (this._weatherEl) this._weatherEl.innerHTML = `<span class="weather-art weather-art--${p.icon}" aria-hidden="true"></span><span>${p.label}</span>`;
         if (instant && this._weatherCur) {
             const c = this._weatherCur;
             c.fog = p.fog; c.sun = p.sun; c.amb = p.amb;

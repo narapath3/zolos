@@ -1057,11 +1057,12 @@ export class PlayerProfileModal {
     const skillIds = JOBS[jobId]?.skills || [];
     if (skillIds.length === 0) return '<div style="font-size:11px; color:rgba(255,255,255,0.2)">No skills unlocked</div>';
 
+    const glyphs = { bash:'bash', heal:'heal', magnumBreak:'magnum', endure:'shield', fireBolt:'fire', frostNova:'frost', energyCoat:'orb', doubleStrafe:'arrow', arrowShower:'arrows', concentration:'target', holyLight:'holy', blessing:'bless' };
+
     return skillIds.map(id => {
       const s = SKILLS[id];
       const name = s ? s.name : (id.charAt(0).toUpperCase() + id.slice(1));
-      const emoji = s ? s.emoji : '🌀';
-      return `<div class="skill-badge">${emoji} ${name}</div>`;
+      return `<div class="skill-badge"><svg class="skill-glyph" aria-hidden="true"><use href="#ic-${glyphs[id] || 'target'}" /></svg> ${name}</div>`;
     }).join('');
   }
 
@@ -1097,7 +1098,7 @@ export class PlayerProfileModal {
       const itemData = isFilled ? ITEMS[itemName] : null;
       const icon = isFilled
         ? itemIconMarkup(itemName, itemData?.emoji || '➖', 'item-visual--equipped')
-        : '➖';
+        : '<span class="empty-slot-mark" aria-hidden="true"></span>';
       const rf = refine[slot.id] || 0;
       const displayName = isFilled ? ((rf > 0 ? `+${rf} ` : '') + itemName) : 'Empty';
       const rarCls = itemData?.rarity ? ` rar-${itemData.rarity}` : '';
@@ -1105,7 +1106,7 @@ export class PlayerProfileModal {
       const cardIdOrName = cards[slot.id];
       const card = cardIdOrName ? getCard(cardIdOrName) : null;
       const cardBadge = card
-        ? `<div class="equip-card-badge" title="การ์ด: ${card.itemName}" style="border-color:${RARITY_COLOR[card.rarity] || '#b8c0cc'}">🃏</div>`
+        ? `<div class="equip-card-badge" title="การ์ด: ${card.itemName}" style="border-color:${RARITY_COLOR[card.rarity] || '#b8c0cc'}"><img src="${card.art}" alt=""></div>`
         : '';
 
       return `
@@ -1120,23 +1121,22 @@ export class PlayerProfileModal {
     }).join('');
   }
 
-  // Companion pet display (emoji + name + aura tier). Empty string when none.
+  // Companion pet display with the real pet atlas art. Empty string when none.
   _renderPet(appearance) {
     const petKey = appearance.pet;
     if (!petKey) return '';
     const petItemName = Object.keys(ITEMS).find(n => ITEMS[n].type === 'pet' && ITEMS[n].pet === petKey);
     const it = petItemName ? ITEMS[petItemName] : null;
-    const emoji = it?.emoji || '🐾';
     const name = petItemName ? petItemName.replace(/ Pet$/, '') : petKey;
     const lvl = appearance.petLevel || 1;
     const tier = ['ธรรมดา', 'ออร่า ✨', 'ออร่า+เกล็ดแสง 🌟', 'เรืองรอง 💫', 'สุดยอดตำนาน 🌈'][
       lvl >= 30 ? 4 : lvl >= 20 ? 3 : lvl >= 10 ? 2 : lvl >= 5 ? 1 : 0];
     const col = lvl >= 30 ? '#ffcf6a' : lvl >= 20 ? '#c9a0ff' : lvl >= 10 ? '#7be0ff' : '#8fd0a0';
     return `<div class="pet-display">
-        <div class="pet-emoji">${emoji}</div>
+        <div class="pet-emoji">${itemIconMarkup(petItemName || '', '', 'item-visual--pet-profile')}</div>
         <div class="pet-info">
           <div class="pet-name">${name}</div>
-          <div class="pet-lvl" style="color:${col}">🐾 Lv.${lvl} · ${tier}</div>
+          <div class="pet-lvl" style="color:${col}">Lv.${lvl} · ${tier}</div>
         </div>
       </div>`;
   }

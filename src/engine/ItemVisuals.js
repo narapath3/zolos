@@ -1,3 +1,5 @@
+import { getCard } from '../cards/CardCatalog.js';
+
 // Canonical visual identity shared by shop, inventory, market, equipment UI,
 // and character rendering. Never trust the emoji stored on an inventory row:
 // old rows may contain a stale platform-colored glyph.
@@ -54,10 +56,11 @@ export function canonicalItemName(itemOrName) {
 }
 
 export function itemIconPath(itemOrName) {
-  return ITEM_VISUALS[canonicalItemName(itemOrName)]?.icon || null;
+  const name = canonicalItemName(itemOrName);
+  return ITEM_VISUALS[name]?.icon || getCard(name)?.art || null;
 }
 
-export function itemIconMarkup(itemOrName, fallbackEmoji = '📦', className = '') {
+export function itemIconMarkup(itemOrName, _legacyFallback = '', className = '') {
   const name = canonicalItemName(itemOrName);
   const petIndex = PET_ATLAS_ORDER.indexOf(name);
   const path = itemIconPath(name);
@@ -70,7 +73,7 @@ export function itemIconMarkup(itemOrName, fallbackEmoji = '📦', className = '
     return `<span class="item-visual item-visual--pet ${className}" aria-hidden="true"><span class="item-visual__pet-art" style="--pet-x:${x}%;--pet-y:${y}%"></span></span><span class="sr-only">${safeName}</span>`;
   }
   if (path) {
-    return `<span class="item-visual ${className}" aria-hidden="true"><img src="${path}" alt="" loading="lazy" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="item-visual__fallback" hidden>${fallbackEmoji}</span></span><span class="sr-only">${safeName}</span>`;
+    return `<span class="item-visual ${className}" aria-hidden="true"><img src="${path}" alt="" loading="lazy" onerror="this.src='/assets/items/fallback/unknown-loot.png';this.onerror=null"></span><span class="sr-only">${safeName}</span>`;
   }
-  return `<span class="item-visual item-visual--emoji ${className}" aria-hidden="true"><span>${fallbackEmoji}</span></span><span class="sr-only">${safeName}</span>`;
+  return `<span class="item-visual item-visual--model ${className}" aria-hidden="true"><img data-item-model="${safeName}" alt="" loading="lazy" src="/assets/items/fallback/unknown-loot.png"></span><span class="sr-only">${safeName}</span>`;
 }

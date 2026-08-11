@@ -6943,7 +6943,9 @@ a,
 
 .item-visual__fallback[hidden] { display: none; }
 
-.item-visual--emoji > span:first-child { font-size: 24px; }
+.item-visual--model img{filter:drop-shadow(0 3px 5px rgba(0,0,0,.55))}
+.empty-slot-mark{display:inline-block;width:58%;height:58%;border:1px solid rgba(170,190,220,.34);border-radius:30% 55% 38% 50%;background:linear-gradient(145deg,rgba(170,190,220,.12),rgba(60,75,100,.04));box-shadow:inset 0 0 8px rgba(150,180,220,.08)}.eq-card-socket img,.equip-card-badge img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.weather-art{position:relative;display:inline-block;width:18px;height:18px;margin-right:5px;vertical-align:middle;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}.weather-art::before,.weather-art::after{content:"";position:absolute}.weather-art--sunny::before{inset:3px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff7b0,#ffb51f 58%,#df7300);box-shadow:0 0 8px #ffc13d}.weather-art--spring::before{inset:3px;border-radius:70% 20% 70% 20%;background:linear-gradient(135deg,#ffe4f4,#ef7fbd);transform:rotate(25deg);box-shadow:-5px 3px 0 -2px #f5a4cf,4px 4px 0 -2px #f7bad9}.weather-art--cloudy::before,.weather-art--rain::before{left:2px;right:1px;bottom:4px;height:8px;border-radius:9px;background:linear-gradient(#e6eef5,#8fa3b6);box-shadow:4px -5px 0 -2px #c9d7e3,-3px -3px 0 -1px #dbe5ed}.weather-art--rain::after{left:4px;bottom:-1px;width:2px;height:5px;background:#62bfff;box-shadow:5px 1px #62bfff,10px 0 #62bfff;transform:skew(-15deg)}
 .item-visual--pet { background:#071020; }
 .item-visual__pet-art {
   position:absolute;

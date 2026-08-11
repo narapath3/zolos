@@ -1,3 +1,5 @@
+import { itemIconMarkup } from '../engine/ItemVisuals.js';
+
 // ============ GLOBAL ANNOUNCEMENTS SYSTEM ============
 // Broadcasts important events to all players on the server to create a sense of
 // community and make the game world feel alive. Shows level-ups, rare drops, achievements.
@@ -62,7 +64,7 @@ export class GlobalAnnouncements {
         type: 'level-up',
         playerName: data.playerName,
         level: data.level,
-        icon: '⬆️',
+        art: '/assets/zolos_icon.png',
         color: '#ffaa4a',
       });
     });
@@ -73,7 +75,7 @@ export class GlobalAnnouncements {
         playerName: data.playerName,
         itemName: data.itemName,
         rarity: data.rarity,
-        icon: '✨',
+        art: null,
         color: '#ff7aaa',
       });
     });
@@ -83,7 +85,7 @@ export class GlobalAnnouncements {
         type: 'boss-defeated',
         playerName: data.playerName,
         bossName: data.bossName,
-        icon: '🐉',
+        art: '/assets/cards/nidhogg.png',
         color: '#ff5a7a',
       });
     });
@@ -93,7 +95,7 @@ export class GlobalAnnouncements {
         type: 'achievement',
         playerName: data.playerName,
         achievementName: data.achievementName,
-        icon: '🏆',
+        art: '/assets/items/equipment/crown.png',
         color: '#ffcf4a',
       });
     });
@@ -103,7 +105,7 @@ export class GlobalAnnouncements {
         type: 'guild-milestone',
         guildName: data.guildName,
         milestone: data.milestone,
-        icon: '🏰',
+        art: '/assets/zolos_icon.png',
         color: '#9fccff',
       });
     });
@@ -135,21 +137,24 @@ export class GlobalAnnouncements {
     item.style.borderLeftColor = announcement.color;
 
     let content = '';
+    const art = announcement.type === 'rare-drop'
+      ? itemIconMarkup(announcement.itemName, '', 'global-feed-art')
+      : `<img class="global-feed-art" src="${announcement.art || '/assets/items/fallback/unknown-loot.png'}" alt="">`;
     switch (announcement.type) {
       case 'level-up':
-        content = `${announcement.icon} <strong>${announcement.playerName}</strong> ขึ้นเลเวล <span style="color:${announcement.color};font-weight:900;">${announcement.level}</span>!`;
+        content = `${art} <strong>${announcement.playerName}</strong> ขึ้นเลเวล <span style="color:${announcement.color};font-weight:900;">${announcement.level}</span>!`;
         break;
       case 'rare-drop':
-        content = `${announcement.icon} <strong>${announcement.playerName}</strong> ได้ <span style="color:${announcement.color};font-weight:900;">${announcement.itemName}</span> (${announcement.rarity})`;
+        content = `${art} <strong>${announcement.playerName}</strong> ได้ <span style="color:${announcement.color};font-weight:900;">${announcement.itemName}</span> (${announcement.rarity})`;
         break;
       case 'boss-defeated':
-        content = `${announcement.icon} <strong>${announcement.playerName}</strong> สังหารบอส <span style="color:${announcement.color};font-weight:900;">${announcement.bossName}</span>!`;
+        content = `${art} <strong>${announcement.playerName}</strong> สังหารบอส <span style="color:${announcement.color};font-weight:900;">${announcement.bossName}</span>!`;
         break;
       case 'achievement':
-        content = `${announcement.icon} <strong>${announcement.playerName}</strong> ปลดล็อก <span style="color:${announcement.color};font-weight:900;">${announcement.achievementName}</span>!`;
+        content = `${art} <strong>${announcement.playerName}</strong> ปลดล็อก <span style="color:${announcement.color};font-weight:900;">${announcement.achievementName}</span>!`;
         break;
       case 'guild-milestone':
-        content = `${announcement.icon} กิลด์ <strong>${announcement.guildName}</strong> บรรลุ <span style="color:${announcement.color};font-weight:900;">${announcement.milestone}</span>!`;
+        content = `${art} กิลด์ <strong>${announcement.guildName}</strong> บรรลุ <span style="color:${announcement.color};font-weight:900;">${announcement.milestone}</span>!`;
         break;
       default:
         content = announcement.message || 'ไม่ทราบเหตุการณ์';
@@ -229,6 +234,7 @@ export class GlobalAnnouncements {
         backdrop-filter: blur(8px);
         overflow: hidden;
       }
+      .global-feed-art,.global-feed-text .item-visual{display:inline-block;width:24px;height:24px;object-fit:contain;vertical-align:middle;margin-right:5px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 
       .global-feed-header {
         display: flex;

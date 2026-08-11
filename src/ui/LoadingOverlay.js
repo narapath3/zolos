@@ -24,15 +24,15 @@ export class LoadingOverlay {
         this._audioCtx = null;
 
         this.tips = [
-            { icon: '⚔️', text: 'สกิล Bash มีโอกาสทำให้เป้าหมายติด Stun และสร้างความเสียหายรุนแรง' },
-            { icon: '⛏️', text: 'ขุดแร่จากโหนดแร่ในแผนที่ นำวัตถุดิบไปให้พ่อค้าคราฟต์อาวุธระดับตำนาน' },
-            { icon: '🐾', text: 'สัตว์เลี้ยงของคุณจะเลเวลอัพเมื่อพาออกรบร่วมกัน พร้อมรับออร่าโบนัสเพิ่มพลัง' },
-            { icon: '⚖️', text: 'ตลาดผู้เล่น (P2P) ช่วยให้คุณนำไอเทมดรอปหายากมาตั้งขายแลก Zeny ได้ตลอดเวลา' },
-            { icon: '👹', text: 'เข้าร่วมศึกบอสโลก ร่วมมือกับผู้เล่นทั้งเซิร์ฟเวอร์เพื่อล่า Dragon Heart' },
-            { icon: '⚡', text: 'ระบบ AUTO Farm จะค้นหาและโจมตีมอนสเตอร์ใกล้เคียงให้อัตโนมัติอย่างชาญฉลาด' },
-            { icon: '🎨', text: 'ปรับแต่งสีผม เสื้อผ้า และอุปกรณ์สวมใส่ของตัวละครได้ฟรีที่เมนู Settings' },
-            { icon: '🃏', text: 'สะสมการ์ดมอนสเตอร์จากดรอป ยัดใส่ช่องอุปกรณ์เพื่อปลดล็อกพลังธาตุลับ' },
-            { icon: '🌀', text: 'ใช้ระบบวาร์ปในเมืองเพื่อเดินทางไปยัง Prontera, Geffen หรือ PVP Arena ได้ทันที' }
+            { art: '/assets/items/equipment/sword.png', text: 'สกิล Bash มีโอกาสทำให้เป้าหมายติด Stun และสร้างความเสียหายรุนแรง' },
+            { art: '/assets/items/equipment/oridecon.png', text: 'ขุดแร่จากโหนดแร่ในแผนที่ นำวัตถุดิบไปให้พ่อค้าคราฟต์อาวุธระดับตำนาน' },
+            { art: '/assets/pets/pet-sanctuary-atlas-v1.png', text: 'สัตว์เลี้ยงของคุณจะเลเวลอัพเมื่อพาออกรบร่วมกัน พร้อมรับออร่าโบนัสเพิ่มพลัง' },
+            { art: '/assets/items/fallback/unknown-loot.png', text: 'ตลาดผู้เล่น (P2P) ช่วยให้คุณนำไอเทมดรอปหายากมาตั้งขายแลก Zeny ได้ตลอดเวลา' },
+            { art: '/assets/cards/nidhogg.png', text: 'เข้าร่วมศึกบอสโลก ร่วมมือกับผู้เล่นทั้งเซิร์ฟเวอร์เพื่อล่า Dragon Heart' },
+            { art: '/assets/zolos_icon.png', text: 'ระบบ AUTO Farm จะค้นหาและโจมตีมอนสเตอร์ใกล้เคียงให้อัตโนมัติอย่างชาญฉลาด' },
+            { art: '/assets/items/equipment/crown.png', text: 'ปรับแต่งสีผม เสื้อผ้า และอุปกรณ์สวมใส่ของตัวละครได้ฟรีที่เมนู Settings' },
+            { art: '/assets/cards/poring.png', text: 'สะสมการ์ดมอนสเตอร์จากดรอป ยัดใส่ช่องอุปกรณ์เพื่อปลดล็อกพลังธาตุลับ' },
+            { art: '/assets/zolos_icon.png', text: 'ใช้ระบบวาร์ปในเมืองเพื่อเดินทางไปยัง Prontera, Geffen หรือ PVP Arena ได้ทันที' }
         ];
 
         this.loadingSteps = [
@@ -226,7 +226,7 @@ export class LoadingOverlay {
         this.tipIconEl.style.opacity = '0';
 
         setTimeout(() => {
-            this.tipIconEl.textContent = currentTip.icon;
+            this.tipIconEl.innerHTML = `<img src="${currentTip.art}" alt="" style="width:100%;height:100%;object-fit:contain">`;
             this.tipTextEl.textContent = currentTip.text;
             this.tipTextEl.style.opacity = '1';
             this.tipIconEl.style.transform = 'scale(1)';

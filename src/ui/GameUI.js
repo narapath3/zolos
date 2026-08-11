@@ -3,6 +3,7 @@ import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
+import { observeItemPortraits } from './ItemPortraitRenderer.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
@@ -103,6 +104,7 @@ export class GameUI {
     this._setupRespawnShortcut();
     this.layoutManager = new LayoutManager(this);
     window.gameUI = this;
+    this._itemPortraitObserver = observeItemPortraits(this.gameScreen || document.body);
     this.killStreak = 0;
   }
 
@@ -1314,7 +1316,7 @@ export class GameUI {
           class="almanac-fish-slot${selectedName === name ? ' is-selected' : ''}" data-almanac-fish="${has ? esc(name) : ''}" role="${has ? 'button' : 'presentation'}" tabindex="${has ? '0' : '-1'}"
           style="aspect-ratio:1;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;
           background:${has ? 'rgba(74,163,255,.12)' : 'rgba(255,255,255,.03)'};border:1px solid ${has ? m.color + '66' : 'rgba(255,255,255,.06)'};">
-          <div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;${has ? '' : 'filter:grayscale(1);opacity:.3;'}">${has ? itemIconMarkup(name, d.emoji || '🐟', 'item-visual--fish') : '❓'}</div>
+          <div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;${has ? '' : 'filter:grayscale(1);opacity:.3;'}">${itemIconMarkup(name, '', 'item-visual--fish')}</div>
           <div style="font-size:8px;text-align:center;line-height:1.1;color:${has ? '#dfe8f2' : '#54606e'};max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${has ? esc(name) : '???'}</div>
           ${has ? `<div style="font-size:7px;color:#80a9cf;">จับ ${Math.max(1, Number(this.almanac.counts?.[name]) || 0).toLocaleString()}</div>` : ''}
         </div>`;
@@ -1802,17 +1804,15 @@ export class GameUI {
       const rarity = it && it.rarity ? it.rarity : '';
       const filterCls = this.equipSlotFilter === slot.id ? ' active-filter' : '';
       const ic = filled && it
-        ? itemIconMarkup(name, it.emoji || slot.icon, 'item-visual--equipped')
-        : slot.icon;
+        ? itemIconMarkup(name, '', 'item-visual--equipped')
+        : `<span class="empty-slot-mark" data-slot-kind="${slot.id}" aria-hidden="true"></span>`;
       // Card socket for this slot (shows the socketed card, or a ＋ to add one).
       const cardId = (ch.equippedCards && ch.equippedCards[slot.id]) || null;
       const card = cardId && getCard(cardId);
       const cardName = card?.itemName || cardId;
-      const cardIt = card ? ITEMS[card.itemName] : null;
       const cardRar = card?.rarity || 'common';
-      const cardEmoji = cardIt?.emoji || card?.displayName?.charAt(0) || '🃏';
       const socket = cardId
-        ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด">${cardEmoji}</div>`
+        ? `<div class="eq-card-socket filled rc-${cardRar}" data-cardslot="${slot.id}" title="การ์ด: ${cardName} — แตะเพื่อเปลี่ยน/ถอด"><img src="${card?.art || '/assets/items/fallback/unknown-loot.png'}" alt=""></div>`
         : `<div class="eq-card-socket empty" data-cardslot="${slot.id}" title="ช่องการ์ด (ว่าง) — แตะเพื่อใส่การ์ด">＋</div>`;
       return `<div class="eq-slot ${filled ? 'filled' : 'empty'}${rarity ? ' rarity-' + rarity : ''}${filterCls}"
         data-slot="${slot.id}" ${filled ? `data-item="${name}"` : ''}
@@ -2321,9 +2321,6 @@ export class GameUI {
       const rar = i.rarity || it.rarity || 'common';
       const col = RARITY_COLOR[rar] || '#b8c0cc';
       const inThis = catalogCard?.id === current;
-      // Emoji fallback: inventory emoji → catalog displayName first letter → 🃏
-      const cardEmoji = it.emoji || catalogCard?.displayName?.charAt(0) || '🃏';
-
       // Build stat bonus summary from catalog card stats
       const bonuses = [];
       const cStats = catalogCard?.stats || {};
@@ -2334,7 +2331,7 @@ export class GameUI {
       const bonusStr = bonuses.length ? bonuses.join(' · ') : (it.desc || catalogCard?.abilityName || '');
 
       return `<div class="sp-row cp-row${inThis ? ' sp-eq' : ''}" data-name="${i.item_name}" style="display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent;border-left:3px solid ${col};transition:background .12s,border-color .12s;">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid ${col};font-size:16px;flex-shrink:0">${cardEmoji}</span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid ${col};flex-shrink:0"><img src="${catalogCard?.art || '/assets/items/fallback/unknown-loot.png'}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:5px"></span>
         <span style="flex:1;color:#e6ecff;font-size:13.5px;line-height:1.3;">
           <b style="color:${col}">${i.item_name}</b>
           <span style="font-size:10px;color:#8b97ba;margin-left:4px">(${rar})</span>
@@ -2935,7 +2932,7 @@ export class GameUI {
     this._refreshProfileEditorEquipment();
   }
 
-  // Live pet badge on the top HUD: emoji + level + XP bar. Refreshed every
+  // Live pet badge on the top HUD: real pet atlas art + level + XP bar.
   // time the HUD updates (which happens on every kill / exp gain), so the cat
   // visibly fills its bar and levels up while you fight.
   updatePetHud() {
@@ -2955,7 +2952,7 @@ export class GameUI {
     const lvlEl = document.getElementById('pet-hud-level');
     const fillEl = document.getElementById('pet-xp-fill');
     const txtEl = document.getElementById('pet-xp-text');
-    if (emojiEl && petItem) emojiEl.textContent = petItem.emoji || '🐾';
+    if (emojiEl && petItem) emojiEl.innerHTML = itemIconMarkup(petItem, '', 'item-visual--pet-hud');
     if (nameEl) nameEl.textContent = c.petName || (petItem ? petItem.item_name.replace(/ Pet$/, '') : 'สัตว์เลี้ยง');
     if (lvlEl) lvlEl.textContent = 'Lv.' + lvl + (lvl >= 40 ? ' MAX' : '');
     if (lvl >= 40) {
@@ -5711,9 +5708,9 @@ export class GameUI {
     ov.id = 'buy-confirm-overlay';
     ov.innerHTML = `
       <div class="bc-box">
-        <div class="bc-emoji">${itemData.emoji}</div>
+        <div class="bc-emoji">${itemIconMarkup(item.name, '', 'item-visual--detail')}</div>
         <div class="bc-title">ยืนยันการซื้อ?</div>
-        <div class="bc-item">${itemData.emoji} ${item.name} <b>x${qty}</b></div>
+        <div class="bc-item">${itemIconMarkup(item.name, '', 'item-visual--market')} ${item.name} <b>x${qty}</b></div>
         <div class="bc-rows">
           <div class="bc-row"><span>ราคาชิ้นละ</span><span>${item.price.toLocaleString()} z</span></div>
           <div class="bc-row bc-total"><span>รวมทั้งหมด</span><span>${total.toLocaleString()} z</span></div>
@@ -5742,7 +5739,7 @@ export class GameUI {
     if (t) t.remove();
     t = document.createElement('div');
     t.id = 'buy-success-toast';
-    t.innerHTML = `<div class="bs-check">✅</div><div class="bs-text">ซื้อไอเทมสำเร็จ!<br><span>${itemData.emoji} ${item.name} x${qty}</span></div>`;
+    t.innerHTML = `<div class="bs-check"><img src="/assets/zolos_icon.png" alt=""></div><div class="bs-text">ซื้อไอเทมสำเร็จ!<br><span>${itemIconMarkup(item.name, '', 'item-visual--market')} ${item.name} x${qty}</span></div>`;
     document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add('show'));
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, 2000);
@@ -6016,7 +6013,7 @@ export class GameUI {
         : `🔧 ทน ${it.durability} ครั้ง`;
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06);">
-          <div style="font-size:26px;">${it.emoji}</div>
+          <div>${itemIconMarkup(it.name, '', 'item-visual--detail')}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-weight:800;color:#fff;font-size:13px;">${name}
               <span style="color:${r.c};font-size:10px;font-weight:800;">${r.b} ${r.t}</span></div>
@@ -6455,7 +6452,7 @@ export class GameUI {
     const streakShown = canClaim ? pending : (this.loginStreak?.streak || 0);
     const brokeStreak = canClaim && pending === 1 && (this.loginStreak?.streak || 0) > 0;
 
-    const itemLine = (r) => r.items.map(it => `${(ITEMS[it.name] || {}).emoji || '📦'}×${it.qty}`).join(' ');
+    const itemLine = (r) => r.items.map(it => `${itemIconMarkup(it.name, '', 'item-visual--market')}×${it.qty}`).join(' ');
 
     const slots = rewards.map(r => {
       const isToday = r.day === todayIdx;
@@ -6472,10 +6469,10 @@ export class GameUI {
           ${isPast && !(isToday && canClaim) ? 'opacity:.55;filter:saturate(.6);' : ''}
           transition: all 0.3s ease; cursor: ${isToday && canClaim ? 'pointer' : 'default'};">
           <div style="font-size:9px;font-weight:800;color:${isToday && canClaim ? r.color : '#9aa5c0'};margin-bottom:4px;">${label}</div>
-          <div style="font-size:${isDay7 ? '32px' : '24px'};margin-bottom:4px;">${isDay7 ? '🐉' : '💰'}</div>
+          <div style="height:${isDay7 ? '42px' : '34px'};margin-bottom:4px;display:flex;justify-content:center;">${itemIconMarkup(isDay7 ? 'Dragon Heart' : 'Copper Coin', '', 'item-visual--detail')}</div>
           <div style="font-size:11px;color:${r.color};font-weight:700;">${r.gold.toLocaleString()}g</div>
           ${r.items.length ? `<div style="font-size:10px;color:#9fccff;margin-top:3px;">${itemLine(r)}</div>` : ''}
-          ${isDay7 ? `<div style="font-size:9px;color:#ff9a7a;font-weight:700;margin-top:3px;">🌟 Dragon Heart!</div>` : ''}
+          ${isDay7 ? `<div style="font-size:9px;color:#ff9a7a;font-weight:700;margin-top:3px;">Dragon Heart!</div>` : ''}
           ${r.cosmetic ? `<div style="font-size:8px;color:#aaffaa;margin-top:2px;">✨ ${r.cosmetic}</div>` : ''}
         </div>`;
     }).join('');
@@ -6673,7 +6670,7 @@ export class GameUI {
         : `${esc(l.item_name)} ×${l.quantity}`;
       return `
         <div class="stall-listing" style="background:rgba(0,0,0,.3);border:1px solid ${rc}44;">
-          <div style="font-size:22px;">${meta.emoji}</div>
+          <div>${itemIconMarkup(l.item_name, '', 'item-visual--market')}</div>
           <div class="stall-listing-copy">
             <div class="stall-listing-name" style="color:${rc};">${disp}</div>
             <div class="stall-price">💰 ${Number(l.price).toLocaleString()} Zeny</div>
@@ -7486,9 +7483,9 @@ export class GameUI {
     if (item && item.item_type === 'card') {
       const card = getCard(item.item_name);
       if (card && card.art) {
-        return `<img src="${card.art}" alt="" style="width:1.3em;height:1.3em;object-fit:contain;vertical-align:middle;" onerror="this.outerHTML='🃏'">`;
+        return `<img src="${card.art}" alt="" style="width:1.3em;height:1.3em;object-fit:contain;vertical-align:middle;" onerror="this.src='/assets/items/fallback/unknown-loot.png';this.onerror=null">`;
       }
-      return '🃏';
+      return `<img src="/assets/items/fallback/unknown-loot.png" alt="" style="width:1.3em;height:1.3em;object-fit:contain;vertical-align:middle;">`;
     }
     const fallback = ITEMS[item?.item_name]?.emoji || item?.emoji || '📦';
     return itemIconMarkup(item, fallback, 'item-visual--market');
@@ -8761,7 +8758,7 @@ export class GameUI {
 
   _wikiItemPortrait(item, large = false) {
     const rarity = item.rarity || 'common';
-    return `<span class="wiki-item-portrait ${large ? 'large' : ''} rarity-${rarity}"><em>${item.emoji || '📦'}</em><i></i></span>`;
+    return `<span class="wiki-item-portrait ${large ? 'large' : ''} rarity-${rarity}">${itemIconMarkup(item, '', large ? 'item-visual--detail' : '')}<i></i></span>`;
   }
 
   // How-to-play guide with the game's real formulas (kept in sync with
