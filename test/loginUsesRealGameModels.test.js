@@ -57,6 +57,14 @@ test('soundtrack finale writes ZOLOS ONLINE progressively with game actors', () 
   assert.match(auth, /this\._bgCanvas\.setSoundtrack\(this\._bgm\)/);
 });
 
+test('login monsters hide both health bar layers and magic bursts into ZOLOS', () => {
+  assert.match(scene, /monster\.hpBarBg\.visible = false/);
+  assert.match(scene, /monster\.hpBarFill\.visible = false/);
+  assert.match(scene, /const word = 'ZOLOS'/);
+  assert.match(scene, /_updateZolosFirework/);
+  assert.match(scene, /index === 2 && p < 0\.38/);
+});
+
 test('AuthUI runs the real 3D showcase instead of the illustrated canvas actor', () => {
   assert.match(auth, /new LoginShowcase3D\('auth-bg-canvas'\)/);
   assert.doesNotMatch(auth, /new LoginCanvasBg/);

@@ -866,6 +866,7 @@ export class Monster {
         hpBarBg.position.y = size + 0.3 + labelStagger;
         hpBarBg.rotation.x = 0;
         this.mesh.add(hpBarBg);
+        this.hpBarBg = hpBarBg;
 
         this.hpBarFill = new THREE.Mesh(
             new THREE.PlaneGeometry(0.78, 0.06),

@@ -63,6 +63,7 @@ export class LoginShowcase3D {
     this._buildLighting();
     this._buildCast();
     this._buildFinaleTitle();
+    this._buildZolosFirework();
 
     this._onResize = this._onResize.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
@@ -153,7 +154,8 @@ export class LoginShowcase3D {
       monster.mesh.scale.multiplyScalar(scale);
       monster.mesh.rotation.y = facing;
       if (monster.nameSprite) monster.nameSprite.visible = false;
-      if (monster.hpBarGroup) monster.hpBarGroup.visible = false;
+      if (monster.hpBarBg) monster.hpBarBg.visible = false;
+      if (monster.hpBarFill) monster.hpBarFill.visible = false;
       monster.showcaseHome = position.clone();
       monster.showcasePhase = index;
       return monster;
@@ -197,6 +199,66 @@ export class LoginShowcase3D {
       this.finaleLetters.push(sprite);
     });
     this.scene.add(this.finaleTitle);
+  }
+
+  _buildZolosFirework() {
+    const glyphs = {
+      Z: ['11111', '00010', '00100', '01000', '10000', '10000', '11111'],
+      O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+      L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+      S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
+    };
+    const word = 'ZOLOS';
+    const targets = [];
+    let cursor = -4.15;
+    for (const letter of word) {
+      const rows = glyphs[letter];
+      rows.forEach((row, y) => [...row].forEach((on, x) => {
+        if (on === '1') targets.push(cursor + x * 0.18, 4.65 - y * 0.18, -3.15);
+      }));
+      cursor += 1.08;
+    }
+    const count = targets.length / 3;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const palette = [new THREE.Color(0x5cf3ff), new THREE.Color(0xffd85a), new THREE.Color(0xff72d0), new THREE.Color(0xffffff)];
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = 0.8; positions[i * 3 + 1] = 0.5; positions[i * 3 + 2] = -1;
+      const color = palette[i % palette.length];
+      colors[i * 3] = color.r; colors[i * 3 + 1] = color.g; colors[i * 3 + 2] = color.b;
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const material = new THREE.PointsMaterial({ size: 0.12, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+    this.zolosFirework = new THREE.Points(geometry, material);
+    this.zolosFirework.renderOrder = 49;
+    this.zolosFireworkTargets = new Float32Array(targets);
+    this.scene.add(this.zolosFirework);
+  }
+
+  _updateZolosFirework(progress, time) {
+    if (!this.zolosFirework) return;
+    const p = THREE.MathUtils.clamp(progress, 0, 1);
+    const positions = this.zolosFirework.geometry.attributes.position;
+    this.zolosFirework.material.opacity = p <= 0 ? 0 : Math.min(1, p * 7) * (p > 0.88 ? (1 - p) / 0.12 : 1);
+    for (let i = 0; i < positions.count; i++) {
+      const phase = i * 1.618;
+      if (p < 0.3) {
+        const rise = THREE.MathUtils.smoothstep(p / 0.3, 0, 1);
+        positions.setXYZ(i, 0.8 + Math.sin(time * 12 + phase) * 0.055, 0.55 + rise * 3.25 + Math.cos(time * 10 + phase) * 0.04, -1.0);
+      } else {
+        const explode = 1 - Math.pow(1 - (p - 0.3) / 0.7, 3);
+        const tx = this.zolosFireworkTargets[i * 3];
+        const ty = this.zolosFireworkTargets[i * 3 + 1];
+        const tz = this.zolosFireworkTargets[i * 3 + 2];
+        positions.setXYZ(i,
+          THREE.MathUtils.lerp(0.8, tx, explode) + Math.sin(time * 8 + phase) * 0.018,
+          THREE.MathUtils.lerp(3.8, ty, explode) + Math.cos(time * 7 + phase) * 0.018,
+          THREE.MathUtils.lerp(-1, tz, explode));
+      }
+    }
+    positions.needsUpdate = true;
   }
 
   _setFinaleProgress(progress) {
@@ -252,6 +314,7 @@ export class LoginShowcase3D {
     const finaleStart = Number.isFinite(this.soundtrack?.duration) ? Math.max(91, this.soundtrack.duration - 18) : Infinity;
     const finaleProgress = mvPhase === 'finale' ? (musicTime - finaleStart) / 12 : 0;
     this._setFinaleProgress(finaleProgress);
+    this._updateZolosFirework(mvPhase === 'finale' ? (musicTime - finaleStart) / 7 : 0, t);
     this.monsters.forEach((monster, index) => {
       const home = monster.showcaseHome;
       const party = mvPhase !== 'combat';
@@ -280,14 +343,21 @@ export class LoginShowcase3D {
           config.position[2] + Math.cos(beat * 0.44) * 0.65,
         );
         hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
-        hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, beat + Math.sin(beat * 0.6) * 0.5, 1 - Math.exp(-dt * 6));
+        const lookBeat = Math.floor((musicTime - 91) * 1.7 + index) % 4;
+        const partyFacing = [-1.15, -0.35, 0.45, 1.2][lookBeat];
+        hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, partyFacing, 1 - Math.exp(-dt * 8));
         hero.attackAnimElapsed = hero.attackAnimDuration;
         hero.update(dt);
         return;
       }
       if (mvPhase === 'finale') {
         const p = THREE.MathUtils.clamp(finaleProgress, 0, 1);
-        if (index === 0) {
+        if (index === 2 && p < 0.38) {
+          hero.state = 'attacking';
+          hero.showcaseDesired.set(0.8, 0.08, -0.8);
+          hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.PI, 1 - Math.exp(-dt * 8));
+          hero.attackAnimElapsed = ((musicTime - finaleStart) % hero.attackAnimDuration);
+        } else if (index === 0) {
           hero.state = 'running';
           hero.showcaseDesired.set(THREE.MathUtils.lerp(-3.45, 3.45, p), 0.15 + Math.sin(t * 8) * 0.04, -1.0);
           hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.PI / 2, 1 - Math.exp(-dt * 7));
@@ -298,7 +368,7 @@ export class LoginShowcase3D {
           hero.mesh.rotation.y = THREE.MathUtils.lerp(hero.mesh.rotation.y, Math.sin(t * 2.1 + index) * 0.55, 1 - Math.exp(-dt * 7));
         }
         hero.mesh.position.lerp(hero.showcaseDesired, 1 - Math.exp(-dt * 7.5));
-        hero.attackAnimElapsed = hero.attackAnimDuration;
+        if (!(index === 2 && p < 0.38)) hero.attackAnimElapsed = hero.attackAnimDuration;
         hero.update(dt);
         return;
       }
