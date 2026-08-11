@@ -4175,6 +4175,10 @@ export class SceneManager {
         merchantGroup.position.set(0, 0.18, 0.5);
         merchantGroup.rotation.y = 0; // facing +Z (toward player)
         group.add(merchantGroup);
+        merchantGroup.visible = false;
+        const premiumMerchant = this._buildPremiumShopkeeper('merchant');
+        premiumMerchant.position.set(0, 0.2, 0.48);
+        group.add(premiumMerchant);
 
         // ---- Floating shop name tag ----
         const canvas = document.createElement('canvas');
@@ -4212,6 +4216,97 @@ export class SceneManager {
         this.scene.add(group);
         this.envObjects.push(group);
         this.npcMesh = group;
+    }
+
+    // Detailed RO-inspired shopkeepers shared by the town services. Rounded
+    // anatomy, layered hair/clothes and role-specific equipment keep them from
+    // reading as the old stack of primitive boxes while remaining lightweight.
+    _buildPremiumShopkeeper(role) {
+        const root = new THREE.Group();
+        root.name = `premium_${role}_npc`;
+        root.userData.npcModelRole = role;
+        const palettes = {
+            merchant: { coat: 0x274d83, trim: 0xf2c85b, hair: 0x6d321b, accent: 0xc94747 },
+            appraiser: { coat: 0x27634b, trim: 0xe8d6a2, hair: 0x473126, accent: 0xd3a735 },
+            smith: { coat: 0x743b2d, trim: 0x34343c, hair: 0x2c211d, accent: 0xe06c32 },
+            keeper: { coat: 0xb44c79, trim: 0xffe5b1, hair: 0x7b3c67, accent: 0x65cda8 },
+        };
+        const p = palettes[role] || palettes.merchant;
+        const mat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: .62, ...options });
+        const skin = mat(0xffcba5); const coat = mat(p.coat); const trim = mat(p.trim, { roughness: .38 });
+        const dark = mat(0x292735); const hair = mat(p.hair); const accent = mat(p.accent);
+        const metal = mat(0xc9d2df, { metalness: .75, roughness: .25 });
+        const add = (geometry, material, x, y, z, sx = 1, sy = 1, sz = 1) => {
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z); mesh.scale.set(sx, sy, sz); mesh.castShadow = true; root.add(mesh); return mesh;
+        };
+
+        // Boots, legs and flared coat form a readable chibi silhouette.
+        add(new THREE.SphereGeometry(.18, 10, 7), dark, -.19, .17, .05, 1, .72, 1.35);
+        add(new THREE.SphereGeometry(.18, 10, 7), dark, .19, .17, .05, 1, .72, 1.35);
+        add(new THREE.CapsuleGeometry(.14, .35, 5, 9), coat, -.17, .48, 0);
+        add(new THREE.CapsuleGeometry(.14, .35, 5, 9), coat, .17, .48, 0);
+        add(new THREE.ConeGeometry(.53, .9, 10), coat, 0, .91, 0);
+        add(new THREE.SphereGeometry(.42, 12, 9), coat, 0, 1.18, 0, 1.06, .9, .78);
+        add(new THREE.TorusGeometry(.36, .045, 7, 18), trim, 0, .87, .01, 1, 1, .72).rotation.x = Math.PI / 2;
+        add(new THREE.BoxGeometry(.44, .07, .08), trim, 0, 1.22, .32);
+        add(new THREE.SphereGeometry(.055, 8, 6), accent, 0, 1.18, .37);
+
+        // Arms are angled instead of hanging as rectangular rods.
+        const leftArm = add(new THREE.CapsuleGeometry(.105, .48, 5, 8), coat, -.48, 1.05, .02); leftArm.rotation.z = -.28;
+        const rightArm = add(new THREE.CapsuleGeometry(.105, .48, 5, 8), coat, .48, 1.05, .02); rightArm.rotation.z = .28;
+        add(new THREE.SphereGeometry(.13, 9, 7), skin, -.56, .78, .05);
+        add(new THREE.SphereGeometry(.13, 9, 7), skin, .56, .78, .05);
+
+        // Face, ears, nose, mouth and glossy eyes.
+        add(new THREE.SphereGeometry(.37, 16, 12), skin, 0, 1.72, .02, 1, 1.08, .9);
+        add(new THREE.SphereGeometry(.09, 9, 7), skin, -.36, 1.72, .01, .48, 1, .72);
+        add(new THREE.SphereGeometry(.09, 9, 7), skin, .36, 1.72, .01, .48, 1, .72);
+        const eye = mat(0x231c29, { roughness: .15 });
+        add(new THREE.SphereGeometry(.055, 10, 7), eye, -.13, 1.77, .335, .82, 1.25, .5);
+        add(new THREE.SphereGeometry(.055, 10, 7), eye, .13, 1.77, .335, .82, 1.25, .5);
+        add(new THREE.SphereGeometry(.014, 6, 5), mat(0xffffff), -.145, 1.795, .365);
+        add(new THREE.SphereGeometry(.014, 6, 5), mat(0xffffff), .115, 1.795, .365);
+        add(new THREE.SphereGeometry(.035, 7, 5), skin, 0, 1.69, .365, .7, .8, .55);
+        const smile = add(new THREE.TorusGeometry(.07, .012, 5, 10, Math.PI), mat(0x9b4c4c), 0, 1.61, .355);
+        smile.rotation.z = Math.PI; smile.rotation.x = Math.PI / 2;
+
+        // Layered hair cap, fringe and side locks.
+        add(new THREE.SphereGeometry(.39, 14, 10), hair, 0, 1.94, -.02, 1.04, .72, .94);
+        [-.25, -.12, 0, .13, .25].forEach((x, i) => {
+            const lock = add(new THREE.ConeGeometry(.09, .3 + (i % 2) * .07, 7), hair, x, 1.91, .29);
+            lock.rotation.z = x * 1.25;
+        });
+        add(new THREE.CapsuleGeometry(.07, .34, 4, 7), hair, -.34, 1.78, .02).rotation.z = -.12;
+        add(new THREE.CapsuleGeometry(.07, .34, 4, 7), hair, .34, 1.78, .02).rotation.z = .12;
+
+        if (role === 'merchant') {
+            add(new THREE.CylinderGeometry(.34, .38, .16, 12), accent, 0, 2.18, 0);
+            add(new THREE.TorusGeometry(.27, .035, 6, 16), trim, 0, 2.12, .02).rotation.x = Math.PI / 2;
+            const satchel = add(new THREE.BoxGeometry(.38, .3, .15), mat(0x805125), .48, .77, .17); satchel.rotation.z = -.1;
+            add(new THREE.TorusGeometry(.07, .018, 6, 12), metal, .48, .78, .255);
+        } else if (role === 'appraiser') {
+            add(new THREE.CylinderGeometry(.31, .35, .14, 12), mat(0x684729), 0, 2.17, 0);
+            const lens = add(new THREE.TorusGeometry(.12, .022, 7, 18), metal, .45, .92, .18); lens.rotation.x = Math.PI / 2;
+            const handle = add(new THREE.CylinderGeometry(.018, .018, .28, 7), mat(0x6b421f), .53, .73, .13); handle.rotation.z = -.42;
+            add(new THREE.BoxGeometry(.42, .08, .24), mat(0x8e5a2e), -.38, .77, .2);
+        } else if (role === 'smith') {
+            add(new THREE.BoxGeometry(.48, .58, .035), dark, 0, 1.04, .335);
+            add(new THREE.SphereGeometry(.17, 9, 7), metal, -.42, 1.25, .04, 1.1, .55, 1.15);
+            add(new THREE.SphereGeometry(.17, 9, 7), metal, .42, 1.25, .04, 1.1, .55, 1.15);
+            const hammerHandle = add(new THREE.CylinderGeometry(.035, .045, .72, 8), mat(0x70431f), .57, 1.12, .16); hammerHandle.rotation.z = -.34;
+            const hammerHead = add(new THREE.BoxGeometry(.42, .19, .2), metal, .69, 1.43, .16); hammerHead.rotation.z = -.34;
+            add(new THREE.TorusGeometry(.31, .045, 7, 18), accent, 0, 2.04, .01).rotation.x = Math.PI / 2;
+        } else {
+            add(new THREE.ConeGeometry(.16, .42, 7), accent, -.22, 2.19, 0).rotation.z = -.22;
+            add(new THREE.ConeGeometry(.16, .42, 7), accent, .22, 2.19, 0).rotation.z = .22;
+            add(new THREE.SphereGeometry(.055, 8, 6), trim, -.22, 2.22, .12);
+            add(new THREE.SphereGeometry(.055, 8, 6), trim, .22, 2.22, .12);
+            const wand = add(new THREE.CylinderGeometry(.025, .035, .7, 7), mat(0x78502b), .58, 1.11, .11); wand.rotation.z = -.35;
+            add(new THREE.SphereGeometry(.13, 10, 8), accent, .69, 1.42, .12, 1, 1.3, 1);
+        }
+        root.scale.setScalar(1.08);
+        return root;
     }
 
     // Pet Sanctuary: an open-air garden boutique with real companion models on
@@ -4259,6 +4354,8 @@ export class SceneManager {
         const label=this._makePortalLabel('PET SANCTUARY',new THREE.Color(0xff75bd),'✦ ZOLOS COMPANIONS ✦');
         label.position.y=4.95; label.scale.multiplyScalar(1.12); group.add(label);
         const glow=new THREE.PointLight(0xff8fc9,1.15,10); glow.position.set(0,2.4,0); group.add(glow);
+        const keeper = this._buildPremiumShopkeeper('keeper');
+        keeper.position.set(0, .28, .35); keeper.scale.multiplyScalar(1.12); group.add(keeper);
         group.position.set(PET_BOUTIQUE_POSITION.x, 0, PET_BOUTIQUE_POSITION.z);
         this.scene.add(group); this.envObjects.push(group); this.npcPetMesh=group;
     }
@@ -4356,6 +4453,9 @@ export class SceneManager {
         smith.position.set(0.55, 0.16, 1.05);
         smith.rotation.y = -0.5;
         group.add(smith);
+        smith.visible = false;
+        const premiumSmith = this._buildPremiumShopkeeper('smith');
+        premiumSmith.position.set(.5, .16, 1.0); premiumSmith.rotation.y = -.42; group.add(premiumSmith);
 
         // ---- Floating name tag ----
         const canvas = document.createElement('canvas');
@@ -4754,6 +4854,9 @@ export class SceneManager {
         // Position merchant behind counter
         merchantGroup.position.set(0, 0.18, 0.5);
         group.add(merchantGroup);
+        merchantGroup.visible = false;
+        const premiumAppraiser = this._buildPremiumShopkeeper('appraiser');
+        premiumAppraiser.position.set(0, .18, .48); group.add(premiumAppraiser);
 
         // ---- Floating shop name tag ----
         const canvas = document.createElement('canvas');

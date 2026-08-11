@@ -51,6 +51,18 @@ test('vending street leaves a walkable aisle between every pair of stalls', asyn
     assert.ok(spacing - (2 * (stallRadius + playerRadius)) >= 1.25);
 });
 
+test('all four town services use detailed role-specific NPC models', async () => {
+    const scene = await readFile(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+
+    assert.match(scene, /_buildPremiumShopkeeper\(role\)/);
+    for (const role of ['merchant', 'appraiser', 'smith', 'keeper']) {
+        assert.match(scene, new RegExp(`_buildPremiumShopkeeper\\('${role}'\\)`));
+    }
+    assert.match(scene, /new THREE\.CapsuleGeometry/);
+    assert.match(scene, /new THREE\.TorusGeometry/);
+    assert.match(scene, /userData\.npcModelRole = role/);
+});
+
 test('priest cooldowns remain per-skill and respawn restores the owner mesh', async () => {
     const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
     assert.match(character, /this\.cooldowns\[skillId\] = skill\.cooldown/);
