@@ -1320,6 +1320,26 @@ export class Monster {
 
     destroy() {
         this.scene.remove(this.mesh);
+        const disposedGeometry = new Set();
+        const disposedMaterial = new Set();
+        this.mesh.traverse(child => {
+            if (child.geometry && !disposedGeometry.has(child.geometry)) {
+                disposedGeometry.add(child.geometry);
+                child.geometry.dispose();
+            }
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            for (const material of materials) {
+                if (!material || disposedMaterial.has(material)) continue;
+                disposedMaterial.add(material);
+                // The bump map is shared by every monster and must outlive this
+                // instance. Per-monster name labels own their CanvasTexture.
+                if (material.map && material.map !== sharedMonsterSkinTexture) material.map.dispose();
+                material.dispose();
+            }
+        });
+        this._nameTexture = null;
+        this._nameCanvas = null;
+        this._nameContext = null;
     }
 }
 
@@ -1334,13 +1354,10 @@ export class MonsterManager {
     }
 
     clearAll() {
-        // Remove all monster meshes from scene
-        this.monsters.forEach(m => {
-            if (m.mesh) this.scene.remove(m.mesh);
-        });
-        this.waterMonsters.forEach(m => {
-            if (m.mesh) this.scene.remove(m.mesh);
-        });
+        // Release GPU resources as maps and authoritative modes are switched.
+        // A Set avoids double-disposal if an inconsistent list ever contains the
+        // same monster in both collections.
+        new Set([...this.monsters, ...this.waterMonsters]).forEach(m => m.destroy());
 
         // Reset arrays
         this.monsters = [];
@@ -1447,7 +1464,7 @@ export class MonsterManager {
     }
 
     _removeServerMonster(m) {
-        if (m.mesh) this.scene.remove(m.mesh);
+        m.destroy();
         this.monsters = this.monsters.filter(x => x !== m);
         this.waterMonsters = this.waterMonsters.filter(x => x !== m);
         if (this._srvById) this._srvById.delete(m.id);
