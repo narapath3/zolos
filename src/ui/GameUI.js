@@ -9708,8 +9708,13 @@ export class GameUI {
 
     // Never carry the sender's socket state onto the recipient's fresh copy.
     const catalog = getCard(item.item_name);
-    const cleanStats = { card_id: catalog?.id || item.stats?.card_id };
-    if (item.stats && item.stats.card_stars) cleanStats.card_stars = item.stats.card_stars;
+    const cardId = catalog?.id || item.stats?.card_id;
+    // A traded copy always starts at the base tier. Star refinement belongs
+    // to its current owner and is never transferred to another character.
+    const cleanStats = { card_id: cardId, card_stars: 1, card_pity: 0 };
+    // Mail keeps the original stats only so a rejected parcel can be restored
+    // unchanged to its sender; the claim RPC sanitizes the recipient copy.
+    const returnableMailStats = { ...(item.stats || {}), card_id: cardId };
     const targetLabel = target.username || displayedCharacterUid(target.characterId);
 
     // Online recipient → live trade popup (instant, accept/decline).
@@ -9749,7 +9754,7 @@ export class GameUI {
 
     // Offline → mailbox delivery.
     setStatus(`📬 ผู้รับ (${targetLabel}) ออฟไลน์ กำลังส่งเข้ากล่องจดหมาย...`, 'var(--text-dim)');
-    const res = await sendCardMail(target.characterId, item.item_name, 'card', qty, price, cleanStats);
+    const res = await sendCardMail(target.characterId, item.item_name, 'card', qty, price, returnableMailStats);
     if (!res || !res.ok) {
       const reason = res && res.reason;
       const msg = reason === 'not_enough' ? '❌ การ์ดไม่พอสำหรับส่ง'

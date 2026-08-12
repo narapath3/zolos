@@ -71,7 +71,8 @@ BEGIN
   UPDATE inventory SET quantity = quantity + v_mail.quantity WHERE character_id = v_recipient.id AND item_name = v_mail.item_name;
   IF NOT FOUND THEN
     INSERT INTO inventory (character_id, item_name, item_type, quantity, stats)
-    VALUES (v_recipient.id, v_mail.item_name, v_mail.item_type, v_mail.quantity, COALESCE(v_mail.stats, '{}'::jsonb));
+    VALUES (v_recipient.id, v_mail.item_name, v_mail.item_type, v_mail.quantity,
+      jsonb_build_object('card_id', v_mail.stats->>'card_id', 'card_stars', 1, 'card_pity', 0));
   END IF;
   UPDATE card_mailbox SET status = 'claimed', resolved_at = now() WHERE id = p_mail_id;
   RETURN jsonb_build_object('ok', true, 'item_name', v_mail.item_name, 'item_type', v_mail.item_type,

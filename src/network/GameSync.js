@@ -2748,8 +2748,12 @@ export async function executeDecentralizedReceiverTrade(receiverCharId, itemName
         || !stats || typeof stats !== 'object' || Array.isArray(stats)) {
         throw new Error('Invalid incoming trade payload');
     }
-    // Add item to receiver inventory
-    await saveInventoryItem(receiverCharId, itemName, itemType, quantity, stats);
+    // Card refinement is owner-bound. Never trust or inherit card star/pity
+    // fields supplied by another client; every received copy starts at ★1.
+    const receivedStats = itemType === 'card'
+        ? { card_id: stats.card_id, card_stars: 1, card_pity: 0 }
+        : stats;
+    await saveInventoryItem(receiverCharId, itemName, itemType, quantity, receivedStats);
 
     // Deduct gold from receiver
     if (price > 0) {
