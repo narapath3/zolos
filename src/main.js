@@ -100,6 +100,13 @@ let username = 'Adventurer';
 // Multiplayer state
 const remotePlayersMap = new Map();
 window.remotePlayersMap = remotePlayersMap;
+function removeRemotePlayer(userId) {
+    const remote = remotePlayersMap.get(userId);
+    if (!remote) return;
+    if (remote.character?.destroy) remote.character.destroy();
+    else if (remote.mesh) sceneManager?.scene?.remove(remote.mesh);
+    remotePlayersMap.delete(userId);
+}
 let lastBroadcastTime = 0;
 // Attack signal broadcast to other players so they hear our weapon. `localAtkSeq`
 // bumps once per swing; `localWsc` is the current weapon's sound class.
@@ -998,8 +1005,7 @@ async function initGame(charData) {
             const currentIds = new Set(players.map(p => p.userId));
             for (const [id, rp] of remotePlayersMap.entries()) {
                 if (!currentIds.has(id)) {
-                    sceneManager.scene.remove(rp.mesh);
-                    remotePlayersMap.delete(id);
+                    removeRemotePlayer(id);
                 }
             }
 
@@ -1007,9 +1013,7 @@ async function initGame(charData) {
                 if (p.userId === userId) return;
                 if (p.mapId && p.mapId !== sceneManager.currentMap) {
                     if (remotePlayersMap.has(p.userId)) {
-                        const rp = remotePlayersMap.get(p.userId);
-                        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
-                        remotePlayersMap.delete(p.userId);
+                        removeRemotePlayer(p.userId);
                     }
                 }
             });
@@ -1037,9 +1041,7 @@ async function initGame(charData) {
             // Map isolation: Only update/render if on the same map
             if (p.mapId && p.mapId !== sceneManager.currentMap) {
                 if (remotePlayersMap.has(p.userId)) {
-                    const rp = remotePlayersMap.get(p.userId);
-                    if (rp.mesh) sceneManager.scene.remove(rp.mesh);
-                    remotePlayersMap.delete(p.userId);
+                    removeRemotePlayer(p.userId);
                 }
                 return;
             }
@@ -1299,9 +1301,8 @@ async function initGame(charData) {
 
             // 4. Remove remote player meshes
             for (const [id, rp] of remotePlayersMap.entries()) {
-                if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+                removeRemotePlayer(id);
             }
-            remotePlayersMap.clear();
 
             // 5. Sign out from Supabase
             try {
@@ -1951,10 +1952,9 @@ function loadMapAndSpawn(targetMap, spawn) {
     );
 
     // Clear remote players carried over from the old map
-    for (const [, rp] of remotePlayersMap.entries()) {
-        if (rp.mesh) sceneManager.scene.remove(rp.mesh);
+    for (const [id] of remotePlayersMap.entries()) {
+        removeRemotePlayer(id);
     }
-    remotePlayersMap.clear();
 
     // Rebuild the player market street when arriving in town
     if (window.stallManager) window.stallManager.refresh();

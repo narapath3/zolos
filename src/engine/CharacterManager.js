@@ -1814,6 +1814,13 @@ export class CharacterManager {
         });
     }
 
+    _disposeSprite(sprite) {
+        if (!sprite) return;
+        if (sprite.parent) sprite.parent.remove(sprite);
+        if (sprite.material?.map) sprite.material.map.dispose();
+        sprite.material?.dispose?.();
+    }
+
     // Signature colour for a piece of gear, by item name (falls back by rarity).
     _gearColor(name, fallback = 0x9aa4b2) {
         const MAP = {
@@ -2216,7 +2223,8 @@ export class CharacterManager {
 
     updateNameTag() {
         if (this.nameSprite) {
-            this.mesh.remove(this.nameSprite);
+            this._disposeSprite(this.nameSprite);
+            this.nameSprite = null;
         }
 
         const meta = this.title ? CharacterManager.TITLE_META[this.title] : null;
@@ -2280,7 +2288,8 @@ export class CharacterManager {
 
     showKillStreakEffect(count) {
         if (this.streakSprite) {
-            this.mesh.remove(this.streakSprite);
+            this._disposeSprite(this.streakSprite);
+            this.streakSprite = null;
             if (this.streakTimeout) clearTimeout(this.streakTimeout);
         }
 
@@ -2352,7 +2361,7 @@ export class CharacterManager {
                 requestAnimationFrame(animate);
             } else {
                 if (this.streakSprite) {
-                    this.mesh.remove(this.streakSprite);
+                    this._disposeSprite(this.streakSprite);
                     this.streakSprite = null;
                 }
             }
@@ -2361,7 +2370,7 @@ export class CharacterManager {
 
         this.streakTimeout = setTimeout(() => {
             if (this.streakSprite) {
-                this.mesh.remove(this.streakSprite);
+                this._disposeSprite(this.streakSprite);
                 this.streakSprite = null;
             }
         }, 4000);
@@ -2372,7 +2381,8 @@ export class CharacterManager {
 
         // Remove old bubble if exists
         if (this.chatBubble) {
-            this.mesh.remove(this.chatBubble);
+            this._disposeSprite(this.chatBubble);
+            this.chatBubble = null;
             if (this.chatBubbleTimeout) clearTimeout(this.chatBubbleTimeout);
         }
 
@@ -2473,7 +2483,7 @@ export class CharacterManager {
         // Auto-remove after 5 seconds
         this.chatBubbleTimeout = setTimeout(() => {
             if (this.chatBubble) {
-                this.mesh.remove(this.chatBubble);
+                this._disposeSprite(this.chatBubble);
                 this.chatBubble = null;
             }
         }, 5000);
@@ -3361,24 +3371,33 @@ export class CharacterManager {
     applyAppearance(app) {
         if (!app) return;
         if (app.gender !== undefined && app.gender !== this.gender) this.setGender(app.gender);
-        if (app.bodyColor !== undefined) this.setBodyColor(app.bodyColor);
-        if (app.hairColor !== undefined) this.setHairColor(app.hairColor);
-        if (app.pantsColor !== undefined) this.setPantsColor(app.pantsColor);
-        if (app.hat !== undefined) this.setHat(app.hat);
-        if (app.glasses !== undefined) this.setGlasses(app.glasses);
-        if (app.weapon !== undefined) this.equipWeapon(app.weapon);
+        if (app.bodyColor !== undefined && app.bodyColor !== this.bodyColor) this.setBodyColor(app.bodyColor);
+        if (app.hairColor !== undefined && app.hairColor !== this.hairColor) this.setHairColor(app.hairColor);
+        if (app.pantsColor !== undefined && app.pantsColor !== this.pantsColor) this.setPantsColor(app.pantsColor);
+        if (app.hat !== undefined && (app.hat || 'None') !== this.equippedHat) this.setHat(app.hat);
+        if (app.glasses !== undefined && (app.glasses || 'None') !== this.equippedGlasses) this.setGlasses(app.glasses);
+        if (app.weapon !== undefined && (app.weapon || null) !== this.equippedWeapon) this.equipWeapon(app.weapon);
         // Worn armor/shield → visible on remote heroes too.
+        let gearChanged = false;
         if (app.gear !== undefined && app.gear) {
-            for (const k of Object.keys(this.equippedGear)) this.equippedGear[k] = app.gear[k] || null;
+            for (const k of Object.keys(this.equippedGear)) {
+                const next = app.gear[k] || null;
+                if (this.equippedGear[k] !== next) gearChanged = true;
+                this.equippedGear[k] = next;
+            }
         }
-        if (app.shield !== undefined) this.equippedShield = app.shield || null;
+        if (app.shield !== undefined) {
+            const nextShield = app.shield || null;
+            if (this.equippedShield !== nextShield) gearChanged = true;
+            this.equippedShield = nextShield;
+        }
         // Refine (+N) per slot + socketed cards, so remote heroes carry them and
         // re-broadcast correctly (used by the profile popup to show +N / cards).
         if (app.refine && this.equipRefine) {
             for (const k of Object.keys(this.equipRefine)) this.equipRefine[k] = app.refine[k] || 0;
         }
         this.restoreCardAppearance(app);
-        if (app.gear !== undefined || app.shield !== undefined) this.updateGearVisuals();
+        if (gearChanged) this.updateGearVisuals();
         if (app.pet !== undefined && app.pet !== this.equippedPet) {
             this.setPet(app.pet, app.petLevel || 1, 0, app.petName || null);
         } else if (app.pet !== undefined) {
@@ -3402,6 +3421,21 @@ export class CharacterManager {
             }
         }
         if (app.title !== undefined) this.setTitle(app.title);
+    }
+
+    destroy() {
+        clearTimeout(this.streakTimeout);
+        clearTimeout(this.chatBubbleTimeout);
+        this.streakTimeout = null;
+        this.chatBubbleTimeout = null;
+        this._disposeSprite(this.nameSprite);
+        this._disposeSprite(this.streakSprite);
+        this._disposeSprite(this.chatBubble);
+        this.nameSprite = null;
+        this.streakSprite = null;
+        this.chatBubble = null;
+        this._disposeMesh(this.mesh);
+        this.mesh = null;
     }
 
     async saveStatsToDatabase() {
