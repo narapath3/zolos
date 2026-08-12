@@ -440,12 +440,19 @@ io.on('connection', (socket) => {
         if (existingSocketId && existingSocketId !== socket.id) {
             const existingSock = io.sockets.sockets.get(existingSocketId);
             if (existingSock) {
+                // The disconnect handler owns save/duel/request/map cleanup.
+                // Do not delete its player record here before that lifecycle
+                // has had a chance to persist the outgoing session.
                 existingSock.disconnect(true);
-            }
-            const oldPlayer = onlinePlayers.get(existingSocketId);
-            if (oldPlayer) {
-                onlinePlayers.delete(existingSocketId);
-                broadcastPlayerList(oldPlayer.mapId);
+            } else {
+                // Socket already vanished without its cleanup callback: remove
+                // only the orphaned roster entry before installing the new one.
+                const stalePlayer = onlinePlayers.get(existingSocketId);
+                if (stalePlayer) {
+                    onlinePlayers.delete(existingSocketId);
+                    broadcastPlayerList(stalePlayer.mapId);
+                }
+                clearSocketMappingIfCurrent(userSocketMap, userId, existingSocketId);
             }
         }
 

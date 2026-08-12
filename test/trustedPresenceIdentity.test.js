@@ -17,3 +17,13 @@ test('verified presence updates can change map but not identity or progression',
   assert.match(update, /level: player\.verified \? player\.level/);
   assert.match(update, /mapId: data\.mapId \?\? player\.mapId/);
 });
+
+test('duplicate login preserves the old socket disconnect lifecycle', () => {
+  const start = source.indexOf('// Remove any existing connection for same userId');
+  const end = source.indexOf('const playerInfo = {', start);
+  const reconnect = source.slice(start, end);
+  const liveBranch = reconnect.match(/if \(existingSock\) \{([\s\S]*?)\} else \{/)?.[1] || '';
+  assert.match(liveBranch, /existingSock\.disconnect\(true\)/);
+  assert.doesNotMatch(liveBranch, /onlinePlayers\.delete/);
+  assert.match(reconnect, /else \{[\s\S]*onlinePlayers\.delete\(existingSocketId\)[\s\S]*clearSocketMappingIfCurrent\(userSocketMap, userId, existingSocketId\)/);
+});
