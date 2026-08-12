@@ -957,6 +957,146 @@
 }
 
 /* PWA App Install Button Enhancement */
+/* ---- Community link (official Facebook page) ----
+   Deliberately not a flat corporate blue button: it reads as another piece of
+   the realm's UI — a dark glass sigil plate with the brand blue kept to the
+   glyph's glow, warming to the screen's gold on hover, like the other CTAs. */
+.auth-social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: clamp(8px, 1.6vh, 14px) auto 0;
+  padding: 7px 14px 7px 8px;
+  width: fit-content;
+  max-width: min(92vw, 340px);
+  text-decoration: none;
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(24, 119, 242, 0.16), rgba(8, 12, 28, 0.72) 55%),
+    rgba(4, 7, 16, 0.55);
+  border: 1px solid rgba(120, 170, 255, 0.28);
+  box-shadow:
+    0 6px 18px rgba(2, 6, 18, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.25, 1),
+    border-color 0.28s ease, box-shadow 0.28s ease;
+}
+
+/* Slow sheen sweep so the plate catches the light like the rune circles. */
+.auth-social-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.16) 50%, transparent 62%);
+  transform: translateX(-120%);
+  animation: authSocialSheen 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.auth-social-glyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(150deg, #4c9bff, #1877f2 55%, #0b57c4);
+  box-shadow: 0 0 12px rgba(24, 119, 242, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: box-shadow 0.28s ease, transform 0.28s ease;
+}
+
+.auth-social-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.auth-social-title {
+  font-family: 'Kanit', sans-serif;
+  font-weight: 600;
+  font-size: clamp(11px, 2.2vw, 13px);
+  color: #f2f6ff;
+  white-space: nowrap;
+}
+
+.auth-social-sub {
+  font-size: clamp(9px, 1.8vw, 10.5px);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  color: rgba(168, 196, 240, 0.78);
+  white-space: nowrap;
+}
+
+.auth-social-arrow {
+  flex: 0 0 auto;
+  color: rgba(168, 196, 240, 0.6);
+  transition: color 0.28s ease, transform 0.28s ease;
+}
+
+@media (hover: hover) {
+  .auth-social-link:hover {
+    transform: translateY(-2px);
+    border-color: rgba(240, 192, 64, 0.55);
+    box-shadow:
+      0 10px 24px rgba(2, 6, 18, 0.6),
+      0 0 18px rgba(240, 192, 64, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .auth-social-link:hover .auth-social-glyph {
+    transform: scale(1.06);
+    box-shadow: 0 0 16px rgba(24, 119, 242, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+
+  .auth-social-link:hover .auth-social-arrow {
+    color: #f0c040;
+    transform: translate(2px, -2px);
+  }
+}
+
+.auth-social-link:active {
+  transform: translateY(1px);
+}
+
+.auth-social-link:focus-visible {
+  outline: 2px solid rgba(240, 192, 64, 0.85);
+  outline-offset: 3px;
+}
+
+@keyframes authSocialSheen {
+
+  0%,
+  62% {
+    transform: translateX(-120%);
+  }
+
+  78%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+/* Respect players who have asked the OS to stop moving things. */
+@media (prefers-reduced-motion: reduce) {
+
+  .auth-social-link,
+  .auth-social-glyph,
+  .auth-social-arrow {
+    transition: none;
+  }
+
+  .auth-social-link::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 .auth-pwa-btn {
   display: inline-flex;
   align-items: center;
