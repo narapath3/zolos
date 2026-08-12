@@ -252,6 +252,7 @@ const COMBAT_WEAPON_CLASSES = new Set([
     'shadowslash', 'lightning', 'magic', 'holyorb', 'acolyte', 'bow', 'gun',
 ]);
 const PLAYER_MOTION_STATES = new Set(['idle', 'walking', 'running', 'attacking', 'fishing', 'swimming']);
+const KILL_STREAK_MILESTONES = new Set([10, 20, 50, 100, 200, 500]);
 // Keep world bosses away from Prontera, the main hub. Each selected centre is
 // clear of portals and major map landmarks so the oversized boss has room.
 const BOSS_SPAWN_LOCATIONS = [
@@ -660,6 +661,22 @@ io.on('connection', (socket) => {
             out.tz = payload.tz;
         }
         socket.to(`map:${mapId}`).emit('attack_hit', out);
+    });
+
+    // --- KILL STREAK FEEDBACK --- the client only reports authored display
+    // milestones; identity and map always come from the joined server session.
+    socket.on('kill_streak', (payload) => {
+        const player = trustedSender(socket);
+        const count = Number(payload?.count);
+        if (!player || !Number.isInteger(count) || !KILL_STREAK_MILESTONES.has(count)) return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'kill_streak', 2, 10000)) return;
+        const mapId = resolveTrustedMap(player);
+        io.to(`map:${mapId}`).emit('kill_streak', {
+            userId: player.userId,
+            username: player.username,
+            count,
+            mapId,
+        });
     });
 
     // --- LATENCY PONG --- reply to our periodic srv_ping; RTT = now - echoed ts

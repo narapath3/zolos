@@ -36,6 +36,21 @@ test('stall refresh pings require an authenticated character and are rate limite
     assert.ok(handler.indexOf("shouldRateLimitEvent(socket._rateLimitTracker, 'stall_change', 4, 10000)") < handler.indexOf("io.emit('stalls_update')"));
 });
 
+test('kill streak milestones relay with trusted identity, map and bounded cadence', async () => {
+    const server = await readFile(new URL('../server/server.js', import.meta.url), 'utf8');
+    const handler = server.slice(server.indexOf("socket.on('kill_streak'"), server.indexOf('// --- LATENCY PONG ---'));
+
+    assert.match(server, /const KILL_STREAK_MILESTONES = new Set\(\[10, 20, 50, 100, 200, 500\]\)/);
+    assert.match(handler, /const player = trustedSender\(socket\)/);
+    assert.match(handler, /KILL_STREAK_MILESTONES\.has\(count\)/);
+    assert.match(handler, /shouldRateLimitEvent\(socket\._rateLimitTracker, 'kill_streak', 2, 10000\)/);
+    assert.match(handler, /userId: player\.userId/);
+    assert.match(handler, /username: player\.username/);
+    assert.match(handler, /mapId = resolveTrustedMap\(player\)/);
+    assert.match(handler, /io\.to\(`map:\$\{mapId\}`\)\.emit\('kill_streak'/);
+    assert.doesNotMatch(handler, /payload\.(userId|username|mapId)/);
+});
+
 test('players can zoom, disable fog, and cannot walk through shop colliders', async () => {
     const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
     const ui = await readFile(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
