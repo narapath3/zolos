@@ -2726,6 +2726,14 @@ export async function executeDecentralizedSenderTrade(senderCharId, targetName, 
 }
 
 export async function executeDecentralizedReceiverTrade(receiverCharId, itemName, itemType, quantity, stats = {}, price = 0) {
+    if (typeof receiverCharId !== 'string' || !receiverCharId
+        || typeof itemName !== 'string' || !itemName || itemName.length > 120
+        || typeof itemType !== 'string' || !itemType || itemType.length > 40
+        || !Number.isInteger(quantity) || quantity < 1 || quantity > 9999
+        || !Number.isSafeInteger(price) || price < 0 || price > 2_147_483_647
+        || !stats || typeof stats !== 'object' || Array.isArray(stats)) {
+        throw new Error('Invalid incoming trade payload');
+    }
     // Add item to receiver inventory
     await saveInventoryItem(receiverCharId, itemName, itemType, quantity, stats);
 

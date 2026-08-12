@@ -952,22 +952,47 @@ io.on('connection', (socket) => {
         });
     }
 
+    const isBoundedString = (value, max = 160) => typeof value === 'string'
+        && value.length > 0 && value.length <= max;
+    const isTradeId = value => isBoundedString(value, 220) && /^trade:[A-Za-z0-9:_-]+$/.test(value);
+    const hasSafeTradeStats = stats => {
+        if (!stats) return true;
+        if (typeof stats !== 'object' || Array.isArray(stats)) return false;
+        try { return JSON.stringify(stats).length <= 8192; } catch { return false; }
+    };
+    const isSafeTradeRequest = payload => payload && typeof payload === 'object'
+        && isBoundedString(payload.targetUserId, 160)
+        && (!payload.targetCharacterId || isBoundedString(payload.targetCharacterId, 160))
+        && isBoundedString(payload.itemName, 120)
+        && isBoundedString(payload.itemType, 40)
+        && Number.isInteger(payload.quantity) && payload.quantity >= 1 && payload.quantity <= 9999
+        && Number.isSafeInteger(payload.price) && payload.price >= 0 && payload.price <= 2_147_483_647
+        && isTradeId(payload.requestId)
+        && hasSafeTradeStats(payload.stats);
+    const isTradeEnvelope = payload => payload && typeof payload === 'object'
+        && isBoundedString(payload.senderUserId, 160)
+        && payload.requestPayload && isTradeId(payload.requestPayload.requestId);
+
     socket.on('trade_request', (payload) => {
         const sender = trustedSender(socket);
-        if (!sender || !payload || !payload.targetUserId) return;
-        relayRequest('trade_request', payload, sender);
+        if (!sender?.verified || !sender.characterId || !isSafeTradeRequest(payload)) return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'trade_request', 5, 10000)) return;
+        relayRequest('trade_request', { ...payload, senderCharacterId: sender.characterId }, sender);
     });
 
     socket.on('trade_response', (payload) => {
         const sender = trustedSender(socket);
-        if (!sender || !payload || !payload.senderUserId) return;
+        if (!sender?.verified || !isTradeEnvelope(payload) || typeof payload.accepted !== 'boolean') return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'trade_response', 8, 10000)) return;
         relayResponse('trade_response', payload, sender);
     });
 
     // Cancel travels the same direction as the request (asker → target).
     socket.on('trade_cancel', (payload) => {
         const sender = trustedSender(socket);
-        if (!sender || !payload || !payload.targetUserId) return;
+        if (!sender?.verified || !isBoundedString(payload?.targetUserId, 160)
+            || !isTradeId(payload?.requestPayload?.requestId)) return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'trade_cancel', 8, 10000)) return;
         relayRequest('trade_cancel', payload, sender);
     });
 

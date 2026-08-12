@@ -9432,7 +9432,8 @@ export class GameUI {
           const req = {
             senderUserId: this.characterId,
             targetUserId: this.tradeTarget.userId,
-            senderName: this.character && this.character.stats ? this.character.stats.name : 'Player'
+            senderName: this.character && this.character.stats ? this.character.stats.name : 'Player',
+            requestId: this.pendingTradeRequestId
           };
           await sendTradeCancelPacket(this.characterId, this.tradeTarget.userId, req);
         }
@@ -9987,9 +9988,10 @@ export class GameUI {
   }
 
   receiveTradeRequest(payload) {
-    if (!payload) return;
-    if (payload.targetCharacterId && payload.targetCharacterId !== this.characterId) return;
-    this.activeTradeRequest = payload;
+    const request = this._normalizeIncomingTradeRequest(payload);
+    if (!request) return;
+    payload = request;
+    this.activeTradeRequest = request;
 
     // Populate confirm modal fields
     const senderName = document.getElementById('trade-confirm-sender-name');
@@ -10050,13 +10052,35 @@ export class GameUI {
 
   receiveTradeCancel(payload) {
     if (!payload) return;
-    if (this.activeTradeRequest && this.activeTradeRequest.senderUserId === payload.senderUserId) {
+    const activeId = this.activeTradeRequest?.requestId;
+    const cancelledId = payload.requestPayload?.requestId;
+    if (this.activeTradeRequest && this.activeTradeRequest.senderUserId === payload.senderUserId
+      && activeId && cancelledId === activeId) {
       const panel = document.getElementById('trade-confirm-modal');
       if (panel) panel.style.display = 'none';
       this.activeTradeRequest = null;
       const senderName = payload.requestPayload?.senderName || 'ผู้เล่น';
       this.addCombatLog(`🤝 ${senderName} ได้ยกเลิกคำขอโอนไอเทมและราคาเสนอแล้ว`, 'system');
     }
+  }
+
+  _normalizeIncomingTradeRequest(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.targetCharacterId && payload.targetCharacterId !== this.characterId) return null;
+    const itemName = typeof payload.itemName === 'string' ? payload.itemName.trim() : '';
+    const itemType = typeof payload.itemType === 'string' ? payload.itemType.trim() : '';
+    const knownItem = itemType === 'card' ? getCard(itemName) : ITEMS[itemName];
+    if (!knownItem || !/^trade:[A-Za-z0-9:_-]{1,214}$/.test(payload.requestId || '')) return null;
+    if (!Number.isInteger(payload.quantity) || payload.quantity < 1 || payload.quantity > 9999) return null;
+    if (!Number.isSafeInteger(payload.price) || payload.price < 0 || payload.price > 2_147_483_647) return null;
+    if (typeof payload.senderUserId !== 'string' || !payload.senderUserId || payload.senderUserId.length > 160) return null;
+    if (payload.stats && (typeof payload.stats !== 'object' || Array.isArray(payload.stats))) return null;
+    try {
+      if (JSON.stringify(payload.stats || {}).length > 8192) return null;
+    } catch (_) {
+      return null;
+    }
+    return { ...payload, itemName, itemType, stats: { ...(payload.stats || {}) } };
   }
 
   async _acceptIncomingTrade() {
