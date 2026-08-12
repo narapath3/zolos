@@ -127,9 +127,10 @@ test('online delivery requires the exact active character, not only its account'
   }), false);
 });
 
-test('live trade packets carry and validate the target character identity', () => {
-  assert.match(gameUiSource, /isTradeCharacterOnline\(this\.onlinePlayers,\s*target\)/);
-  assert.match(gameUiSource, /cleanStats,\s*target\.characterId/);
+test('card transfers use the exact database character through authoritative mail', () => {
+  const cardSend = gameUiSource.slice(gameUiSource.indexOf('async _sendCardTrade()'), gameUiSource.indexOf('// ============ Card Mailbox'));
+  assert.match(cardSend, /sendCardMail\(target\.characterId/);
+  assert.match(cardSend, /if \(false\)[\s\S]*sendTradeRequestPacket\(/);
   assert.match(gameUiSource, /payload\.targetCharacterId !== this\.characterId/);
   assert.match(gameSyncSource, /targetCharacterId:\s*targetCharacterId/);
   assert.match(gameSyncSource, /payload\.targetCharacterId === currentCharacterId/);

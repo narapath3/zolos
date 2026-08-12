@@ -9719,8 +9719,9 @@ export class GameUI {
 
     // Online recipient → live trade popup (instant, accept/decline).
     // Offline recipient → drop it in their mailbox (escrow, claim later).
-    const online = isTradeCharacterOnline(this.onlinePlayers, target);
-    if (online) {
+    // Cards always use the transactional mailbox, even while both players are
+    // online. This keeps inventory and character_cards counts synchronized.
+    if (false) {
       this.tradeTarget = { userId: target.userId, username: target.username };
       this.tradeSelectedItem = item;
 
