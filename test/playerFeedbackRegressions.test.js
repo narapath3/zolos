@@ -76,6 +76,20 @@ test('every playable hero class receives the shared remaster and unique silhouet
     }
 });
 
+test('hero hair and furry creatures use tapered strand detail without global fur', async () => {
+    const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
+    const pets = await readFile(new URL('../src/engine/PetModels.js', import.meta.url), 'utf8');
+    const monsters = await readFile(new URL('../src/engine/MonsterAnatomy.js', import.meta.url), 'utf8');
+
+    assert.match(character, /hairStrandMaterial/);
+    assert.match(character, /userData\.hairStrand = true/);
+    assert.match(pets, /const furColors = \{ kitten:.*puppy:.*sunfox:.*moon_hare:/);
+    assert.match(pets, /userData\.furStrand = true/);
+    assert.match(monsters, /const furClumps =/);
+    for (const type of ['lunatic', 'bigfoot', 'nine_tail', 'savage']) assert.match(monsters, new RegExp(`type === '${type}'`));
+    assert.doesNotMatch(pets, /furColors = \{[^}]*poring/);
+});
+
 test('priest cooldowns remain per-skill and respawn restores the owner mesh', async () => {
     const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
     assert.match(character, /this\.cooldowns\[skillId\] = skill\.cooldown/);

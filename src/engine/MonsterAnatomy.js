@@ -254,6 +254,15 @@ export function addSpeciesArtDetails({ THREE, type, size, bodyMesh, bodyMat, cre
   };
   const sph = (radius, width = 9, height = 7) => new THREE.SphereGeometry(radius * size, width, height);
   const cone = (radius, height, sides = 6) => new THREE.ConeGeometry(radius * size, height * size, sides);
+  const furClumps = (material, radius, centerY, centerZ, count = 18) => {
+    for (let i = 0; i < count; i++) {
+      const a = i / count * Math.PI * 2;
+      const strand = add(cone(0.018, 0.14 + (i % 3) * 0.025, 5), material,
+        Math.cos(a) * radius, centerY + Math.sin(a) * radius * .72, centerZ,
+        [0, 0, -a + Math.PI / 2]);
+      strand.userData.furStrand = true;
+    }
+  };
 
   // Every branch below is deliberately species-authored. There is no generic
   // family decoration or universal face decal: details describe anatomy and
@@ -271,6 +280,7 @@ export function addSpeciesArtDetails({ THREE, type, size, bodyMesh, bodyMat, cre
     add(sph(0.038, 7, 5), lightMat, -0.22, 0.25, 0.39);
     add(sph(0.021, 7, 5), lightMat, -0.15, 0.32, 0.405);
   } else if (type === 'lunatic') {
+    furClumps(lightMat, .29, -.02, .34, 20);
     const muzzle = add(sph(0.16, 12, 8), lightMat, 0, -0.08, 0.39);
     muzzle.scale.set(1.12, 0.72, 0.62);
     add(sph(0.045, 8, 6), inkMat, 0, -0.04, 0.49);
@@ -305,6 +315,7 @@ export function addSpeciesArtDetails({ THREE, type, size, bodyMesh, bodyMat, cre
     }
     add(new THREE.TorusGeometry(0.34 * size, 0.025 * size, 5, 20), darkMat, 0, 0.30, 0, [Math.PI / 2, 0, 0]);
   } else if (type === 'bigfoot') {
+    furClumps(lightMat, .35, -.04, .30, 22);
     const muzzle = add(sph(0.19, 12, 8), createMat(0xcba77f, 0.94, 0), 0, -0.09, 0.39);
     muzzle.scale.set(1.15, 0.78, 0.75);
     add(sph(0.065, 8, 6), inkMat, 0, -0.03, 0.52);
@@ -313,12 +324,14 @@ export function addSpeciesArtDetails({ THREE, type, size, bodyMesh, bodyMat, cre
       for (let i = -1; i <= 1; i++) add(cone(0.025, 0.11, 5), createMat(0xeee0ca, 0.82, 0), side * (0.20 + i * 0.04), -0.52, 0.18, [Math.PI / 2, 0, 0]);
     });
   } else if (type === 'nine_tail') {
+    furClumps(lightMat, .31, -.01, .34, 22);
     add(new THREE.OctahedronGeometry(0.075 * size, 0), new THREE.MeshStandardMaterial({ color: 0x78dfff, emissive: 0x2499dd, emissiveIntensity: 0.9 }), 0, 0.26, 0.43, [0, 0, Math.PI / 4]);
     [-1, 1].forEach(side => add(new THREE.BoxGeometry(0.17 * size, 0.025 * size, 0.025 * size), darkMat, side * 0.13, 0.14, 0.43, [0, 0, side * -0.18]));
   } else if (type === 'horn') {
     add(new THREE.BoxGeometry(0.025 * size, 0.025 * size, 0.68 * size), darkMat, 0, 0.08, -0.32, [0, 0, 0]);
     [-1, 1].forEach(side => add(cone(0.09, 0.24, 6), darkMat, side * 0.13, -0.12, 0.43, [1.12, 0, side * 0.40]));
   } else if (type === 'savage') {
+    furClumps(darkMat, .34, -.01, .30, 20);
     const snout = add(new THREE.CapsuleGeometry(0.16 * size, 0.18 * size, 4, 8), darkMat, 0, -0.10, 0.42, [Math.PI / 2, 0, 0]);
     snout.scale.set(1.12, 1, 0.78);
     [-1, 1].forEach(side => {

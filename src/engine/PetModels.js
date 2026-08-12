@@ -90,6 +90,17 @@ const leg2 = (x, hipY, z, r, color, phase, o = {}) => {
 // Whisker.
 const whisker = (x, y, z, len, ang) => { const b = box(len, 0.008, 0.008, 0xf2f2f2, x, y, z, { rough: 0.4, glow: 0xffffff, glowI: 0.15 }); b.rotation.y = ang; return b; };
 
+// Small tapered fur clusters produce a true fibrous silhouette at gameplay
+// distance. They are geometry-light and only applied to genuinely furry pets.
+const addFurClumps = (g, color, placements, o = {}) => {
+    const furMat = mat(color, { rough: .92, ...o });
+    placements.forEach(([x, y, z, rx = 0, rz = 0, scale = 1]) => {
+        const clump = new THREE.Mesh(new THREE.ConeGeometry(.018 * scale, .13 * scale, 5), furMat);
+        clump.position.set(x, y, z); clump.rotation.set(rx, 0, rz); clump.castShadow = true;
+        clump.userData.furStrand = true; g.add(clump);
+    });
+};
+
 // ── Eyes ─────────────────────────────────────────────────────────────────────
 // Big glossy chibi eye: sclera + iris + pupil + two catchlights. Tagged 'eye';
 // the animator squashes its Y to blink. Brows are added per-pet (outside the
@@ -324,5 +335,17 @@ export const PET_BUILDERS = {
 // Build a pet group for `key`, or null if unknown.
 export function buildPet(key) {
     const fn = PET_BUILDERS[key];
-    return fn ? fn() : null;
+    const pet = fn ? fn() : null;
+    if (!pet) return null;
+    const furColors = { kitten: 0xc7ccd5, puppy: 0xc4935f, sunfox: 0xffe098, moon_hare: 0xffffff };
+    if (furColors[key]) {
+        const placements = [];
+        for (let i = 0; i < 18; i++) {
+            const a = i / 18 * Math.PI * 2;
+            placements.push([Math.cos(a) * .21, .40 + Math.sin(a) * .12, .23, .18, -a * .18, .75 + (i % 3) * .12]);
+        }
+        [-.13, -.065, 0, .065, .13].forEach((x, i) => placements.push([x, .55 + (i % 2) * .025, .28, -.2, x * 1.5, .8]));
+        addFurClumps(pet, furColors[key], placements, key === 'sunfox' ? { glow: 0xffb84a, glowI: .2 } : {});
+    }
+    return pet;
 }

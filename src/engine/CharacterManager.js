@@ -1299,6 +1299,7 @@ export class CharacterManager {
         group.name = 'chibi-hair-silhouette';
         const highlightColor = mat.color.clone().offsetHSL(0, -0.04, 0.12);
         this.hairHighlightMaterial = new THREE.MeshStandardMaterial({ color: highlightColor, roughness: 0.62, metalness: 0 });
+        this.hairStrandMaterial = new THREE.MeshStandardMaterial({ color: highlightColor, roughness: 0.46, metalness: 0.03 });
         const smoothLock = ({ x, y, z, sx, sy, sz, rz = 0, rx = 0, material = mat }) => {
             const lock = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), material);
             lock.position.set(x, y, z);
@@ -1328,6 +1329,27 @@ export class CharacterManager {
         smoothLock({ x: 0.315, y: 1.775, z: 0.065, sx: 0.085, sy: 0.205, sz: 0.105, rz: 0.13 });
         smoothLock({ x: -0.10, y: 2.075, z: 0.105, sx: 0.075, sy: 0.035, sz: 0.055, rz: -0.20, material: this.hairHighlightMaterial });
         smoothLock({ x: 0.055, y: 2.085, z: 0.11, sx: 0.055, sy: 0.028, sz: 0.05, rz: 0.10, material: this.hairHighlightMaterial });
+
+        // Tapered strand cards: individually readable tips and specular ribbons
+        // give the hair a combed, fibrous finish without strand simulation.
+        const strandGeo = new THREE.ConeGeometry(.022, .25, 5);
+        [
+            [-.28, 1.86, .29, -.28, .88], [-.21, 1.88, .31, -.20, 1.0],
+            [-.13, 1.89, .32, -.12, .92], [-.045, 1.89, .325, -.04, 1.05],
+            [.045, 1.89, .325, .04, .96], [.13, 1.89, .32, .12, 1.04],
+            [.21, 1.88, .31, .20, .9], [.28, 1.86, .29, .28, .84],
+        ].forEach(([x, y, z, rz, scale]) => {
+            const strand = new THREE.Mesh(strandGeo, this.hairStrandMaterial);
+            strand.position.set(x, y, z); strand.rotation.z = rz; strand.scale.y = scale;
+            strand.castShadow = true; strand.userData.hairStrand = true; group.add(strand);
+        });
+        for (let i = 0; i < 7; i++) {
+            const a = -1.15 + i * .38;
+            const strand = new THREE.Mesh(new THREE.ConeGeometry(.018, .20, 5), i % 2 ? mat : this.hairStrandMaterial);
+            strand.position.set(Math.sin(a) * .28, 2.02 + Math.cos(a) * .06, -.16 + Math.cos(a) * .08);
+            strand.rotation.z = -a * .35; strand.rotation.x = -.18; strand.castShadow = true;
+            strand.userData.hairStrand = true; group.add(strand);
+        }
         return group;
     }
 
@@ -1382,6 +1404,9 @@ export class CharacterManager {
         }
         if (this.hairHighlightMaterial) {
             this.hairHighlightMaterial.color.setHex(colorVal).offsetHSL(0, -0.04, 0.12);
+        }
+        if (this.hairStrandMaterial) {
+            this.hairStrandMaterial.color.setHex(colorVal).offsetHSL(0, -0.08, 0.18);
         }
         if (this.brows) this.brows.forEach(b => b.material && b.material.color.setHex(colorVal));
     }
