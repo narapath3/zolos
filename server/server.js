@@ -694,6 +694,16 @@ io.on('connection', (socket) => {
         socket.emit('client_pong', t);
     });
 
+    // Socket.io acknowledgement ping used by the client-side latency meter.
+    // Previously no handler existed, so every measurement waited three seconds
+    // then performed an unnecessary HTTP fallback request.
+    socket.on('cli_pong', (t, acknowledge) => {
+        if (typeof acknowledge !== 'function' || !Number.isFinite(t)) return;
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'cli_pong', 4, 10000)) return;
+        acknowledge();
+    });
+
     // --- CHAT ---
     socket.on('chat', (payload) => {
         if (!payload || typeof payload.message !== 'string') return;

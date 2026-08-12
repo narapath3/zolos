@@ -51,6 +51,21 @@ test('kill streak milestones relay with trusted identity, map and bounded cadenc
     assert.doesNotMatch(handler, /payload\.(userId|username|mapId)/);
 });
 
+test('latency measurement has a bounded Socket.IO acknowledgement path', async () => {
+    const server = await readFile(new URL('../server/server.js', import.meta.url), 'utf8');
+    const sync = await readFile(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
+    const socketClient = await readFile(new URL('../src/network/SocketClient.js', import.meta.url), 'utf8');
+    const handler = server.slice(server.indexOf("socket.on('cli_pong'"), server.indexOf('// --- CHAT ---'));
+    const srvPing = sync.slice(sync.indexOf("socket.on('srv_ping'"), sync.indexOf('// Client-side RTT measurement'));
+
+    assert.match(socketClient, /socket\.volatile\.emit\('cli_pong', Date\.now\(\), \(\) =>/);
+    assert.match(handler, /typeof acknowledge !== 'function' \|\| !Number\.isFinite\(t\)/);
+    assert.match(handler, /shouldRateLimitEvent\(socket\._rateLimitTracker, 'cli_pong', 4, 10000\)/);
+    assert.match(handler, /acknowledge\(\)/);
+    assert.match(srvPing, /socket\.emit\('srv_pong', t\)/);
+    assert.doesNotMatch(srvPing, /cli_pong/);
+});
+
 test('players can zoom, disable fog, and cannot walk through shop colliders', async () => {
     const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
     const ui = await readFile(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');

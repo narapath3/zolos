@@ -1772,7 +1772,6 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('srv_ping', (t) => {
                 if (socket && socket.connected) {
                     socket.emit('srv_pong', t);
-                    socket.emit('cli_pong', t);
                 }
             });
 
