@@ -15,7 +15,9 @@ export class AdaptiveRendererSystem {
     this.fps = 60;
     this.frameTime = 0;
     this.frameCount = 0;
-    this.lastTime = performance.now();
+    this.sampleStartTime = performance.now();
+    this.qualityCandidate = null;
+    this.qualityCandidateSamples = 0;
 
     // Quality Levels
     this.selectedQualityLevel = 'auto'; // auto, high, medium, low, ultra-low
@@ -182,32 +184,26 @@ export class AdaptiveRendererSystem {
    */
   startPerformanceMonitoring() {
     this.performanceInterval = setInterval(() => {
-      this.updatePerformanceMetrics();
-      this.adaptQualityBasedOnPerformance();
+      if (this.updatePerformanceMetrics()) this.adaptQualityBasedOnPerformance();
     }, 2000); // ตรวจสอบทุก 2 วินาที (reduced frequency)
   }
 
   /**
    * อัปเดต Metrics ประสิทธิภาพ
    */
+  recordFrame() {
+    if (typeof document === 'undefined' || !document.hidden) this.frameCount++;
+  }
+
   updatePerformanceMetrics() {
     const now = performance.now();
-    const deltaTime = now - this.lastTime;
-
-    if (deltaTime > 0) {
-      // Calculate FPS over a longer period for stability
-      this.frameCount++;
-      if (this.frameCount >= 60) { // Average over 60 frames
-        this.fps = Math.round(60000 / (performance.now() - this.lastTime));
-        this.lastTime = performance.now();
-        this.frameCount = 0;
-      } else {
-        this.fps = Math.round(1000 / deltaTime);
-      }
-      this.frameTime = deltaTime;
-    }
-
-    this.lastTime = now;
+    const elapsed = now - this.sampleStartTime;
+    if (elapsed < 500 || this.frameCount < 1) return false;
+    this.fps = Math.round((this.frameCount * 1000) / elapsed);
+    this.frameTime = elapsed / this.frameCount;
+    this.frameCount = 0;
+    this.sampleStartTime = now;
+    return true;
 
     // console.log(`📊 FPS: ${this.fps}, Frame Time: ${this.frameTime.toFixed(2)}ms`);
   }
@@ -220,15 +216,33 @@ export class AdaptiveRendererSystem {
 
     const previousQuality = this.activeQualityLevel;
 
+    let candidate = previousQuality;
     if (this.fps < this.fpsThresholds.ultraLow) {
-      this.activeQualityLevel = 'ultra-low';
+      candidate = 'ultra-low';
     } else if (this.fps < this.fpsThresholds.low) {
-      this.activeQualityLevel = 'low';
+      candidate = 'low';
     } else if (this.fps < this.fpsThresholds.medium) {
-      this.activeQualityLevel = 'medium';
+      candidate = 'medium';
     } else if (this.fps >= this.fpsThresholds.high) {
-      this.activeQualityLevel = 'high';
+      candidate = 'high';
     }
+    if (candidate === previousQuality) {
+      this.qualityCandidate = null;
+      this.qualityCandidateSamples = 0;
+      return;
+    }
+    if (candidate !== this.qualityCandidate) {
+      this.qualityCandidate = candidate;
+      this.qualityCandidateSamples = 1;
+      return;
+    }
+    this.qualityCandidateSamples++;
+    const qualityOrder = ['ultra-low', 'low', 'medium', 'high'];
+    const isUpgrade = qualityOrder.indexOf(candidate) > qualityOrder.indexOf(previousQuality);
+    if (this.qualityCandidateSamples < (isUpgrade ? 3 : 2)) return;
+    this.activeQualityLevel = candidate;
+    this.qualityCandidate = null;
+    this.qualityCandidateSamples = 0;
 
     // ถ้าคุณภาพเปลี่ยน ให้ปรับการตั้งค่า
     if (previousQuality !== this.activeQualityLevel) {
@@ -301,6 +315,7 @@ export class AdaptiveRendererSystem {
       if (child.isLight && child.shadow) {
         child.shadow.mapSize.width = this.shadowMapSize;
         child.shadow.mapSize.height = this.shadowMapSize;
+        child.shadow.map?.dispose?.();
         child.shadow.map = null; // Force regenerate
       }
     });
@@ -339,6 +354,7 @@ export class AdaptiveRendererSystem {
   stop() {
     if (this.performanceInterval) {
       clearInterval(this.performanceInterval);
+      this.performanceInterval = null;
     }
   }
 }

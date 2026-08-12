@@ -822,6 +822,7 @@ async function initGame(charData) {
     }
 
     // Initialize Adaptive Renderer System and expose to window for settings UI
+    window.rendererSystem?.stop?.();
     window.rendererSystem = new AdaptiveRendererSystem(
         sceneManager.renderer,
         sceneManager.camera,
@@ -2906,6 +2907,7 @@ function gameLoop(time) {
     // While hidden, the background loop drives the simulation instead — no point
     // rendering to an invisible canvas.
     if (document.hidden) return;
+    window.rendererSystem?.recordFrame?.(time);
 
     try {
         const dt = Math.min(0.1, (time - lastTime) / 1000);
