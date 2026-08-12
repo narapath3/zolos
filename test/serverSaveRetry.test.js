@@ -19,7 +19,19 @@ test('save failures are returned to callers instead of being treated as success'
 });
 
 test('disconnect only removes a successfully persisted current snapshot', () => {
-  const disconnect = source.match(/\/\/ Save on disconnect[\s\S]*?clearSocketMappingIfCurrent/)?.[0] || '';
+  const start = source.indexOf('// --- DISCONNECT ---');
+  const end = source.indexOf('// ============ Helpers ============', start);
+  const disconnect = source.slice(start, end);
   assert.match(disconnect, /const saved = await saveCharacterToSupabase\(player\.lastSaveData\)/);
   assert.match(disconnect, /saved && pendingSaves\.get\(player\.userId\) === player\.lastSaveData/);
+});
+
+test('disconnect removes presence before awaiting duel or save persistence', () => {
+  const start = source.indexOf('// --- DISCONNECT ---');
+  const end = source.indexOf('// ============ Helpers ============', start);
+  const disconnect = source.slice(start, end);
+  const remove = disconnect.indexOf('onlinePlayers.delete(socket.id)');
+  const firstAwait = disconnect.indexOf('await settleDuelMMR');
+  assert.ok(remove >= 0 && firstAwait > remove);
+  assert.ok(disconnect.indexOf('broadcastPlayerList(player.mapId)') < firstAwait);
 });

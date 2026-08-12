@@ -1368,6 +1368,13 @@ io.on('connection', (socket) => {
         if (player) {
             console.log(`[Server] ➖ Player left: ${player.username} (${player.userId}) — reason: ${reason}`);
 
+            // Presence must disappear synchronously. Duel settlement and save
+            // persistence below can take seconds; retaining this socket in the
+            // roster meanwhile creates duplicate users when a replacement joins.
+            clearSocketMappingIfCurrent(userSocketMap, player.userId, socket.id);
+            onlinePlayers.delete(socket.id);
+            broadcastPlayerList(player.mapId);
+
             // Drop any duel challenges this player issued or received, so they
             // don't linger and let a stale accept start a duel later.
             for (const key of pendingDuelChallenges.keys()) {
@@ -1408,11 +1415,6 @@ io.on('connection', (socket) => {
                 }
             }
 
-            clearSocketMappingIfCurrent(userSocketMap, player.userId, socket.id);
-            onlinePlayers.delete(socket.id);
-
-            // Broadcast updated player list
-            broadcastPlayerList(player.mapId);
         }
     });
 });
