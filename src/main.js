@@ -39,23 +39,23 @@ window.addEventListener('contextmenu', (e) => {
     if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
     e.preventDefault();
 }, { capture: true });
-import { SceneManager } from './engine/SceneManager.js';
+// The login screen only needs the auth UI and its 3D showcase, which renders
+// real CharacterManager/MonsterManager models — those two stay static. Every
+// other engine and UI module is game-only, so they are pulled in by
+// loadGameModules() below once the player is actually entering the world.
 import { CharacterManager } from './engine/CharacterManager.js';
 import { MonsterManager } from './engine/MonsterManager.js';
-import { CombatSystem } from './engine/CombatSystem.js';
 import * as THREE from 'three';
-import { ParticleSystem } from './engine/ParticleSystem.js';
-import { SoundManager } from './engine/SoundManager.js';
-import { AdaptiveRendererSystem } from './engine/AdaptiveRendererSystem.js';
-import { GameUI } from './ui/GameUI.js';
-import { initBGMHUD } from './ui/BGMHUD.js';
 import { AuthUI } from './ui/AuthUI.js';
 import { loadingOverlay } from './ui/LoadingOverlay.js';
-import { AdminUI } from './ui/AdminUI.js';
 import { announcementSystem } from './ui/AnnouncementSystem.js';
-import { TutorialSystem } from './ui/TutorialSystem.js';
-import { GlobalAnnouncements } from './ui/GlobalAnnouncements.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
+
+// Filled in by loadGameModules(). Declared here so the existing call sites and
+// `new X(...)` uses below keep working untouched — every one of them runs
+// after the loader has resolved.
+let SceneManager, CombatSystem, ParticleSystem, SoundManager, AdaptiveRendererSystem;
+let GameUI, AdminUI, TutorialSystem, GlobalAnnouncements, initBGMHUD;
 import { applyWorldBossCardEffects } from './cards/CardEffects.js';
 import { resolveCardDrops } from './cards/CardDrops.js';
 import { getCard } from './cards/CardCatalog.js';
@@ -63,28 +63,62 @@ import {
     applyTrustedCardReward,
     loadAndMergeAuthoritativeCards,
 } from './cards/CardRewards.js';
-import {
-    loadCharacter,
-    saveCharacter,
-    loadInventory,
-    loadCharacterCards,
-    saveInventoryItem,
-    joinPresence,
-    leavePresence,
-    startAutoSave,
-    stopAutoSave,
-    sendSaveState,
-    broadcastPosition,
-    broadcastMonsterHit,
-    reportMonsterHit,
-    broadcastSkillCast,
-    broadcastAttackHit,
-    broadcastChat,
-    updatePresence,
-    getDeterministicGuestName,
-    isPlaceholderName,
-    sendBossHit,
-} from './network/GameSync.js';
+// GameSync talks to the map server and the character tables — nothing the
+// login screen does. Same deal as the engine modules: bindings now, module on
+// the way into the world. Call sites (including the per-frame broadcasts) stay
+// synchronous.
+let loadCharacter, saveCharacter, loadCharacterCards, saveInventoryItem;
+let joinPresence, leavePresence, startAutoSave, stopAutoSave, sendSaveState;
+let broadcastPosition, broadcastMonsterHit, reportMonsterHit, broadcastAttackHit;
+let broadcastChat, broadcastSkillCast, updatePresence;
+let getDeterministicGuestName, isPlaceholderName, sendBossHit;
+
+// Resolves once; every entry point into the game awaits the same promise.
+let gameModulesPromise = null;
+function loadGameModules() {
+    if (gameModulesPromise) return gameModulesPromise;
+    gameModulesPromise = (async () => {
+        const [scene, combat, particle, sound, adaptive, ui, bgm, admin, tutorial, announce, sync] =
+            await Promise.all([
+                import('./engine/SceneManager.js'),
+                import('./engine/CombatSystem.js'),
+                import('./engine/ParticleSystem.js'),
+                import('./engine/SoundManager.js'),
+                import('./engine/AdaptiveRendererSystem.js'),
+                import('./ui/GameUI.js'),
+                import('./ui/BGMHUD.js'),
+                import('./ui/AdminUI.js'),
+                import('./ui/TutorialSystem.js'),
+                import('./ui/GlobalAnnouncements.js'),
+                import('./network/GameSync.js'),
+            ]);
+
+        SceneManager = scene.SceneManager;
+        CombatSystem = combat.CombatSystem;
+        ParticleSystem = particle.ParticleSystem;
+        SoundManager = sound.SoundManager;
+        AdaptiveRendererSystem = adaptive.AdaptiveRendererSystem;
+        GameUI = ui.GameUI;
+        initBGMHUD = bgm.initBGMHUD;
+        AdminUI = admin.AdminUI;
+        TutorialSystem = tutorial.TutorialSystem;
+        GlobalAnnouncements = announce.GlobalAnnouncements;
+
+        ({
+            loadCharacter, saveCharacter, loadCharacterCards, saveInventoryItem,
+            joinPresence, leavePresence, startAutoSave, stopAutoSave, sendSaveState,
+            broadcastPosition, broadcastMonsterHit, reportMonsterHit, broadcastAttackHit,
+            broadcastChat, broadcastSkillCast, updatePresence,
+            getDeterministicGuestName, isPlaceholderName, sendBossHit,
+        } = sync);
+    })().catch((error) => {
+        // Let the next attempt retry from scratch instead of latching a
+        // permanently rejected promise (a flaky network must stay recoverable).
+        gameModulesPromise = null;
+        throw error;
+    });
+    return gameModulesPromise;
+}
 
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
@@ -1606,6 +1640,11 @@ async function showCharacterSelect(isGuest = false) {
 
     const task = (async () => {
         try {
+            // Every path into the world funnels through here, so this is the one
+            // place the game bundle has to be resolved. The overlay is already
+            // up, so the fetch happens under the existing loading screen.
+            loadingOverlay.setProgress(8, '📦 กำลังโหลดโลกของเกม...');
+            await loadGameModules();
             const char = await loadCharacterResilient();
             char.isGuest = isGuest;
             await initGame(char);
