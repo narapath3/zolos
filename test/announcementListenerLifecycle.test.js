@@ -17,3 +17,12 @@ test('game initialization does not bind announcements from the roster callback',
   assert.doesNotMatch(rosterCallback, /setupAnnouncementListeners/);
   assert.equal((main.match(/setupAnnouncementListeners\(/g) || []).length, 1);
 });
+
+test('announcement feeds bind only after the socket-owning presence join resolves', () => {
+  const joinIndex = main.indexOf('await joinPresence(');
+  const bindIndex = main.indexOf('setupAnnouncementListeners((announcementData)');
+  const globalFeedIndex = main.indexOf('globalAnnouncements.init(socket)');
+  assert.ok(joinIndex >= 0);
+  assert.ok(bindIndex > joinIndex);
+  assert.ok(globalFeedIndex > joinIndex);
+});

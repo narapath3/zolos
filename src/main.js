@@ -751,21 +751,6 @@ async function initGame(charData) {
     window.updatePresence = updatePresence;
     window.broadcastPosition = broadcastPosition;
 
-    // Bind once for this socket lifecycle. Binding from players_update used to
-    // add another callback whenever the roster changed, duplicating broadcasts.
-    try {
-        const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
-        setupAnnouncementListeners((announcementData) => {
-            window.announcementSystem?.addAnnouncement(
-                announcementData.text,
-                announcementData.type || 'info',
-                announcementData.duration || 8000
-            );
-        });
-    } catch (err) {
-        console.warn('[Zolos] Failed to setup announcement listeners:', err);
-    }
-
     // Build the World Boss HUD (countdown, HP bar, summary board)
     initBossUI();
 
@@ -776,14 +761,6 @@ async function initGame(charData) {
     // Initialize Global Announcements (server events feed)
     globalAnnouncements = new GlobalAnnouncements();
     window.globalAnnouncements = globalAnnouncements;
-    // Connect to socket for real-time events
-    import('./network/GameSync.js').then(({ getSocket }) => {
-        const socket = getSocket();
-        if (socket) {
-            globalAnnouncements.init(socket);
-        }
-    }).catch(e => console.warn('[GlobalAnnouncements] Socket init failed:', e));
-
     // Initialize Tutorial System for new players
     const tutorialSystem = new TutorialSystem(gameUI, character, sceneManager);
     window.tutorialSystem = tutorialSystem;
@@ -1005,7 +982,7 @@ async function initGame(charData) {
     }
 
     // Join multiplayer
-    joinPresence(
+    await joinPresence(
         userId,
         username,
         character.stats.level,
@@ -1175,6 +1152,26 @@ async function initGame(charData) {
         sceneManager.currentMap,
         charData.id
     );
+
+    // joinPresence owns socket creation. Bind dependent feeds only after it has
+    // completed so the initial login cannot silently miss every announcement.
+    try {
+        const [{ setupAnnouncementListeners }, { getSocket }] = await Promise.all([
+            import('./network/AnnouncementSync.js'),
+            import('./network/GameSync.js'),
+        ]);
+        setupAnnouncementListeners((announcementData) => {
+            window.announcementSystem?.addAnnouncement(
+                announcementData.text,
+                announcementData.type || 'info',
+                announcementData.duration || 8000
+            );
+        });
+        const socket = getSocket();
+        if (socket) globalAnnouncements.init(socket);
+    } catch (err) {
+        console.warn('[Zolos] Announcement socket init failed:', err);
+    }
 
     // Start auto-save
     startAutoSave(() => {
