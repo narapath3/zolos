@@ -20,6 +20,25 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         sourcemap: false,
+        // Split the third-party libraries out of the app chunk. The total first
+        // load is unchanged, but three.js/Supabase/Socket.io only change when we
+        // bump a dependency, so returning players keep them from cache across
+        // the several app deploys we ship most days instead of re-downloading
+        // ~1.3 MB every time a UI string moves.
+        rollupOptions: {
+            output: {
+                advancedChunks: {
+                    groups: [
+                        { name: 'vendor-three', test: /node_modules[\\/]three[\\/]/ },
+                        { name: 'vendor-supabase', test: /node_modules[\\/]@supabase[\\/]/ },
+                        {
+                            name: 'vendor-socketio',
+                            test: /node_modules[\\/](socket\.io-client|engine\.io-client|engine\.io-parser|socket\.io-parser|@socket\.io)[\\/]/,
+                        },
+                    ],
+                },
+            },
+        },
     },
     server: {
         port: 3000,
