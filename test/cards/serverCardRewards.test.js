@@ -336,6 +336,19 @@ test('map server binds an owned active character and awaits rewards at boss deat
   assert.ok(deathEmitIndex > awardIndex, 'boss rewards persist before the death result is broadcast');
 });
 
+test('boss death event freezes encounter location before asynchronous rewards', async () => {
+  const source = await readFile(new URL('../../server/server.js', import.meta.url), 'utf8');
+  const start = source.indexOf('async function endWorldBoss');
+  const end = source.indexOf('function fleeWorldBoss', start);
+  const death = source.slice(start, end);
+  const award = death.indexOf('await awardBossCardRewards');
+  assert.ok(death.indexOf('const mapId = worldBoss.mapId') < award);
+  assert.ok(death.indexOf('const mapName = worldBoss.mapName') < award);
+  const emit = death.slice(death.indexOf("io.emit('boss_dead'"));
+  assert.match(emit, /mapId,\s*mapName,/);
+  assert.doesNotMatch(emit, /worldBoss\.mapId|worldBoss\.mapName/);
+});
+
 test('map server never accepts client card roll inputs', async () => {
   const source = await readFile(new URL('../../server/server.js', import.meta.url), 'utf8');
   const bossHitStart = source.indexOf("socket.on('boss_hit'");

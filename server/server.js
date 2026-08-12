@@ -309,6 +309,8 @@ async function endWorldBoss(killerName) {
     const boss = worldBoss.boss;
     const rewardId = worldBoss.rewardId;
     const maxHp = worldBoss.maxHp;
+    const mapId = worldBoss.mapId;
+    const mapName = worldBoss.mapName;
     const name = boss.name;
     worldBoss.active = false;
     worldBoss.hp = 0;
@@ -330,8 +332,8 @@ async function endWorldBoss(killerName) {
     io.emit('boss_dead', {
         id: boss.id,
         name,
-        mapId: worldBoss.mapId,
-        mapName: worldBoss.mapName,
+        mapId,
+        mapName,
         killerName: killerName || (ranking[0] && ranking[0].name) || 'นักผจญภัย',
         ranking: publicRanking,
     });
