@@ -1113,20 +1113,45 @@ export class CharacterManager {
         if (!job) return;
 
         const add = (obj) => { this.mesh.add(obj); this._jobDecor.push(obj); };
-        const lambert = (color) => new THREE.MeshLambertMaterial({ color });
+        const lambert = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.58, metalness: 0.04, ...extra });
         const glow = (color, opacity = 0.5) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
 
+        // Shared remaster layers. Every class keeps the same compact WebGL
+        // skeleton, but gains the readable silhouette and material breakup of
+        // the promotional target without loading heavyweight external models.
+        const trimColor = { swordsman: 0xf2c45b, mage: 0xa9d8ff, archer: 0xd4c06b, priest: 0xffd96a }[job] || 0xd8d8e8;
+        const belt = new THREE.Mesh(new THREE.TorusGeometry(0.295, 0.038, 7, 18), lambert(0x4a2d20));
+        belt.position.set(0, .82, 0); belt.rotation.x = Math.PI / 2; belt.scale.z = .72; add(belt);
+        const buckle = new THREE.Mesh(new THREE.BoxGeometry(.12, .1, .045), lambert(trimColor, { metalness: .5, roughness: .28 }));
+        buckle.position.set(0, .82, .235); add(buckle);
+        const collar = new THREE.Mesh(new THREE.TorusGeometry(.285, .045, 7, 18, Math.PI), lambert(trimColor));
+        collar.position.set(0, 1.27, .03); collar.rotation.x = Math.PI / 2; add(collar);
+        [-1, 1].forEach(side => {
+            const cuff = new THREE.Mesh(new THREE.TorusGeometry(.11, .027, 6, 14), lambert(trimColor));
+            cuff.position.set(side * .43, .78, 0); cuff.rotation.x = Math.PI / 2; add(cuff);
+            const knee = new THREE.Mesh(new THREE.SphereGeometry(.135, 10, 7), lambert(trimColor, { metalness: .2 }));
+            knee.position.set(side * .15, .34, .105); knee.scale.set(1, .72, .42); add(knee);
+        });
+        const chestGem = new THREE.Mesh(new THREE.OctahedronGeometry(.09), glow(trimColor, .95));
+        chestGem.position.set(0, 1.13, .27); chestGem.scale.set(1, 1.2, .45); add(chestGem);
+
         if (job === 'swordsman') {
-            const steel = lambert(0x9aa4b2);
+            const steel = lambert(0xaeb9c8, { metalness: .58, roughness: .3 });
             [-0.37, 0.37].forEach(x => {
-                const p = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.16, 0.36), steel);
+                const p = new THREE.Mesh(new THREE.SphereGeometry(.22, 10, 7), steel);
                 p.position.set(x, 1.3, 0);
+                p.scale.set(1.25, .55, 1.05);
                 p.castShadow = true;
                 add(p);
             });
-            const cape = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.95, 0.05), lambert(0x8a1a2a));
+            const breastplate = new THREE.Mesh(new THREE.BoxGeometry(.48, .48, .08), steel);
+            breastplate.position.set(0, 1.05, .25); breastplate.scale.y = 1.08; add(breastplate);
+            const cape = new THREE.Mesh(new THREE.ConeGeometry(.36, 1.05, 8, 1, true), lambert(0x8a1a2a, { side: THREE.DoubleSide }));
             cape.position.set(0, 0.95, -0.24);
+            cape.rotation.x = -.08;
             add(cape);
+            const crest = new THREE.Mesh(new THREE.ConeGeometry(.12, .28, 6), lambert(0xd94b45));
+            crest.position.set(0, 2.2, -.04); crest.rotation.x = -.1; add(crest);
         } else if (job === 'mage') {
             const purple = lambert(0x5b3a9a);
             const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 12), purple);
@@ -1143,11 +1168,20 @@ export class CharacterManager {
             robe.position.set(0, 0.5, 0);
             robe.castShadow = true;
             add(robe);
+            for (let i = 0; i < 5; i++) {
+                const rune = new THREE.Mesh(new THREE.OctahedronGeometry(.045), glow(i % 2 ? 0xb975ff : 0x8be8ff, .9));
+                const a = i / 5 * Math.PI * 2; rune.position.set(Math.cos(a) * .43, 1.02 + (i % 2) * .16, Math.sin(a) * .32); add(rune);
+            }
+            const mantle = new THREE.Mesh(new THREE.TorusGeometry(.37, .08, 8, 18, Math.PI), lambert(0x7651b8));
+            mantle.position.set(0, 1.28, -.02); mantle.rotation.x = Math.PI / 2; add(mantle);
         } else if (job === 'archer') {
-            const hood = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.36, 0.62), lambert(0x2f5a2f));
+            const hood = new THREE.Mesh(new THREE.SphereGeometry(.39, 12, 9), lambert(0x2f5a2f));
             hood.position.set(0, 1.98, -0.02);
+            hood.scale.set(1, .6, .88);
             hood.castShadow = true;
             add(hood);
+            const hoodPeak = new THREE.Mesh(new THREE.ConeGeometry(.17, .38, 8), lambert(0x3f733e));
+            hoodPeak.position.set(0, 2.18, -.1); hoodPeak.rotation.x = -.45; add(hoodPeak);
             const quiver = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), lambert(0x6a4a2a));
             quiver.position.set(0.16, 1.15, -0.26);
             quiver.rotation.z = 0.35;
@@ -1158,6 +1192,12 @@ export class CharacterManager {
                 const tip = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 6), tipMat);
                 tip.position.set(0.16 + dx, 1.45 + i * 0.02, -0.28);
                 add(tip);
+            });
+            const chestStrap = new THREE.Mesh(new THREE.BoxGeometry(.08, .82, .04), lambert(0x76502c));
+            chestStrap.position.set(0, 1.03, .27); chestStrap.rotation.z = -.52; add(chestStrap);
+            [-1, 1].forEach(side => {
+                const leaf = new THREE.Mesh(new THREE.ConeGeometry(.065, .22, 6), lambert(0x79b85b));
+                leaf.position.set(side * .25, 1.27, .23); leaf.rotation.z = side * .75; add(leaf);
             });
         } else if (job === 'priest') {
             const halo = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.035, 8, 20), glow(0xffe98a, 0.95));
@@ -1171,6 +1211,16 @@ export class CharacterManager {
             robe.position.set(0, 0.5, 0);
             robe.castShadow = true;
             add(robe);
+            const stole = new THREE.Mesh(new THREE.BoxGeometry(.18, .82, .035), lambert(0xf2c75b));
+            stole.position.set(0, .94, .29); add(stole);
+            const crossV = new THREE.Mesh(new THREE.BoxGeometry(.055, .25, .04), glow(0xffffff, .95));
+            crossV.position.set(0, 1.08, .32); add(crossV);
+            const crossH = new THREE.Mesh(new THREE.BoxGeometry(.18, .055, .04), glow(0xffffff, .95));
+            crossH.position.set(0, 1.12, .32); add(crossH);
+            [-1, 1].forEach(side => {
+                const wing = new THREE.Mesh(new THREE.ConeGeometry(.13, .5, 7), glow(0xffefb0, .72));
+                wing.position.set(side * .34, 1.15, -.28); wing.rotation.z = side * .5; add(wing);
+            });
         }
     }
 

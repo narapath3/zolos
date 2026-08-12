@@ -63,6 +63,19 @@ test('all four town services use detailed role-specific NPC models', async () =>
     assert.match(scene, /userData\.npcModelRole = role/);
 });
 
+test('every playable hero class receives the shared remaster and unique silhouette layers', async () => {
+    const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
+    const particles = await readFile(new URL('../src/engine/ParticleSystem.js', import.meta.url), 'utf8');
+
+    for (const job of ['swordsman', 'mage', 'archer', 'priest']) {
+        assert.match(character, new RegExp(`job === '${job}'`));
+    }
+    for (const layer of ['belt', 'buckle', 'collar', 'chestGem']) assert.match(character, new RegExp(`const ${layer} =`));
+    for (const skill of ['bash', 'heal', 'magnumBreak', 'endure', 'fireBolt', 'frostNova', 'energyCoat', 'doubleStrafe', 'arrowShower', 'concentration', 'holyLight', 'blessing']) {
+        assert.match(particles, new RegExp(`case '${skill}'`));
+    }
+});
+
 test('priest cooldowns remain per-skill and respawn restores the owner mesh', async () => {
     const character = await readFile(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
     assert.match(character, /this\.cooldowns\[skillId\] = skill\.cooldown/);
