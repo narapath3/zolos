@@ -18,6 +18,17 @@ const pendingCardFusions = new Map();
 const pendingOreConversions = new Map();
 const pendingPetPurchases = new Map();
 let clientMeasuredPing = null;
+const inventoryMutationQueues = new Map();
+
+function enqueueInventoryMutation(characterId, itemName, mutation) {
+    const key = `${characterId}\u0000${itemName}`;
+    const previous = inventoryMutationQueues.get(key) || Promise.resolve();
+    const current = previous.catch(() => undefined).then(mutation);
+    inventoryMutationQueues.set(key, current);
+    return current.finally(() => {
+        if (inventoryMutationQueues.get(key) === current) inventoryMutationQueues.delete(key);
+    });
+}
 
 // ============ Client-side profanity filter (mirrors server) ============
 const _PROFANITY = [
@@ -1195,7 +1206,7 @@ export async function loadCharacterCards(characterId) {
  * The policy ensures that only authenticated users can INSERT/UPDATE/DELETE
  * inventory rows whose character_id belongs to a character they own.
  */
-export async function saveInventoryItem(characterId, itemName, itemType, quantity, stats = {}) {
+async function saveInventoryItemNow(characterId, itemName, itemType, quantity, stats = {}) {
     console.log(`[Zolos] 📦 saveInventoryItem called: characterId=${characterId}, itemName=${itemName}, quantity=${quantity}`);
 
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
@@ -1284,6 +1295,11 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
     }
 }
 
+export function saveInventoryItem(characterId, itemName, itemType, quantity, stats = {}) {
+    return enqueueInventoryMutation(characterId, itemName,
+        () => saveInventoryItemNow(characterId, itemName, itemType, quantity, stats));
+}
+
 /**
  * SET an inventory item's quantity to an ABSOLUTE value (and its stats),
  * inserting the row if missing. Unlike saveInventoryItem (which ADDS a delta),
@@ -1292,7 +1308,7 @@ export async function saveInventoryItem(characterId, itemName, itemType, quantit
  * "ensure the row exists" before a stats update); use saveInventoryItem only
  * for +N / -N gameplay adjustments (pickups, uses, sells, trades).
  */
-export async function setInventoryItemQuantity(characterId, itemName, itemType, quantity, stats = {}) {
+async function setInventoryItemQuantityNow(characterId, itemName, itemType, quantity, stats = {}) {
     const qty = Math.max(0, Math.floor(quantity) || 0);
 
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
@@ -1344,7 +1360,12 @@ export async function setInventoryItemQuantity(characterId, itemName, itemType, 
     }
 }
 
-export async function updateInventoryItemStats(characterId, itemName, stats) {
+export function setInventoryItemQuantity(characterId, itemName, itemType, quantity, stats = {}) {
+    return enqueueInventoryMutation(characterId, itemName,
+        () => setInventoryItemQuantityNow(characterId, itemName, itemType, quantity, stats));
+}
+
+async function updateInventoryItemStatsNow(characterId, itemName, stats) {
     console.log(`[Zolos] 🔄 updateInventoryItemStats called: characterId=${characterId}, itemName=${itemName}, stats=${JSON.stringify(stats)}`);
 
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
@@ -1373,6 +1394,11 @@ export async function updateInventoryItemStats(characterId, itemName, stats) {
     } catch (e) {
         console.error(`[Zolos] ❌ updateInventoryItemStats threw for characterId=${characterId}, itemName=${itemName}:`, e.message);
     }
+}
+
+export function updateInventoryItemStats(characterId, itemName, stats) {
+    return enqueueInventoryMutation(characterId, itemName,
+        () => updateInventoryItemStatsNow(characterId, itemName, stats));
 }
 
 function isCommittedFusionResult(result) {
