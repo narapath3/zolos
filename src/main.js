@@ -1500,8 +1500,16 @@ async function initGame(charData) {
         sceneManager.adjustLook(-e.movementX * FP_LOOK_SENS, -e.movementY * FP_LOOK_SENS);
     });
 
-    // Mouse move for monster/player hovering with highlight glow
-    canvas.addEventListener('mousemove', (e) => {
+    // Mouse move for monster/player hovering with highlight glow. Pointer
+    // devices can emit hundreds of events per second; coalesce them so the
+    // expensive scene raycast runs at most once per rendered frame.
+    let pendingHoverEvent = null;
+    let hoverFrameId = null;
+    const updateCanvasHover = () => {
+        hoverFrameId = null;
+        const e = pendingHoverEvent;
+        pendingHoverEvent = null;
+        if (!e || document.hidden) return;
         if (camDragging) return; // don't fight the rotate cursor / waste raycasts
         if (!sceneManager || !monsters || !gameUI) return;
         const hit = sceneManager.getMouseIntersection(e, monsters, sceneManager.getNPCs(), remotePlayersMap);
@@ -1536,6 +1544,10 @@ async function initGame(charData) {
 
         // Update cursor style
         canvas.style.cursor = newHoverMesh ? "url('/assets/cute_cursor_32.png'), pointer" : "url('/assets/cute_cursor_32.png'), default";
+    };
+    canvas.addEventListener('mousemove', (e) => {
+        pendingHoverEvent = { clientX: e.clientX, clientY: e.clientY };
+        if (hoverFrameId === null) hoverFrameId = requestAnimationFrame(updateCanvasHover);
     });
 }
 
