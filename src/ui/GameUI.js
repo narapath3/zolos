@@ -5573,7 +5573,7 @@ export class GameUI {
     const stepQty = (delta) => {
       if (!qtyInput) return;
       qtyInput.value = (parseInt(qtyInput.value) || 1) + delta;
-      this._updateShopTotal();
+      this._updateShopTotal(true);
     };
     const minusBtn = document.getElementById('btn-shop-qty-minus');
     const plusBtn = document.getElementById('btn-shop-qty-plus');
@@ -5582,9 +5582,15 @@ export class GameUI {
     if (plusBtn) plusBtn.addEventListener('click', () => stepQty(1));
     if (maxBtn) maxBtn.addEventListener('click', () => {
       if (qtyInput) qtyInput.value = Math.max(1, this._shopMaxAffordable());
-      this._updateShopTotal();
+      this._updateShopTotal(true);
     });
-    if (qtyInput) qtyInput.addEventListener('input', () => this._updateShopTotal());
+    if (qtyInput) {
+      // Live total while typing, but the field itself is only corrected once
+      // the player has finished entering a number.
+      qtyInput.addEventListener('input', () => this._updateShopTotal(false));
+      qtyInput.addEventListener('change', () => this._updateShopTotal(true));
+      qtyInput.addEventListener('blur', () => this._updateShopTotal(true));
+    }
   }
 
   // Open the buy shop pre-filtered to a tab ('all' | 'usable' | 'equip').
@@ -5681,7 +5687,7 @@ export class GameUI {
     // the "affordable" hint + total.
     const qtyInput = document.getElementById('shop-qty-input');
     if (qtyInput) qtyInput.value = 1;
-    this._updateShopTotal();
+    this._updateShopTotal(true);
   }
 
   // How many of the selected item the player can afford (min 1 shown, 0 real).
@@ -5692,9 +5698,15 @@ export class GameUI {
     return Math.floor((this.character.stats.gold || 0) / price);
   }
 
-  // Recompute the total price for the chosen quantity, clamping the input to
-  // [1, affordable] (but never below 1 so the field stays usable).
-  _updateShopTotal() {
+  // Recompute the total price for the chosen quantity.
+  //
+  // `writeBack` must stay false while the player is typing. Rewriting a
+  // number field's value on every keystroke made it impossible to enter a
+  // quantity: clearing the box snapped it straight back to 1, and each digit
+  // that pushed the value past what the player could afford was replaced by
+  // the cap, so the typed number never appeared. The field is clamped on
+  // change/blur and again before the purchase instead.
+  _updateShopTotal(writeBack = false) {
     if (!this.selectedShopItem) return;
     const qtyInput = document.getElementById('shop-qty-input');
     const totalEl = document.getElementById('shop-total-price');
@@ -5706,7 +5718,7 @@ export class GameUI {
     if (qty < 1) qty = 1;
     // Cap at what they can afford (but allow 1 so the buy button can warn).
     if (affordable >= 1 && qty > affordable) qty = affordable;
-    if (qtyInput) qtyInput.value = qty;
+    if (writeBack && qtyInput && qtyInput.value !== String(qty)) qtyInput.value = qty;
 
     if (totalEl) totalEl.textContent = (price * qty).toLocaleString();
     if (affEl) affEl.textContent = `ซื้อได้สูงสุด: ${affordable.toLocaleString()}`;
@@ -7319,7 +7331,14 @@ export class GameUI {
 
     const qtyInput = document.getElementById('sell-shop-qty-input');
     if (qtyInput) {
-      qtyInput.addEventListener('input', () => this._updateSellShopDetail());
+      // While typing, only refresh the total. _updateSellShopDetail() clamps the
+      // field to the stack size, which meant every digit that took the value
+      // past what the player owned was overwritten mid-keystroke — the typed
+      // number could never be seen. Clamp on change/blur instead; the sell
+      // action re-validates the quantity against the inventory anyway.
+      qtyInput.addEventListener('input', () => this._updateSellShopTotal());
+      qtyInput.addEventListener('change', () => this._updateSellShopDetail());
+      qtyInput.addEventListener('blur', () => this._updateSellShopDetail());
     }
 
     const maxBtn = document.getElementById('btn-sell-shop-max');

@@ -1479,6 +1479,27 @@ a,
   outline: none;
 }
 
+/* Quantity / price fields (shop, sell shop, market, trade, card trade).
+   The inherited 11px was too small to read the number being typed, and the
+   native spin buttons ate enough of a narrow centred field to push the digits
+   out of view. Every one of these fields already has explicit −/+/MAX controls
+   or is free text, so the spinners are redundant. */
+.form-group input[type="number"] {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  min-height: 32px;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.form-group input[type="number"]::-webkit-outer-spin-button,
+.form-group input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
 
 /* Leaderboard Tabs */
 .leaderboard-tabs {
