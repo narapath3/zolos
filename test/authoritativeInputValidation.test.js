@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { validateMovement } from '../server/securityPolicy.js';
+import { sanitizeRemoteAppearance, validateMovement } from '../server/securityPolicy.js';
 
 const server = fs.readFileSync(new URL('../server/server.js', import.meta.url), 'utf8');
 
@@ -11,6 +11,39 @@ test('movement rejects non-finite and impossible world coordinates', () => {
   assert.equal(validateMovement(prev, { x: 0, y: Infinity, z: 0, mapId: 'prontera' }, 200), false);
   assert.equal(validateMovement(prev, { x: 501, y: 1, z: 0, mapId: 'prontera' }, 200), false);
   assert.equal(validateMovement(prev, { x: 1, y: 1, z: 1, mapId: 'prontera' }, 200), true);
+});
+
+test('position relay stamps identity and bounds high-cost animation fields', () => {
+  const pos = server.slice(server.indexOf("socket.on('pos'"), server.indexOf('// --- SHARED MONSTER HP ---'));
+  assert.doesNotMatch(pos, /\.\.\.payload/);
+  assert.match(pos, /username: self\.username/);
+  assert.match(pos, /level: self\.level/);
+  assert.match(pos, /PLAYER_MOTION_STATES\.has\(payload\.state\) \? payload\.state : 'idle'/);
+  assert.match(pos, /Number\.isSafeInteger\(payload\.aseq\)/);
+  assert.match(pos, /appearanceKey !== socket\._lastAppearanceKey/);
+  assert.match(pos, /now - \(socket\._lastAppearanceAt \|\| 0\) >= 5000/);
+  assert.match(pos, /socket\._lastAppearanceAt = now/);
+  assert.match(pos, /out\.appearance = appearance/);
+});
+
+test('remote appearance sanitizer keeps render fields and drops unbounded data', () => {
+  const clean = sanitizeRemoteAppearance({
+    gender: 'male', bodyColor: 0x123456, petLevel: 999,
+    hat: 'H'.repeat(100), petName: 'P'.repeat(80),
+    gear: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`slot${i}`, `item${i}`])),
+    refine: { weapon: 999, body: 12 }, cards: { weapon: 'poring_card' },
+    cardState: { enormous: 'x'.repeat(10000) }, injected: { deep: true },
+  });
+  assert.equal(clean.gender, 'male');
+  assert.equal(clean.bodyColor, 0x123456);
+  assert.equal(clean.petLevel, undefined);
+  assert.equal(clean.hat.length, 64);
+  assert.equal(clean.petName.length, 32);
+  assert.equal(Object.keys(clean.gear).length, 16);
+  assert.deepEqual(clean.refine, { body: 12 });
+  assert.deepEqual(clean.cards, { weapon: 'poring_card' });
+  assert.equal(clean.cardState, undefined);
+  assert.equal(clean.injected, undefined);
 });
 
 test('socket relays require finite positions and effect targets', () => {

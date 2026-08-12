@@ -33,6 +33,10 @@ const CARD_SOCKET_SLOTS = new Set([
     'weapon', 'shield', 'hat', 'glasses', 'head', 'body', 'garment',
     'ring', 'wrist', 'pants', 'feet', 'accessory',
 ]);
+const REMOTE_APPEARANCE_TEXT_FIELDS = new Set([
+    'hat', 'glasses', 'weapon', 'shield', 'pet', 'petName', 'job', 'title',
+]);
+const REMOTE_APPEARANCE_MAP_FIELDS = new Set(['gear', 'refine', 'cards']);
 
 function cardCategoryForSocket(slot) {
     if (slot === 'weapon') return 'weapon';
@@ -88,6 +92,37 @@ function sanitizeAppearance(value) {
     }
     appearance.cards = cards;
     return appearance;
+}
+
+export function sanitizeRemoteAppearance(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const out = {};
+    if (value.gender === 'male' || value.gender === 'female') out.gender = value.gender;
+    for (const key of ['bodyColor', 'hairColor', 'pantsColor']) {
+        const color = boundedInteger(value[key], 0, 0xffffff);
+        if (color !== null) out[key] = color;
+    }
+    for (const key of REMOTE_APPEARANCE_TEXT_FIELDS) {
+        if (value[key] === null) out[key] = null;
+        else if (typeof value[key] === 'string') out[key] = value[key].slice(0, key === 'petName' ? 32 : 64);
+    }
+    const petLevel = boundedInteger(value.petLevel, 1, 300);
+    if (petLevel !== null) out.petLevel = petLevel;
+    for (const key of REMOTE_APPEARANCE_MAP_FIELDS) {
+        if (!value[key] || typeof value[key] !== 'object' || Array.isArray(value[key])) continue;
+        const map = {};
+        for (const [slot, raw] of Object.entries(value[key]).slice(0, 16)) {
+            if (!/^[A-Za-z0-9_-]{1,32}$/.test(slot)) continue;
+            if (key === 'refine') {
+                const rank = boundedInteger(raw, 0, 20);
+                if (rank !== null) map[slot] = rank;
+            } else if (raw === null || typeof raw === 'string') {
+                map[slot] = raw === null ? null : raw.slice(0, 64);
+            }
+        }
+        out[key] = map;
+    }
+    return Object.keys(out).length ? out : null;
 }
 
 export function clearSocketMappingIfCurrent(userSocketMap, userId, socketId) {

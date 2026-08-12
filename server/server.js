@@ -36,6 +36,7 @@ import {
     sanitizeSaveUpdates,
     serializeOnlinePlayer,
     sanitizeInventoryBackup,
+    sanitizeRemoteAppearance,
     validateMovement,
     shouldRateLimitEvent,
     clampMonsterDamage,
@@ -250,6 +251,7 @@ const COMBAT_WEAPON_CLASSES = new Set([
     'melee', 'sword', 'blunt', 'staff', 'spear', 'unarmed', 'thief',
     'shadowslash', 'lightning', 'magic', 'holyorb', 'acolyte', 'bow', 'gun',
 ]);
+const PLAYER_MOTION_STATES = new Set(['idle', 'walking', 'running', 'attacking', 'fishing', 'swimming']);
 // Keep world bosses away from Prontera, the main hub. Each selected centre is
 // clear of portals and major map landmarks so the oversized boss has room.
 const BOSS_SPAWN_LOCATIONS = [
@@ -539,7 +541,33 @@ io.on('connection', (socket) => {
         // Broadcast to all OTHER clients in the SAME map, stamped with the
         // server's identity for this socket so a client can't puppet another
         // player's avatar by claiming their userId.
-        socket.to(`map:${mapId}`).emit('pos', { ...payload, userId: self.userId, mapId });
+        const out = {
+            userId: self.userId,
+            username: self.username,
+            level: self.level,
+            mapId,
+            x: self.lastPos.x,
+            y: Number.isFinite(payload.y) ? payload.y : 1.2,
+            z: self.lastPos.z,
+            rY: Number.isFinite(payload.rY) ? payload.rY : 0,
+            state: PLAYER_MOTION_STATES.has(payload.state) ? payload.state : 'idle',
+        };
+        if (Number.isSafeInteger(payload.aseq) && payload.aseq >= 0 && payload.aseq <= 2_147_483_647) {
+            out.aseq = payload.aseq;
+            out.wsc = COMBAT_WEAPON_CLASSES.has(payload.wsc) ? payload.wsc : 'sword';
+        }
+        const appearance = sanitizeRemoteAppearance(payload.appearance);
+        if (appearance) {
+            const appearanceKey = JSON.stringify(appearance);
+            const now = Date.now();
+            if (appearanceKey !== socket._lastAppearanceKey
+                || now - (socket._lastAppearanceAt || 0) >= 5000) {
+                socket._lastAppearanceKey = appearanceKey;
+                socket._lastAppearanceAt = now;
+                out.appearance = appearance;
+            }
+        }
+        socket.to(`map:${mapId}`).emit('pos', out);
     });
 
     // --- SHARED MONSTER HP --- relay a monster hit to everyone else on the map
