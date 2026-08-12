@@ -1854,8 +1854,9 @@ window.duelManager = {
     },
 
     onDuelHit(payload) {
-        if (!duelState || !payload || !character) return;
-        const dmg = Math.max(1, Number(payload.damage) || 0);
+        if (!duelState || !payload || !character || payload.duelId !== duelState.duelId) return;
+        const dmg = Number(payload.damage);
+        if (!Number.isFinite(dmg) || dmg <= 0 || dmg > 5000) return;
         const actual = character.takeDamage(dmg);
         if (gameUI) gameUI.addCombatLog(`🩸 โดนโจมตี -${actual}${payload.critical ? ' (CRIT!)' : ''}`, 'warning');
         if (particles) {
@@ -1874,7 +1875,7 @@ window.duelManager = {
     },
 
     onDuelResult(payload) {
-        if (!payload) return;
+        if (!payload || !duelState || payload.duelId !== duelState.duelId) return;
         const won = payload.winnerUserId === userId;
         const myMmr = won ? payload.winnerMmr : payload.loserMmr;
         const deltaTxt = payload.delta !== undefined

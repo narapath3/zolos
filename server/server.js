@@ -1182,13 +1182,16 @@ io.on('connection', (socket) => {
         if (!duel || duel.settled) return;
         const opponentId = duel.a === attacker.userId ? duel.b : duel.a;
         if (payload.targetUserId !== opponentId) return;
+        const damage = Number(payload.damage);
+        if (!Number.isFinite(damage) || damage <= 0) return;
 
         const targetSocketId = userSocketMap.get(opponentId);
         if (targetSocketId) {
             io.to(targetSocketId).emit('duel_hit', {
-                ...payload,
+                duelId: duel.duelId,
                 attackerUserId: attacker.userId,
-                damage: Math.max(0, Math.min(5000, Number(payload.damage) || 0)),
+                damage: Math.min(5000, damage),
+                critical: payload.critical === true,
             });
         }
     });
@@ -1350,6 +1353,10 @@ io.on('connection', (socket) => {
             for (const key of pendingDuelChallenges.keys()) {
                 const [from, to] = key.split('->');
                 if (from === player.userId || to === player.userId) pendingDuelChallenges.delete(key);
+            }
+            for (const key of pendingFriendRequests.keys()) {
+                const [from, to] = key.split('->');
+                if (from === player.userId || to === player.userId) pendingFriendRequests.delete(key);
             }
 
             // If mid-duel, the disconnector forfeits: opponent wins
