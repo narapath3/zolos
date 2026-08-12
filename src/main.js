@@ -826,7 +826,8 @@ async function initGame(charData) {
     window.rendererSystem = new AdaptiveRendererSystem(
         sceneManager.renderer,
         sceneManager.camera,
-        sceneManager.scene
+        sceneManager.scene,
+        sceneManager
     );
 
     // Persisted audio prefs (per-device, in localStorage). Separate controls

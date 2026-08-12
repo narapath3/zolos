@@ -20,4 +20,13 @@ test('quality changes require stable samples and renderer replacement stops old 
 
 test('shadow map replacement disposes the previous render target', () => {
   assert.match(adaptive, /child\.shadow\.map\?\.dispose\?\.\(\)/);
+  assert.match(adaptive, /this\.scene\.traverse\(\(child\) =>/);
+});
+
+test('quality settings control the real composer render path and its resolution', () => {
+  const scene = fs.readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+  assert.match(adaptive, /composer\?\.setPixelRatio\?\.\(this\.pixelRatio\)/);
+  assert.match(adaptive, /sceneManager\.postProcessingEnabled = this\.postProcessing/);
+  assert.match(scene, /this\.composer && this\.postProcessingEnabled !== false/);
+  assert.match(main, /sceneManager\.scene,\s*\n\s*sceneManager/);
 });

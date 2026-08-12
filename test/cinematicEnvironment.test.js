@@ -36,7 +36,7 @@ test('high quality adds restrained cinematic post-processing', () => {
   assert.match(sceneSource, /new EffectComposer\(this\.renderer\)/);
   assert.match(sceneSource, /new UnrealBloomPass\(/);
   assert.match(sceneSource, /this\.graphicsQuality !== 'high'/);
-  assert.match(sceneSource, /if \(this\.composer\) this\.composer\.render\(\)/);
+  assert.match(sceneSource, /if \(this\.composer && this\.postProcessingEnabled !== false\) this\.composer\.render\(\)/);
 });
 
 test('auto quality resolves to a real render tier without an in-game update badge', () => {

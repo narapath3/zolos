@@ -233,6 +233,7 @@ export class SceneManager {
         // deliberately subtle: it gives portals, water spray and magic a soft
         // photographic falloff without washing out the readable RO palette.
         this._setupPostProcessing();
+        this.postProcessingEnabled = true;
 
         // Clock
         this.clock = new THREE.Clock();
@@ -5065,7 +5066,7 @@ export class SceneManager {
     }
 
     render() {
-        if (this.composer) this.composer.render();
+        if (this.composer && this.postProcessingEnabled !== false) this.composer.render();
         else this.renderer.render(this.scene, this.camera);
     }
 

@@ -6,10 +6,11 @@
 import * as THREE from 'three';
 
 export class AdaptiveRendererSystem {
-  constructor(renderer, camera, scene) {
+  constructor(renderer, camera, scene, sceneManager = null) {
     this.renderer = renderer;
     this.camera = camera;
     this.scene = scene;
+    this.sceneManager = sceneManager;
 
     // Performance Metrics
     this.fps = 60;
@@ -154,6 +155,8 @@ export class AdaptiveRendererSystem {
     }
 
     this.renderer.setPixelRatio(this.pixelRatio);
+    this.sceneManager?.composer?.setPixelRatio?.(this.pixelRatio);
+    if (this.sceneManager) this.sceneManager.postProcessingEnabled = this.postProcessing;
 
     if (this.activeQualityLevel === 'low') {
       this.renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -264,6 +267,8 @@ export class AdaptiveRendererSystem {
     localStorage.setItem('zolos_graphics_quality', this.selectedQualityLevel);
 
     this.renderer.setPixelRatio(this.pixelRatio);
+    this.sceneManager?.composer?.setPixelRatio?.(this.pixelRatio);
+    if (this.sceneManager) this.sceneManager.postProcessingEnabled = this.postProcessing;
 
     if (this.activeQualityLevel === 'low') {
       this.renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -311,7 +316,7 @@ export class AdaptiveRendererSystem {
    * อัปเดต Shadow Map Size
    */
   updateShadowMapSize() {
-    this.scene.children.forEach((child) => {
+    this.scene.traverse((child) => {
       if (child.isLight && child.shadow) {
         child.shadow.mapSize.width = this.shadowMapSize;
         child.shadow.mapSize.height = this.shadowMapSize;
@@ -356,6 +361,7 @@ export class AdaptiveRendererSystem {
       clearInterval(this.performanceInterval);
       this.performanceInterval = null;
     }
+    this.sceneManager = null;
   }
 }
 
