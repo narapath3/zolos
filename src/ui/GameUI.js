@@ -303,6 +303,10 @@ export class GameUI {
   destroy() {
     this.cardAlbum?.destroy();
     this.cardAlbum = null;
+    this._petViewer?.destroy?.();
+    this._petViewer = null;
+    document.removeEventListener('keydown', this._petBoutiqueEscapeHandler);
+    this._petBoutiqueEscapeHandler = null;
     this.cardDropRevealQueue.length = 0;
     this._itemPortraitObserver?.disconnect?.();
     this._itemPortraitObserver = null;

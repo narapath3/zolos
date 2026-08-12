@@ -96,6 +96,7 @@ export class PetLiveViewer {
         this.pet = null; this.parts = null; this.float = false;
         this.center = new THREE.Vector3(); this.dist = 4;
         this.t = 0; this.blink = { t: -1, next: 1.5 }; this.running = false;
+        this.animationFrameId = null;
         this._loop = this._loop.bind(this);
     }
 
@@ -123,8 +124,19 @@ export class PetLiveViewer {
         this._renderOnce(); // show a first frame even while paused
     }
 
-    resume() { if (!this.running && this.pet) { this.running = true; this._last = performance.now(); requestAnimationFrame(this._loop); } }
-    pause() { this.running = false; }
+    resume() {
+        if (!this.running && this.pet) {
+            this.running = true;
+            this._last = performance.now();
+            this.animationFrameId = requestAnimationFrame(this._loop);
+        }
+    }
+
+    pause() {
+        this.running = false;
+        if (this.animationFrameId !== null) cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+    }
 
     _resize() {
         const w = this.canvas.clientWidth || 300, h = this.canvas.clientHeight || 300;
@@ -148,7 +160,7 @@ export class PetLiveViewer {
         this._animate(dt);
         this._place();
         this.renderer.render(this.scene, this.camera);
-        requestAnimationFrame(this._loop);
+        this.animationFrameId = requestAnimationFrame(this._loop);
     }
 
     _animate(dt) {
@@ -174,5 +186,18 @@ export class PetLiveViewer {
             if (o.geometry) o.geometry.dispose();
             if (o.material) Array.isArray(o.material) ? o.material.forEach(m => m.dispose()) : o.material.dispose();
         });
+    }
+
+    destroy() {
+        this.pause();
+        if (this.pet) {
+            this.scene.remove(this.pet);
+            this._dispose(this.pet);
+            this.pet = null;
+        }
+        this.parts = null;
+        this.canvas.remove();
+        this.renderer.dispose();
+        this.renderer.forceContextLoss?.();
     }
 }
