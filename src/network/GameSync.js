@@ -6,6 +6,7 @@ import { fuseCard } from '../cards/CardProgression.js';
 export { getDeterministicGuestName, isPlaceholderName };
 
 let autoSaveInterval = null;
+let autoSaveInFlight = false;
 let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
 let offlineChatInterval = null;
@@ -2171,8 +2172,11 @@ export function startAutoSave(getStateCallback, intervalMs = 180000) {
     // Default: 3 minutes (180000ms) instead of 15s
     stopAutoSave();
     autoSaveInterval = setInterval(async () => {
+        if (autoSaveInFlight || (typeof document !== 'undefined' && document.hidden)) return;
         const state = getStateCallback();
         if (state && state.characterId) {
+            autoSaveInFlight = true;
+            try {
             // Save directly to Supabase
             if (state.userId) {
                 await saveCharacterByUserId(state.userId, state.updates);
@@ -2182,6 +2186,9 @@ export function startAutoSave(getStateCallback, intervalMs = 180000) {
 
             // Also send state to Socket server for save-on-disconnect backup
             sendSaveState(state);
+            } finally {
+                autoSaveInFlight = false;
+            }
         }
     }, intervalMs);
 }
@@ -2190,6 +2197,7 @@ export function stopAutoSave() {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
     }
+    autoSaveInFlight = false;
 }
 
 // ============ P2P MARKETPLACE ============

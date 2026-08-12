@@ -129,12 +129,14 @@ export class GameUI {
 
     // Update every 2 seconds
     this._networkStatusInterval = setInterval(() => {
-      this.updateNetworkStatus();
+      if (!document.hidden) this.updateNetworkStatus();
     }, 2000);
   }
 
   async updateNetworkStatus() {
-    if (!this.networkDot || !this.networkText) return;
+    if (!this.networkDot || !this.networkText || this._networkStatusInFlight) return;
+    this._networkStatusInFlight = true;
+    try {
 
     const { isSocketConnected, isSocketMode } = await import('../network/SocketClient.js');
     const connected = isSocketConnected();
@@ -181,6 +183,9 @@ export class GameUI {
 
     // Update map name and ping in local HUD
     this._updateHUDMapAndPing();
+    } finally {
+      this._networkStatusInFlight = false;
+    }
   }
 
   _setupTargetIndicator() {
@@ -315,6 +320,7 @@ export class GameUI {
     this._itemPortraitObserver = null;
     clearInterval(this._networkStatusInterval);
     this._networkStatusInterval = null;
+    this._networkStatusInFlight = false;
     clearInterval(this._onlinePlayersInterval);
     this._onlinePlayersInterval = null;
     clearTimeout(this._equipToastTimer);

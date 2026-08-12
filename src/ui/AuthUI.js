@@ -633,13 +633,16 @@ export class AuthUI {
     }
 
     async _measurePing() {
-        if (!this._pingEl) return;
+        if (!this._pingEl || this._pingInFlight || document.hidden) return;
+        this._pingInFlight = true;
         let ms = null;
         try {
             const { measurePing } = await import('../network/SocketClient.js');
             ms = await measurePing();
         } catch (e) {
             console.warn('[AuthUI] Failed to measure ping:', e);
+        } finally {
+            this._pingInFlight = false;
         }
         this._updatePingDisplay(ms);
     }
