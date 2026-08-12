@@ -2565,9 +2565,10 @@ function updateRemotePlayers(dt) {
             rp.mesh.position.z += (rp.targetPos.z - rp.mesh.position.z) * k;
         }
         if (rp.targetRotY !== undefined) {
-            let d = rp.targetRotY - rp.mesh.rotation.y;
-            while (d > Math.PI) d -= Math.PI * 2;
-            while (d < -Math.PI) d += Math.PI * 2;
+            const d = Math.atan2(
+                Math.sin(rp.targetRotY - rp.mesh.rotation.y),
+                Math.cos(rp.targetRotY - rp.mesh.rotation.y),
+            );
             rp.mesh.rotation.y += d * k;
         }
         if (rp.character && rp.character.update) rp.character.update(dt);

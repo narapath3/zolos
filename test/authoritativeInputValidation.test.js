@@ -19,7 +19,10 @@ test('position relay stamps identity and bounds high-cost animation fields', () 
   assert.match(pos, /username: self\.username/);
   assert.match(pos, /level: self\.level/);
   assert.match(pos, /PLAYER_MOTION_STATES\.has\(payload\.state\) \? payload\.state : 'idle'/);
+  assert.match(pos, /Math\.atan2\(Math\.sin\(payload\.rY\), Math\.cos\(payload\.rY\)\)/);
   assert.match(pos, /Number\.isSafeInteger\(payload\.aseq\)/);
+  assert.match(pos, /payload\.aseq !== socket\._lastAttackSequence/);
+  assert.match(pos, /shouldRateLimitEvent\(socket\._rateLimitTracker, 'pos_attack', 8, 1000\)/);
   assert.match(pos, /appearanceKey !== socket\._lastAppearanceKey/);
   assert.match(pos, /now - \(socket\._lastAppearanceAt \|\| 0\) >= 5000/);
   assert.match(pos, /socket\._lastAppearanceAt = now/);

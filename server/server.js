@@ -549,12 +549,16 @@ io.on('connection', (socket) => {
             x: self.lastPos.x,
             y: Number.isFinite(payload.y) ? payload.y : 1.2,
             z: self.lastPos.z,
-            rY: Number.isFinite(payload.rY) ? payload.rY : 0,
+            rY: Number.isFinite(payload.rY) ? Math.atan2(Math.sin(payload.rY), Math.cos(payload.rY)) : 0,
             state: PLAYER_MOTION_STATES.has(payload.state) ? payload.state : 'idle',
         };
         if (Number.isSafeInteger(payload.aseq) && payload.aseq >= 0 && payload.aseq <= 2_147_483_647) {
-            out.aseq = payload.aseq;
-            out.wsc = COMBAT_WEAPON_CLASSES.has(payload.wsc) ? payload.wsc : 'sword';
+            const sequenceChanged = payload.aseq !== socket._lastAttackSequence;
+            if (!sequenceChanged || !shouldRateLimitEvent(socket._rateLimitTracker, 'pos_attack', 8, 1000)) {
+                socket._lastAttackSequence = payload.aseq;
+                out.aseq = payload.aseq;
+                out.wsc = COMBAT_WEAPON_CLASSES.has(payload.wsc) ? payload.wsc : 'sword';
+            }
         }
         const appearance = sanitizeRemoteAppearance(payload.appearance);
         if (appearance) {

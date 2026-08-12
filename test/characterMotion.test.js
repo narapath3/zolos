@@ -34,3 +34,9 @@ test('attack poses have readable anticipation, impact and weapon-specific motion
   assert.notDeepEqual(sampleAttackPose('bow', 0.4), sampleAttackPose('gun', 0.4));
   assert.ok(sampleAttackPose('magic', 0.4).leftZ > 0);
 });
+
+test('remote rotation smoothing uses constant-time wrapped angle math', () => {
+  const update = mainSource.slice(mainSource.indexOf('function updateRemotePlayers'), mainSource.indexOf('// ============ Auto-Skill'));
+  assert.match(update, /Math\.atan2\([\s\S]*Math\.sin\(rp\.targetRotY - rp\.mesh\.rotation\.y\)[\s\S]*Math\.cos\(rp\.targetRotY - rp\.mesh\.rotation\.y\)/);
+  assert.doesNotMatch(update, /while \(d [<>]/);
+});
