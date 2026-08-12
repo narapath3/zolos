@@ -98,6 +98,9 @@ export class Monster {
         // Aggro state (chase + attack the player when provoked or approached).
         this._aggroUntil = 0;
         this._atkCd = 0;
+        // Reused for environment probes during movement. Avoid producing
+        // short-lived Vector3 objects for every active monster and frame.
+        this._environmentProbe = new THREE.Vector3();
     }
 
     _createModel(position) {
@@ -1131,7 +1134,7 @@ export class Monster {
                     let ok = true;
                     if (sceneManager) {
                         if (sceneManager.isInArena && sceneManager.isInArena(nx, nz)) ok = false;
-                        else if (sceneManager.getEnvironmentAt(new THREE.Vector3(nx, 0, nz)) !== (this.data.environment || 'ground')) ok = false;
+                        else if (sceneManager.getEnvironmentAt(this._environmentProbe.set(nx, 0, nz)) !== (this.data.environment || 'ground')) ok = false;
                     }
                     if (ok) { this.mesh.position.x = nx; this.mesh.position.z = nz; }
                     this.mesh.rotation.y = Math.atan2(adx, adz);
@@ -1255,8 +1258,7 @@ export class Monster {
                         this.isMoving = false;
                         return;
                     }
-                    const nextPos = new THREE.Vector3(nextX, 0, nextZ);
-                    const nextEnv = sceneManager.getEnvironmentAt(nextPos);
+                    const nextEnv = sceneManager.getEnvironmentAt(this._environmentProbe.set(nextX, 0, nextZ));
                     const requiredEnv = this.data.environment || 'ground';
                     if (nextEnv !== requiredEnv) {
                         this.wanderTarget = null;
@@ -1311,6 +1313,7 @@ export class Monster {
         this.wanderTimer = 0;
         this._localContributed = false; // fresh monster — no shared-damage credit yet
         this._cardDeathResolved = false;
+        this._respawnQueued = false;
 
         // Spawn glow so the respawned monster materializes with a flourish.
         if (typeof window !== 'undefined' && window.particles) {
@@ -1627,6 +1630,7 @@ export class MonsterManager {
                 const entry = this.deadQueue.splice(i, 1)[0];
                 const monster = entry.monster;
                 // Simply reset the same monster at its original spawnPosition and type!
+                monster._respawnQueued = false;
                 monster.reset(monster.spawnPosition);
             }
         }
@@ -1640,6 +1644,8 @@ export class MonsterManager {
     }
 
     queueRespawn(monster) {
+        if (!monster || monster._respawnQueued) return;
+        monster._respawnQueued = true;
         if (!monster._cardDeathResolved) {
             monster._cardDeathResolved = true;
             if (typeof this.onMonsterDeath === 'function') {
@@ -1669,13 +1675,15 @@ export class MonsterManager {
         let nearest = null;
         let nearestDist = maxRange;
 
-        const pool = landOnly ? this.monsters : [...this.monsters, ...this.waterMonsters];
-        for (const m of pool) {
-            if (!m.alive) continue;
-            const d = m.distanceTo(position);
-            if (d < nearestDist) {
-                nearestDist = d;
-                nearest = m;
+        const pools = landOnly ? [this.monsters] : [this.monsters, this.waterMonsters];
+        for (const pool of pools) {
+            for (const m of pool) {
+                if (!m.alive) continue;
+                const d = m.distanceTo(position);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearest = m;
+                }
             }
         }
 

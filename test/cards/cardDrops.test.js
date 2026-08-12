@@ -68,4 +68,6 @@ test('monster respawn queue resolves each local death once with contribution eli
   manager.queueRespawn(monster);
 
   assert.deepEqual(events, [{ monster, context: { eligible: true } }]);
+  assert.equal(manager.deadQueue.length, 1);
+  assert.equal(monster._respawnQueued, true);
 });
