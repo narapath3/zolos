@@ -53,6 +53,7 @@ export class GameUI {
     this.soundManager = soundManager;
     this.combatSystem = combatSystem;
     this.particles = null;
+    this._globalListenerRemovers = [];
 
     this.currentTab = 'all';
     this.selectedItemName = null;
@@ -307,6 +308,7 @@ export class GameUI {
 
   destroy() {
     this._mobileControlCleanup?.();
+    for (const remove of this._globalListenerRemovers.splice(0)) remove();
     this.cardAlbum?.destroy();
     this.cardAlbum = null;
     this._petViewer?.destroy?.();
@@ -336,6 +338,12 @@ export class GameUI {
     this._journalSaveTimer = null;
     this._cardTradeSuggestTimer = null;
     this.tradeTimeout = null;
+    if (window.gameUI === this) window.gameUI = null;
+  }
+
+  _listenGlobal(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    this._globalListenerRemovers.push(() => target.removeEventListener(type, handler, options));
   }
 
   _setupPanels() {
@@ -365,10 +373,10 @@ export class GameUI {
     document.querySelectorAll('.hud-menu-popover .hud-btn').forEach(button => {
       button.addEventListener('click', () => closeHudMenus());
     });
-    document.addEventListener('click', event => {
+    this._listenGlobal(document, 'click', event => {
       if (!event.target.closest?.('#hud-bottom')) closeHudMenus();
     });
-    document.addEventListener('keydown', event => {
+    this._listenGlobal(document, 'keydown', event => {
       if (event.key === 'Escape') closeHudMenus();
     });
 
@@ -4306,7 +4314,7 @@ export class GameUI {
     // Tap anywhere OUTSIDE the open chat (the world, a button, the HUD) fades it
     // back to the faint preview and drops the keyboard — no need to hunt for a
     // close button on mobile.
-    document.addEventListener('pointerdown', (e) => {
+    this._listenGlobal(document, 'pointerdown', (e) => {
       if (!chatPanel || chatPanel.classList.contains('preview-mode')) return;
       if (e.target.closest('#chat-panel') || e.target.closest('#btn-chat-toggle')) return;
       this._closeChatToPreview();
@@ -4376,7 +4384,7 @@ export class GameUI {
     }
 
     // Global hotkey: Enter to toggle/focus chat panel helper
-    window.addEventListener('keydown', (e) => {
+    this._listenGlobal(window, 'keydown', (e) => {
       if (e.defaultPrevented) return;
       if (e.key === 'Enter') {
         const activeEl = document.activeElement;
@@ -4447,7 +4455,7 @@ export class GameUI {
         emojiPanel.style.display = emojiPanel.style.display === 'none' ? 'grid' : 'none';
         if (mentionBox) mentionBox.style.display = 'none';
       });
-      document.addEventListener('click', (e) => {
+      this._listenGlobal(document, 'click', (e) => {
         if (emojiPanel.style.display !== 'none' && !emojiPanel.contains(e.target) && e.target !== emojiBtn) {
           emojiPanel.style.display = 'none';
         }

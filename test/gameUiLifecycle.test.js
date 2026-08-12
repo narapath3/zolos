@@ -21,6 +21,16 @@ test('GameUI owns and releases recurring UI resources', () => {
   }
 });
 
+test('GameUI owns global HUD and chat listeners across teardown', () => {
+  assert.match(source, /this\._globalListenerRemovers\s*=\s*\[\]/);
+  assert.match(source, /_listenGlobal\(target, type, handler, options\)\s*\{[\s\S]*addEventListener\(type, handler, options\)[\s\S]*removeEventListener\(type, handler, options\)/);
+  const destroy = source.match(/destroy\(\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] || '';
+  assert.match(destroy, /this\._globalListenerRemovers\.splice\(0\)/);
+  assert.match(source, /this\._listenGlobal\(document, 'pointerdown'/);
+  assert.match(source, /this\._listenGlobal\(window, 'keydown'/);
+  assert.match(source, /if \(window\.gameUI === this\) window\.gameUI = null/);
+});
+
 test('pet boutique cancels animation frames and releases its WebGL resources', () => {
   assert.match(source, /this\._petViewer\?\.destroy\?\.\(\)/);
   assert.match(petPreviewSource, /this\.animationFrameId\s*=\s*requestAnimationFrame\(this\._loop\)/);
