@@ -22,6 +22,25 @@ const pendingPetPurchases = new Map();
 let clientMeasuredPing = null;
 const inventoryMutationQueues = new Map();
 
+function isCommittedOreConversion(result) {
+    return Boolean(result
+        && typeof result.requestId === 'string'
+        && Number.isInteger(result.ore_spent) && result.ore_spent > 0
+        && Number.isInteger(result.zol_gained) && result.zol_gained > 0
+        && Number.isInteger(result.zol) && result.zol >= 0);
+}
+
+function isCommittedPetPurchase(result) {
+    return Boolean(result
+        && typeof result.requestId === 'string'
+        && typeof result.item_name === 'string' && result.item_name.length > 0
+        && Number.isInteger(result.price) && result.price > 0
+        && Number.isInteger(result.gold) && result.gold >= 0
+        && Number.isInteger(result.quantity) && result.quantity >= 1
+        && result.stats && Array.isArray(result.stats.instances)
+        && result.stats.instances.length === result.quantity);
+}
+
 function enqueueInventoryMutation(characterId, itemName, mutation) {
     const key = `${characterId}\u0000${itemName}`;
     const previous = inventoryMutationQueues.get(key) || Promise.resolve();
@@ -76,6 +95,10 @@ function attachOreConversionListeners(socket) {
         if (!pending) return;
         clearTimeout(pending.timeout);
         pendingOreConversions.delete(result.requestId);
+        if (!isCommittedOreConversion(result)) {
+            pending.reject(new Error('Invalid ore conversion response'));
+            return;
+        }
         pending.resolve(result);
     });
     socket.on('ore_conversion_error', (error) => {
@@ -125,6 +148,10 @@ function attachPetPurchaseListeners(socket) {
         if (!pending) return;
         clearTimeout(pending.timeout);
         pendingPetPurchases.delete(result.requestId);
+        if (!isCommittedPetPurchase(result)) {
+            pending.reject(new Error('Invalid pet purchase response'));
+            return;
+        }
         pending.resolve(result);
     });
     socket.on('pet_purchase_error', (error) => {
@@ -1530,6 +1557,14 @@ export async function requestCardFusion(cardId, requestId, opts = {}) {
 const pendingCardRefines = new Map();
 let cardRefineSocket = null;
 
+function isCommittedCardRefineResult(result) {
+    return Boolean(result
+        && getCard(result.cardId)?.id === result.cardId
+        && Number.isInteger(result.owned) && result.owned >= 0
+        && Number.isInteger(result.stardust) && result.stardust >= 0
+        && typeof result.requestId === 'string');
+}
+
 function attachCardRefineListeners(socket) {
     if (!socket || cardRefineSocket === socket) return;
     cardRefineSocket = socket;
@@ -1538,6 +1573,10 @@ function attachCardRefineListeners(socket) {
         if (!pending) return;
         pendingCardRefines.delete(result.requestId);
         clearTimeout(pending.timeout);
+        if (!isCommittedCardRefineResult(result)) {
+            pending.reject(new Error('Invalid card refine response'));
+            return;
+        }
         window.gameUI?.onCardRefineResult?.(result);
         pending.resolve(result);
     });
