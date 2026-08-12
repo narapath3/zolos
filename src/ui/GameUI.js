@@ -9400,6 +9400,7 @@ export class GameUI {
     this.tradeTarget = null;
     this.tradeSelectedItem = null;
     this.activeTradeRequest = null;
+    this.pendingTradeRequestId = null;
     this.tradeTimeout = null;
 
     // Sender Panel Setup
@@ -9418,6 +9419,7 @@ export class GameUI {
       if (panel) panel.style.display = 'none';
       this.tradeTarget = null;
       this.tradeSelectedItem = null;
+      this.pendingTradeRequestId = null;
     };
     if (closeBtn) closeBtn.addEventListener('click', closeTradePanel);
     if (overlay) overlay.addEventListener('click', closeTradePanel);
@@ -9495,6 +9497,7 @@ export class GameUI {
       }
       this.tradeTarget = null;
       this.tradeSelectedItem = null;
+      this.pendingTradeRequestId = null;
       closeCardTrade();
     });
 
@@ -9668,10 +9671,11 @@ export class GameUI {
 
       try {
         const myName = this.character?.stats?.name || 'Player';
-        await sendTradeRequestPacket(
+        const sent = await sendTradeRequestPacket(
           this.characterId, myName, target.userId, target.username || 'Player',
           item.item_name, 'card', qty, price, cleanStats, target.characterId
         );
+        this.pendingTradeRequestId = sent?.requestId || null;
 
         this.tradeTimeout = setTimeout(() => {
           if (waiting && waiting.style.display !== 'none') {
@@ -9679,6 +9683,7 @@ export class GameUI {
             this.addCombatLog('⏱️ คำขอเทรดการ์ดหมดเวลา ไม่มีการตอบรับ', 'warning');
             this.tradeTarget = null;
             this.tradeSelectedItem = null;
+            this.pendingTradeRequestId = null;
           }
         }, 30000);
       } catch (err) {
@@ -9950,7 +9955,7 @@ export class GameUI {
 
     try {
       const myName = this.character && this.character.stats ? this.character.stats.name : 'Player';
-      await sendTradeRequestPacket(
+      const sent = await sendTradeRequestPacket(
         this.characterId,
         myName,
         this.tradeTarget.userId,
@@ -9961,6 +9966,7 @@ export class GameUI {
         price,
         item.stats || {}
       );
+      this.pendingTradeRequestId = sent?.requestId || null;
 
       // Start 30 seconds timeout
       this.tradeTimeout = setTimeout(() => {
@@ -9969,6 +9975,7 @@ export class GameUI {
           this.addCombatLog('⏱️ คำขอการซื้อขายหมดเวลาไม่มีการตอบรับ', 'warning');
           this.tradeTarget = null;
           this.tradeSelectedItem = null;
+          this.pendingTradeRequestId = null;
         }
       }, 30000);
 
@@ -10121,7 +10128,14 @@ export class GameUI {
   }
 
   async receiveTradeResponse(payload) {
-    if (!payload) return;
+    const req = payload?.requestPayload;
+    if (!req || typeof payload.accepted !== 'boolean') return;
+    if (this.pendingTradeRequestId) {
+      if (req.requestId !== this.pendingTradeRequestId) return;
+    } else if (!this.tradeTarget || req.targetUserId !== this.tradeTarget.userId
+      || !this.tradeSelectedItem || req.itemName !== this.tradeSelectedItem.item_name) {
+      return;
+    }
 
     // Clear timeout & wait overlay
     if (this.tradeTimeout) {
@@ -10141,7 +10155,6 @@ export class GameUI {
     if (cardWaiting) cardWaiting.style.display = 'none';
     this.updateMobileControlsVisibility();
 
-    const req = payload.requestPayload;
     if (payload.accepted) {
       // Execute sender transaction logic
       try {
@@ -10190,6 +10203,7 @@ export class GameUI {
 
     this.tradeTarget = null;
     this.tradeSelectedItem = null;
+    this.pendingTradeRequestId = null;
   }
 
   // ============ Daily Quest System ============

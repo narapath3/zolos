@@ -2596,6 +2596,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
 
 // ============ P2P DIRECT TRADE ============
 export async function sendTradeRequestPacket(senderCharId, senderName, targetUserId, targetName, itemName, itemType, quantity, price, stats = {}, targetCharacterId = null) {
+    const requestId = `trade:${senderCharId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
     if (isOfflineMode) {
         // Simulation mode: auto respond after 1.5s
         setTimeout(() => {
@@ -2615,12 +2616,13 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
                         itemType: itemType,
                         quantity: quantity,
                         price: price,
-                        stats: stats
+                        stats: stats,
+                        requestId,
                     }
                 });
             }
         }, 1500);
-        return { success: true };
+        return { success: true, requestId };
     }
 
     const socket = getSocket();
@@ -2636,10 +2638,11 @@ export async function sendTradeRequestPacket(senderCharId, senderName, targetUse
             itemType: itemType,
             quantity: quantity,
             price: price,
-            stats: stats
+            stats: stats,
+            requestId,
         });
     }
-    return { success: true };
+    return { success: true, requestId };
 }
 
 export async function sendTradeResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
