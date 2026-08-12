@@ -3744,6 +3744,7 @@ export class GameUI {
           this.character?.stats?.level || 1
         );
         if (res.success) {
+          this.pendingDuelRequestId = res.requestId;
           this.addCombatLog(`⚔️ ส่งคำท้าดวลไปยัง ${target.username} แล้ว รอการตอบรับ...`, 'system');
         } else {
           this.addCombatLog('❌ ท้าดวลไม่ได้ (ออฟไลน์/เซิร์ฟเวอร์ไม่เชื่อมต่อ)', 'warning');
@@ -4035,18 +4036,22 @@ export class GameUI {
 
   // ============ PVP Duel Request/Response ============
   receiveDuelRequest(payload) {
-    if (!payload) return;
+    if (!payload || typeof payload.senderUserId !== 'string' || !payload.senderUserId
+      || !/^duel:[A-Za-z0-9:_-]{1,214}$/.test(payload.requestId || '')
+      || !Number.isInteger(payload.senderLevel) || payload.senderLevel < 1 || payload.senderLevel > 9999) return;
     this.addCombatLog(`⚔️ ${payload.senderName} (Lv.${payload.senderLevel || '?'}) ท้าดวล PVP!`, 'warning');
     // Simple accept dialog (same approach as layout-reset confirm)
     const accepted = confirm(`⚔️ ${payload.senderName} (Lv.${payload.senderLevel || '?'}) ท้าดวล PVP!\n\nรับคำท้าหรือไม่?`);
     import('../network/GameSync.js').then(({ sendDuelResponse }) => {
-      sendDuelResponse(payload.senderUserId, accepted);
+      sendDuelResponse(payload.senderUserId, accepted, payload.requestId);
     });
     if (!accepted) this.addCombatLog('🚫 ปฏิเสธคำท้าดวล', 'system');
   }
 
   receiveDuelResponse(payload) {
-    if (!payload) return;
+    if (!payload || typeof payload.accepted !== 'boolean'
+      || !this.pendingDuelRequestId || payload.requestId !== this.pendingDuelRequestId) return;
+    this.pendingDuelRequestId = null;
     if (payload.accepted) {
       this.addCombatLog('✅ คู่ต่อสู้รับคำท้า! กำลังเข้าสู่สังเวียน...', 'system');
     } else {

@@ -1103,25 +1103,30 @@ io.on('connection', (socket) => {
     // --- Challenge another player ---
     socket.on('duel_request', (payload) => {
         const sender = trustedSender(socket);
-        if (!sender || !payload || !payload.targetUserId) return;
+        if (!sender?.verified || !isBoundedString(payload?.targetUserId, 160)
+            || !isBoundedString(payload?.requestId, 220)) return;
         if (payload.targetUserId === sender.userId) return; // no self-duels
         // Record the challenge so the accept can be checked against it.
-        pendingDuelChallenges.set(`${sender.userId}->${payload.targetUserId}`, Date.now());
-        relayRequest('duel_request', payload, sender);
+        if (activeDuels.has(sender.userId) || shouldRateLimitEvent(socket._rateLimitTracker, 'duel_request', 4, 10000)) return;
+        pendingDuelChallenges.set(`${sender.userId}->${payload.targetUserId}`, { requestId: payload.requestId, issuedAt: Date.now() });
+        relayRequest('duel_request', { ...payload, senderLevel: sender.level }, sender);
     });
 
     // --- Accept / decline ---
     socket.on('duel_response', (payload) => {
         const accepter = trustedSender(socket);
-        if (!accepter || !payload || !payload.senderUserId) return;
+        if (!accepter?.verified || !isBoundedString(payload?.senderUserId, 160)
+            || !isBoundedString(payload?.requestId, 220) || typeof payload.accepted !== 'boolean') return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'duel_response', 6, 10000)) return;
 
         // The replier is THIS socket — never payload.targetUserId. Previously
         // both ids came from the client, so anyone could register a duel between
         // two arbitrary players and then settle its Elo with duel_end.
         const challengerId = payload.senderUserId;
         const key = `${challengerId}->${accepter.userId}`;
-        const issuedAt = pendingDuelChallenges.get(key);
-        if (!issuedAt || Date.now() - issuedAt > DUEL_CHALLENGE_TTL_MS) {
+        const pending = pendingDuelChallenges.get(key);
+        if (!pending || pending.requestId !== payload.requestId
+            || Date.now() - pending.issuedAt > DUEL_CHALLENGE_TTL_MS) {
             pendingDuelChallenges.delete(key);
             return; // no such challenge (or it expired) — ignore
         }
@@ -1130,11 +1135,12 @@ io.on('connection', (socket) => {
         const challengerSocketId = userSocketMap.get(challengerId);
         if (!challengerSocketId) return;
 
-        relayResponse('duel_response', payload, accepter);
-
         if (payload.accepted) {
             // Refuse if either side is already in a duel.
-            if (activeDuels.has(challengerId) || activeDuels.has(accepter.userId)) return;
+            if (activeDuels.has(challengerId) || activeDuels.has(accepter.userId)) {
+                relayResponse('duel_response', { ...payload, accepted: false, reason: 'busy' }, accepter);
+                return;
+            }
 
             const duelId = `duel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const duel = {
@@ -1159,6 +1165,7 @@ io.on('connection', (socket) => {
             io.to(socket.id).emit('duel_start', startPayload);
             console.log(`[Server] ⚔️ Duel started: ${duel.a} vs ${duel.b}`);
         }
+        relayResponse('duel_response', payload, accepter);
     });
 
     // --- Relay a hit to the victim ---

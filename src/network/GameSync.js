@@ -2845,19 +2845,21 @@ export function sendDuelRequest(targetUserId, targetName, senderName, senderLeve
     if (isOfflineMode) return { success: false, reason: 'offline' };
     const socket = getSocket();
     if (socket && isSocketConnected()) {
+        const requestId = `duel:${currentUserId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
         socket.emit('duel_request', {
             senderUserId: currentUserId,
             senderName,
             senderLevel,
             targetUserId,
             targetName,
+            requestId,
         });
-        return { success: true };
+        return { success: true, requestId };
     }
     return { success: false, reason: 'not_connected' };
 }
 
-export function sendDuelResponse(senderUserId, accepted) {
+export function sendDuelResponse(senderUserId, accepted, requestId) {
     if (isOfflineMode) return;
     const socket = getSocket();
     if (socket && isSocketConnected()) {
@@ -2865,6 +2867,7 @@ export function sendDuelResponse(senderUserId, accepted) {
             senderUserId,           // the challenger (recipient of this response)
             targetUserId: currentUserId, // the accepter
             accepted,
+            requestId,
         });
     }
 }
