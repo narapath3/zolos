@@ -1,6 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
 import { observeItemPortraits } from './ItemPortraitRenderer.js';
@@ -3711,32 +3711,6 @@ export class GameUI {
 
         // Determine the friend's map — same approach as warp menu.
         // 1. Try to find friend in the live online roster (has mapId from server)
-        let targetMap = null;
-        if (Array.isArray(this.onlinePlayers)) {
-          const onlineTarget = this.onlinePlayers.find(p =>
-            p.username === target.username || p.userId === target.userId
-          );
-          if (onlineTarget && onlineTarget.mapId) {
-            targetMap = onlineTarget.mapId;
-          }
-        }
-
-        // 2. Fallback: also check remotePlayersMap for local map players
-        if (!targetMap && window.remotePlayersMap) {
-          const remoteP = window.remotePlayersMap.get(target.userId);
-          // remotePlayersMap only has same-map players, so they're on the current map
-          if (remoteP) {
-            targetMap = window.sceneManager?.currentMap || 'prontera';
-          }
-        }
-
-        // 3. Final fallback: warp to a default map
-        if (!targetMap) {
-          targetMap = 'prontera';
-        }
-
-        console.error('[Warp] Warping to friend "' + target.username + '" — targetMap:', targetMap);
-
         if (popup) popup.style.display = 'none';
         this.updateMobileControlsVisibility();
         this.addCombatLog(`🌀 กำลังวาปไปหา ${target.username}...`, 'system');
@@ -3744,11 +3718,13 @@ export class GameUI {
         // Use the same _doWarp mechanism as the warp menu — proven working.
         // This bypasses the socket round-trip entirely and directly loads the
         // friend's city, exactly like the normal warp menu does.
-        this._doWarp(targetMap);
+        const warpResult = sendWarpRequest(target.userId || target.username);
+        if (!warpResult.success) {
+          this.addCombatLog('Warp failed: server is not connected.', 'warning');
+          return;
+        }
+        window.warpManager.pending = { targetName: target.username, requestId: warpResult.requestId };
 
-        // Override the success log to show the friend's name
-        // _doWarp already logs 'วาร์ปไป <map> สำเร็จ!', so we add the friend context
-        this.addCombatLog(`✨ วาปไปหา ${target.username} สำเร็จ!`, 'levelup');
       });
     }
 
@@ -3777,6 +3753,7 @@ export class GameUI {
 
     // Friend request confirmation modal buttons
     this.activeIncomingFriendRequest = null;
+    this.pendingFriendRequestId = null;
     const friendModal = document.getElementById('friend-confirm-modal');
     const friendOverlay = document.getElementById('friend-confirm-overlay');
     const btnAcceptFriend = document.getElementById('btn-accept-friend');
@@ -4049,7 +4026,9 @@ export class GameUI {
         addFriendBtn.style.pointerEvents = 'none';
       }
 
-      sendFriendRequestPacket(myName, myLevel, targetUserId, username);
+      sendFriendRequestPacket(myName, myLevel, targetUserId, username).then(result => {
+        this.pendingFriendRequestId = result?.requestId || null;
+      });
       this.addCombatLog(`✉️ ส่งคำขอเป็นเพื่อนไปยัง ${username} แล้ว`, 'system');
     }
   }
@@ -4178,7 +4157,10 @@ export class GameUI {
   }
 
   receiveFriendRequest(payload) {
-    if (!payload) return;
+    if (!payload || typeof payload.senderUserId !== 'string' || !payload.senderUserId
+      || typeof payload.senderName !== 'string' || !payload.senderName
+      || !/^friend:[A-Za-z0-9:_-]{1,214}$/.test(payload.requestId || '')
+      || !Number.isInteger(payload.senderLevel) || payload.senderLevel < 1 || payload.senderLevel > 9999) return;
     this.activeIncomingFriendRequest = payload;
 
     const nameEl = document.getElementById('friend-confirm-sender-name');
@@ -4238,8 +4220,10 @@ export class GameUI {
   }
 
   receiveFriendResponse(payload) {
-    if (!payload) return;
+    if (!payload || typeof payload.accepted !== 'boolean') return;
     const req = payload.requestPayload;
+    if (!req || !this.pendingFriendRequestId || req.requestId !== this.pendingFriendRequestId) return;
+    this.pendingFriendRequestId = null;
     const targetName = req ? req.targetName : 'Unknown';
 
     if (payload.accepted) {

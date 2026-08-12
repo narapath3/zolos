@@ -171,6 +171,8 @@ const activeDuels = new Map();
 // so a client can't fabricate a duel between two arbitrary players.
 const pendingDuelChallenges = new Map();
 const DUEL_CHALLENGE_TTL_MS = 60 * 1000;
+const pendingFriendRequests = new Map();
+const FRIEND_REQUEST_TTL_MS = 2 * 60 * 1000;
 
 // ============ Admin Dashboard ============
 // Static SPA at /admin and its JSON API at /admin/api. The API is is_admin-gated
@@ -998,13 +1000,26 @@ io.on('connection', (socket) => {
 
     socket.on('friend_request', (payload) => {
         const sender = trustedSender(socket);
-        if (!sender || !payload || !payload.targetUserId) return;
-        relayRequest('friend_request', payload, sender);
+        if (!sender?.verified || !isBoundedString(payload?.targetUserId, 160)
+            || !isBoundedString(payload?.requestId, 220) || payload.targetUserId === sender.userId) return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'friend_request', 5, 30000)) return;
+        pendingFriendRequests.set(`${sender.userId}->${payload.targetUserId}`, {
+            requestId: payload.requestId,
+            issuedAt: Date.now(),
+        });
+        relayRequest('friend_request', { ...payload, senderLevel: sender.level }, sender);
     });
 
     socket.on('friend_response', (payload) => {
         const sender = trustedSender(socket);
-        if (!sender || !payload || !payload.senderUserId) return;
+        if (!sender?.verified || !isBoundedString(payload?.senderUserId, 160)
+            || typeof payload.accepted !== 'boolean' || !isBoundedString(payload?.requestPayload?.requestId, 220)) return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'friend_response', 8, 30000)) return;
+        const key = `${payload.senderUserId}->${sender.userId}`;
+        const pending = pendingFriendRequests.get(key);
+        pendingFriendRequests.delete(key);
+        if (!pending || pending.requestId !== payload.requestPayload.requestId
+            || Date.now() - pending.issuedAt > FRIEND_REQUEST_TTL_MS) return;
         relayResponse('friend_response', payload, sender);
     });
 
@@ -1014,15 +1029,17 @@ io.on('connection', (socket) => {
     // including which map they're on, so cross-map warps work too.
     socket.on('warp_request', (payload) => {
         console.log(`[Server] 🌀 [Warp DEBUG] warp_request received from ${socket.id}:`, payload);
-        if (!payload || !payload.targetUserId) {
+        if (!isBoundedString(payload?.targetUserId, 160)
+            || !isBoundedString(payload?.requestId, 220)) {
             console.log(`[Server] 🌀 [Warp DEBUG] warp_request: missing payload or targetUserId`);
             return;
         }
         const requester = onlinePlayers.get(socket.id);
-        if (!requester) {
+        if (!requester?.verified) {
             console.log(`[Server] 🌀 [Warp DEBUG] warp_request: requester not found for socket ${socket.id}`);
             return;
         }
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'warp_request', 4, 10000)) return;
         console.log(`[Server] 🌀 [Warp DEBUG] Requester: ${requester.username} (id: ${requester.userId})`);
 
         // Look up the target player — try userId first, then fall back to
@@ -1042,7 +1059,7 @@ io.on('connection', (socket) => {
         if (!target) {
             console.warn(`[Server] 🌀 Warp failed: target ${payload.targetUserId} not found or offline.`);
             console.log(`[Server] 🌀 [Warp DEBUG] Emitting warp_result ok:false (offline)`);
-            socket.emit('warp_result', { ok: false, reason: 'offline', targetUserId: payload.targetUserId });
+            socket.emit('warp_result', { ok: false, reason: 'offline', targetUserId: payload.targetUserId, requestId: payload.requestId });
             return;
         }
         console.log(`[Server] 🌀 [Warp DEBUG] Target found: ${target.username} on map ${target.mapId || 'prontera'}`);
@@ -1063,6 +1080,7 @@ io.on('connection', (socket) => {
             x: hasCoords ? pos.x : 0,
             y: hasCoords ? pos.y : 1.2,
             z: hasCoords ? pos.z : 10,
+            requestId: payload.requestId,
         });
         requester.lastPos = {
             x: hasCoords ? pos.x : 0,

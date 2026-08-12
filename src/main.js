@@ -1991,10 +1991,8 @@ window.warpManager = {
     },
 
     onWarpResult(payload) {
-        console.error('[Warp DEBUG] onWarpResult called:', payload);
-
+        if (!payload || !this._pending || payload.requestId !== this._pending.requestId) return;
         this.pending = null;
-        if (!payload) return;
 
         if (!payload.ok) {
             if (window.gameUI) window.gameUI.addCombatLog(

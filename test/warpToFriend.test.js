@@ -10,6 +10,7 @@ const gameSyncSource = readFileSync(
     new URL('../src/network/GameSync.js', import.meta.url),
     'utf8',
 );
+const gameUISource = readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 
 test('sendWarpRequest supports simulation in offline mode', () => {
     // Verify that sendWarpRequest checks isOfflineMode and has a mockPlayers check code path.
@@ -52,5 +53,13 @@ test('warpManager handles pending request timeout', () => {
         mainSource,
         /10000/
     );
+});
+
+test('warp-to-friend uses correlated live server coordinates', () => {
+    assert.match(gameSyncSource, /const requestId = `warp:/);
+    assert.match(gameSyncSource, /socket\.emit\('warp_request', \{ targetUserId, requestId \}\)/);
+    assert.match(mainSource, /payload\.requestId !== this\._pending\.requestId/);
+    assert.match(gameUISource, /sendWarpRequest\(target\.userId \|\| target\.username\)/);
+    assert.doesNotMatch(gameUISource.slice(gameUISource.indexOf('// Warp-to-friend from profile popup'), gameUISource.indexOf('// PVP duel challenge from profile popup')), /this\._doWarp\(targetMap\)/);
 });
 

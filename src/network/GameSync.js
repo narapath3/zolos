@@ -2766,6 +2766,7 @@ export async function executeDecentralizedReceiverTrade(receiverCharId, itemName
 
 // ============ P2P FRIEND REQUEST ============
 export async function sendFriendRequestPacket(senderName, senderLevel, targetUserId, targetName) {
+    const requestId = `friend:${currentUserId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
     if (isOfflineMode) {
         // Simulation mode: auto respond after 1s
         setTimeout(() => {
@@ -2779,12 +2780,13 @@ export async function sendFriendRequestPacket(senderName, senderLevel, targetUse
                         senderName: senderName,
                         senderLevel: senderLevel,
                         targetUserId: targetUserId,
-                        targetName: targetName
+                        targetName: targetName,
+                        requestId
                     }
                 });
             }
         }, 1000);
-        return { success: true };
+        return { success: true, requestId };
     }
 
     const socket = getSocket();
@@ -2794,10 +2796,11 @@ export async function sendFriendRequestPacket(senderName, senderLevel, targetUse
             senderName: senderName,
             senderLevel: senderLevel,
             targetUserId: targetUserId,
-            targetName: targetName
+            targetName: targetName,
+            requestId
         });
     }
-    return { success: true };
+    return { success: true, requestId };
 }
 
 export async function sendFriendResponsePacket(senderUserId, targetUserId, accepted, originalRequest) {
@@ -2900,7 +2903,7 @@ export function sendBossHit(damage, critical = false) {
 // Ask the server for a friend's current position/map. The reply arrives on the
 // `warp_result` socket event and is handled by window.warpManager.
 export function sendWarpRequest(targetUserId) {
-    console.error('[Warp DEBUG] sendWarpRequest called with:', targetUserId);
+    const requestId = `warp:${currentUserId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
     if (isOfflineMode) {
         if (!targetUserId) return { success: false };
         const list = (typeof mockPlayers !== 'undefined' && Array.isArray(mockPlayers)) ? mockPlayers : [];
@@ -2915,11 +2918,12 @@ export function sendWarpRequest(targetUserId) {
                         mapId: mockPlayer.mapId || 'prontera',
                         x: typeof mockPlayer.x === 'number' ? mockPlayer.x : 0,
                         y: typeof mockPlayer.y === 'number' ? mockPlayer.y : 1.2,
-                        z: typeof mockPlayer.z === 'number' ? mockPlayer.z : 10
+                        z: typeof mockPlayer.z === 'number' ? mockPlayer.z : 10,
+                        requestId
                     });
                 }
             }, 100);
-            return { success: true };
+            return { success: true, requestId };
         }
         console.error('[Warp DEBUG] Offline mode: no mock player found for', targetUserId);
         return { success: false };
@@ -2927,11 +2931,9 @@ export function sendWarpRequest(targetUserId) {
     if (!targetUserId) return { success: false };
     const socket = getSocket();
     if (socket && isSocketConnected()) {
-        socket.emit('warp_request', { targetUserId });
-        console.error('[Warp DEBUG] socket.emit warp_request sent with targetUserId:', targetUserId);
-        return { success: true };
+        socket.emit('warp_request', { targetUserId, requestId });
+        return { success: true, requestId };
     }
-    console.error('[Warp DEBUG] socket not connected or missing:', !!socket, 'connected:', isSocketConnected());
     return { success: false };
 }
 
