@@ -1575,6 +1575,7 @@ async function loadCharacterResilient() {
 }
 
 async function showCharacterSelect(isGuest = false) {
+    if (isGameStarted) return;
     characterLoadGuest = isGuest;
     if (characterLoadInFlight) return characterLoadInFlight;
     clearTimeout(characterLoadRetryTimer);
