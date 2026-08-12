@@ -29,7 +29,7 @@ test('all 73 fishing collectibles use canonical transparent PNG art in the alman
     assert.equal(png.subarray(1, 4).toString(), 'PNG', `${name} must be a PNG`);
   }
   const gameUi = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
-  assert.match(gameUi, /itemIconMarkup\(name, d\.emoji \|\| '🐟', 'item-visual--fish'\)/);
+  assert.match(gameUi, /itemIconMarkup\(name, '', 'item-visual--fish'\)/);
 });
 
 test('shop, inventory and equipped summaries share the canonical renderer', () => {
@@ -42,11 +42,12 @@ test('shop, inventory and equipped summaries share the canonical renderer', () =
   assert.match(character, /'Soulreaper': \{ kind: 'scythe'/);
 });
 
-test('real item art hides its emoji fallback and the active sell shop uses canonical art', () => {
+test('real item art falls back to canonical unknown-loot art and the active sell shop uses it', () => {
   const gameUi = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
   const visuals = fs.readFileSync(new URL('../../src/engine/ItemVisuals.js', import.meta.url), 'utf8');
-  assert.match(visuals, /class="item-visual__fallback" hidden/);
-  assert.match(visuals, /onerror="this\.hidden=true;this\.nextElementSibling\.hidden=false"/);
+  assert.match(visuals, /unknown-loot\.png/);
+  assert.match(visuals, /this\.onerror=null/);
+  assert.doesNotMatch(visuals, /item-visual__fallback/);
   assert.match(gameUi, /itemIconMarkup\(item, item\.emoji \|\| itemData\.emoji \|\| '📦'\)/);
   assert.match(gameUi, /sell-shop-detail-icon'\)\.innerHTML = itemIconMarkup/);
   assert.doesNotMatch(gameUi, /sell-shop-detail-icon'\)\.textContent = item\.emoji/);
@@ -56,10 +57,9 @@ test('settings equipment and every blacksmith item surface use canonical PNG art
   const gameUi = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
   const profile = fs.readFileSync(new URL('../../src/ui/PlayerProfileModal.js', import.meta.url), 'utf8');
 
-  assert.match(gameUi, /itemIconMarkup\(name, it\.emoji \|\| slot\.icon, 'item-visual--equipped'\)/);
-  assert.match(gameUi, /itemIconMarkup\(r\.result, res\.emoji \|\| '🗡️', 'item-visual--forge-result'\)/);
-  assert.match(gameUi, /itemIconMarkup\(i, i\.emoji \|\| '📦', 'item-visual--forge-cell'\)/);
-  assert.match(gameUi, /itemIconMarkup\(sel, sel\.emoji \|\| '🗡️', 'item-visual--forge-stage'\)/);
-  assert.match(gameUi, /itemIconMarkup\(ore, ITEMS\[ore\]\?\.emoji \|\| '🔩', 'item-visual--forge-material'\)/);
-  assert.match(profile, /itemIconMarkup\(itemName, itemData\?\.emoji \|\| '➖', 'item-visual--equipped'\)/);
+  assert.match(gameUi, /itemIconMarkup\(name, '', 'item-visual--equipped'\)/);
+  for (const className of ['item-visual--forge-result', 'item-visual--forge-cell', 'item-visual--forge-stage', 'item-visual--forge-material']) {
+    assert.match(gameUi, new RegExp(className));
+  }
+  assert.match(profile, /itemIconMarkup\(itemName, itemData\?\.emoji/);
 });

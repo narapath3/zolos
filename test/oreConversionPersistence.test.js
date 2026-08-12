@@ -8,7 +8,7 @@ const server = fs.readFileSync(new URL('../server/server.js', import.meta.url), 
 const economy = fs.readFileSync(new URL('../server/api/oreEconomy.js', import.meta.url), 'utf8');
 
 test('ore conversion no longer mutates ZOL or inventory before server confirmation', () => {
-  const block = gameUi.match(/async _convertOreToZol\(\) \{[\s\S]*?\n  \}\n\n  openDivineZolShop/)?.[0] || '';
+  const block = gameUi.match(/async _convertOreToZol\(\) \{[\s\S]*?\r?\n  \}\r?\n\r?\n  openDivineZolShop/)?.[0] || '';
   assert.match(block, /await requestOreConversion/);
   assert.doesNotMatch(block, /saveInventoryItem\(this\.characterId, 'Celestial Ore'/);
   assert.ok(block.indexOf('await requestOreConversion') < block.indexOf('this.character.stats.zol ='));

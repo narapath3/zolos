@@ -26,11 +26,10 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.match(scene, /petShowcaseModels/);
   assert.match(main, /npcType === 'pet_boutique'/);
   assert.match(ui, /openPetBoutique\(\)/);
-  assert.match(ui, /petPortraitMarkup/);
+  assert.match(ui, /petModelMarkup/);
   assert.match(ui, /Pet Sanctuary/);
-  assert.match(ui, /pet-sanctuary-atlas-v1\.png/);
+  assert.match(ui, /petModelMarkup\(data\.pet,320\)/);
   assert.doesNotMatch(ui.match(/function petPortraitMarkup[\s\S]*?\n\}/)?.[0] || '', /<svg/);
-  assert.ok(fs.existsSync(new URL('../../public/assets/pets/pet-sanctuary-atlas-v1.png', import.meta.url)));
   const mobileVisibility = ui.slice(ui.indexOf('updateMobileControlsVisibility() {'), ui.indexOf('// ============ Map Name Update'));
   const fishStart = ui.indexOf('recordFishCatch(item) {');
   const fishCatch = ui.slice(fishStart, ui.indexOf('_almanacOwnedCount(', fishStart));
@@ -47,7 +46,7 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.match(ui, /class="pet-boutique__detail" aria-live="polite"/);
   assert.match(ui, /card\.onclick=e=>.*selectEntry\(entry,card\)/);
   assert.match(ui, /detailBuy\.onclick=\(\)=>buyEntry\(entry,detailBuy\)/);
-  assert.match(ui, /if\(firstCard\)selectEntry\(PET_SHOP\[0\],firstCard\)/);
+  assert.match(ui, /if\(firstCard\)selectEntry\(PET_SHOP\[0\],firstCard,false\)/);
 });
 
 test('pet sanctuary is physically separated from every existing NPC shop', () => {

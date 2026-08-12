@@ -128,7 +128,7 @@ export class GameUI {
     this.networkStatusEl = document.getElementById('network-status');
 
     // Update every 2 seconds
-    setInterval(() => {
+    this._networkStatusInterval = setInterval(() => {
       this.updateNetworkStatus();
     }, 2000);
   }
@@ -304,6 +304,12 @@ export class GameUI {
     this.cardAlbum?.destroy();
     this.cardAlbum = null;
     this.cardDropRevealQueue.length = 0;
+    this._itemPortraitObserver?.disconnect?.();
+    this._itemPortraitObserver = null;
+    clearInterval(this._networkStatusInterval);
+    this._networkStatusInterval = null;
+    clearInterval(this._onlinePlayersInterval);
+    this._onlinePlayersInterval = null;
   }
 
   _setupPanels() {
@@ -3432,7 +3438,7 @@ export class GameUI {
 
     // Keep the ping badges fresh while the panel is open (offsetParent is null
     // when the panel is hidden, so this is a no-op the rest of the time).
-    setInterval(() => {
+    this._onlinePlayersInterval = setInterval(() => {
       const body = document.getElementById('players-body');
       if (body && body.offsetParent !== null) this._renderOnlinePlayers();
     }, 2000);

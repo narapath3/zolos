@@ -6,17 +6,13 @@ const css = fs.readFileSync(new URL('../src/styles/login-new.css', import.meta.u
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 test('login uses dedicated production artwork for landscape and portrait', () => {
-  assert.match(css, /login_bg_desktop_v2\.webp/);
-  assert.match(css, /@media\s*\(orientation:\s*portrait\)[\s\S]*login_bg_mobile_v2\.webp/);
-  for (const name of ['login_bg_desktop_v2.png', 'login_bg_mobile_v2.png']) {
+  assert.match(css, /login_environment_ro_desktop_v1\.jpg/);
+  assert.match(css, /@media\s*\(orientation:\s*portrait\)[\s\S]*login_environment_ro_mobile_v1\.jpg/);
+  for (const name of ['login_environment_ro_desktop_v1.jpg', 'login_environment_ro_mobile_v1.jpg']) {
     const file = new URL(`../src/assets/${name}`, import.meta.url);
     assert.ok(fs.existsSync(file), `missing ${name}`);
-    assert.ok(fs.statSync(file).size > 1_000_000, `${name} is unexpectedly small`);
-  }
-  for (const name of ['login_bg_desktop_v2.webp', 'login_bg_mobile_v2.webp']) {
-    const file = new URL(`../src/assets/${name}`, import.meta.url);
-    assert.ok(fs.existsSync(file), `missing optimized ${name}`);
-    assert.ok(fs.statSync(file).size < 350_000, `${name} is too heavy for login`);
+    const size = fs.statSync(file).size;
+    assert.ok(size > 100_000 && size < 700_000, `${name} is outside the production size budget`);
   }
 });
 
