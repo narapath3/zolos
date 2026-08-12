@@ -240,6 +240,16 @@ const BOSS_FIGHT_MS = parseInt(process.env.BOSS_FIGHT_MS) || 6 * 60 * 1000;     
 // interpolation margin while requiring the player to join the actual fight.
 const BOSS_MAX_HIT_RANGE = 14;
 const DUEL_MAX_HIT_RANGE = 12;
+const COMBAT_VISUAL_MAX_RANGE = 14;
+const COMBAT_SKILL_IDS = new Set([
+    'bash', 'heal', 'magnumBreak', 'endure', 'fireBolt', 'frostNova',
+    'energyCoat', 'doubleStrafe', 'arrowShower', 'concentration',
+    'holyLight', 'blessing',
+]);
+const COMBAT_WEAPON_CLASSES = new Set([
+    'melee', 'sword', 'blunt', 'staff', 'spear', 'unarmed', 'thief',
+    'shadowslash', 'lightning', 'magic', 'holyorb', 'acolyte', 'bow', 'gun',
+]);
 // Keep world bosses away from Prontera, the main hub. Each selected centre is
 // clear of portals and major map landmarks so the oversized boss has room.
 const BOSS_SPAWN_LOCATIONS = [
@@ -567,12 +577,23 @@ io.on('connection', (socket) => {
     // effect at the caster's avatar. Server stamps the sender's userId so the
     // receiver anchors the effect on the right hero.
     socket.on('skill_cast', (payload) => {
-        if (!payload || typeof payload.skillId !== 'string') return;
+        if (!payload || !COMBAT_SKILL_IDS.has(payload.skillId)) return;
         const self = trustedSender(socket);
         if (!self) return;
         const mapId = resolveTrustedMap(self);
         const out = { skillId: payload.skillId, userId: self.userId };
-        if (Number.isFinite(payload.tx) && Number.isFinite(payload.tz)) { out.tx = payload.tx; out.tz = payload.tz; }
+        const hasTarget = payload.tx !== undefined || payload.tz !== undefined;
+        if (hasTarget) {
+            if (!Number.isFinite(payload.tx) || !Number.isFinite(payload.tz)
+                || !self.lastPos || self.lastPos.mapId !== mapId
+                || !Number.isFinite(self.lastPos.x) || !Number.isFinite(self.lastPos.z)) return;
+            const dx = payload.tx - self.lastPos.x;
+            const dz = payload.tz - self.lastPos.z;
+            if (dx * dx + dz * dz > COMBAT_VISUAL_MAX_RANGE * COMBAT_VISUAL_MAX_RANGE) return;
+            out.tx = payload.tx;
+            out.tz = payload.tz;
+        }
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'skill_cast', 8, 1000)) return;
         socket.to(`map:${mapId}`).emit('skill_cast', out);
     });
 
@@ -589,13 +610,21 @@ io.on('connection', (socket) => {
         const mapId = resolveTrustedMap(self);
         const rawDmg = typeof payload.dmg === 'number' ? payload.dmg : 0;
         const clampedDmg = clampMonsterDamage(self.level, rawDmg);
+        const weaponClass = COMBAT_WEAPON_CLASSES.has(payload.wsc) ? payload.wsc : 'melee';
         const out = {
             userId: self.userId,
             tc: typeof payload.tc === 'number' ? payload.tc : undefined, // critical flag
             dmg: clampedDmg,
-            wsc: typeof payload.wsc === 'string' ? payload.wsc : 'melee',
+            wsc: weaponClass,
         };
-        if (Number.isFinite(payload.tx) && Number.isFinite(payload.tz)) {
+        const hasTarget = payload.tx !== undefined || payload.tz !== undefined;
+        if (hasTarget) {
+            if (!Number.isFinite(payload.tx) || !Number.isFinite(payload.tz)
+                || !self.lastPos || self.lastPos.mapId !== mapId
+                || !Number.isFinite(self.lastPos.x) || !Number.isFinite(self.lastPos.z)) return;
+            const dx = payload.tx - self.lastPos.x;
+            const dz = payload.tz - self.lastPos.z;
+            if (dx * dx + dz * dz > COMBAT_VISUAL_MAX_RANGE * COMBAT_VISUAL_MAX_RANGE) return;
             out.tx = payload.tx;
             out.tz = payload.tz;
         }
