@@ -296,7 +296,11 @@ export function sanitizeInventoryBackup(inventory) {
 }
 
 export function validateMovement(prevPos, nextPos, elapsedMs) {
-    if (!prevPos || !nextPos) return true;
+    if (!nextPos || !Number.isFinite(nextPos.x) || !Number.isFinite(nextPos.z)) return false;
+    if (nextPos.y !== undefined && !Number.isFinite(nextPos.y)) return false;
+    if (Math.abs(nextPos.x) > 500 || Math.abs(nextPos.z) > 500 || Math.abs(nextPos.y ?? 0) > 500) return false;
+    if (!prevPos) return true;
+    if (!Number.isFinite(prevPos.x) || !Number.isFinite(prevPos.z)) return false;
     if (prevPos.mapId !== nextPos.mapId) return true;
     if (prevPos.teleported) {
         prevPos.teleported = false;
@@ -305,6 +309,7 @@ export function validateMovement(prevPos, nextPos, elapsedMs) {
     if (elapsedMs < 150) return true;
 
     const elapsedSecs = Number(elapsedMs) / 1000;
+    if (!Number.isFinite(elapsedSecs) || elapsedSecs <= 0) return false;
     const dx = (nextPos.x ?? 0) - (prevPos.x ?? 0);
     const dz = (nextPos.z ?? 0) - (prevPos.z ?? 0);
     const distance = Math.sqrt(dx * dx + dz * dz);

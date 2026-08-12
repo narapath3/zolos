@@ -499,7 +499,7 @@ io.on('connection', (socket) => {
         const mapId = resolveTrustedMap(self);
         // Remember the sender's latest position so friends can warp to them —
         // even across maps (positions are only relayed within a map room).
-        if (typeof payload.x === 'number' && typeof payload.z === 'number') {
+        if (Number.isFinite(payload.x) && Number.isFinite(payload.z)) {
             const now = Date.now();
             const elapsed = now - (self.lastPosTime || now);
             const isValid = validateMovement(self.lastPos, { x: payload.x, y: payload.y, z: payload.z, mapId }, elapsed);
@@ -510,7 +510,7 @@ io.on('connection', (socket) => {
                 if (socket._clientIp) ipMonitor.recordSuspicious(socket._clientIp, `speed-hack ${self.username}`);
                 return;
             }
-        }
+        } else return;
         // Broadcast to all OTHER clients in the SAME map, stamped with the
         // server's identity for this socket so a client can't puppet another
         // player's avatar by claiming their userId.
@@ -557,7 +557,7 @@ io.on('connection', (socket) => {
         if (!self) return;
         const mapId = resolveTrustedMap(self);
         const out = { skillId: payload.skillId, userId: self.userId };
-        if (typeof payload.tx === 'number' && typeof payload.tz === 'number') { out.tx = payload.tx; out.tz = payload.tz; }
+        if (Number.isFinite(payload.tx) && Number.isFinite(payload.tz)) { out.tx = payload.tx; out.tz = payload.tz; }
         socket.to(`map:${mapId}`).emit('skill_cast', out);
     });
 
@@ -580,7 +580,7 @@ io.on('connection', (socket) => {
             dmg: clampedDmg,
             wsc: typeof payload.wsc === 'string' ? payload.wsc : 'melee',
         };
-        if (typeof payload.tx === 'number' && typeof payload.tz === 'number') {
+        if (Number.isFinite(payload.tx) && Number.isFinite(payload.tz)) {
             out.tx = payload.tx;
             out.tz = payload.tz;
         }
@@ -592,7 +592,7 @@ io.on('connection', (socket) => {
         const info = onlinePlayers.get(socket.id);
         if (!info) return;
         const rtt = Date.now() - (typeof t === 'number' ? t : Date.now());
-        if (rtt >= 0 && rtt < 60000) {
+        if (Number.isFinite(rtt) && rtt >= 0 && rtt < 60000) {
             info.ping = Math.round(info.ping == null ? rtt : info.ping * 0.5 + rtt * 0.5);
         }
     });
@@ -1023,7 +1023,8 @@ io.on('connection', (socket) => {
         const pos = target.lastPos;
         // Use the target's stored coordinates when available; fall back to
         // safe spawn defaults so the warp never stalls with null coords.
-        const hasCoords = pos && typeof pos.x === 'number' && typeof pos.z === 'number';
+        const hasCoords = pos && Number.isFinite(pos.x) && Number.isFinite(pos.z)
+            && (pos.y === undefined || Number.isFinite(pos.y));
         console.log(`[Server] 🌀 [Warp DEBUG] Target coords: hasCoords=${hasCoords}, lastPos=${JSON.stringify(pos)}`);
 
         socket.emit('warp_result', {
@@ -1148,9 +1149,10 @@ io.on('connection', (socket) => {
         // Validate the pair matches the registered duel
         const pair = [duel.a, duel.b];
         if (!pair.includes(payload.winnerUserId) || !pair.includes(payload.loserUserId)) return;
+        if (payload.winnerUserId === payload.loserUserId) return;
         // ...and that the reporter is one of the two participants, so a
         // bystander can't settle other people's duels.
-        if (!pair.includes(reporter.userId)) return;
+        if (reporter.userId !== payload.loserUserId) return;
         duel.settled = true;
         activeDuels.delete(duel.a);
         activeDuels.delete(duel.b);
