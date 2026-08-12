@@ -1320,8 +1320,10 @@ io.on('connection', (socket) => {
 
             // Save on disconnect
             if (player.lastSaveData) {
-                await saveCharacterToSupabase(player.lastSaveData);
-                pendingSaves.delete(player.userId);
+                const saved = await saveCharacterToSupabase(player.lastSaveData);
+                if (saved && pendingSaves.get(player.userId) === player.lastSaveData) {
+                    pendingSaves.delete(player.userId);
+                }
             }
 
             clearSocketMappingIfCurrent(userSocketMap, player.userId, socket.id);
@@ -1428,7 +1430,7 @@ async function settleDuelMMR(winnerUserId, loserUserId) {
 
 // ============ Periodic Save to Supabase ============
 async function saveCharacterToSupabase(saveData) {
-    if (!supabase || !saveData || !saveData.characterId) return;
+    if (!supabase || !saveData || !saveData.characterId) return false;
 
     try {
         const { characterId, updates, inventory, dailyQuests, friendsList } = saveData;
@@ -1437,7 +1439,7 @@ async function saveCharacterToSupabase(saveData) {
         // server-trusted user. Blocks cross-account stat/inventory overwrites
         // (the server uses the service-role key, which bypasses RLS).
         const ownerUserId = saveData._ownerUserId;
-        if (!ownerUserId) return;
+        if (!ownerUserId) return true;
         const { data: owned, error: ownErr } = await supabase
             .from('characters')
             .select('id, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, updated_at')
@@ -1447,7 +1449,7 @@ async function saveCharacterToSupabase(saveData) {
         if (ownErr || !owned) {
             console.warn(`[Server] 🚫 save_state ownership mismatch: char ${characterId} not owned by ${ownerUserId}`);
             if (saveData._clientIp) ipMonitor.recordSuspicious(saveData._clientIp, `save-ownership-mismatch ${characterId}`);
-            return;
+            return true;
         }
 
         // 1. Save character stats
@@ -1468,7 +1470,7 @@ async function saveCharacterToSupabase(saveData) {
                     .update(filtered)
                     .eq('id', characterId);
                 if (error) {
-                    console.error(`[Server] ❌ Save character error (${characterId}):`, error.message);
+                    throw error;
                 } else {
                     console.log(`[Server] 💾 Saved character: ${characterId}`);
                 }
@@ -1478,18 +1480,20 @@ async function saveCharacterToSupabase(saveData) {
         // 2. Save daily quests (as system inventory item)
         if (dailyQuests) {
             try {
-                const { data: existing } = await supabase
+                const { data: existing, error: lookupError } = await supabase
                     .from('inventory')
                     .select('id')
                     .eq('character_id', characterId)
                     .eq('item_name', 'daily_quests')
                     .eq('item_type', 'system')
                     .maybeSingle();
+                if (lookupError) throw lookupError;
 
+                let mutation;
                 if (existing) {
-                    await supabase.from('inventory').update({ stats: dailyQuests }).eq('id', existing.id);
+                    mutation = await supabase.from('inventory').update({ stats: dailyQuests }).eq('id', existing.id);
                 } else {
-                    await supabase.from('inventory').insert({
+                    mutation = await supabase.from('inventory').insert({
                         character_id: characterId,
                         item_name: 'daily_quests',
                         item_type: 'system',
@@ -1497,26 +1501,29 @@ async function saveCharacterToSupabase(saveData) {
                         stats: dailyQuests
                     });
                 }
+                if (mutation.error) throw mutation.error;
             } catch (e) {
-                console.error('[Server] ❌ Save daily quests error:', e.message);
+                throw new Error(`Save daily quests failed: ${e.message}`);
             }
         }
 
         // 3. Save friends list (as system inventory item)
         if (friendsList) {
             try {
-                const { data: existing } = await supabase
+                const { data: existing, error: lookupError } = await supabase
                     .from('inventory')
                     .select('id')
                     .eq('character_id', characterId)
                     .eq('item_name', 'friends_list')
                     .eq('item_type', 'system')
                     .maybeSingle();
+                if (lookupError) throw lookupError;
 
+                let mutation;
                 if (existing) {
-                    await supabase.from('inventory').update({ stats: { list: friendsList } }).eq('id', existing.id);
+                    mutation = await supabase.from('inventory').update({ stats: { list: friendsList } }).eq('id', existing.id);
                 } else {
-                    await supabase.from('inventory').insert({
+                    mutation = await supabase.from('inventory').insert({
                         character_id: characterId,
                         item_name: 'friends_list',
                         item_type: 'system',
@@ -1524,8 +1531,9 @@ async function saveCharacterToSupabase(saveData) {
                         stats: { list: friendsList }
                     });
                 }
+                if (mutation.error) throw mutation.error;
             } catch (e) {
-                console.error('[Server] ❌ Save friends list error:', e.message);
+                throw new Error(`Save friends list failed: ${e.message}`);
             }
         }
 
@@ -1536,18 +1544,21 @@ async function saveCharacterToSupabase(saveData) {
                 // Batch update inventory items that have stats
                 const itemsWithStats = sanitized.filter(i => i.stats && Object.keys(i.stats).length > 0);
                 for (const item of itemsWithStats) {
-                    await supabase
+                    const { error } = await supabase
                         .from('inventory')
                         .update({ stats: item.stats })
                         .eq('character_id', characterId)
                         .eq('item_name', item.item_name);
+                    if (error) throw error;
                 }
             } catch (e) {
-                console.error('[Server] ❌ Save inventory backup error:', e.message);
+                throw new Error(`Save inventory backup failed: ${e.message}`);
             }
         }
+        return true;
     } catch (err) {
         console.error('[Server] ❌ saveCharacterToSupabase failed:', err.message);
+        return false;
     }
 }
 
@@ -1557,10 +1568,12 @@ setInterval(async () => {
     console.log(`[Server] ⏰ Periodic save — ${pendingSaves.size} player(s) to save...`);
 
     const saves = [...pendingSaves.entries()];
-    pendingSaves.clear();
 
     for (const [userId, saveData] of saves) {
-        await saveCharacterToSupabase(saveData);
+        const saved = await saveCharacterToSupabase(saveData);
+        // A newer save_state may arrive while the database request is pending.
+        // Delete only the exact snapshot we successfully persisted.
+        if (saved && pendingSaves.get(userId) === saveData) pendingSaves.delete(userId);
     }
 
     console.log('[Server] ✅ Periodic save complete');
