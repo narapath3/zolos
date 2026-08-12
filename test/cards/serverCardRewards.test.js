@@ -358,3 +358,16 @@ test('map server never accepts client card roll inputs', async () => {
     assert.doesNotMatch(handler, new RegExp(`payload\\.${field}\\b`));
   }
 });
+
+test('world boss hits require a finite trusted position within encounter range', async () => {
+  const source = await readFile(new URL('../../server/server.js', import.meta.url), 'utf8');
+  assert.match(source, /const BOSS_MAX_HIT_RANGE = 14/);
+  const start = source.indexOf("socket.on('boss_hit'");
+  const end = source.indexOf('// --- VENDING STALLS ---', start);
+  const hit = source.slice(start, end);
+  assert.match(hit, /const pos = player\.lastPos/);
+  assert.match(hit, /pos\.mapId !== worldBoss\.mapId/);
+  assert.match(hit, /!Number\.isFinite\(pos\.x\) \|\| !Number\.isFinite\(pos\.z\)/);
+  assert.match(hit, /bossDx \* bossDx \+ bossDz \* bossDz > BOSS_MAX_HIT_RANGE \* BOSS_MAX_HIT_RANGE/);
+  assert.ok(hit.indexOf('BOSS_MAX_HIT_RANGE * BOSS_MAX_HIT_RANGE') < hit.indexOf('socket._bossWin'));
+});

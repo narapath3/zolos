@@ -236,6 +236,9 @@ const CHAT_DUP_MS = 3000;
 // are completed server-side before a private card_reward event is emitted.
 const BOSS_INTERVAL_MS = parseInt(process.env.BOSS_INTERVAL_MS) || 12 * 60 * 1000; // spawn every 12 min
 const BOSS_FIGHT_MS = parseInt(process.env.BOSS_FIGHT_MS) || 6 * 60 * 1000;        // 6 min to kill
+// Boss mesh radius is ~2.4 and the longest skill range is 10. Allow a small
+// interpolation margin while requiring the player to join the actual fight.
+const BOSS_MAX_HIT_RANGE = 14;
 // Keep world bosses away from Prontera, the main hub. Each selected centre is
 // clear of portals and major map landmarks so the oversized boss has room.
 const BOSS_SPAWN_LOCATIONS = [
@@ -1256,6 +1259,12 @@ io.on('connection', (socket) => {
         if (!worldBoss.active || worldBoss.hp <= 0 || !payload) return;
         const player = onlinePlayers.get(socket.id);
         if (!player || player.mapId !== worldBoss.mapId) return;
+        const pos = player.lastPos;
+        if (!pos || pos.mapId !== worldBoss.mapId
+            || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return;
+        const bossDx = pos.x - worldBoss.x;
+        const bossDz = pos.z - worldBoss.z;
+        if (bossDx * bossDx + bossDz * bossDz > BOSS_MAX_HIT_RANGE * BOSS_MAX_HIT_RANGE) return;
         const dmg = Math.max(0, Math.min(5000, Number(payload.damage) || 0));
         if (dmg <= 0) return;
 
