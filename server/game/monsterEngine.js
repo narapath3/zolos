@@ -28,6 +28,8 @@ const ATTACK_CD_MS = 1300;
 // Longest current player cast range is 10 world units. Keep a small network
 // interpolation allowance without permitting arbitrary off-screen hits.
 const MAX_PLAYER_HIT_RANGE = 12;
+const HIT_WINDOW_MS = 500;
+const MAX_HITS_PER_MONSTER_WINDOW = 2;
 
 let io = null;
 let onlinePlayers = null;          // Map<socketId, playerInfo>
@@ -129,6 +131,7 @@ function makeMonster(id, type, isWater) {
         aggroChar: null, aggroUntil: 0, atkReadyAt: 0,
         wanderUntil: 0, targetX: pos.x, targetZ: pos.z,
         dmgByChar: new Map(),
+        hitCadenceByChar: new Map(),
         respawnAt: 0,
     };
 }
@@ -284,6 +287,7 @@ function respawnMonster(m, mapId) {
     m.alive = true; m.respawnAt = 0;
     m.aggroChar = null; m.aggroUntil = 0;
     m.dmgByChar = new Map();
+    m.hitCadenceByChar = new Map();
 }
 
 // ---------------- damage + death (authoritative) ----------------
@@ -305,7 +309,14 @@ export function applyHit(player, payload) {
     if (dmg <= 0) return;
 
     const charId = player.characterId;
-    if (charId) m.dmgByChar.set(charId, (m.dmgByChar.get(charId) || 0) + dmg);
+    if (!charId) return;
+    const now = Date.now();
+    const recent = (m.hitCadenceByChar.get(charId) || []).filter(t => now - t < HIT_WINDOW_MS);
+    if (recent.length >= MAX_HITS_PER_MONSTER_WINDOW) return;
+    recent.push(now);
+    m.hitCadenceByChar.set(charId, recent);
+
+    m.dmgByChar.set(charId, (m.dmgByChar.get(charId) || 0) + dmg);
 
     // A hit provokes the monster toward the most recent attacker.
     m.aggroChar = charId || m.aggroChar;

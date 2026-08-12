@@ -17,3 +17,17 @@ test('authoritative monster hits are bounded to current skill range plus latency
   assert.match(hit, /dx \* dx \+ dz \* dz > MAX_PLAYER_HIT_RANGE \* MAX_PLAYER_HIT_RANGE/);
   assert.ok(hit.indexOf('MAX_PLAYER_HIT_RANGE * MAX_PLAYER_HIT_RANGE') < hit.indexOf('clampMonsterDamage'));
 });
+
+test('same player cannot burst unlimited hits into one monster', () => {
+  assert.match(engine, /const HIT_WINDOW_MS = 500/);
+  assert.match(engine, /const MAX_HITS_PER_MONSTER_WINDOW = 2/);
+  const hit = engine.match(/export function applyHit[\s\S]*?\n\}/)?.[0] || '';
+  assert.match(hit, /const charId = player\.characterId;\s*if \(!charId\) return/);
+  assert.match(hit, /m\.hitCadenceByChar\.get\(charId\)/);
+  assert.match(hit, /recent\.length >= MAX_HITS_PER_MONSTER_WINDOW/);
+  assert.match(hit, /m\.hitCadenceByChar\.set\(charId, recent\)/);
+});
+
+test('hit cadence state is reset for every monster life', () => {
+  assert.ok((engine.match(/hitCadenceByChar: new Map\(\)|m\.hitCadenceByChar = new Map\(\)/g) || []).length >= 2);
+});
