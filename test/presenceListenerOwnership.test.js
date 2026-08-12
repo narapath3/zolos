@@ -23,3 +23,15 @@ test('reconnect join emits the latest module-owned identity and character', () =
   assert.match(source, /socket\.emit\('join', \{ userId: currentUserId, username: currentUsername, level: liveLevel, mapId: liveMap, characterId: currentCharacterId/);
   assert.match(source, /leavePresence\(\)[\s\S]*currentCharacterId\s*=\s*null/);
 });
+
+test('long-lived trade, friend, and duel handlers route against current identity', () => {
+  const listeners = source.slice(source.indexOf("socket.on('trade_request'"), source.indexOf('// ===== WARP TO FRIEND ====='));
+  assert.doesNotMatch(listeners, /=== userId|=== characterId/);
+  assert.match(listeners, /payload\.targetUserId === currentUserId/);
+  assert.match(listeners, /payload\.targetCharacterId === currentCharacterId/);
+});
+
+test('malformed roster events degrade to an empty list instead of throwing', () => {
+  assert.match(source, /function normalizeRoster\(players\)/);
+  assert.equal((source.match(/players = normalizeRoster\(players\)/g) || []).length, 2);
+});

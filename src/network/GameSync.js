@@ -87,6 +87,10 @@ function attachOreConversionListeners(socket) {
     });
 }
 
+function normalizeRoster(players) {
+    return Array.isArray(players) ? players.filter(player => player && typeof player === 'object') : [];
+}
+
 export async function requestOreConversion(characterId, requestId) {
     if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
         const inv = localDb.get(`inventory_${characterId}`) || [];
@@ -1701,6 +1705,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('disconnect', rejectPendingSocketRequests);
 
             socket.on('players_update', (players) => {
+                players = normalizeRoster(players);
                 console.log('[Zolos] 👥 Players update via Socket.io:', players.length, players.map(p => p.username));
                 if (onlinePlayersCallback) onlinePlayersCallback(players);
             });
@@ -1709,6 +1714,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             // shows everyone online across all cities. Emitted after
             // players_update, so this is what the panel ends up displaying.
             socket.on('players_global', (players) => {
+                players = normalizeRoster(players);
                 if (window.gameUI && typeof window.gameUI.updateOnlinePlayers === 'function') {
                     window.gameUI.updateOnlinePlayers(players);
                 }
@@ -1804,20 +1810,20 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
 
             socket.on('trade_request', (payload) => {
                 if (payload
-                    && payload.targetUserId === userId
-                    && (!payload.targetCharacterId || payload.targetCharacterId === characterId)) {
+                    && payload.targetUserId === currentUserId
+                    && (!payload.targetCharacterId || payload.targetCharacterId === currentCharacterId)) {
                     if (window.gameUI) window.gameUI.receiveTradeRequest(payload);
                 }
             });
 
             socket.on('trade_response', (payload) => {
-                if (payload && payload.senderUserId === userId) {
+                if (payload && payload.senderUserId === currentUserId) {
                     if (window.gameUI) window.gameUI.receiveTradeResponse(payload);
                 }
             });
 
             socket.on('trade_cancel', (payload) => {
-                if (payload && payload.targetUserId === userId) {
+                if (payload && payload.targetUserId === currentUserId) {
                     if (window.gameUI && typeof window.gameUI.receiveTradeCancel === 'function') {
                         window.gameUI.receiveTradeCancel(payload);
                     }
@@ -1825,7 +1831,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('friend_request', (payload) => {
-                if (payload && payload.targetUserId === userId) {
+                if (payload && payload.targetUserId === currentUserId) {
                     if (window.gameUI && typeof window.gameUI.receiveFriendRequest === 'function') {
                         window.gameUI.receiveFriendRequest(payload);
                     }
@@ -1833,7 +1839,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('friend_response', (payload) => {
-                if (payload && payload.senderUserId === userId) {
+                if (payload && payload.senderUserId === currentUserId) {
                     if (window.gameUI && typeof window.gameUI.receiveFriendResponse === 'function') {
                         window.gameUI.receiveFriendResponse(payload);
                     }
@@ -1842,7 +1848,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
 
             // ===== PVP DUEL =====
             socket.on('duel_request', (payload) => {
-                if (payload && payload.targetUserId === userId) {
+                if (payload && payload.targetUserId === currentUserId) {
                     if (window.gameUI && typeof window.gameUI.receiveDuelRequest === 'function') {
                         window.gameUI.receiveDuelRequest(payload);
                     }
@@ -1850,7 +1856,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('duel_response', (payload) => {
-                if (payload && payload.senderUserId === userId) {
+                if (payload && payload.senderUserId === currentUserId) {
                     if (window.gameUI && typeof window.gameUI.receiveDuelResponse === 'function') {
                         window.gameUI.receiveDuelResponse(payload);
                     }
@@ -1864,7 +1870,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('duel_hit', (payload) => {
-                if (payload && payload.targetUserId === userId) {
+                if (payload && payload.targetUserId === currentUserId) {
                     if (window.duelManager && typeof window.duelManager.onDuelHit === 'function') {
                         window.duelManager.onDuelHit(payload);
                     }

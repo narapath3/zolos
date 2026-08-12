@@ -132,5 +132,5 @@ test('live trade packets carry and validate the target character identity', () =
   assert.match(gameUiSource, /cleanStats,\s*target\.characterId/);
   assert.match(gameUiSource, /payload\.targetCharacterId !== this\.characterId/);
   assert.match(gameSyncSource, /targetCharacterId:\s*targetCharacterId/);
-  assert.match(gameSyncSource, /payload\.targetCharacterId === characterId/);
+  assert.match(gameSyncSource, /payload\.targetCharacterId === currentCharacterId/);
 });
