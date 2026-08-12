@@ -239,6 +239,7 @@ const BOSS_FIGHT_MS = parseInt(process.env.BOSS_FIGHT_MS) || 6 * 60 * 1000;     
 // Boss mesh radius is ~2.4 and the longest skill range is 10. Allow a small
 // interpolation margin while requiring the player to join the actual fight.
 const BOSS_MAX_HIT_RANGE = 14;
+const DUEL_MAX_HIT_RANGE = 12;
 // Keep world bosses away from Prontera, the main hub. Each selected centre is
 // clear of portals and major map landmarks so the oversized boss has room.
 const BOSS_SPAWN_LOCATIONS = [
@@ -1159,6 +1160,11 @@ io.on('connection', (socket) => {
 
         const challengerSocketId = userSocketMap.get(challengerId);
         if (!challengerSocketId) return;
+        const challenger = onlinePlayers.get(challengerSocketId);
+        if (!challenger || challenger.mapId !== accepter.mapId) {
+            relayResponse('duel_response', { ...payload, accepted: false, reason: 'different_map' }, accepter);
+            return;
+        }
 
         if (payload.accepted) {
             // Refuse if either side is already in a duel.
@@ -1186,6 +1192,14 @@ io.on('connection', (socket) => {
                     { userId: duel.b, spawn: { x: -11, z: 14 } },
                 ],
             };
+            // Commit both arena spawns before accepting combat packets. The
+            // client teleport and its next position broadcast are asynchronous;
+            // without this, range validation observes stale pre-duel positions.
+            const startedAt = Date.now();
+            challenger.lastPos = { x: -17, y: 1.2, z: 14, mapId: challenger.mapId, teleported: true };
+            challenger.lastPosTime = startedAt;
+            accepter.lastPos = { x: -11, y: 1.2, z: 14, mapId: accepter.mapId, teleported: true };
+            accepter.lastPosTime = startedAt;
             io.to(challengerSocketId).emit('duel_start', startPayload);
             io.to(socket.id).emit('duel_start', startPayload);
             console.log(`[Server] ⚔️ Duel started: ${duel.a} vs ${duel.b}`);
@@ -1205,15 +1219,26 @@ io.on('connection', (socket) => {
         if (!duel || duel.settled || payload.duelId !== duel.duelId) return;
         const opponentId = duel.a === attacker.userId ? duel.b : duel.a;
         if (payload.targetUserId !== opponentId) return;
+        const opponentSocketId = userSocketMap.get(opponentId);
+        const opponent = opponentSocketId ? onlinePlayers.get(opponentSocketId) : null;
+        const attackerPos = attacker.lastPos;
+        const opponentPos = opponent?.lastPos;
+        if (!opponent || opponent.mapId !== attacker.mapId
+            || !attackerPos || attackerPos.mapId !== attacker.mapId
+            || !opponentPos || opponentPos.mapId !== opponent.mapId
+            || !Number.isFinite(attackerPos.x) || !Number.isFinite(attackerPos.z)
+            || !Number.isFinite(opponentPos.x) || !Number.isFinite(opponentPos.z)) return;
+        const duelDx = attackerPos.x - opponentPos.x;
+        const duelDz = attackerPos.z - opponentPos.z;
+        if (duelDx * duelDx + duelDz * duelDz > DUEL_MAX_HIT_RANGE * DUEL_MAX_HIT_RANGE) return;
         const damage = Number(payload.damage);
         if (!Number.isFinite(damage) || damage <= 0) return;
 
         if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
         if (shouldRateLimitEvent(socket._rateLimitTracker, 'duel_hit', 12, 1000)) return;
 
-        const targetSocketId = userSocketMap.get(opponentId);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('duel_hit', {
+        if (opponentSocketId) {
+            io.to(opponentSocketId).emit('duel_hit', {
                 duelId: duel.duelId,
                 attackerUserId: attacker.userId,
                 targetUserId: opponentId,

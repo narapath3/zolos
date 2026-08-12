@@ -30,6 +30,21 @@ test('duel hit packets carry the encounter ID and exact recipient end to end', (
   assert.match(sync, /payload\.targetUserId === currentUserId[\s\S]*onDuelHit/);
 });
 
+test('duels start on one map and use trusted positions for hit range', () => {
+  const response = server.slice(server.indexOf("socket.on('duel_response'"), server.indexOf("socket.on('duel_hit'"));
+  const hit = server.slice(server.indexOf("socket.on('duel_hit'"), server.indexOf("socket.on('duel_end'"));
+
+  assert.match(server, /const DUEL_MAX_HIT_RANGE = 12/);
+  assert.match(response, /challenger\.mapId !== accepter\.mapId/);
+  assert.match(response, /reason: 'different_map'/);
+  assert.match(response, /challenger\.lastPos = \{ x: -17, y: 1\.2, z: 14/);
+  assert.match(response, /accepter\.lastPos = \{ x: -11, y: 1\.2, z: 14/);
+  assert.match(hit, /opponent\.mapId !== attacker\.mapId/);
+  assert.match(hit, /!Number\.isFinite\(attackerPos\.x\)/);
+  assert.match(hit, /duelDx \* duelDx \+ duelDz \* duelDz > DUEL_MAX_HIT_RANGE \* DUEL_MAX_HIT_RANGE/);
+  assert.ok(hit.indexOf('DUEL_MAX_HIT_RANGE * DUEL_MAX_HIT_RANGE') < hit.indexOf("shouldRateLimitEvent(socket._rateLimitTracker, 'duel_hit'"));
+});
+
 test('disconnect removes pending friend requests in both directions', () => {
   const disconnect = server.slice(server.indexOf("socket.on('disconnect'"));
   assert.match(disconnect, /for \(const key of pendingFriendRequests\.keys\(\)\)/);
