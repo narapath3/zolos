@@ -296,12 +296,48 @@ export class SceneManager {
     }
 
     // ============ Map Loading ============
+    _disposeEnvironmentObjects(objects) {
+        const geometries = new Set();
+        const materials = new Set();
+        const textures = new Set();
+        const retainedTextures = new Set([
+            this._detailTexture,
+            this._roofTileTexture,
+            ...this._leafTextureCache.values(),
+        ].filter(Boolean));
+        for (const object of objects) {
+            if (!object) continue;
+            this.scene.remove(object);
+            object.traverse?.(child => {
+                if (child.geometry && !geometries.has(child.geometry)) {
+                    geometries.add(child.geometry);
+                    child.geometry.dispose();
+                }
+                const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
+                for (const material of childMaterials) {
+                    if (!material || materials.has(material)) continue;
+                    materials.add(material);
+                    // Preserve SceneManager-owned caches but release generated
+                    // canvas maps such as NPC/stall labels and map-only effects.
+                    for (const key of ['map', 'alphaMap', 'bumpMap', 'normalMap', 'roughnessMap', 'emissiveMap']) {
+                        const texture = material[key];
+                        if (texture && !retainedTextures.has(texture) && !textures.has(texture)) {
+                            textures.add(texture);
+                            texture.dispose();
+                        }
+                    }
+                    material.dispose();
+                }
+            });
+        }
+    }
+
     loadMap(mapId) {
         const config = MAP_CONFIGS[mapId];
         if (!config) return;
 
         // Clear previous environment objects
-        this.envObjects.forEach(obj => this.scene.remove(obj));
+        this._disposeEnvironmentObjects(this.envObjects);
         this.envObjects = [];
         this.portalMeshes = [];
         this.oreNodes = [];
