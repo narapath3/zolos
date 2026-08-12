@@ -54,6 +54,7 @@ export class ParticleSystem {
         this.projectiles = [];
         this.slashes = [];
         this.splashCooldown = 0;
+        this._projectileDirection = new THREE.Vector3();
 
         // Performance monitoring
         this.perfMonitor = new ParticlePerformanceMonitor();
@@ -1368,6 +1369,8 @@ export class ParticleSystem {
 
     // ============ Update ============
     update(deltaTime) {
+        if (!Number.isFinite(deltaTime) || deltaTime <= 0) return;
+        deltaTime = Math.min(deltaTime, 0.1);
         // Per-frame FPS estimate (EMA) that drives effect throttling. Guard
         // against huge dt from a backgrounded tab so one hitch doesn't nuke
         // effects; sustained low FPS is caught within ~1s.
@@ -1389,7 +1392,7 @@ export class ParticleSystem {
             const targetPos = p.target.getPosition();
             targetPos.y += 0.8; // Aim for center of monster
 
-            const direction = new THREE.Vector3().subVectors(targetPos, p.mesh.position).normalize();
+            const direction = this._projectileDirection.subVectors(targetPos, p.mesh.position).normalize();
             const distance = p.mesh.position.distanceTo(targetPos);
             const moveStep = p.speed * deltaTime;
 
