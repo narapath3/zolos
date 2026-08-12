@@ -2108,8 +2108,12 @@ function updateDuelCombat(dt) {
             let dmg = (Number(character.stats.atk) || 10) + Math.floor(Math.random() * 5);
             if (isCritical) dmg = Math.floor(dmg * 1.8);
 
+            // Capture the encounter identity with this swing. A late
+            // dynamic-import completion must not be mistaken for a hit in a
+            // later duel against the same opponent.
+            const activeDuel = duelState;
             import('./network/GameSync.js').then(({ sendDuelHit }) => {
-                sendDuelHit(duelState?.opponentUserId, dmg, isCritical);
+                if (activeDuel) sendDuelHit(activeDuel.duelId, activeDuel.opponentUserId, dmg, isCritical);
             });
             if (particles) {
                 const screenPos = worldToScreen(foePos, 1.2);

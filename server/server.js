@@ -1196,25 +1196,27 @@ io.on('connection', (socket) => {
     // --- Relay a hit to the victim ---
     socket.on('duel_hit', (payload) => {
         const attacker = trustedSender(socket);
-        if (!attacker || !payload || !payload.targetUserId) return;
-
-        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
-        if (shouldRateLimitEvent(socket._rateLimitTracker, 'duel_hit', 12, 1000)) return;
+        if (!attacker || !payload || !isBoundedString(payload.targetUserId, 160)
+            || !isBoundedString(payload.duelId, 220)) return;
 
         // Only hit the opponent of a duel this socket is actually in, so a
         // client can't spray duel_hit at players it isn't fighting.
         const duel = activeDuels.get(attacker.userId);
-        if (!duel || duel.settled) return;
+        if (!duel || duel.settled || payload.duelId !== duel.duelId) return;
         const opponentId = duel.a === attacker.userId ? duel.b : duel.a;
         if (payload.targetUserId !== opponentId) return;
         const damage = Number(payload.damage);
         if (!Number.isFinite(damage) || damage <= 0) return;
+
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'duel_hit', 12, 1000)) return;
 
         const targetSocketId = userSocketMap.get(opponentId);
         if (targetSocketId) {
             io.to(targetSocketId).emit('duel_hit', {
                 duelId: duel.duelId,
                 attackerUserId: attacker.userId,
+                targetUserId: opponentId,
                 damage: Math.min(5000, damage),
                 critical: payload.critical === true,
             });

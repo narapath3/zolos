@@ -2887,12 +2887,12 @@ export function sendDuelResponse(senderUserId, accepted, requestId) {
     }
 }
 
-export function sendDuelHit(targetUserId, damage, critical = false) {
+export function sendDuelHit(duelId, targetUserId, damage, critical = false) {
     if (isOfflineMode) return;
     const socket = getSocket();
     if (socket && isSocketConnected()) {
         socket.emit('duel_hit', {
-            attackerUserId: currentUserId,
+            duelId,
             targetUserId,
             damage,
             critical,
