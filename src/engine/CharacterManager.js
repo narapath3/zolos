@@ -3153,8 +3153,9 @@ export class CharacterManager {
             }
 
             if (window.duelState && currentTarget.stats) {
+                const activeDuel = window.duelState;
                 import('../network/GameSync.js').then(({ sendDuelHit }) => {
-                    sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
+                    sendDuelHit(activeDuel.duelId, activeDuel.opponentUserId, finalDmg, false);
                 });
             }
 
@@ -3195,8 +3196,9 @@ export class CharacterManager {
                     const finalDmg = roll(dmgBase, 0.2);
                     const actualDmg = this.applyCardDamage(opponent.character, finalDmg);
                     hits++;
+                    const activeDuel = window.duelState;
                     import('../network/GameSync.js').then(({ sendDuelHit }) => {
-                        sendDuelHit(window.duelState.opponentUserId, finalDmg, false);
+                        sendDuelHit(activeDuel.duelId, activeDuel.opponentUserId, finalDmg, false);
                     });
                     if (effectCallback) effectCallback(skillId, opponent.character, actualDmg);
                 }

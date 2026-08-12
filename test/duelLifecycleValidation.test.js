@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const server = fs.readFileSync(new URL('../server/server.js', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const sync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
+const character = fs.readFileSync(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
 
 test('duel hits are finite, positive and stamped with the active duel ID', () => {
   const handler = server.slice(server.indexOf("socket.on('duel_hit'"), server.indexOf("socket.on('duel_end'"));
@@ -28,6 +29,15 @@ test('duel hit packets carry the encounter ID and exact recipient end to end', (
   assert.doesNotMatch(sender, /attackerUserId:/);
   assert.match(main, /sendDuelHit\(activeDuel\.duelId, activeDuel\.opponentUserId, dmg, isCritical\)/);
   assert.match(sync, /payload\.targetUserId === currentUserId[\s\S]*onDuelHit/);
+});
+
+test('every normal and skill duel hit call uses the current encounter ID', () => {
+  const calls = [...`${main}\n${character}`.matchAll(/sendDuelHit\(([^\n]+)\)/g)].map(match => match[1]);
+  assert.equal(calls.length, 3);
+  for (const args of calls) {
+    assert.match(args, /activeDuel\.duelId, activeDuel\.opponentUserId/);
+  }
+  assert.equal((character.match(/const activeDuel = window\.duelState/g) || []).length, 2);
 });
 
 test('duels start on one map and use trusted positions for hit range', () => {
