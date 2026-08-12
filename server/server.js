@@ -425,7 +425,7 @@ io.on('connection', (socket) => {
             if (data.characterId) {
                 const { data: ownedCharacter } = await supabase
                     .from('characters')
-                    .select('id')
+                    .select('id, level, name')
                     .eq('id', data.characterId)
                     .eq('user_id', userId)
                     .maybeSingle();
@@ -449,8 +449,8 @@ io.on('connection', (socket) => {
 
         const playerInfo = {
             userId,
-            username: username || 'Adventurer',
-            level: level || 1,
+            username: verifiedCharacter?.name || username || 'Adventurer',
+            level: verifiedCharacter?.level || level || 1,
             socketId: socket.id,
             mapId: normalizedPresence.mapId,
             joinedAt: Date.now(),
@@ -664,8 +664,11 @@ io.on('connection', (socket) => {
         if (player) {
             const oldMapId = player.mapId;
             const normalized = normalizePresence({
-                username: data.username ?? player.username,
-                level: data.level ?? player.level,
+                // Verified identity/progression comes from the database. The
+                // client may only move maps; trusting repeated +2 updates lets
+                // an attacker walk server level to 300 and inflate PvE damage.
+                username: player.verified ? player.username : (data.username ?? player.username),
+                level: player.verified ? player.level : (data.level ?? player.level),
                 mapId: data.mapId ?? player.mapId,
             }, player.level);
             player.level = normalized.level;
