@@ -27,6 +27,8 @@ test('position relay stamps identity and bounds high-cost animation fields', () 
   assert.match(pos, /now - \(socket\._lastAppearanceAt \|\| 0\) >= 5000/);
   assert.match(pos, /socket\._lastAppearanceAt = now/);
   assert.match(pos, /out\.appearance = appearance/);
+  const relay = pos.slice(pos.indexOf('const out = {'), pos.indexOf("socket.to(`map:${mapId}`).emit('pos', out)"));
+  assert.doesNotMatch(relay, /\by:/);
 });
 
 test('remote appearance sanitizer keeps render fields and drops unbounded data', () => {

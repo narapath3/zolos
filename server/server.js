@@ -547,7 +547,6 @@ io.on('connection', (socket) => {
             level: self.level,
             mapId,
             x: self.lastPos.x,
-            y: Number.isFinite(payload.y) ? payload.y : 1.2,
             z: self.lastPos.z,
             rY: Number.isFinite(payload.rY) ? Math.atan2(Math.sin(payload.rY), Math.cos(payload.rY)) : 0,
             state: PLAYER_MOTION_STATES.has(payload.state) ? payload.state : 'idle',

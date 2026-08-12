@@ -40,3 +40,13 @@ test('remote rotation smoothing uses constant-time wrapped angle math', () => {
   assert.match(update, /Math\.atan2\([\s\S]*Math\.sin\(rp\.targetRotY - rp\.mesh\.rotation\.y\)[\s\S]*Math\.cos\(rp\.targetRotY - rp\.mesh\.rotation\.y\)/);
   assert.doesNotMatch(update, /while \(d [<>]/);
 });
+
+test('remote heroes ground locally on terrain instead of trusting network Y', () => {
+  const callback = mainSource.slice(mainSource.indexOf('// Handle remote player position updates'), mainSource.indexOf('// Step 9: Use consistent object format'));
+  assert.match(callback, /const remoteEnv = sceneManager\.getEnvironmentAt\(remoteProbe\)/);
+  assert.match(callback, /1\.2 \+ sceneManager\.getWalkableHeight\(p\.x, p\.z\)/);
+  assert.match(callback, /rp\.mesh\.position\.set\(p\.x, remoteBaseY, p\.z\)/);
+  assert.match(callback, /rp\.targetPos\.set\(p\.x, remoteBaseY, p\.z\)/);
+  assert.match(callback, /rp\.character\.baseY = remoteBaseY/);
+  assert.doesNotMatch(callback, /p\.y \?\?/);
+});

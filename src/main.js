@@ -1028,6 +1028,11 @@ async function initGame(charData) {
             }
 
             let rp = remotePlayersMap.get(p.userId);
+            const remoteProbe = new THREE.Vector3(p.x, 0, p.z);
+            const remoteEnv = sceneManager.getEnvironmentAt(remoteProbe);
+            const remoteBaseY = remoteEnv === 'water'
+                ? -0.5
+                : 1.2 + sceneManager.getWalkableHeight(p.x, p.z);
             if (!rp) {
                 // Step 12: Wait for valid position before creating remote mesh to prevent "stuck at portal" visuals
                 if (p.x === undefined || p.z === undefined) return;
@@ -1058,10 +1063,10 @@ async function initGame(charData) {
             if (p.x !== undefined && p.z !== undefined) {
                 if (!rp.targetPos) {
                     // First sighting: snap so it doesn't slide in from the origin.
-                    rp.mesh.position.set(p.x, p.y ?? rp.mesh.position.y, p.z);
-                    rp.targetPos = new THREE.Vector3(p.x, p.y ?? 0, p.z);
+                    rp.mesh.position.set(p.x, remoteBaseY, p.z);
+                    rp.targetPos = new THREE.Vector3(p.x, remoteBaseY, p.z);
                 } else {
-                    rp.targetPos.set(p.x, p.y ?? rp.targetPos.y, p.z);
+                    rp.targetPos.set(p.x, remoteBaseY, p.z);
                 }
             }
             if (p.rY !== undefined) rp.targetRotY = p.rY;
@@ -1076,12 +1081,11 @@ async function initGame(charData) {
                 }
 
                 // Step 10 Part B: Robust water detection (based on the target pos).
-                const remoteEnv = sceneManager.getEnvironmentAt(rp.targetPos || rp.mesh.position);
                 if (remoteEnv === 'water') {
                     rp.character.baseY = -0.5;
                     rp.character.state = 'swimming';
                 } else {
-                    rp.character.baseY = 1.2;
+                    rp.character.baseY = remoteBaseY;
                 }
 
                 if (p.appearance) {
