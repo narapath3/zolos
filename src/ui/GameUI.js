@@ -305,6 +305,9 @@ export class GameUI {
     this.cardAlbum = null;
     this._petViewer?.destroy?.();
     this._petViewer = null;
+    this.playerProfileModal?.destroy?.();
+    this.playerProfileModal = null;
+    this.layoutManager?._disableDragging?.();
     document.removeEventListener('keydown', this._petBoutiqueEscapeHandler);
     this._petBoutiqueEscapeHandler = null;
     this.cardDropRevealQueue.length = 0;
@@ -314,6 +317,18 @@ export class GameUI {
     this._networkStatusInterval = null;
     clearInterval(this._onlinePlayersInterval);
     this._onlinePlayersInterval = null;
+    clearTimeout(this._equipToastTimer);
+    clearTimeout(this._duelOverlayTimer);
+    clearTimeout(this._chatIdleTimer);
+    clearTimeout(this._journalSaveTimer);
+    clearTimeout(this._cardTradeSuggestTimer);
+    clearTimeout(this.tradeTimeout);
+    this._equipToastTimer = null;
+    this._duelOverlayTimer = null;
+    this._chatIdleTimer = null;
+    this._journalSaveTimer = null;
+    this._cardTradeSuggestTimer = null;
+    this.tradeTimeout = null;
   }
 
   _setupPanels() {

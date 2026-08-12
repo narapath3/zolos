@@ -4,6 +4,8 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 const petPreviewSource = fs.readFileSync(new URL('../src/engine/PetPreview.js', import.meta.url), 'utf8');
+const jobPreviewSource = fs.readFileSync(new URL('../src/engine/JobPreview.js', import.meta.url), 'utf8');
+const profileSource = fs.readFileSync(new URL('../src/ui/PlayerProfileModal.js', import.meta.url), 'utf8');
 
 test('GameUI owns and releases recurring UI resources', () => {
   assert.match(source, /this\._networkStatusInterval\s*=\s*setInterval\(/);
@@ -13,6 +15,10 @@ test('GameUI owns and releases recurring UI resources', () => {
   assert.match(destroy, /this\._itemPortraitObserver\?\.disconnect\?\.\(\)/);
   assert.match(destroy, /clearInterval\(this\._networkStatusInterval\)/);
   assert.match(destroy, /clearInterval\(this\._onlinePlayersInterval\)/);
+  assert.match(destroy, /this\.playerProfileModal\?\.destroy\?\.\(\)/);
+  for (const timer of ['_equipToastTimer', '_duelOverlayTimer', '_chatIdleTimer', '_journalSaveTimer', '_cardTradeSuggestTimer', 'tradeTimeout']) {
+    assert.match(destroy, new RegExp(`clearTimeout\\(this\\.${timer}\\)`));
+  }
 });
 
 test('pet boutique cancels animation frames and releases its WebGL resources', () => {
@@ -21,4 +27,12 @@ test('pet boutique cancels animation frames and releases its WebGL resources', (
   assert.match(petPreviewSource, /cancelAnimationFrame\(this\.animationFrameId\)/);
   assert.match(petPreviewSource, /this\.renderer\.dispose\(\)/);
   assert.match(petPreviewSource, /this\.renderer\.forceContextLoss\?\.\(\)/);
+});
+
+test('profile preview releases its character, scene resources, and WebGL context', () => {
+  assert.match(profileSource, /destroy\(\)\s*\{[\s\S]*this\.jobPreview\?\.dispose\?\.\(\)/);
+  assert.match(jobPreviewSource, /this\.char\?\.destroy\?\.\(\)/);
+  assert.match(jobPreviewSource, /this\.scene\?\.traverse\(/);
+  assert.match(jobPreviewSource, /this\.renderer\?\.dispose\?\.\(\)/);
+  assert.match(jobPreviewSource, /this\.renderer\?\.forceContextLoss\?\.\(\)/);
 });

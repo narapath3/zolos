@@ -912,6 +912,15 @@ export class PlayerProfileModal {
     }
   }
 
+  destroy() {
+    this._stopStatusPolling();
+    this.jobPreview?.dispose?.();
+    this.jobPreview = null;
+    this.modal?.remove();
+    this.modal = null;
+    this.currentPlayer = null;
+  }
+
   _init3DPreview(appearance, displayName, displayLevel) {
     const canvas = document.getElementById('player-profile-canvas');
     if (!canvas) return;

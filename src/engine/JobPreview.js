@@ -113,7 +113,23 @@ export class JobPreview {
 
     dispose() {
         this.stop();
-        try { this.renderer.dispose(); } catch (e) { /* ignore */ }
-        this.scene = null; this.char = null;
+        this.char?.destroy?.();
+        this.char = null;
+        this.scene?.traverse((node) => {
+            node.geometry?.dispose?.();
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            materials.forEach((material) => {
+                if (!material) return;
+                for (const value of Object.values(material)) {
+                    if (value?.isTexture) value.dispose();
+                }
+                material.dispose?.();
+            });
+        });
+        this.renderer?.dispose?.();
+        this.renderer?.forceContextLoss?.();
+        this.scene = null;
+        this.ring = null;
+        this.renderer = null;
     }
 }
