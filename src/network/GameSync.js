@@ -12,7 +12,9 @@ let offlineChatInterval = null;
 let clientPingInterval = null;
 let mockPlayers = [];
 let socketListenersAttached = false;
+let socketListenersOwner = null;
 let chatCallback = null;
+let playerPositionCallback = null;
 let cardFusionSocket = null;
 const pendingCardFusions = new Map();
 const pendingOreConversions = new Map();
@@ -1639,7 +1641,7 @@ export async function fetchLeaderboard(category = 'level') {
 export async function joinPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback, currentMapId = 'prontera', characterId = null) {
     onlinePlayersCallback = onPlayersUpdate;
     chatCallback = onChatCallback;
-    socketListenersAttached = false;
+    playerPositionCallback = onPlayerPositionUpdate;
 
     // Store player info for later use in updatePresence/broadcast
     currentUserId = userId;
@@ -1687,7 +1689,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         };
 
         // Attach event listeners (only once)
-        if (!socketListenersAttached) {
+        if (!socketListenersAttached || socketListenersOwner !== socket) {
             // Whenever the underlying connection is (re)established, re-join our
             // map room instead of lingering as a ghost. The initial connection is
             // already up here (so this fires only on later reconnects); the first
@@ -1710,8 +1712,8 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socket.on('pos', (payload) => {
-                if (onPlayerPositionUpdate && payload && payload.userId !== userId) {
-                    onPlayerPositionUpdate(payload);
+                if (playerPositionCallback && payload && payload.userId !== currentUserId) {
+                    playerPositionCallback(payload);
                 }
             });
 
@@ -1926,6 +1928,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             });
 
             socketListenersAttached = true;
+            socketListenersOwner = socket;
         }
 
         // Initial join. Includes the Supabase access token so the server can
@@ -2079,6 +2082,8 @@ export function updatePresence(level, newUsername = null, currentMapId = 'pronte
 
 export function leavePresence() {
     socketListenersAttached = false;
+    socketListenersOwner = null;
+    playerPositionCallback = null;
     rejectPendingSocketRequests();
 
     if (presenceUpdateInterval) {
