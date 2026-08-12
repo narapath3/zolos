@@ -179,7 +179,8 @@ export async function requestPetPurchase(characterId, itemName, requestId, offli
 let currentUserId = null;
 let currentUsername = 'Adventurer';
 let currentLevel = 1;
-let currentMapId = 'prontera';
+let activeMapId = 'prontera';
+let currentCharacterId = null;
 
 // ============ Device Detection ============
 export function getDeviceTypeFromUserAgent(ua) {
@@ -1647,6 +1648,8 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
     currentUserId = userId;
     currentUsername = username;
     currentLevel = level;
+    activeMapId = currentMapId || 'prontera';
+    currentCharacterId = characterId;
 
     // ===== OFFLINE MODE (No Mock Players) =====
     // Skip this gate when Socket.io is available — the map server handles
@@ -1682,9 +1685,9 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
         const emitJoin = async () => {
             let accessToken = null;
             try { accessToken = (await supabase?.auth?.getSession())?.data?.session?.access_token || null; } catch (e) { /* guest */ }
-            const liveMap = (typeof window !== 'undefined' && window.sceneManager?.currentMap) || currentMapId;
-            const liveLevel = (typeof window !== 'undefined' && window.character?.stats?.level) || level;
-            socket.emit('join', { userId, username, level: liveLevel, mapId: liveMap, characterId, accessToken, device: getDeviceType() });
+            const liveMap = (typeof window !== 'undefined' && window.sceneManager?.currentMap) || activeMapId;
+            const liveLevel = (typeof window !== 'undefined' && window.character?.stats?.level) || currentLevel;
+            socket.emit('join', { userId: currentUserId, username: currentUsername, level: liveLevel, mapId: liveMap, characterId: currentCharacterId, accessToken, device: getDeviceType() });
             console.log('[Zolos] ✅ Emitted join to Map Server (map=' + liveMap + ')');
         };
 
@@ -2056,6 +2059,7 @@ export function broadcastChat(userId, username, level, message, currentMapId = '
 
 export function updatePresence(level, newUsername = null, currentMapId = 'prontera') {
     currentLevel = level;
+    activeMapId = currentMapId || activeMapId;
     if (newUsername) {
         currentUsername = newUsername;
     }
@@ -2084,6 +2088,7 @@ export function leavePresence() {
     socketListenersAttached = false;
     socketListenersOwner = null;
     playerPositionCallback = null;
+    currentCharacterId = null;
     rejectPendingSocketRequests();
 
     if (presenceUpdateInterval) {

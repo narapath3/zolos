@@ -17,3 +17,9 @@ test('presence event handlers use replaceable callbacks instead of stale join cl
   assert.match(source, /playerPositionCallback\(payload\)/);
   assert.match(source, /leavePresence\(\)[\s\S]*playerPositionCallback\s*=\s*null/);
 });
+
+test('reconnect join emits the latest module-owned identity and character', () => {
+  assert.match(source, /currentCharacterId\s*=\s*characterId/);
+  assert.match(source, /socket\.emit\('join', \{ userId: currentUserId, username: currentUsername, level: liveLevel, mapId: liveMap, characterId: currentCharacterId/);
+  assert.match(source, /leavePresence\(\)[\s\S]*currentCharacterId\s*=\s*null/);
+});
