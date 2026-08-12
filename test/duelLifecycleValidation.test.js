@@ -6,6 +6,7 @@ const server = fs.readFileSync(new URL('../server/server.js', import.meta.url), 
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const sync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
 const character = fs.readFileSync(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
+const settlement = fs.readFileSync(new URL('../migrations/20260812_atomic_duel_settlement.sql', import.meta.url), 'utf8');
 
 test('duel hits are finite, positive and stamped with the active duel ID', () => {
   const handler = server.slice(server.indexOf("socket.on('duel_hit'"), server.indexOf("socket.on('duel_end'"));
@@ -70,4 +71,24 @@ test('disconnect removes pending friend requests in both directions', () => {
   const disconnect = server.slice(server.indexOf("socket.on('disconnect'"));
   assert.match(disconnect, /for \(const key of pendingFriendRequests\.keys\(\)\)/);
   assert.match(disconnect, /pendingFriendRequests\.delete\(key\)/);
+});
+
+test('duel settlement uses frozen character slots and one atomic RPC', () => {
+  const response = server.slice(server.indexOf("socket.on('duel_response'"), server.indexOf("socket.on('duel_hit'"));
+  const helper = server.slice(server.indexOf('async function settleDuelMMR'), server.indexOf('// ============ Periodic Save'));
+  assert.match(response, /aCharacterId: challenger\.characterId/);
+  assert.match(response, /bCharacterId: accepter\.characterId/);
+  assert.match(server, /winnerCharacterId = payload\.winnerUserId === duel\.a/);
+  assert.match(helper, /supabase\.rpc\('settle_duel_mmr'/);
+  assert.doesNotMatch(helper, /\.from\('characters'\)/);
+  assert.match(helper, /data\.ok !== true/);
+});
+
+test('duel settlement migration locks and updates both rows transactionally', () => {
+  assert.match(settlement, /CREATE OR REPLACE FUNCTION public\.settle_duel_mmr/i);
+  assert.match(settlement, /ORDER BY id\s+FOR UPDATE/i);
+  assert.equal((settlement.match(/UPDATE public\.characters/gi) || []).length, 2);
+  assert.match(settlement, /SECURITY DEFINER\s+SET search_path TO ''/i);
+  assert.match(settlement, /REVOKE ALL ON FUNCTION public\.settle_duel_mmr\(text, text\) FROM PUBLIC, anon, authenticated/i);
+  assert.match(settlement, /GRANT EXECUTE ON FUNCTION public\.settle_duel_mmr\(text, text\) TO service_role/i);
 });

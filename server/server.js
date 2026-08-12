@@ -1269,6 +1269,10 @@ io.on('connection', (socket) => {
                 duelId,
                 a: challengerId,      // challenger
                 b: accepter.userId,   // accepter (server-verified)
+                // Freeze the exact server-verified character slots used for
+                // this round; one account can own multiple characters.
+                aCharacterId: challenger.characterId,
+                bCharacterId: accepter.characterId,
                 settled: false,
                 startedAt: Date.now(),
             };
@@ -1356,7 +1360,9 @@ io.on('connection', (socket) => {
         activeDuels.delete(duel.a);
         activeDuels.delete(duel.b);
 
-        const result = await settleDuelMMR(payload.winnerUserId, payload.loserUserId);
+        const winnerCharacterId = payload.winnerUserId === duel.a ? duel.aCharacterId : duel.bCharacterId;
+        const loserCharacterId = payload.loserUserId === duel.a ? duel.aCharacterId : duel.bCharacterId;
+        const result = await settleDuelMMR(winnerCharacterId, loserCharacterId);
         const resultPayload = {
             duelId: duel.duelId,
             winnerUserId: payload.winnerUserId,
@@ -1532,7 +1538,9 @@ io.on('connection', (socket) => {
                 const opponent = duel.a === player.userId ? duel.b : duel.a;
                 activeDuels.delete(duel.a);
                 activeDuels.delete(duel.b);
-                const result = await settleDuelMMR(opponent, player.userId);
+                const winnerCharacterId = opponent === duel.a ? duel.aCharacterId : duel.bCharacterId;
+                const loserCharacterId = player.userId === duel.a ? duel.aCharacterId : duel.bCharacterId;
+                const result = await settleDuelMMR(winnerCharacterId, loserCharacterId);
                 const sid = userSocketMap.get(opponent);
                 if (sid) {
                     io.to(sid).emit('duel_result', {
@@ -1616,37 +1624,23 @@ setInterval(() => {
 // Reads both players' MMR from `characters`, applies Elo, writes back new
 // MMR + win/loss counters. Returns {winnerMmr, loserMmr, delta} or {} when
 // the DB is unavailable.
-async function settleDuelMMR(winnerUserId, loserUserId) {
-    if (!supabase) return {};
+async function settleDuelMMR(winnerCharacterId, loserCharacterId) {
+    if (!supabase || !winnerCharacterId || !loserCharacterId
+        || winnerCharacterId === loserCharacterId) return {};
     try {
-        const { data: rows, error } = await supabase
-            .from('characters')
-            .select('id, user_id, mmr, pvp_wins, pvp_losses')
-            .in('user_id', [winnerUserId, loserUserId]);
-        if (error || !rows || rows.length < 2) {
+        const { data, error } = await supabase.rpc('settle_duel_mmr', {
+            p_winner_character_id: winnerCharacterId,
+            p_loser_character_id: loserCharacterId,
+        });
+        if (error || !data || data.ok !== true) {
             console.error('[Server] ❌ MMR read failed:', error?.message);
             return {};
         }
-        const w = rows.find(r => r.user_id === winnerUserId);
-        const l = rows.find(r => r.user_id === loserUserId);
-        if (!w || !l) return {};
-
-        const wMmr = Number(w.mmr) || 1000;
-        const lMmr = Number(l.mmr) || 1000;
-        const K = 32;
-        const expectedWin = 1 / (1 + Math.pow(10, (lMmr - wMmr) / 400));
-        const delta = Math.max(1, Math.round(K * (1 - expectedWin)));
-
-        const winnerMmr = wMmr + delta;
-        const loserMmr = Math.max(0, lMmr - delta);
-
-        await supabase.from('characters')
-            .update({ mmr: winnerMmr, pvp_wins: (Number(w.pvp_wins) || 0) + 1 })
-            .eq('id', w.id);
-        await supabase.from('characters')
-            .update({ mmr: loserMmr, pvp_losses: (Number(l.pvp_losses) || 0) + 1 })
-            .eq('id', l.id);
-
+        const winnerMmr = Number(data.winnerMmr);
+        const loserMmr = Number(data.loserMmr);
+        const delta = Number(data.delta);
+        if (![winnerMmr, loserMmr, delta].every(Number.isSafeInteger)
+            || winnerMmr < 0 || loserMmr < 0 || delta < 1) return {};
         return { winnerMmr, loserMmr, delta };
     } catch (e) {
         console.error('[Server] ❌ settleDuelMMR failed:', e.message);
