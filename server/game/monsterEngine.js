@@ -25,6 +25,9 @@ const AGGRO_MS = 8000;             // how long a hit keeps a monster hunting
 const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
 const ATTACK_REACH = 1.8;
 const ATTACK_CD_MS = 1300;
+// Longest current player cast range is 10 world units. Keep a small network
+// interpolation allowance without permitting arbitrary off-screen hits.
+const MAX_PLAYER_HIT_RANGE = 12;
 
 let io = null;
 let onlinePlayers = null;          // Map<socketId, playerInfo>
@@ -291,6 +294,12 @@ export function applyHit(player, payload) {
     if (!world) return;
     const m = world.monsters.get(payload.monsterId);
     if (!m || !m.alive) return;
+
+    const pos = player.lastPos;
+    if (!pos || pos.mapId !== mapId || !Number.isFinite(pos.x) || !Number.isFinite(pos.z)) return;
+    const dx = pos.x - m.x;
+    const dz = pos.z - m.z;
+    if (dx * dx + dz * dz > MAX_PLAYER_HIT_RANGE * MAX_PLAYER_HIT_RANGE) return;
 
     const dmg = clampMonsterDamage(player.level || 1, Number(payload.damage) || 0);
     if (dmg <= 0) return;
