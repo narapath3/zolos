@@ -682,8 +682,9 @@ io.on('connection', (socket) => {
     // --- LATENCY PONG --- reply to our periodic srv_ping; RTT = now - echoed ts
     socket.on('srv_pong', (t) => {
         const info = onlinePlayers.get(socket.id);
-        if (!info) return;
-        const rtt = Date.now() - (typeof t === 'number' ? t : Date.now());
+        if (!info || !Number.isFinite(t) || t !== socket._lastServerPingAt) return;
+        socket._lastServerPingAt = null;
+        const rtt = Date.now() - t;
         if (Number.isFinite(rtt) && rtt >= 0 && rtt < 60000) {
             info.ping = Math.round(info.ping == null ? rtt : info.ping * 0.5 + rtt * 0.5);
         }
@@ -691,6 +692,9 @@ io.on('connection', (socket) => {
 
     // --- CLIENT-SIDE PING --- echo timestamp so client can measure its own RTT
     socket.on('client_ping', (t) => {
+        if (!Number.isFinite(t)) return;
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'client_ping', 4, 10000)) return;
         socket.emit('client_pong', t);
     });
 
@@ -1593,7 +1597,10 @@ setInterval(() => {
     const now = Date.now();
     for (const [socketId] of onlinePlayers) {
         const s = io.sockets.sockets.get(socketId);
-        if (s) s.emit('srv_ping', now);
+        if (s) {
+            s._lastServerPingAt = now;
+            s.emit('srv_ping', now);
+        }
     }
     // Delay: give clients ~1.5s to reply with srv_pong before broadcasting
     setTimeout(() => {

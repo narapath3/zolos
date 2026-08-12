@@ -66,6 +66,20 @@ test('latency measurement has a bounded Socket.IO acknowledgement path', async (
     assert.doesNotMatch(srvPing, /cli_pong/);
 });
 
+test('server latency samples require the latest issued challenge and bounded echo cadence', async () => {
+    const server = await readFile(new URL('../server/server.js', import.meta.url), 'utf8');
+    const pong = server.slice(server.indexOf("socket.on('srv_pong'"), server.indexOf('// --- CLIENT-SIDE PING ---'));
+    const echo = server.slice(server.indexOf("socket.on('client_ping'"), server.indexOf('// Socket.io acknowledgement ping'));
+    const scheduler = server.slice(server.indexOf('// ===== Latency (ping) measurement ====='), server.indexOf('// ============ PVP MMR'));
+
+    assert.match(scheduler, /s\._lastServerPingAt = now[\s\S]*s\.emit\('srv_ping', now\)/);
+    assert.match(pong, /!Number\.isFinite\(t\) \|\| t !== socket\._lastServerPingAt/);
+    assert.match(pong, /socket\._lastServerPingAt = null/);
+    assert.match(pong, /const rtt = Date\.now\(\) - t/);
+    assert.match(echo, /!Number\.isFinite\(t\)/);
+    assert.match(echo, /shouldRateLimitEvent\(socket\._rateLimitTracker, 'client_ping', 4, 10000\)/);
+});
+
 test('players can zoom, disable fog, and cannot walk through shop colliders', async () => {
     const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
     const ui = await readFile(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
