@@ -18,10 +18,22 @@ test('player death clears server-authoritative monster aggro before announcement
     const engine = await readFile(new URL('../server/game/monsterEngine.js', import.meta.url), 'utf8');
 
     const handler = server.slice(server.indexOf("socket.on('player_dead'"), server.indexOf('// --- DISCONNECT ---'));
-    assert.ok(handler.indexOf('clearAggroForCharacter(player.characterId)') < handler.indexOf('if (!payload || !payload.monsterName) return'));
+    assert.match(handler, /trustedSender\(socket\)/);
+    assert.ok(handler.indexOf("shouldRateLimitEvent(socket._rateLimitTracker, 'player_dead', 2, 10000)") < handler.indexOf('clearAggroForCharacter(player.characterId)'));
+    assert.ok(handler.indexOf('clearAggroForCharacter(player.characterId)') < handler.indexOf("isBoundedString(payload?.monsterName, 80)"));
+    assert.match(handler, /const monsterName = payload\.monsterName\.trim\(\)/);
     assert.match(engine, /export function clearAggroForCharacter\(characterId\)/);
     assert.match(engine, /monster\.aggroChar = null/);
     assert.match(engine, /monster\.targetX = monster\.spawnX/);
+});
+
+test('stall refresh pings require an authenticated character and are rate limited', async () => {
+    const server = await readFile(new URL('../server/server.js', import.meta.url), 'utf8');
+    const handler = server.slice(server.indexOf("socket.on('stall_change'"), server.indexOf('// --- ADMIN ANNOUNCEMENT ---'));
+
+    assert.match(handler, /const player = trustedSender\(socket\)/);
+    assert.match(handler, /!player\?\.verified \|\| !player\.characterId/);
+    assert.ok(handler.indexOf("shouldRateLimitEvent(socket._rateLimitTracker, 'stall_change', 4, 10000)") < handler.indexOf("io.emit('stalls_update')"));
 });
 
 test('players can zoom, disable fog, and cannot walk through shop colliders', async () => {

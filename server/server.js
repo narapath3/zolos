@@ -1299,6 +1299,9 @@ io.on('connection', (socket) => {
     // A stall opened/closed anywhere → everyone refreshes their stall view
     // (the stall data itself lives in Supabase; this is just the change ping).
     socket.on('stall_change', () => {
+        const player = trustedSender(socket);
+        if (!player?.verified || !player.characterId) return;
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'stall_change', 4, 10000)) return;
         io.emit('stalls_update');
     });
 
@@ -1341,20 +1344,27 @@ io.on('connection', (socket) => {
 
     // --- PLAYER DEATH ANNOUNCEMENT ---
     socket.on('player_dead', (payload) => {
-        const player = onlinePlayers.get(socket.id);
+        const player = trustedSender(socket);
         if (!player) return;
+
+        // A death transition is rare. Rate-limit before touching aggro so a
+        // modified client cannot repeatedly erase an active monster target or
+        // flood the map announcement channel.
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'player_dead', 2, 10000)) return;
 
         // A dead/respawning player must never remain a valid server-authoritative
         // monster target. Clear this before handling the optional announcement so
         // malformed/older clients cannot accidentally keep aggro alive.
         clearAggroForCharacter(player.characterId);
 
-        if (!payload || !payload.monsterName) return;
+        if (!isBoundedString(payload?.monsterName, 80)) return;
+        const monsterName = payload.monsterName.trim();
+        if (!monsterName) return;
 
         // Only announce if player was above level 5
         if (player.level > 5) {
             const mapId = player.mapId || 'prontera_field';
-            const message = `ผู้เล่น [${player.username}] ถูก [${payload.monsterName}] สังหาร!`;
+            const message = `ผู้เล่น [${player.username}] ถูก [${monsterName}] สังหาร!`;
 
             io.to(`map:${mapId}`).emit('chat', {
                 userId: 'system',
