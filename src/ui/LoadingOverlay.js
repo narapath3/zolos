@@ -20,6 +20,7 @@ export class LoadingOverlay {
         this._particles = [];
         this._tipsIndex = 0;
         this._tipInterval = null;
+        this._hideTimeout = null;
         this._isVisible = false;
         this._audioCtx = null;
 
@@ -237,6 +238,10 @@ export class LoadingOverlay {
     }
 
     show() {
+        clearTimeout(this._hideTimeout);
+        this._hideTimeout = null;
+        if (this._animationFrame) cancelAnimationFrame(this._animationFrame);
+        this._animationFrame = null;
         this._isVisible = true;
         this.overlayEl.style.display = 'flex';
         this.overlayEl.classList.remove('fade-out-warp');
@@ -296,6 +301,7 @@ export class LoadingOverlay {
 
         this._isVisible = false;
         if (this._animationFrame) cancelAnimationFrame(this._animationFrame);
+        this._animationFrame = null;
         if (this._tipInterval) {
             clearInterval(this._tipInterval);
             this._tipInterval = null;
@@ -304,9 +310,12 @@ export class LoadingOverlay {
         // Trigger spectacular portal transition warp animation
         this.overlayEl.classList.add('fade-out-warp');
 
-        setTimeout(() => {
+        clearTimeout(this._hideTimeout);
+        this._hideTimeout = setTimeout(() => {
+            if (this._isVisible) return;
             this.overlayEl.style.display = 'none';
             this.overlayEl.classList.remove('active', 'fade-out-warp');
+            this._hideTimeout = null;
         }, 900);
     }
 }
