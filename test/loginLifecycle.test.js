@@ -30,6 +30,14 @@ test('AuthUI show restores the online-count subscription', async () => {
   assert.match(showMethod, /this\._subscribeOnlineCount\(\)/);
 });
 
+test('AuthUI cancels an old BGM fade before showing the login screen again', async () => {
+  const source = await readFile(new URL('../src/ui/AuthUI.js', import.meta.url), 'utf8');
+  assert.match(source, /this\._bgmFadeInterval\s*=\s*null/);
+  assert.match(source, /_fadeOutBGM\(\)\s*\{[\s\S]*clearInterval\(this\._bgmFadeInterval\)/);
+  assert.match(source, /show\(\)\s*\{\s*clearInterval\(this\._bgmFadeInterval\)/);
+  assert.match(source, /_setupBGMAutoplay\(\)\s*\{\s*this\._removeAutoplayListeners\(\)/);
+});
+
 test('login stylesheet does not request the missing epic background', async () => {
   const source = await readFile(new URL('../src/styles/login-new.css', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /login_bg_epic\.png/);

@@ -19,6 +19,7 @@ export class AuthUI {
         this._bgmPlayed = false;
         this._bgmMuted = false;
         this._autoplayTrigger = null;
+        this._bgmFadeInterval = null;
 
         // The live game-model MV follows the real soundtrack timeline.
         this._bgCanvas = new LoginShowcase3D('auth-bg-canvas');
@@ -674,6 +675,7 @@ export class AuthUI {
     }
 
     _setupBGMAutoplay() {
+        this._removeAutoplayListeners();
         const playAttempt = () => {
             if (this._bgmPlayed) return;
             this._bgm.play().then(() => {
@@ -705,15 +707,18 @@ export class AuthUI {
 
     _fadeOutBGM() {
         if (!this._bgm) return;
+        clearInterval(this._bgmFadeInterval);
+        this._bgmFadeInterval = null;
 
         const fadeInterval = 50; // ms
         const fadeDuration = 500; // ms
         const steps = fadeDuration / fadeInterval;
         const volumeStep = this._bgm.volume / steps;
 
-        const fade = setInterval(() => {
+        this._bgmFadeInterval = setInterval(() => {
             if (!this._bgm) {
-                clearInterval(fade);
+                clearInterval(this._bgmFadeInterval);
+                this._bgmFadeInterval = null;
                 return;
             }
             if (this._bgm.volume > volumeStep) {
@@ -721,7 +726,8 @@ export class AuthUI {
             } else {
                 this._bgm.volume = 0;
                 this._bgm.pause();
-                clearInterval(fade);
+                clearInterval(this._bgmFadeInterval);
+                this._bgmFadeInterval = null;
             }
         }, fadeInterval);
     }
@@ -781,6 +787,8 @@ export class AuthUI {
     }
 
     show() {
+        clearInterval(this._bgmFadeInterval);
+        this._bgmFadeInterval = null;
         this.screen.style.display = 'flex';
         this._subscribeOnlineCount();
         if (this._bgCanvas) {
