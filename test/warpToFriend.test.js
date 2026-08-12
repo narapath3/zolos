@@ -11,6 +11,7 @@ const gameSyncSource = readFileSync(
     'utf8',
 );
 const gameUISource = readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+const serverSource = readFileSync(new URL('../server/server.js', import.meta.url), 'utf8');
 
 test('sendWarpRequest supports simulation in offline mode', () => {
     // Verify that sendWarpRequest checks isOfflineMode and has a mockPlayers check code path.
@@ -61,5 +62,20 @@ test('warp-to-friend uses correlated live server coordinates', () => {
     assert.match(mainSource, /payload\.requestId !== this\._pending\.requestId/);
     assert.match(gameUISource, /sendWarpRequest\(target\.userId \|\| target\.username\)/);
     assert.doesNotMatch(gameUISource.slice(gameUISource.indexOf('// Warp-to-friend from profile popup'), gameUISource.indexOf('// PVP duel challenge from profile popup')), /this\._doWarp\(targetMap\)/);
+});
+
+test('server commits warp room, map and trusted position atomically', () => {
+    const start = serverSource.indexOf("socket.on('warp_request'");
+    const end = serverSource.indexOf('// ============ PVP DUEL SYSTEM', start);
+    const warp = serverSource.slice(start, end);
+    assert.match(warp, /const oldMapId = requester\.mapId/);
+    assert.match(warp, /socket\.leave\(`map:\$\{oldMapId\}`\)/);
+    assert.match(warp, /requester\.mapId = targetMapId/);
+    assert.match(warp, /socket\.join\(`map:\$\{targetMapId\}`\)/);
+    const transition = warp.indexOf('requester.mapId = targetMapId');
+    const successEmit = warp.indexOf("socket.emit('warp_result'", transition);
+    assert.ok(transition >= 0 && successEmit > transition);
+    assert.match(warp, /requester\.lastPos = \{[\s\S]*mapId: targetMapId/);
+    assert.match(warp, /broadcastPlayerList\(oldMapId\)[\s\S]*broadcastPlayerList\(targetMapId\)/);
 });
 

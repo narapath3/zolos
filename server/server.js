@@ -1070,6 +1070,15 @@ io.on('connection', (socket) => {
         // safe spawn defaults so the warp never stalls with null coords.
         const hasCoords = pos && Number.isFinite(pos.x) && Number.isFinite(pos.z)
             && (pos.y === undefined || Number.isFinite(pos.y));
+        // Commit the trusted map transition before acknowledging the warp. This
+        // keeps room membership, mapId, and lastPos atomic instead of relying
+        // on a later client update_presence packet that may be delayed/dropped.
+        const oldMapId = requester.mapId;
+        if (oldMapId !== targetMapId) {
+            socket.leave(`map:${oldMapId}`);
+            requester.mapId = targetMapId;
+            socket.join(`map:${targetMapId}`);
+        }
         console.log(`[Server] 🌀 [Warp DEBUG] Target coords: hasCoords=${hasCoords}, lastPos=${JSON.stringify(pos)}`);
 
         socket.emit('warp_result', {
@@ -1090,6 +1099,10 @@ io.on('connection', (socket) => {
             teleported: true,
         };
         requester.lastPosTime = Date.now();
+        if (oldMapId !== targetMapId) {
+            broadcastPlayerList(oldMapId);
+            broadcastPlayerList(targetMapId);
+        }
         console.log(`[Server] 🌀 Warp: ${requester.username} → ${target.username} (map: ${targetMapId}, coords: ${hasCoords ? 'live' : 'default'})`);
         console.log(`[Server] 🌀 [Warp DEBUG] warp_result emitted to requester ${requester.username}`);
     });
