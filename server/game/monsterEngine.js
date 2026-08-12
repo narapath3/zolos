@@ -46,6 +46,17 @@ const inArena = (mapId, x, z) => {
     const dx = x - (-14), dz = z - 14;
     return dx * dx + dz * dz < 7.5 * 7.5;
 };
+const environmentAt = (mapId, x, z) => {
+    if (isWaterAt(x, z)) return 'water';
+    if (x < -6 && z < -6) return 'cave';
+    if (x > 6 && z > 6) return 'mountain';
+    return 'ground';
+};
+function canMonsterOccupy(m, mapId, x, z, def) {
+    if (!Number.isFinite(x) || !Number.isFinite(z) || inArena(mapId, x, z)) return false;
+    const required = m.isWater ? 'water' : (def?.environment || 'ground');
+    return environmentAt(mapId, x, z) === required;
+}
 function pickLandPos(mapId, environment = 'ground') {
     for (let i = 0; i < 60; i++) {
         let x, z;
@@ -178,9 +189,18 @@ function stepMonster(m, mapId, now, dtSec) {
             const dx = pp.x - m.x, dz = pp.z - m.z;
             const dist = Math.hypot(dx, dz) || 0.001;
             if (dist > ATTACK_REACH) {
-                const step = (speed + 1.4) * 1.5 * dtSec;
-                m.x += (dx / dist) * step;
-                m.z += (dz / dist) * step;
+                const step = Math.min(dist, (speed + 1.4) * 1.5 * dtSec);
+                const nextX = m.x + (dx / dist) * step;
+                const nextZ = m.z + (dz / dist) * step;
+                if (canMonsterOccupy(m, mapId, nextX, nextZ, def)) {
+                    m.x = nextX;
+                    m.z = nextZ;
+                } else {
+                    m.aggroChar = null;
+                    m.aggroUntil = 0;
+                    m.targetX = m.spawnX;
+                    m.targetZ = m.spawnZ;
+                }
             } else if (now >= m.atkReadyAt) {
                 m.atkReadyAt = now + ATTACK_CD_MS;
                 const sock = socketForChar(m.aggroChar);
@@ -199,7 +219,7 @@ function stepMonster(m, mapId, now, dtSec) {
         const d = Math.random() * WANDER_RADIUS;
         let tx = m.spawnX + Math.cos(a) * d;
         let tz = m.spawnZ + Math.sin(a) * d;
-        if (!m.isWater && inArena(mapId, tx, tz)) { tx = m.spawnX; tz = m.spawnZ; }
+        if (!canMonsterOccupy(m, mapId, tx, tz, def)) { tx = m.spawnX; tz = m.spawnZ; }
         const roamRange = mapId === 'prontera' ? PRONTERA_SPAWN_RANGE : SPAWN_RANGE;
         m.targetX = Math.max(-roamRange, Math.min(roamRange, tx));
         m.targetZ = Math.max(-roamRange, Math.min(roamRange, tz));
@@ -207,9 +227,16 @@ function stepMonster(m, mapId, now, dtSec) {
     const dx = m.targetX - m.x, dz = m.targetZ - m.z;
     const dist = Math.hypot(dx, dz);
     if (dist > 0.15) {
-        const step = speed * dtSec * 1.25;
-        m.x += (dx / dist) * step;
-        m.z += (dz / dist) * step;
+        const step = Math.min(dist, speed * dtSec * 1.25);
+        const nextX = m.x + (dx / dist) * step;
+        const nextZ = m.z + (dz / dist) * step;
+        if (!canMonsterOccupy(m, mapId, nextX, nextZ, def)) {
+            m.targetX = m.spawnX;
+            m.targetZ = m.spawnZ;
+            return;
+        }
+        m.x = nextX;
+        m.z = nextZ;
         m.rot = Math.atan2(dx, dz);
     }
 }
