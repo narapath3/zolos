@@ -6,6 +6,10 @@
 
 import { getSocket, isSocketConnected } from './SocketClient.js';
 
+let listenerSocket = null;
+let announcementHandler = null;
+let broadcastHandler = null;
+
 /**
  * Broadcast an announcement to all players via Socket.io
  * @param {string} text - Announcement text
@@ -47,21 +51,26 @@ export function setupAnnouncementListeners(onAnnouncementReceived) {
     return;
   }
 
+  removeAnnouncementListeners();
+  listenerSocket = socket;
+
   // Listen for announcements from other admins
-  socket.on('admin:announcement', (data) => {
+  announcementHandler = (data) => {
     console.log('[AnnouncementSync] 📢 Received announcement:', data.text);
     if (onAnnouncementReceived) {
       onAnnouncementReceived(data);
     }
-  });
+  };
+  socket.on('admin:announcement', announcementHandler);
 
   // Listen for admin broadcast channel
-  socket.on('announcement:broadcast', (data) => {
+  broadcastHandler = (data) => {
     console.log('[AnnouncementSync] 📢 Broadcast announcement:', data.text);
     if (onAnnouncementReceived) {
       onAnnouncementReceived(data);
     }
-  });
+  };
+  socket.on('announcement:broadcast', broadcastHandler);
 
   console.log('[AnnouncementSync] ✅ Announcement listeners setup');
 }
@@ -70,10 +79,12 @@ export function setupAnnouncementListeners(onAnnouncementReceived) {
  * Remove announcement listeners
  */
 export function removeAnnouncementListeners() {
-  const socket = getSocket();
-  if (!socket) return;
+  if (!listenerSocket) return;
 
-  socket.off('admin:announcement');
-  socket.off('announcement:broadcast');
+  if (announcementHandler) listenerSocket.off('admin:announcement', announcementHandler);
+  if (broadcastHandler) listenerSocket.off('announcement:broadcast', broadcastHandler);
+  listenerSocket = null;
+  announcementHandler = null;
+  broadcastHandler = null;
   console.log('[AnnouncementSync] Announcement listeners removed');
 }

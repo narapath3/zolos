@@ -751,6 +751,21 @@ async function initGame(charData) {
     window.updatePresence = updatePresence;
     window.broadcastPosition = broadcastPosition;
 
+    // Bind once for this socket lifecycle. Binding from players_update used to
+    // add another callback whenever the roster changed, duplicating broadcasts.
+    try {
+        const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
+        setupAnnouncementListeners((announcementData) => {
+            window.announcementSystem?.addAnnouncement(
+                announcementData.text,
+                announcementData.type || 'info',
+                announcementData.duration || 8000
+            );
+        });
+    } catch (err) {
+        console.warn('[Zolos] Failed to setup announcement listeners:', err);
+    }
+
     // Build the World Boss HUD (countdown, HP bar, summary board)
     initBossUI();
 
@@ -1018,21 +1033,6 @@ async function initGame(charData) {
                 }
             });
 
-            // Setup announcement listeners for Socket.io broadcasts (after socket is connected)
-            try {
-                const { setupAnnouncementListeners } = await import('./network/AnnouncementSync.js');
-                setupAnnouncementListeners((announcementData) => {
-                    if (window.announcementSystem) {
-                        window.announcementSystem.addAnnouncement(
-                            announcementData.text,
-                            announcementData.type || 'info',
-                            announcementData.duration || 8000
-                        );
-                    }
-                });
-            } catch (err) {
-                console.warn('[Zolos] Failed to setup announcement listeners:', err);
-            }
         },
         (p) => {
             // Handle remote player position updates
