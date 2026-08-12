@@ -31,6 +31,17 @@ test('GameUI owns global HUD and chat listeners across teardown', () => {
   assert.match(source, /if \(window\.gameUI === this\) window\.gameUI = null/);
 });
 
+test('stale network checks cannot update a replacement GameUI after await', () => {
+  assert.match(source, /this\._lifecycleGeneration\s*=\s*0/);
+  assert.match(source, /this\._destroyed\s*=\s*false/);
+  assert.match(source, /const generation = this\._lifecycleGeneration/);
+  assert.match(source, /const isCurrent = \(\) => !this\._destroyed && generation === this\._lifecycleGeneration/);
+  assert.ok((source.match(/if \(!isCurrent\(\)\) return;/g) || []).length >= 3);
+  const destroy = source.match(/destroy\(\)\s*\{([\s\S]*?)\n\s*\}/)?.[1] || '';
+  assert.match(destroy, /if \(this\._destroyed\) return/);
+  assert.match(destroy, /this\._lifecycleGeneration\+\+/);
+});
+
 test('pet boutique cancels animation frames and releases its WebGL resources', () => {
   assert.match(source, /this\._petViewer\?\.destroy\?\.\(\)/);
   assert.match(petPreviewSource, /this\.animationFrameId\s*=\s*requestAnimationFrame\(this\._loop\)/);

@@ -54,6 +54,8 @@ export class GameUI {
     this.combatSystem = combatSystem;
     this.particles = null;
     this._globalListenerRemovers = [];
+    this._lifecycleGeneration = 0;
+    this._destroyed = false;
 
     this.currentTab = 'all';
     this.selectedItemName = null;
@@ -135,15 +137,19 @@ export class GameUI {
   }
 
   async updateNetworkStatus() {
-    if (!this.networkDot || !this.networkText || this._networkStatusInFlight) return;
+    if (this._destroyed || !this.networkDot || !this.networkText || this._networkStatusInFlight) return;
+    const generation = this._lifecycleGeneration;
+    const isCurrent = () => !this._destroyed && generation === this._lifecycleGeneration;
     this._networkStatusInFlight = true;
     try {
 
     const { isSocketConnected, isSocketMode } = await import('../network/SocketClient.js');
+    if (!isCurrent()) return;
     const connected = isSocketConnected();
     const socketMode = isSocketMode();
 
     const { isOfflineMode } = await import('../network/SupabaseClient.js');
+    if (!isCurrent()) return;
 
     if (!socketMode) {
       this.networkDot.style.background = isOfflineMode ? '#888' : '#40a0ff';
@@ -155,6 +161,7 @@ export class GameUI {
       let ping = this.myPing;
       try {
         const { getClientPing } = await import('../network/GameSync.js');
+        if (!isCurrent()) return;
         const cp = getClientPing();
         if (cp != null) {
           ping = cp;
@@ -307,6 +314,9 @@ export class GameUI {
   }
 
   destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    this._lifecycleGeneration++;
     this._mobileControlCleanup?.();
     for (const remove of this._globalListenerRemovers.splice(0)) remove();
     this.cardAlbum?.destroy();
