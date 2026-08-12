@@ -1853,7 +1853,7 @@ window.duelManager = {
         // Raise the cage — players are locked inside until the duel ends
         if (sceneManager && sceneManager.showArenaCage) sceneManager.showArenaCage();
 
-        duelState = { duelId: payload.duelId, opponentUserId: foe.userId, cooldown: 1.0 };
+        duelState = { duelId: payload.duelId, opponentUserId: foe.userId, cooldown: 1.0, defeatReported: false };
         window.duelState = duelState;
 
         // A duel uses a cinematic two-fighter camera, so drop out of first-person
@@ -1873,7 +1873,8 @@ window.duelManager = {
     },
 
     onDuelHit(payload) {
-        if (!duelState || !payload || !character || payload.duelId !== duelState.duelId) return;
+        if (!duelState || duelState.defeatReported || !payload || !character
+            || payload.duelId !== duelState.duelId || !character.isAlive()) return;
         const dmg = Number(payload.damage);
         if (!Number.isFinite(dmg) || dmg <= 0 || dmg > 5000) return;
         const actual = character.takeDamage(dmg);
@@ -1887,8 +1888,10 @@ window.duelManager = {
 
         // I died → report defeat; server settles MMR and notifies both sides
         if (!character.isAlive()) {
+            duelState.defeatReported = true;
+            const defeatedDuel = duelState;
             import('./network/GameSync.js').then(({ reportDuelEnd }) => {
-                reportDuelEnd(payload.attackerUserId || duelState.opponentUserId, userId);
+                reportDuelEnd(payload.attackerUserId || defeatedDuel.opponentUserId, userId);
             });
         }
     },

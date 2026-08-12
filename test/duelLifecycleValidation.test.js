@@ -22,6 +22,17 @@ test('client ignores stale duel hits and results from another round', () => {
   assert.match(main, /!Number\.isFinite\(dmg\) \|\| dmg <= 0 \|\| dmg > 5000/);
 });
 
+test('client reports one defeat and ignores queued hits while settlement is pending', () => {
+  const start = main.slice(main.indexOf('onDuelStart(payload)'), main.indexOf('onDuelResult(payload)'));
+  assert.match(start, /defeatReported: false/);
+  assert.match(start, /duelState\.defeatReported \|\| !payload/);
+  assert.match(start, /!character\.isAlive\(\)\) return/);
+  assert.match(start, /duelState\.defeatReported = true/);
+  assert.match(start, /const defeatedDuel = duelState/);
+  assert.match(start, /reportDuelEnd\(payload\.attackerUserId \|\| defeatedDuel\.opponentUserId, userId\)/);
+  assert.equal((start.match(/reportDuelEnd\(/g) || []).length, 1);
+});
+
 test('duel hit packets carry the encounter ID and exact recipient end to end', () => {
   assert.match(sync, /sendDuelHit\(duelId, targetUserId, damage, critical = false\)/);
   const sender = sync.slice(sync.indexOf('export function sendDuelHit'), sync.indexOf('export function reportDuelEnd'));
