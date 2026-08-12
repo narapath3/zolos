@@ -8370,6 +8370,28 @@ export class GameUI {
       window.dispatchEvent(event);
     };
 
+    const resetMovementInput = () => {
+      const inputManager = this.character ? this.character.inputManager : null;
+      if (inputManager) inputManager.setJoystickInput(0, 0);
+      for (const key of Object.keys(activeKeys)) triggerKeyEvent(key, false);
+    };
+
+    // Mobile browsers synthesize a click after touchstart. Run an action once
+    // immediately on touch and suppress only that follow-up click.
+    const bindTouchAction = (button, action) => {
+      let lastTouchAt = 0;
+      button.addEventListener('touchstart', event => {
+        event.preventDefault();
+        lastTouchAt = performance.now();
+        action();
+      }, { passive: false });
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        if (performance.now() - lastTouchAt < 700) return;
+        action();
+      });
+    };
+
     // Show joystick at a specific position
     const showJoystickAt = (x, y) => {
       const size = container.offsetWidth || 130;
@@ -8403,8 +8425,7 @@ export class GameUI {
         joystickTouchId = null;
         knob.style.transform = 'translate(0px, 0px)';
         hideJoystick();
-        const inputManager = this.character ? this.character.inputManager : null;
-        if (inputManager) inputManager.setJoystickInput(0, 0);
+        resetMovementInput();
         e.preventDefault();
         return;
       }
@@ -8467,7 +8488,7 @@ export class GameUI {
       if (window.__zolosPinching) {
         if (e.touches && e.touches.length >= 2 && pinchStartDistance > 0) {
           const distance = getPinchDistance(e.touches);
-          window.sceneManager?.setCameraZoom?.(pinchStartZoom * pinchStartDistance / distance);
+          if (distance > 0) window.sceneManager?.setCameraZoom?.(pinchStartZoom * pinchStartDistance / distance);
         }
         e.preventDefault();
         return;
@@ -8561,7 +8582,7 @@ export class GameUI {
 
       // Tap detection (both halves): a short tap with little movement acts on
       // the world — targeting a monster, talking to an NPC, mining ore, etc.
-      if (duration < 250 && distance < 15) {
+      if (e.type !== 'touchcancel' && duration < 250 && distance < 15) {
         if (window.handleCanvasTap) {
           window.handleCanvasTap({
             clientX: touch.clientX,
@@ -8624,14 +8645,7 @@ export class GameUI {
         window.dispatchEvent(event);
       };
 
-      sprintBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        toggleSprint();
-      });
-      sprintBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        toggleSprint();
-      });
+      bindTouchAction(sprintBtn, toggleSprint);
     }
 
     // Target/Attack Button logic
@@ -8657,14 +8671,7 @@ export class GameUI {
         }
       };
 
-      attackBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        triggerAttack();
-      });
-      attackBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        triggerAttack();
-      });
+      bindTouchAction(attackBtn, triggerAttack);
     }
 
     // Skill buttons touch and click triggers. Bound by SLOT, resolving the skill
@@ -8672,14 +8679,7 @@ export class GameUI {
     [0, 1, 2].forEach((index) => {
       const btn = document.getElementById(`btn-mobile-skill-${index + 1}`);
       if (btn) {
-        btn.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          this.castSkillSlot(index);
-        });
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          this.castSkillSlot(index);
-        });
+        bindTouchAction(btn, () => this.castSkillSlot(index));
       }
     });
   }
