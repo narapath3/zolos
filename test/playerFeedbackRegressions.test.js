@@ -54,7 +54,7 @@ test('vending street leaves a walkable aisle between every pair of stalls', asyn
 test('all four town services use detailed role-specific NPC models', async () => {
     const scene = await readFile(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
 
-    assert.match(scene, /_buildPremiumShopkeeper\(role\)/);
+    assert.match(scene, /_buildPremiumShopkeeper\(role, appearance = null\)/);
     for (const role of ['merchant', 'appraiser', 'smith', 'keeper']) {
         assert.match(scene, new RegExp(`_buildPremiumShopkeeper\\('${role}'\\)`));
     }
@@ -88,6 +88,21 @@ test('hero hair and furry creatures use tapered strand detail without global fur
     assert.match(monsters, /const furClumps =/);
     for (const type of ['lunatic', 'bigfoot', 'nine_tail', 'savage']) assert.match(monsters, new RegExp(`type === '${type}'`));
     assert.doesNotMatch(pets, /furColors = \{[^}]*poring/);
+});
+
+test('remaining boxy vendors and elite monsters receive professional sculpt passes', async () => {
+    const scene = await readFile(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+    const anatomy = await readFile(new URL('../src/engine/MonsterAnatomy.js', import.meta.url), 'utf8');
+    const monsters = await readFile(new URL('../src/engine/MonsterManager.js', import.meta.url), 'utf8');
+
+    assert.match(scene, /_buildPremiumShopkeeper\('merchant', app\)/);
+    assert.match(scene, /vendor\.visible = false/);
+    assert.match(anatomy, /export function addEliteSculptDetails/);
+    assert.match(anatomy, /userData\.eliteSculpt = true/);
+    assert.match(monsters, /addEliteSculptDetails/);
+    for (const family of ['skeleton', 'raydric', 'harpy', 'gargoyle', 'storm_dragon', 'abyss_knight']) {
+        assert.match(anatomy, new RegExp(family));
+    }
 });
 
 test('priest cooldowns remain per-skill and respawn restores the owner mesh', async () => {

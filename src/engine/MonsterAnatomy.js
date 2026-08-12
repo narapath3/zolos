@@ -376,3 +376,89 @@ export function addSpeciesArtDetails({ THREE, type, size, bodyMesh, bodyMat, cre
 
   return parts;
 }
+
+// Sculptural finish for the hand-built mid/high-tier roster. Their gameplay
+// identity was sound, but broad rectangular torsos and flat wing slabs still
+// exposed the primitive construction. These layered forms add anatomical
+// joints, bevel-like armour masses, feathers/membranes and species emblems.
+export function addEliteSculptDetails({ THREE, type, size, bodyMat, createMat, put }) {
+  const elite = new Set(['skeleton','archer_skeleton','zombie','raydric','hunter_fly','dullahan','golem','stone_golem','harpy','gargoyle','iron_golem','storm_dragon','dragon_egg','sea_dragon','leib_olmai','dark_illusion','abyss_knight']);
+  if (!elite.has(type)) return [];
+  const parts = [];
+  const color = bodyMat?.color || new THREE.Color(0xffffff);
+  const light = new THREE.Color(color).offsetHSL(.01, -.04, .18);
+  const dark = new THREE.Color(color).offsetHSL(-.01, .03, -.24);
+  const skin = createMat(light, .62, .08);
+  const joint = createMat(dark, .7, .18);
+  const metal = createMat(light, .28, .72);
+  const add = (geo, mat, x, y, z, rot) => { const m = put(geo, mat, x, y, z, rot); m.userData.eliteSculpt = true; parts.push(m); return m; };
+  const sph = (r, w = 12, h = 9) => new THREE.SphereGeometry(r * size, w, h);
+  const cap = (r, len) => new THREE.CapsuleGeometry(r * size, len * size, 5, 9);
+  const cone = (r, h, sides = 7) => new THREE.ConeGeometry(r * size, h * size, sides);
+
+  if (type === 'skeleton' || type === 'archer_skeleton') {
+    add(sph(.22), skin, 0, .46, .01).scale.set(1, .9, .86);
+    for (let i = 0; i < 4; i++) {
+      const y = .22 - i * .095;
+      [-1, 1].forEach(side => add(cap(.018, .26 - i * .025), skin, side * (.11 + i * .012), y, .09, [Math.PI / 2, 0, side * .88]));
+    }
+    [-1, 1].forEach(side => add(sph(.075, 8, 6), joint, side * .27, .15, 0));
+  } else if (type === 'zombie' || type === 'leib_olmai') {
+    add(new THREE.CapsuleGeometry(.27 * size, .34 * size, 6, 10), skin, 0, .08, -.02);
+    [-1, 1].forEach(side => {
+      add(sph(.13), skin, side * .26, .2, .01);
+      for (let i = 0; i < 5; i++) add(cone(.018, .13, 5), joint, side * (.11 + i * .035), .55 + (i % 2) * .035, .12, [0, 0, side * (.3 + i * .08)]);
+    });
+  } else if (['raydric','dullahan','abyss_knight','iron_golem'].includes(type)) {
+    const plate = add(new THREE.SphereGeometry(.38 * size, 12, 8), metal, 0, .16, .01);
+    plate.scale.set(1.15, .92, .75);
+    [-1, 1].forEach(side => {
+      const pauldron = add(sph(.19), metal, side * .38, .38, 0); pauldron.scale.set(1.28, .62, 1);
+      add(new THREE.TorusGeometry(.12 * size, .025 * size, 6, 14), joint, side * .16, -.18, .02, [Math.PI / 2, 0, 0]);
+    });
+    const crest = add(cone(.09, .34, 6), type === 'abyss_knight' ? createMat(0x8d1747, .5, .4) : joint, 0, .88, -.04);
+    crest.rotation.x = -.18;
+  } else if (type === 'golem' || type === 'stone_golem') {
+    [-1, 1].forEach(side => {
+      const shoulder = add(new THREE.DodecahedronGeometry(.22 * size, 0), skin, side * .4, .32, 0);
+      shoulder.scale.set(1.2, .82, 1);
+      add(new THREE.DodecahedronGeometry(.18 * size, 0), joint, side * .17, -.28, .01);
+    });
+    for (let i = -2; i <= 2; i++) add(cone(.035, .18 + Math.abs(i) * .025, 5), joint, i * .12, .61, -.05, [0, 0, i * .12]);
+  } else if (type === 'harpy') {
+    [-1, 1].forEach(side => {
+      for (let i = 0; i < 6; i++) {
+        const feather = add(cone(.07 - i * .005, .48 - i * .035, 6), skin, side * (.28 + i * .07), .28 - i * .045, -.08, [0, 0, side * (.72 + i * .06)]);
+        feather.scale.z = .35;
+      }
+      for (let i = -1; i <= 1; i++) add(cone(.018, .16, 5), joint, side * (.08 + i * .025), -.53, .14, [Math.PI / 2, 0, side * .1]);
+    });
+  } else if (type === 'hunter_fly') {
+    const wingMat = createMat(0xbfeaff, .12, .08, true, .42);
+    [-1, 1].forEach(side => [-1, 1].forEach(back => {
+      const wing = add(new THREE.SphereGeometry(.25 * size, 12, 7), wingMat, side * .3, .31, back * .16, [0, side * .55, side * -.25]);
+      wing.scale.set(1.7, .14, .68);
+      for (let i = 0; i < 3; i++) add(cap(.008, .34), joint, side * (.22 + i * .07), .30, back * .16, [Math.PI / 2, side * .4, side * .5]);
+    }));
+  } else if (type === 'gargoyle' || type === 'storm_dragon' || type === 'sea_dragon') {
+    [-1, 1].forEach(side => {
+      const shoulder = add(sph(.17), skin, side * .32, .26, -.08); shoulder.scale.set(1.15, .75, 1);
+      for (let i = 0; i < 4; i++) {
+        const rib = add(cone(.055, .48 - i * .06, 5), skin, side * (.36 + i * .09), .22 - i * .06, -.16, [0, 0, side * (.75 + i * .08)]);
+        rib.scale.z = .32;
+      }
+    });
+    for (let i = 0; i < 5; i++) add(cone(.045, .18 + i * .025, 6), joint, 0, .55 - i * .10, -.18 - i * .13, [.75, 0, 0]);
+  } else if (type === 'dragon_egg') {
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2;
+      add(new THREE.OctahedronGeometry(.055 * size, 0), metal, Math.cos(a) * .34, .08 + Math.sin(a) * .28, .34);
+    }
+  } else if (type === 'dark_illusion') {
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      add(cone(.045, .46 - (i % 2) * .08, 6), joint, Math.cos(a) * .32, .12 + Math.sin(a) * .18, -.06, [0, 0, -a]);
+    }
+  }
+  return parts;
+}

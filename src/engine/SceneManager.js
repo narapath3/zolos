@@ -4221,7 +4221,7 @@ export class SceneManager {
     // Detailed RO-inspired shopkeepers shared by the town services. Rounded
     // anatomy, layered hair/clothes and role-specific equipment keep them from
     // reading as the old stack of primitive boxes while remaining lightweight.
-    _buildPremiumShopkeeper(role) {
+    _buildPremiumShopkeeper(role, appearance = null) {
         const root = new THREE.Group();
         root.name = `premium_${role}_npc`;
         root.userData.npcModelRole = role;
@@ -4231,7 +4231,9 @@ export class SceneManager {
             smith: { coat: 0x743b2d, trim: 0x34343c, hair: 0x2c211d, accent: 0xe06c32 },
             keeper: { coat: 0xb44c79, trim: 0xffe5b1, hair: 0x7b3c67, accent: 0x65cda8 },
         };
-        const p = palettes[role] || palettes.merchant;
+        const p = { ...(palettes[role] || palettes.merchant) };
+        if (appearance?.bodyColor != null) p.coat = appearance.bodyColor;
+        if (appearance?.hairColor != null) p.hair = appearance.hairColor;
         const mat = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: .62, ...options });
         const skin = mat(0xffcba5); const coat = mat(p.coat); const trim = mat(p.trim, { roughness: .38 });
         const dark = mat(0x292735); const hair = mat(p.hair); const accent = mat(p.accent);
@@ -4586,6 +4588,11 @@ export class SceneManager {
             vendor.add(this._boxMesh(0.16, 0.42, 0.16, app.bodyColor || 0x4060c0, 0.33, 0.62, 0.1));
             vendor.position.set(0, 0.14, -0.15);
             group.add(vendor);
+            vendor.visible = false;
+            const detailedVendor = this._buildPremiumShopkeeper('merchant', app);
+            detailedVendor.position.set(0, .18, -.18);
+            detailedVendor.scale.multiplyScalar(.84);
+            group.add(detailedVendor);
 
             // Featured wares on the counter (up to 3 item emojis)
             const items = stall.items || [];

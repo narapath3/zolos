@@ -1,7 +1,7 @@
 // Monster Manager — Monster spawning, AI, and management
 import * as THREE from 'three';
 import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster, getWaterSpawnTable } from './GameData.js';
-import { upgradeMonsterAnatomy, animateMonsterRig, addSpeciesArtDetails } from './MonsterAnatomy.js';
+import { upgradeMonsterAnatomy, animateMonsterRig, addSpeciesArtDetails, addEliteSculptDetails } from './MonsterAnatomy.js';
 
 // Reference level used for the SHARED world spawn tables. Fixed (not the local
 // player's level) so every player — whatever their level — builds the exact
@@ -823,6 +823,9 @@ export class Monster {
             bodyMat,
             createMat,
             put,
+        });
+        this._eliteSculpt = addEliteSculptDetails({
+            THREE, type: this.type, size, bodyMat, createMat, put,
         });
 
         // Eyes (attached to main bodyMesh so they squish/bounce with slimes)
