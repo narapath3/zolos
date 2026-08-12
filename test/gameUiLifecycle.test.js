@@ -42,6 +42,28 @@ test('stale network checks cannot update a replacement GameUI after await', () =
   assert.match(destroy, /this\._lifecycleGeneration\+\+/);
 });
 
+test('character data loaders reject stale results after account replacement', () => {
+  assert.match(source, /_isCharacterLoadCurrent\(characterId, generation\)/);
+  for (const loader of [
+    'loadInventoryFromDB',
+    'loadDailyQuestsFromDB',
+    'loadFriendsFromDB',
+    'loadFishingAlmanacFromDB',
+    'loadAdventureJournalFromDB',
+  ]) {
+    const start = source.indexOf(`async ${loader}(characterId)`);
+    assert.notEqual(start, -1, `${loader} exists`);
+    const next = source.indexOf('\n  async ', start + 10);
+    const body = source.slice(start, next === -1 ? source.length : next);
+    assert.match(body, /const generation = this\._lifecycleGeneration/);
+    assert.match(body, /_isCharacterLoadCurrent\(characterId, generation\)|isCurrent\(\)/);
+  }
+  const inventoryStart = source.indexOf('async loadInventoryFromDB(characterId)');
+  const inventoryEnd = source.indexOf('\n  async loadDailyQuestsFromDB', inventoryStart);
+  const inventory = source.slice(inventoryStart, inventoryEnd);
+  assert.match(inventory, /catch \(e\) \{\s*if \(!isCurrent\(\)\) return;/);
+});
+
 test('pet boutique cancels animation frames and releases its WebGL resources', () => {
   assert.match(source, /this\._petViewer\?\.destroy\?\.\(\)/);
   assert.match(petPreviewSource, /this\.animationFrameId\s*=\s*requestAnimationFrame\(this\._loop\)/);

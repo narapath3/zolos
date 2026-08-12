@@ -356,6 +356,12 @@ export class GameUI {
     this._globalListenerRemovers.push(() => target.removeEventListener(type, handler, options));
   }
 
+  _isCharacterLoadCurrent(characterId, generation) {
+    return !this._destroyed
+      && generation === this._lifecycleGeneration
+      && this.characterId === characterId;
+  }
+
   _setupPanels() {
     // Compact categorized bottom HUD. Existing action IDs stay on the real
     // buttons, so grouping does not change any gameplay behavior.
@@ -826,8 +832,11 @@ export class GameUI {
 
   async loadInventoryFromDB(characterId) {
     this.characterId = characterId;
+    const generation = this._lifecycleGeneration;
+    const isCurrent = () => this._isCharacterLoadCurrent(characterId, generation);
     try {
       const rawInv = await loadInventory(characterId);
+      if (!isCurrent()) return;
       const migration = migrateLegacyCards(rawInv, this.character?.equippedCards);
       const knownCards = rawInv.filter(row => row.item_type === 'card'
         && (getCard(row.item_name) || getCard(row.stats?.card_id)));
@@ -843,10 +852,12 @@ export class GameUI {
       if (needsMigration) {
         for (const itemName of new Set(knownCards.map(row => row.item_name))) {
           await setInventoryItemQuantity(characterId, itemName, 'card', 0);
+          if (!isCurrent()) return;
         }
         for (const row of migration.inventory) {
           if (row.item_type === 'card' && getCard(row.item_name)) {
             await setInventoryItemQuantity(characterId, row.item_name, 'card', row.quantity, row.stats);
+            if (!isCurrent()) return;
           }
         }
       }
@@ -985,9 +996,11 @@ export class GameUI {
 
       // Already handled weapon restoration above
     } catch (e) {
+      if (!isCurrent()) return;
       console.error('Failed to load inventory:', e);
       this.inventory = [];
     }
+    if (!isCurrent()) return;
     this._renderInventory();
   }
 
@@ -995,6 +1008,7 @@ export class GameUI {
   async loadDailyQuestsFromDB(characterId) {
     if (!characterId) return;
     this.characterId = characterId;
+    const generation = this._lifecycleGeneration;
     try {
       const localKey = `zolos_daily_quests_${characterId}`;
       let localData = null;
@@ -1005,6 +1019,7 @@ export class GameUI {
 
       // Load from DB
       const dbQuests = await loadDailyQuests(characterId);
+      if (!this._isCharacterLoadCurrent(characterId, generation)) return;
       const today = new Date().toDateString();
 
       let selectedState = null;
@@ -1019,6 +1034,7 @@ export class GameUI {
         localStorage.setItem(localKey, JSON.stringify(selectedState));
         localStorage.setItem('zolos_daily_quests', JSON.stringify(selectedState));
         await saveDailyQuests(characterId, selectedState);
+        if (!this._isCharacterLoadCurrent(characterId, generation)) return;
       } else {
         // Force refresh daily quests
         this._checkDailyQuestsReset();
@@ -1048,6 +1064,8 @@ export class GameUI {
   // ============ Friends List load/save helpers ============
   async loadFriendsFromDB(characterId) {
     if (!characterId) return;
+    this.characterId = characterId;
+    const generation = this._lifecycleGeneration;
     try {
       const localKey = `zolos_friends_${characterId}`;
       let localFriends = [];
@@ -1057,6 +1075,7 @@ export class GameUI {
       } catch (e) { }
 
       const dbFriends = await loadFriendsList(characterId);
+      if (!this._isCharacterLoadCurrent(characterId, generation)) return;
       if (dbFriends && dbFriends.length > 0) {
         this.friends = dbFriends;
       } else {
@@ -1119,12 +1138,14 @@ export class GameUI {
   async loadFishingAlmanacFromDB(characterId) {
     if (!characterId) return;
     this.characterId = characterId;
+    const generation = this._lifecycleGeneration;
     this.almanac = { caught: [], claimed: [], counts: {} };
     try {
       const localKey = `zolos_almanac_${characterId}`;
       let local = null;
       try { const s = localStorage.getItem(localKey); if (s) local = JSON.parse(s); } catch (e) { }
       const db = await loadFishingAlmanac(characterId);
+      if (!this._isCharacterLoadCurrent(characterId, generation)) return;
       // Merge DB + local so nothing is ever lost (union of caught species)
       const merged = { caught: [], claimed: [], counts: {} };
       const caught = new Set([...(db?.caught || []), ...(local?.caught || [])]);
@@ -8781,9 +8802,11 @@ export class GameUI {
   async loadAdventureJournalFromDB(characterId) {
     if (!characterId) return;
     this.characterId = characterId;
+    const generation = this._lifecycleGeneration;
     let local = null;
     try { local = JSON.parse(localStorage.getItem(`zolos_adventure_journal_${characterId}`) || 'null'); } catch { /* ignore */ }
     const remote = await loadAdventureJournal(characterId);
+    if (!this._isCharacterLoadCurrent(characterId, generation)) return;
     this.adventureJournal = sanitizeAdventureJournal(remote || local);
     this._renderWiki();
   }
