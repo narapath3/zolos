@@ -20,5 +20,14 @@ test('login ping monitor does not stack slow measurements', () => {
 test('autosave skips overlap and hidden-tab duplicate writes', () => {
   assert.match(sync, /if \(autoSaveInFlight \|\| \(typeof document !== 'undefined' && document\.hidden\)\) return/);
   assert.match(sync, /finally \{\s*autoSaveInFlight = false/);
-  assert.match(sync, /autoSaveInFlight = false;\s*\n\}/);
+  assert.match(sync, /catch \(error\) \{\s*console\.warn\('\[Zolos\] Autosave failed/);
+});
+
+test('stopped autosave sessions cannot send stale backup state or unlock early', () => {
+  assert.match(sync, /let autoSaveGeneration = 0/);
+  assert.match(sync, /const generation = autoSaveGeneration/);
+  assert.match(sync, /if \(generation === autoSaveGeneration\) sendSaveState\(state\)/);
+  const stop = sync.match(/export function stopAutoSave\(\) \{([\s\S]*?)\n\}/)?.[1] || '';
+  assert.match(stop, /autoSaveGeneration\+\+/);
+  assert.doesNotMatch(stop, /autoSaveInFlight\s*=\s*false/);
 });

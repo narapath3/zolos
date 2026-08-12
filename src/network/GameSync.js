@@ -7,6 +7,7 @@ export { getDeterministicGuestName, isPlaceholderName };
 
 let autoSaveInterval = null;
 let autoSaveInFlight = false;
+let autoSaveGeneration = 0;
 let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
 let offlineChatInterval = null;
@@ -2171,6 +2172,7 @@ export function sendSaveState(saveData) {
 export function startAutoSave(getStateCallback, intervalMs = 180000) {
     // Default: 3 minutes (180000ms) instead of 15s
     stopAutoSave();
+    const generation = autoSaveGeneration;
     autoSaveInterval = setInterval(async () => {
         if (autoSaveInFlight || (typeof document !== 'undefined' && document.hidden)) return;
         const state = getStateCallback();
@@ -2185,7 +2187,9 @@ export function startAutoSave(getStateCallback, intervalMs = 180000) {
             }
 
             // Also send state to Socket server for save-on-disconnect backup
-            sendSaveState(state);
+            if (generation === autoSaveGeneration) sendSaveState(state);
+            } catch (error) {
+                console.warn('[Zolos] Autosave failed; the next interval will retry:', error?.message || error);
             } finally {
                 autoSaveInFlight = false;
             }
@@ -2193,11 +2197,14 @@ export function startAutoSave(getStateCallback, intervalMs = 180000) {
     }, intervalMs);
 }
 export function stopAutoSave() {
+    autoSaveGeneration++;
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
     }
-    autoSaveInFlight = false;
+    // Do not clear the lock while an older database write is still pending.
+    // Its finally block releases the lock; a replacement session must not
+    // overlap that write or let the old completion alter its server backup.
 }
 
 // ============ P2P MARKETPLACE ============
