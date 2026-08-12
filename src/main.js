@@ -228,6 +228,7 @@ async function initGame(charData) {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('game-screen').style.display = 'block';
 
+    sceneManager?.destroyResizeHandling?.();
     sceneManager = new SceneManager(canvas);
 
     // Setup input

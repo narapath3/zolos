@@ -253,7 +253,14 @@ export class SceneManager {
         this.loadMap('prontera');
 
         // Resize handling
-        window.addEventListener('resize', () => this._onResize());
+        this._boundResize = () => this._onResize();
+        window.addEventListener('resize', this._boundResize, { passive: true });
+        window.visualViewport?.addEventListener?.('resize', this._boundResize, { passive: true });
+        if (typeof ResizeObserver !== 'undefined' && this.canvas.parentElement) {
+            this._resizeObserver = new ResizeObserver(this._boundResize);
+            this._resizeObserver.observe(this.canvas.parentElement);
+        }
+        this._onResize();
     }
 
     _setupLights() {
@@ -5050,6 +5057,7 @@ export class SceneManager {
         const container = this.canvas.parentElement;
         const w = container ? container.clientWidth : window.innerWidth;
         const h = container ? container.clientHeight : window.innerHeight;
+        if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1) return;
         
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
@@ -5068,6 +5076,16 @@ export class SceneManager {
     render() {
         if (this.composer && this.postProcessingEnabled !== false) this.composer.render();
         else this.renderer.render(this.scene, this.camera);
+    }
+
+    destroyResizeHandling() {
+        if (this._boundResize) {
+            window.removeEventListener('resize', this._boundResize);
+            window.visualViewport?.removeEventListener?.('resize', this._boundResize);
+        }
+        this._resizeObserver?.disconnect?.();
+        this._resizeObserver = null;
+        this._boundResize = null;
     }
 
     // Follow a target position (camera follows player)
