@@ -306,6 +306,7 @@ export class GameUI {
   }
 
   destroy() {
+    this._mobileControlCleanup?.();
     this.cardAlbum?.destroy();
     this.cardAlbum = null;
     this._petViewer?.destroy?.();
@@ -8343,6 +8344,12 @@ export class GameUI {
   }
 
   _setupMobileControls() {
+    this._mobileControlCleanup?.();
+    const removers = [];
+    const listen = (target, type, handler, options) => {
+      target.addEventListener(type, handler, options);
+      removers.push(() => target.removeEventListener(type, handler, options));
+    };
     const pad = document.getElementById('mobile-pad');
     const container = document.getElementById('joystick-container');
     const base = document.getElementById('joystick-base');
@@ -8611,10 +8618,10 @@ export class GameUI {
     };
 
     // Listen on the window for floating joystick (since mobile-pad has pointer-events: none)
-    window.addEventListener('touchstart', handleStart, { passive: false });
-    window.addEventListener('touchmove', handleMove, { passive: false });
-    window.addEventListener('touchend', handleEnd, { passive: false });
-    window.addEventListener('touchcancel', handleEnd, { passive: false });
+    listen(window, 'touchstart', handleStart, { passive: false });
+    listen(window, 'touchmove', handleMove, { passive: false });
+    listen(window, 'touchend', handleEnd, { passive: false });
+    listen(window, 'touchcancel', handleEnd, { passive: false });
 
     // Safari/iOS also exposes native gesture events for pinch. Supporting this
     // path makes zoom reliable even when WebKit coalesces the underlying touch
@@ -8622,27 +8629,41 @@ export class GameUI {
     const gameCanvas = document.getElementById('game-canvas');
     let gestureStartZoom = 1;
     if (gameCanvas) {
-      gameCanvas.addEventListener('gesturestart', (e) => {
+      const onGestureStart = (e) => {
         gestureStartZoom = window.sceneManager?.cameraZoom || 1;
         window.__zolosPinching = true;
         e.preventDefault();
-      }, { passive: false });
-      gameCanvas.addEventListener('gesturechange', (e) => {
+      };
+      const onGestureChange = (e) => {
         const scale = Number(e.scale) || 1;
         window.sceneManager?.setCameraZoom?.(gestureStartZoom / scale);
         e.preventDefault();
-      }, { passive: false });
-      gameCanvas.addEventListener('gestureend', (e) => {
+      };
+      const onGestureEnd = (e) => {
         window.__zolosPinching = false;
         pinchStartDistance = 0;
         e.preventDefault();
-      }, { passive: false });
+      };
+      listen(gameCanvas, 'gesturestart', onGestureStart, { passive: false });
+      listen(gameCanvas, 'gesturechange', onGestureChange, { passive: false });
+      listen(gameCanvas, 'gestureend', onGestureEnd, { passive: false });
     }
 
     // Desktop/mouse fallback (for browser mobile simulation mode)
-    window.addEventListener('mousedown', handleStart);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleEnd);
+    listen(window, 'mousedown', handleStart);
+    listen(window, 'mousemove', handleMove);
+    listen(window, 'mouseup', handleEnd);
+    this._mobileControlCleanup = () => {
+      resetMovementInput();
+      joystickActive = false;
+      tapCandidate = false;
+      joystickTouchId = null;
+      pinchStartDistance = 0;
+      window.__zolosPinching = false;
+      hideJoystick();
+      removers.splice(0).forEach(remove => remove());
+      this._mobileControlCleanup = null;
+    };
 
     // Sprint Button logic
     const sprintBtn = document.getElementById('btn-mobile-sprint');

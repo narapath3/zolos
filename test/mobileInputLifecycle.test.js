@@ -19,3 +19,11 @@ test('pinch and cancel paths cannot leave movement active or trigger a world tap
   assert.match(source, /if \(distance > 0\) window\.sceneManager\?\.setCameraZoom/);
   assert.match(source, /e\.type !== 'touchcancel' && duration < 250/);
 });
+
+test('mobile movement listeners are owned and removed when GameUI is replaced', () => {
+  assert.match(source, /this\._mobileControlCleanup\?\.\(\)/);
+  assert.match(source, /const listen = \(target, type, handler, options\)/);
+  assert.match(source, /target\.removeEventListener\(type, handler, options\)/);
+  assert.match(source, /removers\.splice\(0\)\.forEach\(remove => remove\(\)\)/);
+  assert.match(source, /window\.__zolosPinching = false/);
+});
