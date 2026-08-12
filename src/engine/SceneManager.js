@@ -180,7 +180,11 @@ export class SceneManager {
             const isLowEnd = isMobile && (cores <= 2 || memory <= 2);
             const isMidRange = isMobile && cores >= 4 && memory >= 4;
             initialQuality = isLowEnd ? 'ultra-low' : (isMidRange ? 'medium' : 'high');
-            localStorage.setItem('zolos_graphics_quality', initialQuality);
+            // Persist the *preference* ('auto'), never the detected tier. Writing
+            // a concrete tier here pinned every new player to a fixed quality and
+            // permanently disabled AdaptiveRendererSystem, which only adapts while
+            // the stored preference is 'auto'.
+            localStorage.setItem('zolos_graphics_quality', 'auto');
         }
         // `auto` is a UI preference, not an actual render tier. Previously it
         // leaked into SceneManager, silently disabling all high-tier scenery
@@ -277,8 +281,10 @@ export class SceneManager {
         // Directional (sun)
         this.sunLight = new THREE.DirectionalLight(0xffe8c0, 1.4);
         this.sunLight.position.set(12, 25, 10);
-        const savedQuality = localStorage.getItem('zolos_graphics_quality') || 'high';
-        this.sunLight.castShadow = (savedQuality !== 'ultra-low');
+        // Use the resolved render tier, not the raw stored preference: an 'auto'
+        // preference on a low-end phone resolves to 'ultra-low' but the stored
+        // string is still 'auto', which used to leave sun shadows switched on.
+        this.sunLight.castShadow = (this.graphicsQuality !== 'ultra-low');
         this.sunLight.shadow.mapSize.set(1024, 1024); // Reduced from 2048 for performance
         this.sunLight.shadow.camera.near = 0.5;
         this.sunLight.shadow.camera.far = 180;

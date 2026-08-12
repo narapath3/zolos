@@ -3317,6 +3317,11 @@ export class CharacterManager {
         } else if (localSettings.graphics_quality) {
             this.gameSettings.graphics_quality = localSettings.graphics_quality;
         }
+        // The renderer reads its tier from `zolos_graphics_quality`, so an account
+        // level choice used to be display-only on a second device: the Settings
+        // dropdown showed it while the scene kept rendering at the local tier.
+        // Adopt it here so it applies on this device too.
+        this._applyStoredGraphicsQuality(this.gameSettings.graphics_quality);
         if (data.fps_enabled !== undefined && data.fps_enabled !== null) {
             this.gameSettings.fps_enabled = !!data.fps_enabled;
         } else if (localSettings.fps_enabled !== undefined) {
@@ -3328,6 +3333,23 @@ export class CharacterManager {
         this.mesh.position.set(0, 1.2, 10);
 
         this.updateNameTag();
+    }
+
+    // Adopt the account's saved graphics tier on this device. Scene density and
+    // composer passes are built at map startup, so the live renderer only picks
+    // up what can change at runtime (pixel ratio, shadows); the rest applies on
+    // the next load from the persisted preference.
+    _applyStoredGraphicsQuality(quality) {
+        const VALID = ['auto', 'high', 'medium', 'low', 'ultra-low'];
+        if (!VALID.includes(quality)) return;
+        try {
+            if (localStorage.getItem('zolos_graphics_quality') === quality) return;
+            localStorage.setItem('zolos_graphics_quality', quality);
+        } catch (e) { return; /* localStorage unavailable */ }
+        const rendererSystem = (typeof window !== 'undefined') ? window.rendererSystem : null;
+        if (!rendererSystem) return;
+        rendererSystem.qualityLevel = quality;
+        rendererSystem.applyQualitySettings?.();
     }
 
     _getRenderedColor(mesh, fallback) {

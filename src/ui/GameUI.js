@@ -4983,7 +4983,13 @@ export class GameUI {
         if (this.character && this.character.gameSettings) {
           const graphicsSelect = document.getElementById('settings-graphics-quality');
           if (graphicsSelect) {
-            graphicsSelect.value = this.character.gameSettings.graphics_quality || 'medium';
+            // Fall back to what is actually being rendered rather than a fixed
+            // 'medium', which mislabelled the tier whenever no explicit choice
+            // had been saved for this character.
+            graphicsSelect.value = this.character.gameSettings.graphics_quality
+              || window.rendererSystem?.qualityLevel
+              || localStorage.getItem('zolos_graphics_quality')
+              || 'auto';
           }
           const fpsCheckbox = document.getElementById('settings-fps-enabled');
           if (fpsCheckbox) {
