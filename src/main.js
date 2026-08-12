@@ -762,6 +762,7 @@ async function initGame(charData) {
     globalAnnouncements = new GlobalAnnouncements();
     window.globalAnnouncements = globalAnnouncements;
     // Initialize Tutorial System for new players
+    window.tutorialSystem?.destroy?.();
     const tutorialSystem = new TutorialSystem(gameUI, character, sceneManager);
     window.tutorialSystem = tutorialSystem;
     // Pass full charData so TutorialSystem can read tutorial_completed from DB

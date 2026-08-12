@@ -15,6 +15,7 @@ export class TutorialSystem {
     this.stepOverlay = null;
     this.stepTooltip = null;
     this.stepBackdrop = null;
+    this._walkCheckInterval = null;
   }
 
   // Load tutorial state from the database (characters.tutorial_completed)
@@ -220,6 +221,7 @@ export class TutorialSystem {
 
   // Show a specific tutorial step
   _showStep(stepIndex) {
+    this._clearStepHandlers();
     const steps = this._getSteps();
     if (stepIndex >= steps.length) {
       this._completeTutorial();
@@ -316,11 +318,12 @@ export class TutorialSystem {
         // Track player movement
         if (this.character && this.character.getPosition) {
           const startPos = this.character.getPosition().clone();
-          const checkWalk = setInterval(() => {
+          this._walkCheckInterval = setInterval(() => {
             const currentPos = this.character.getPosition();
             const distance = startPos.distanceTo(currentPos);
             if (distance >= step.distance) {
-              clearInterval(checkWalk);
+              clearInterval(this._walkCheckInterval);
+              this._walkCheckInterval = null;
               this.gameUI?.addCombatLog('✅ ดีเลย! คุณเดินได้ดี', 'system');
               this._grantReward(step.reward);
               nextStep();
@@ -453,6 +456,7 @@ export class TutorialSystem {
 
   // Complete tutorial — save to server so it never shows again
   _completeTutorial() {
+    this._clearStepHandlers();
     // Save completion status to database (server-side persistent)
     this.saveTutorialCompleted();
 
@@ -464,6 +468,28 @@ export class TutorialSystem {
     // Restore mobile controls via the standard visibility system
     this.gameUI?.updateMobileControlsVisibility?.();
     this.gameUI?.addCombatLog('🎉 ยินดีด้วย! คุณจบบทเรียนแล้ว! ตอนนี้คุณพร้อมที่จะเริ่มการผจญภัยของคุณ', 'levelup');
+  }
+
+  _clearStepHandlers() {
+    if (this._walkCheckInterval) {
+      clearInterval(this._walkCheckInterval);
+      this._walkCheckInterval = null;
+    }
+    window._tutorialMonsterKillHandler = null;
+    window._tutorialPanelHandler = null;
+    window._tutorialEquipHandler = null;
+    window._tutorialAutoFarmHandler = null;
+  }
+
+  destroy() {
+    this._clearStepHandlers();
+    this.stepTooltip?.remove();
+    this.stepOverlay?.remove();
+    this.stepBackdrop?.remove();
+    this.stepTooltip = null;
+    this.stepOverlay = null;
+    this.stepBackdrop = null;
+    this.isActive = false;
   }
 
   // Allow returning tutorial from menu (resets completed flag locally)
