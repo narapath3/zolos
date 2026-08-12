@@ -382,7 +382,13 @@ export class AdminUI {
         const statusEl = document.getElementById('admin-status-text');
         if (statusEl) {
             const adminType = this.isDbAdmin ? '<span style="color:#4aef4a;font-weight:bold;">Database Admin</span>' : '<span style="color:#e06060;font-weight:bold;">Local Override (Offline/Non-DB Admin)</span>';
-            statusEl.innerHTML = `Logged in as: <strong style="color: #ffd700;">${this.currentUsername}</strong> (${adminType})`;
+            statusEl.replaceChildren(document.createTextNode('Logged in as: '));
+            const username = document.createElement('strong');
+            username.style.color = '#ffd700';
+            username.textContent = this.currentUsername;
+            statusEl.append(username, document.createTextNode(' ('));
+            statusEl.insertAdjacentHTML('beforeend', adminType);
+            statusEl.append(document.createTextNode(')'));
         }
     }
 

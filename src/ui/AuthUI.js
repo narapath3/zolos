@@ -395,7 +395,8 @@ export class AuthUI {
         if (this._charnameEl) this._charnameEl.style.display = 'none';
         if (this._changeAccountBtn) this._changeAccountBtn.style.display = 'inline-flex';
 
-        this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span>Enter Game as ${username}</span>`;
+        this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span></span>`;
+        this._loginBtn.querySelector('span').textContent = `Enter Game as ${username}`;
         this._registerBtn.style.display = 'none';
 
         const guestBtn = document.getElementById('btn-guest');

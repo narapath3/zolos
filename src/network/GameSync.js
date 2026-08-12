@@ -8,6 +8,8 @@ export { getDeterministicGuestName, isPlaceholderName };
 let autoSaveInterval = null;
 let onlinePlayersCallback = null;
 let presenceUpdateInterval = null;
+let offlineChatInterval = null;
+let clientPingInterval = null;
 let mockPlayers = [];
 let socketListenersAttached = false;
 let chatCallback = null;
@@ -1692,7 +1694,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 }
             });
             // Start periodic client_ping using multi-strategy measurePing helper
-            if (!window.__zolosClientPingInterval) {
+            if (!clientPingInterval) {
                 const runPing = async () => {
                     try {
                         const { measurePing } = await import('./SocketClient.js');
@@ -1705,7 +1707,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                         console.warn('[GameSync] Ping measurement failed:', e);
                     }
                 };
-                window.__zolosClientPingInterval = setInterval(runPing, 5000);
+                clientPingInterval = setInterval(runPing, 5000);
                 // Fire first ping immediately
                 runPing();
             }
@@ -2038,6 +2040,16 @@ export function leavePresence() {
     if (presenceUpdateInterval) {
         clearInterval(presenceUpdateInterval);
         presenceUpdateInterval = null;
+    }
+
+    if (offlineChatInterval) {
+        clearInterval(offlineChatInterval);
+        offlineChatInterval = null;
+    }
+
+    if (clientPingInterval) {
+        clearInterval(clientPingInterval);
+        clientPingInterval = null;
     }
 
     disconnectSocket();
@@ -2815,6 +2827,8 @@ export function sendWarpRequest(targetUserId) {
 
 // ============ Offline Mock Presence (unchanged) ============
 function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onPlayerPositionUpdate, onChatCallback) {
+    if (presenceUpdateInterval) clearInterval(presenceUpdateInterval);
+    if (offlineChatInterval) clearInterval(offlineChatInterval);
     // Simulate real online players
     const names = ['XyzRef', 'PoringsLayer', 'PoringHunter', 'MerchantSatoshi', 'WarlockZee', 'SniperSky'];
     const mapIds = ['prontera', 'payon', 'glast_heim', 'mjolnir', 'abyss_lake', 'svarrga'];
@@ -2910,7 +2924,7 @@ function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onP
     }, 3000);
 
     // Simulation for chat messages in offline mode
-    setInterval(() => {
+    offlineChatInterval = setInterval(() => {
         if (onChatCallback && mockPlayers.length > 1) {
             const randomReplies = [
                 'สวัสดีครับทุกคน! 😃',

@@ -4452,7 +4452,14 @@ export class GameUI {
         .filter(n => n.toLowerCase().includes(q) && n !== (this.character?.stats?.name))
         .slice(0, 6);
       if (!names.length) { mentionBox.style.display = 'none'; return; }
-      mentionBox.innerHTML = names.map(n => `<button type="button" class="mention-cell" data-name="${n.replace(/"/g, '&quot;')}">👤 ${n.replace(/</g, '&lt;')}</button>`).join('');
+      mentionBox.replaceChildren(...names.map(name => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'mention-cell';
+        button.dataset.name = name;
+        button.textContent = `👤 ${name}`;
+        return button;
+      }));
       mentionBox.querySelectorAll('.mention-cell').forEach(cell => {
         cell.addEventListener('click', () => {
           const name = cell.getAttribute('data-name');
