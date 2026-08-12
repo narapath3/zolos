@@ -4563,7 +4563,12 @@ export class SceneManager {
         // The old 4-unit spacing made the two player collision envelopes overlap,
         // so entering the visual gap could pin the character between both stalls.
         const STALL_SPACING = 5.25;
-        const SLOT_X = Array.from({ length: 8 }, (_, slot) => (slot - 3.5) * STALL_SPACING);
+        // Shift the row one slot west. Centred on x = 0 the last slot landed at
+        // x ≈ 18.4, already on the north-east mountain's foothill, where the
+        // ground climbs ~2.5 units across a single 3-unit stall footprint and
+        // buried that stall. From here the whole street stays on flat field.
+        const MARKET_CENTER_X = -5.25;
+        const SLOT_X = Array.from({ length: 8 }, (_, slot) => (slot - 3.5) * STALL_SPACING + MARKET_CENTER_X);
         // South side of town — the winding river tops out at z ≈ +8, the PvP
         // arena at (-14,14) reaches z ≈ 20, portals sit at x = ±25. z = 22
         // keeps the whole street clear of all of them.
@@ -4689,7 +4694,9 @@ export class SceneManager {
             sign.scale.set(3.2, 1.0, 1);
             group.add(sign);
 
-            group.position.set(SLOT_X[slot], 0, STREET_Z);
+            // Sit on the ground rather than at y = 0: the field still rolls by
+            // ±0.15, which is enough to sink the thin base slab out of sight.
+            group.position.set(SLOT_X[slot], this.getTerrainHeight(SLOT_X[slot], STREET_Z), STREET_Z);
             this.scene.add(group);
             this.stallMeshes.push(group);
         }
@@ -4745,7 +4752,7 @@ export class SceneManager {
         sign.scale.set(2.8, 0.55, 1);
         group.add(sign);
 
-        group.position.set(x, 0, z);
+        group.position.set(x, this.getTerrainHeight(x, z), z);
         return group;
     }
 
