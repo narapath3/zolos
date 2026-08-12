@@ -36,6 +36,30 @@ test('selling still validates the quantity against the real inventory stack', ()
   assert.match(perform, /if \(!invItem \|\| invItem\.quantity < sellQty\)/);
 });
 
+test('the quantity field wins the row instead of being squeezed by its buttons', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+
+  // Both rows are class driven now — inline `flex: 1` on the input lost to the
+  // buttons' inherited `width: 100%`.
+  for (const id of ['shop-qty-input', 'sell-shop-qty-input']) {
+    assert.match(html, new RegExp(`id="${id}" class="qty-field"`));
+    assert.doesNotMatch(
+      html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] || '',
+      /style=/,
+      `${id} must not carry inline layout styles`,
+    );
+  }
+  assert.match(html, /<div class="qty-row">/);
+
+  const field = css.match(/\.qty-row \.qty-field \{([\s\S]*?)\n\}/)?.[1] || '';
+  assert.match(field, /flex: 1 1 auto/);
+  assert.ok(Number(field.match(/min-width: (\d+)px/)?.[1] || 0) >= 90);
+
+  const button = css.match(/\.qty-row \.btn-secondary \{([\s\S]*?)\n\}/)?.[1] || '';
+  assert.match(button, /flex: 0 0 auto/);
+  assert.match(button, /width: auto/);
+});
+
 test('quantity fields are legible and are not squeezed by native spin buttons', () => {
   const rule = css.match(/\.form-group input\[type="number"\] \{([\s\S]*?)\n\}/)?.[1] || '';
   assert.notEqual(rule, '', 'number inputs need their own readable sizing');

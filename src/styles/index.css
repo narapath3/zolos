@@ -1500,6 +1500,50 @@ a,
   margin: 0;
 }
 
+/* Quantity row: [−] [value] [+] [MAX] in the shop, [value] [MAX] in the sell
+   shop. The buttons carry the shared `.btn-secondary { width: 100% }`, so in a
+   flex row every one of them demanded the full width and shrank the number
+   field down to a few pixels — the value was unreadable and looked like typing
+   did nothing. The field owns the leftover space here; the buttons are sized
+   to their own content. */
+.qty-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.qty-row .qty-field {
+  flex: 1 1 auto;
+  min-width: 96px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: #fff;
+  text-align: center;
+  font-family: var(--font-pixel);
+}
+
+.qty-row .btn-secondary {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0 14px;
+  font-family: var(--font-ui);
+  /* Comfortable touch target without stealing the field's width. */
+  min-width: 44px;
+}
+
+.qty-row .qty-step {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.qty-row .qty-max {
+  min-width: 54px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
 
 /* Leaderboard Tabs */
 .leaderboard-tabs {

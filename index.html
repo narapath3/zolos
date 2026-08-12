@@ -736,15 +736,12 @@
                 <label for="shop-qty-input" style="font-size: 11px; color: var(--text);">จำนวนที่จะซื้อ:</label>
                 <span id="shop-affordable" style="font-size: 11px; color: var(--text-dim);">ซื้อได้สูงสุด: 0</span>
               </div>
-              <div style="display: flex; gap: 6px;">
-                <button id="btn-shop-qty-minus" class="btn-secondary"
-                  style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">−</button>
-                <input type="number" id="shop-qty-input" min="1" value="1"
-                  style="flex: 1; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: var(--font-pixel); text-align: center;">
-                <button id="btn-shop-qty-plus" class="btn-secondary"
-                  style="padding: 0 12px; font-size: 16px; font-family: var(--font-ui);">+</button>
-                <button id="btn-shop-qty-max" class="btn-secondary"
-                  style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
+              <div class="qty-row">
+                <button id="btn-shop-qty-minus" class="btn-secondary qty-step">−</button>
+                <input type="number" id="shop-qty-input" class="qty-field" min="1" value="1"
+                  inputmode="numeric">
+                <button id="btn-shop-qty-plus" class="btn-secondary qty-step">+</button>
+                <button id="btn-shop-qty-max" class="btn-secondary qty-max">MAX</button>
               </div>
             </div>
 
@@ -802,11 +799,10 @@
                 <label for="sell-shop-qty-input" style="font-size: 11px; color: var(--text);">จำนวนที่จะขาย:</label>
                 <span id="sell-shop-owned-qty" style="font-size: 11px; color: var(--text-dim);">มีอยู่: 0 ชิ้น</span>
               </div>
-              <div style="display: flex; gap: 6px;">
-                <input type="number" id="sell-shop-qty-input" min="1" value="1"
-                  style="flex: 1; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: var(--font-pixel); text-align: center;">
-                <button id="btn-sell-shop-max" class="btn-secondary"
-                  style="padding: 0 10px; font-size: 10px; font-family: var(--font-ui);">MAX</button>
+              <div class="qty-row">
+                <input type="number" id="sell-shop-qty-input" class="qty-field" min="1" value="1"
+                  inputmode="numeric">
+                <button id="btn-sell-shop-max" class="btn-secondary qty-max">MAX</button>
               </div>
             </div>
 
