@@ -284,12 +284,21 @@ async function killMonster(world, m, mapId) {
     m.respawnAt = Date.now() + RESPAWN_MS;
     io.to(`map:${mapId}`).emit('mon_dead', { id: m.id });
 
-    const def = cfg.defs.get(m.type);
+    // Freeze this life before the first database await. The same monster object
+    // is reused on respawn and may reroll its type while rewards are still
+    // being persisted on a slow database connection.
+    const defeated = {
+        id: m.id,
+        type: m.type,
+        contributors: [...m.dmgByChar.entries()],
+        killNonce: `${Date.now()}:${(m._kills = (m._kills || 0) + 1)}`,
+    };
+    const def = cfg.defs.get(defeated.type);
     if (!def) return;
 
     // Contributors (everyone who dealt damage) → exp + gold each. Top-damage
     // dealer also gets the item drop (RO-style).
-    const contributors = [...m.dmgByChar.entries()];
+    const contributors = defeated.contributors;
     if (!contributors.length) return;
     let topChar = null, topDmg = -1;
     for (const [cid, d] of contributors) if (d > topDmg) { topDmg = d; topChar = cid; }
@@ -312,8 +321,8 @@ async function killMonster(world, m, mapId) {
             const committed = rows[0];
             if (sock && committed) {
                 sock.emit('mon_reward', {
-                    id: m.id,
-                    type: m.type,
+                    id: defeated.id,
+                    type: defeated.type,
                     name: def.name,
                     exp: def.exp || 0,
                     gold,
@@ -330,14 +339,14 @@ async function killMonster(world, m, mapId) {
     }
 
     // Item drops → top-damage contributor.
-    const drops = cfg.dropsByType.get(m.type) || [];
+    const drops = cfg.dropsByType.get(defeated.type) || [];
     for (const dr of drops) {
         if (Math.random() >= dr.chance) continue;
         const qty = (dr.qty_min || 1) + Math.floor(Math.random() * ((dr.qty_max || 1) - (dr.qty_min || 1) + 1));
         try {
             await grantItem(topChar, dr.item_name, dr.item_type || 'material', qty);
             const sock = socketForChar(topChar);
-            if (sock) sock.emit('mon_loot', { id: m.id, item_name: dr.item_name, emoji: dr.emoji || '', item_type: dr.item_type || 'material', quantity: qty });
+            if (sock) sock.emit('mon_loot', { id: defeated.id, item_name: dr.item_name, emoji: dr.emoji || '', item_type: dr.item_type || 'material', quantity: qty });
         } catch (e) {
             console.error('[MonEngine] grantItem failed:', e.message);
         }
@@ -348,9 +357,8 @@ async function killMonster(world, m, mapId) {
     // A unique nonce per death makes the award_card_drop idempotency keys stable
     // across accidental replays but distinct across separate kills of the reused
     // monster id.
-    const killNonce = `${Date.now()}:${(m._kills = (m._kills || 0) + 1)}`;
     for (const [cid] of contributors) {
-        awardMonsterCards(cid, m.type, mapId, m.id, killNonce).catch(e =>
+        awardMonsterCards(cid, defeated.type, mapId, defeated.id, defeated.killNonce).catch(e =>
             console.error('[MonEngine] card drop failed:', e.message));
     }
 }
