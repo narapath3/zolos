@@ -134,9 +134,11 @@ export class SceneManager {
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(MAP_CONFIGS.prontera.fogColor);
-        this.scene.fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.012);
-        this._fog = this.scene.fog;
-        this.fogEnabled = true;
+        // Keep every map crisp. Weather may still recolor the sky, but fog is
+        // never attached to the scene where it would obscure distant models.
+        this._fog = new THREE.FogExp2(MAP_CONFIGS.prontera.fogColor, 0.012);
+        this.scene.fog = null;
+        this.fogEnabled = false;
 
         // Camera (isometric-style)
         const aspect = window.innerWidth / window.innerHeight;
@@ -581,10 +583,9 @@ export class SceneManager {
         return list;
     }
 
-    setFogEnabled(enabled) {
-        this.fogEnabled = enabled !== false;
-        this.scene.fog = this.fogEnabled ? this._fog : null;
-        if (this.fogEnabled && this._weatherCur) this._applyWeather();
+    setFogEnabled() {
+        this.fogEnabled = false;
+        this.scene.fog = null;
     }
 
     // Resolve shop collision in the X/Z plane. This is called after all forms

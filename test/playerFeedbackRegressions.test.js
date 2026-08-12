@@ -80,16 +80,17 @@ test('server latency samples require the latest issued challenge and bounded ech
     assert.match(echo, /shouldRateLimitEvent\(socket\._rateLimitTracker, 'client_ping', 4, 10000\)/);
 });
 
-test('players can zoom, disable fog, and cannot walk through shop colliders', async () => {
+test('players can zoom, fog stays disabled globally, and shops remain solid', async () => {
     const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
     const ui = await readFile(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
     const scene = await readFile(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
     const main = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 
     assert.match(html, /maximum-scale=5\.0, user-scalable=yes/);
-    assert.match(html, /id="settings-fog-enabled"/);
-    assert.match(ui, /zolos_fog_enabled/);
-    assert.match(scene, /setFogEnabled\(enabled\)/);
+    assert.doesNotMatch(html, /id="settings-fog-enabled"/);
+    assert.doesNotMatch(ui, /zolos_fog_enabled/);
+    assert.match(scene, /this\.scene\.fog = null/);
+    assert.match(scene, /setFogEnabled\(\)[\s\S]*this\.fogEnabled = false;[\s\S]*this\.scene\.fog = null;/);
     assert.match(scene, /resolvePlayerCollisions\(position, previousPosition\)/);
     assert.match(main, /sceneManager\.resolvePlayerCollisions\(character\.mesh\.position/);
 });

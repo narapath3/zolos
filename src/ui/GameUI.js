@@ -4654,7 +4654,7 @@ export class GameUI {
   applyDeviceSettings() {
     if (this.soundManager) this.soundManager.skillSoundsEnabled = this._flag('zolos_skill_sfx_enabled', true);
     if (window.particles) window.particles.effectsEnabled = !this._flag('zolos_hide_effects', false);
-    if (window.sceneManager?.setFogEnabled) window.sceneManager.setFogEnabled(this._flag('zolos_fog_enabled', true));
+    if (window.sceneManager?.setFogEnabled) window.sceneManager.setFogEnabled(false);
   }
 
   // Reflect the effects/performance/auto-potion controls from storage.
@@ -4665,7 +4665,6 @@ export class GameUI {
     set('settings-skill-sfx-enabled', 'checked', this._flag('zolos_skill_sfx_enabled', true));
     set('settings-mute-all', 'checked', !musicOn && !sfxOn);
     set('settings-hide-effects', 'checked', this._flag('zolos_hide_effects', false));
-    set('settings-fog-enabled', 'checked', this._flag('zolos_fog_enabled', true));
     set('settings-hide-others-gear', 'checked', this._flag('zolos_hide_others_gear', false));
     set('settings-hide-others', 'checked', this._flag('zolos_hide_others', false));
 
@@ -5073,10 +5072,6 @@ export class GameUI {
     bindFlag('settings-hide-effects', 'zolos_hide_effects', (on) => {
       if (window.particles) window.particles.effectsEnabled = !on;
       this.addCombatLog(on ? '🎆 ปิดเอฟเฟกต์ภาพแล้ว' : '🎆 เปิดเอฟเฟกต์ภาพแล้ว', 'system');
-    });
-    bindFlag('settings-fog-enabled', 'zolos_fog_enabled', (on) => {
-      if (window.sceneManager?.setFogEnabled) window.sceneManager.setFogEnabled(on);
-      this.addCombatLog(on ? '🌫️ เปิดหมอกแล้ว' : '🔭 ปิดหมอกแล้ว — ระยะภาพชัดขึ้น', 'system');
     });
     bindFlag('settings-hide-others-gear', 'zolos_hide_others_gear');
     bindFlag('settings-hide-others', 'zolos_hide_others');
