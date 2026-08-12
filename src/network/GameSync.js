@@ -30,6 +30,22 @@ function enqueueInventoryMutation(characterId, itemName, mutation) {
     });
 }
 
+function rejectPendingMap(map, message) {
+    for (const pending of map.values()) {
+        clearTimeout(pending.timeout);
+        pending.reject(new Error(message));
+    }
+    map.clear();
+}
+
+function rejectPendingSocketRequests() {
+    const message = 'การเชื่อมต่อหลุด กรุณารอให้เชื่อมต่อใหม่แล้วลองอีกครั้ง';
+    rejectPendingMap(pendingOreConversions, message);
+    rejectPendingMap(pendingPetPurchases, message);
+    rejectPendingMap(pendingCardFusions, message);
+    rejectPendingMap(pendingCardRefines, message);
+}
+
 // ============ Client-side profanity filter (mirrors server) ============
 const _PROFANITY = [
     'motherfucker', 'ควยเย็ดแม่', 'เย็ดแม่มึง', 'ไอ้ชาติหมา', 'พ่อมึงตาย', 'แม่มึงตาย',
@@ -1677,6 +1693,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             // already up here (so this fires only on later reconnects); the first
             // join is emitted explicitly below.
             socket.on('connect', emitJoin);
+            socket.on('disconnect', rejectPendingSocketRequests);
 
             socket.on('players_update', (players) => {
                 console.log('[Zolos] 👥 Players update via Socket.io:', players.length, players.map(p => p.username));
@@ -2062,6 +2079,7 @@ export function updatePresence(level, newUsername = null, currentMapId = 'pronte
 
 export function leavePresence() {
     socketListenersAttached = false;
+    rejectPendingSocketRequests();
 
     if (presenceUpdateInterval) {
         clearInterval(presenceUpdateInterval);
