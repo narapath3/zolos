@@ -167,6 +167,27 @@ export class ParticleSystem {
         });
     }
 
+    _disposeEffectObject(object) {
+        if (!object) return;
+        this.scene.remove(object);
+        const geometries = new Set();
+        const materials = new Set();
+        object.traverse?.(child => {
+            if (child.geometry && !geometries.has(child.geometry)) {
+                geometries.add(child.geometry);
+                child.geometry.dispose();
+            }
+            const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
+            for (const material of childMaterials) {
+                if (!material || materials.has(material)) continue;
+                materials.add(material);
+                // Material maps are shared procedural textures owned by this
+                // ParticleSystem and are released only by destroy().
+                material.dispose();
+            }
+        });
+    }
+
     // ============ Water Splash Effect ============
     spawnWaterSplash(position) {
         // Rate limit splashes
@@ -1360,7 +1381,7 @@ export class ParticleSystem {
             p.life -= deltaTime;
 
             if (p.life <= 0 || !p.target || !p.target.alive) {
-                this.scene.remove(p.mesh);
+                this._disposeEffectObject(p.mesh);
                 this.projectiles.splice(i, 1);
                 continue;
             }
@@ -1375,7 +1396,7 @@ export class ParticleSystem {
             if (distance <= moveStep) {
                 // Hit!
                 if (p.onHit) p.onHit();
-                this.scene.remove(p.mesh);
+                this._disposeEffectObject(p.mesh);
                 this.projectiles.splice(i, 1);
             } else {
                 p.mesh.position.add(direction.multiplyScalar(moveStep));
@@ -1395,7 +1416,7 @@ export class ParticleSystem {
             effect.mesh.material.opacity = Math.max(0, effect.life / (0.6 + 0.2));
 
             if (effect.life <= 0) {
-                this.scene.remove(effect.mesh);
+                this._disposeEffectObject(effect.mesh);
                 this.splashEffects.splice(i, 1);
             }
         }
@@ -1444,7 +1465,7 @@ export class ParticleSystem {
             wave.life -= deltaTime;
 
             if (wave.life <= 0) {
-                this.scene.remove(wave.mesh);
+                this._disposeEffectObject(wave.mesh);
                 this.shockwaves.splice(i, 1);
             }
         }
@@ -1472,7 +1493,7 @@ export class ParticleSystem {
             }
 
             if (effect.life <= 0) {
-                this.scene.remove(effect.mesh);
+                this._disposeEffectObject(effect.mesh);
                 this.hitEffects.splice(i, 1);
             }
         }
@@ -1498,7 +1519,7 @@ export class ParticleSystem {
             }
 
             if (effect.life <= 0) {
-                this.scene.remove(effect.mesh);
+                this._disposeEffectObject(effect.mesh);
                 this.deathEffects.splice(i, 1);
             }
         }
@@ -1512,7 +1533,7 @@ export class ParticleSystem {
             s.mesh.scale.set(scale, scale, scale);
             s.mesh.material.opacity = Math.max(0, 0.9 * (1 - progress));
             if (s.life <= 0) {
-                this.scene.remove(s.mesh);
+                this._disposeEffectObject(s.mesh);
                 this.slashes.splice(i, 1);
             }
         }
@@ -1534,5 +1555,21 @@ export class ParticleSystem {
 
     isLowEndDevice() {
         return this.perfMonitor.isLowEndDevice;
+    }
+
+    destroy() {
+        const collections = [this.projectiles, this.splashEffects, this.shockwaves,
+            this.hitEffects, this.deathEffects, this.slashes, this.particles];
+        const objects = new Set();
+        for (const collection of collections) {
+            for (const entry of collection) {
+                const object = entry?.mesh || entry;
+                if (object) objects.add(object);
+            }
+            collection.length = 0;
+        }
+        objects.forEach(object => this._disposeEffectObject(object));
+        Object.values(this.textures || {}).forEach(texture => texture?.dispose?.());
+        this.textures = {};
     }
 }
