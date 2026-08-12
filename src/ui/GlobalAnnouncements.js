@@ -1,5 +1,11 @@
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 
+function escapeFeedText(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[char]);
+}
+
 // ============ GLOBAL ANNOUNCEMENTS SYSTEM ============
 // Broadcasts important events to all players on the server to create a sense of
 // community and make the game world feel alive. Shows level-ups, rare drops, achievements.
@@ -10,11 +16,13 @@ export class GlobalAnnouncements {
     this.maxAnnouncements = 50;
     this.feedContainer = null;
     this.socket = null;
+    this._socketHandlers = new Map();
     this._injectStyles();
   }
 
   // Initialize with socket connection
   init(socket) {
+    this._removeSocketListeners();
     this.socket = socket;
     this._createFeedUI();
     this._setupSocketListeners();
@@ -59,7 +67,12 @@ export class GlobalAnnouncements {
   _setupSocketListeners() {
     if (!this.socket) return;
 
-    this.socket.on('player_level_up', (data) => {
+    const bind = (event, handler) => {
+      this._socketHandlers.set(event, handler);
+      this.socket.on(event, handler);
+    };
+
+    bind('player_level_up', (data) => {
       this.addAnnouncement({
         type: 'level-up',
         playerName: data.playerName,
@@ -69,7 +82,7 @@ export class GlobalAnnouncements {
       });
     });
 
-    this.socket.on('rare_drop', (data) => {
+    bind('rare_drop', (data) => {
       this.addAnnouncement({
         type: 'rare-drop',
         playerName: data.playerName,
@@ -80,7 +93,7 @@ export class GlobalAnnouncements {
       });
     });
 
-    this.socket.on('boss_defeated', (data) => {
+    bind('boss_defeated', (data) => {
       this.addAnnouncement({
         type: 'boss-defeated',
         playerName: data.playerName,
@@ -90,7 +103,7 @@ export class GlobalAnnouncements {
       });
     });
 
-    this.socket.on('achievement_unlocked', (data) => {
+    bind('achievement_unlocked', (data) => {
       this.addAnnouncement({
         type: 'achievement',
         playerName: data.playerName,
@@ -100,7 +113,7 @@ export class GlobalAnnouncements {
       });
     });
 
-    this.socket.on('guild_milestone', (data) => {
+    bind('guild_milestone', (data) => {
       this.addAnnouncement({
         type: 'guild-milestone',
         guildName: data.guildName,
@@ -109,6 +122,13 @@ export class GlobalAnnouncements {
         color: '#9fccff',
       });
     });
+  }
+
+  _removeSocketListeners() {
+    if (this.socket) {
+      for (const [event, handler] of this._socketHandlers) this.socket.off(event, handler);
+    }
+    this._socketHandlers.clear();
   }
 
   // Add an announcement to the feed
@@ -131,6 +151,20 @@ export class GlobalAnnouncements {
   _renderAnnouncement(announcement) {
     const list = document.getElementById('global-feed-list');
     if (!list) return;
+
+    announcement = {
+      ...announcement,
+      playerName: escapeFeedText(announcement.playerName),
+      itemName: escapeFeedText(announcement.itemName),
+      rarity: escapeFeedText(announcement.rarity),
+      bossName: escapeFeedText(announcement.bossName),
+      achievementName: escapeFeedText(announcement.achievementName),
+      guildName: escapeFeedText(announcement.guildName),
+      milestone: escapeFeedText(announcement.milestone),
+      message: escapeFeedText(announcement.message),
+      level: Math.max(1, Math.floor(Number(announcement.level) || 1)),
+      color: /^#[0-9a-f]{3,8}$/i.test(String(announcement.color)) ? announcement.color : '#ffcf4a',
+    };
 
     const item = document.createElement('div');
     item.className = `global-feed-item global-feed-${announcement.type}`;
@@ -209,6 +243,14 @@ export class GlobalAnnouncements {
     if (this.socket) {
       this.socket.emit('announce_event', data);
     }
+  }
+
+  destroy() {
+    this._removeSocketListeners();
+    this.socket = null;
+    this.feedContainer?.remove();
+    this.feedContainer = null;
+    this.announcements.length = 0;
   }
 
   // Inject styles
