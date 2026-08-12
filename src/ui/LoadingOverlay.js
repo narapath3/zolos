@@ -20,9 +20,11 @@ export class LoadingOverlay {
         this._particles = [];
         this._tipsIndex = 0;
         this._tipInterval = null;
+        this._tipTimeout = null;
         this._hideTimeout = null;
         this._isVisible = false;
         this._audioCtx = null;
+        this._boundResize = () => this._resizeCanvas();
 
         this.tips = [
             { art: '/assets/items/equipment/sword.png', text: 'สกิล Bash มีโอกาสทำให้เป้าหมายติด Stun และสร้างความเสียหายรุนแรง' },
@@ -118,7 +120,7 @@ export class LoadingOverlay {
         if (!this.canvas) return;
         this.ctx = this.canvas.getContext('2d');
         this._resizeCanvas();
-        window.addEventListener('resize', () => this._resizeCanvas());
+        window.addEventListener('resize', this._boundResize);
 
         // Spawn ambient particles (gold embers, blue mana sparks, purple dust)
         this._particles = [];
@@ -226,7 +228,10 @@ export class LoadingOverlay {
         this.tipIconEl.style.transform = 'scale(0.5)';
         this.tipIconEl.style.opacity = '0';
 
-        setTimeout(() => {
+        clearTimeout(this._tipTimeout);
+        this._tipTimeout = setTimeout(() => {
+            this._tipTimeout = null;
+            if (!this._isVisible) return;
             this.tipIconEl.innerHTML = `<img src="${currentTip.art}" alt="" style="width:100%;height:100%;object-fit:contain">`;
             this.tipTextEl.textContent = currentTip.text;
             this.tipTextEl.style.opacity = '1';
@@ -240,6 +245,8 @@ export class LoadingOverlay {
     show() {
         clearTimeout(this._hideTimeout);
         this._hideTimeout = null;
+        clearTimeout(this._tipTimeout);
+        this._tipTimeout = null;
         if (this._animationFrame) cancelAnimationFrame(this._animationFrame);
         this._animationFrame = null;
         this._isVisible = true;
@@ -300,12 +307,7 @@ export class LoadingOverlay {
         await new Promise(r => setTimeout(r, 600));
 
         this._isVisible = false;
-        if (this._animationFrame) cancelAnimationFrame(this._animationFrame);
-        this._animationFrame = null;
-        if (this._tipInterval) {
-            clearInterval(this._tipInterval);
-            this._tipInterval = null;
-        }
+        this._stopActivity();
 
         // Trigger spectacular portal transition warp animation
         this.overlayEl.classList.add('fade-out-warp');
@@ -317,6 +319,36 @@ export class LoadingOverlay {
             this.overlayEl.classList.remove('active', 'fade-out-warp');
             this._hideTimeout = null;
         }, 900);
+    }
+
+    _stopActivity() {
+        if (this._animationFrame) cancelAnimationFrame(this._animationFrame);
+        this._animationFrame = null;
+        if (this._tipInterval) clearInterval(this._tipInterval);
+        this._tipInterval = null;
+        clearTimeout(this._tipTimeout);
+        this._tipTimeout = null;
+    }
+
+    // Immediate exit used when loading fails or the player returns to login.
+    // It must stop the hidden canvas loop, not merely hide its DOM element.
+    hide() {
+        this._isVisible = false;
+        this._stopActivity();
+        clearTimeout(this._hideTimeout);
+        this._hideTimeout = null;
+        if (!this.overlayEl) return;
+        this.overlayEl.style.display = 'none';
+        this.overlayEl.classList.remove('active', 'fade-out-warp');
+    }
+
+    destroy() {
+        this.hide();
+        window.removeEventListener('resize', this._boundResize);
+        if (this._audioCtx && this._audioCtx.state !== 'closed') {
+            this._audioCtx.close().catch(() => {});
+        }
+        this._audioCtx = null;
     }
 }
 
