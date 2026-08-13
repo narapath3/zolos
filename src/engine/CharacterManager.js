@@ -2211,7 +2211,8 @@ export class CharacterManager {
     // Achievement titles rendered above the name. Glow color feeds the canvas
     // shadowBlur; the sprite itself gets a soft pulse in update().
     static TITLE_META = {
-        master_angler: { text: '🏆 Master Angler', color: '#ffd24a', glow: '#ffb020' },
+        master_angler: { text: '🏆 Master Angler', color: '#ffd24a', edge: '#ffe9a0', glow: '#ffb020' },
+        bug_hunter: { text: '🐞 Bug Hunter', color: '#ff303f', edge: '#ff9aa2', glow: '#ff1028' },
     };
 
     setTitle(titleId) {
@@ -2250,9 +2251,9 @@ export class CharacterManager {
             ctx.shadowColor = meta.glow;
             ctx.shadowBlur = 12;
             const grad = ctx.createLinearGradient(60, 0, 260, 0);
-            grad.addColorStop(0, '#ffe9a0');
+            grad.addColorStop(0, meta.edge || meta.color);
             grad.addColorStop(0.5, meta.color);
-            grad.addColorStop(1, '#ffe9a0');
+            grad.addColorStop(1, meta.edge || meta.color);
             ctx.fillStyle = grad;
             ctx.fillText(meta.text, 160, 28);
             ctx.fillText(meta.text, 160, 28);

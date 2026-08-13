@@ -293,7 +293,8 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorl
                 if (inv.rows[0]) {
                     await client.query('UPDATE inventory SET quantity=quantity+$2 WHERE id=$1', [inv.rows[0].id,itemQty]);
                 } else {
-                    await client.query('INSERT INTO inventory (character_id,item_name,item_type,quantity,stats) VALUES ($1,$2,$3,$4,$5)', [report.character_id,itemName,'special',itemQty,{}]);
+                    const rewardType = itemName === 'Bug Hunter Emblem' ? 'title' : 'special';
+                    await client.query('INSERT INTO inventory (character_id,item_name,item_type,quantity,stats) VALUES ($1,$2,$3,$4,$5)', [report.character_id,itemName,rewardType,itemQty,{}]);
                 }
                 const money = await client.query('UPDATE characters SET gold=gold+$2,updated_at=now() WHERE id=$1 RETURNING gold', [report.character_id,gold]);
                 if (!money.rows[0]) throw httpErr(404, 'ไม่พบตัวละครผู้แจ้งบัค');

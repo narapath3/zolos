@@ -1469,6 +1469,17 @@ export function getEquipSlot(itemName) {
 }
 
 // ===== CARDS =====
+// Reward-only title token. It is intentionally not sold by any shop and has
+// zero resale value; admins grant it for approved, useful bug reports.
+ITEMS['Bug Hunter Emblem'] = {
+    emoji: '🐞', type: 'title', rarity: 'legendary', price: 0,
+    desc: 'ตราเกียรติยศสำหรับผู้ช่วยค้นพบบัค กดใช้งานเพื่อเปิดหรือปิดป้าย Bug Hunter สีแดงเรืองแสงเหนือชื่อตัวละคร',
+};
+ITEMS['Master Angler Trophy'] = {
+    emoji: '🏆', type: 'title', rarity: 'legendary', price: 0,
+    desc: 'ถ้วยรางวัลสำหรับผู้จับปลาครบทุกชนิด กดใช้งานเพื่อเปิดหรือปิดป้าย Master Angler สีทองเรืองแสงเหนือชื่อตัวละคร',
+};
+
 // Which card category a paper-doll slot accepts. A card fits a slot only when
 // its `cardSlot` equals this category.
 export function cardCategoryForSlot(slotId) {

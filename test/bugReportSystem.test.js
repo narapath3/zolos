@@ -5,6 +5,9 @@ import fs from 'node:fs';
 const playerApi = fs.readFileSync(new URL('../server/api/bugReports.js', import.meta.url), 'utf8');
 const adminApi = fs.readFileSync(new URL('../server/api/admin.js', import.meta.url), 'utf8');
 const ui = fs.readFileSync(new URL('../src/ui/BugReportUI.js', import.meta.url), 'utf8');
+const gameUi = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+const character = fs.readFileSync(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
+const gameData = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
 
 test('bug reports authenticate ownership and bound screenshot input', () => {
   assert.match(playerApi, /authFromReq\(req\)/);
@@ -54,4 +57,24 @@ test('admin bug API enables configured cross-origin frontend access', () => {
   assert.match(adminApi, /import cors from 'cors'/);
   assert.match(adminApi, /allowedOrigins/);
   assert.match(adminApi, /r\.use\(cors/);
+});
+
+test('Bug Hunter Emblem toggles a persisted glowing red name title', () => {
+  assert.match(gameData, /ITEMS\['Bug Hunter Emblem'\]/);
+  assert.match(gameData, /type: 'title'/);
+  assert.match(gameData, /price: 0/);
+  assert.match(character, /bug_hunter: \{ text: '🐞 Bug Hunter'/);
+  assert.match(character, /color: '#ff303f'/);
+  assert.match(gameUi, /_toggleTitleItem/);
+  assert.match(gameUi, /item\.stats\.equipped = enabled/);
+  assert.match(gameUi, /setInventoryItemQuantity\(this\.characterId,item\.item_name,'title'/);
+  assert.match(gameUi, /setTitle\(enabled \? definition\.id : null\)/);
+});
+
+test('Master Angler Trophy uses the same persisted title toggle', () => {
+  assert.match(gameData, /ITEMS\['Master Angler Trophy'\]/);
+  assert.match(gameData, /Master Angler Trophy'[\s\S]*?type: 'title'/);
+  assert.match(gameUi, /'Master Angler Trophy': \{ id:'master_angler'/);
+  assert.match(gameUi, /Only one floating name title may be active/);
+  assert.doesNotMatch(gameUi, /this\.almanac\.claimed\.includes\('all'\)[\s\S]{0,150}setTitle\('master_angler'\)/);
 });

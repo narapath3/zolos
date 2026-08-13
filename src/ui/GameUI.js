@@ -836,12 +836,12 @@ export class GameUI {
     const meta = ITEMS[item.item_name];
     return {
       item_name: item.item_name,
-      item_type: item.item_type || meta?.type || 'material',
+      item_type: ['Bug Hunter Emblem', 'Master Angler Trophy'].includes(item.item_name) ? 'title' : (item.item_type || meta?.type || 'material'),
       quantity: item.quantity,
       emoji: meta?.emoji || item.emoji || '📦',
       rarity: meta?.rarity || 'common',
       desc: meta?.desc || 'ไม่มีข้อมูลรายละเอียดสเตตัสเพิ่มเติมสำหรับไอเทมสไตล์ RO ชิ้นนี้',
-      price: meta?.price || 10,
+      price: meta?.price ?? 10,
       healHp: meta?.healHp || 0,
       restoreSp: meta?.restoreSp || 0,
       stats: item.stats || {}
@@ -1027,6 +1027,15 @@ export class GameUI {
       const equippedPick = this.inventory.find(i => i.item_type === 'tool' && i.stats && i.stats.equipped === true);
       if (this.character) this.character.equippedPickaxe = equippedPick ? equippedPick.item_name : null;
 
+      // Reward title items persist their on/off state in inventory stats. Match
+      // by name too so emblems granted before item_type="title" was introduced
+      // remain fully usable without a database migration.
+      const bugEmblem = this.inventory.find(i => i.item_name === 'Bug Hunter Emblem');
+      const anglerTrophy = this.inventory.find(i => i.item_name === 'Master Angler Trophy');
+      if (this.character && bugEmblem?.stats?.equipped === true) this.character.setTitle('bug_hunter');
+      else if (this.character && anglerTrophy?.stats?.equipped === true) this.character.setTitle('master_angler');
+      else if (this.character && ['bug_hunter','master_angler'].includes(this.character.title)) this.character.setTitle(null);
+
       // Already handled weapon restoration above
     } catch (e) {
       if (!isCurrent()) return;
@@ -1195,10 +1204,7 @@ export class GameUI {
     } catch (e) {
       console.error('[Zolos] Failed to load fishing almanac:', e);
     }
-    // Restore the Master Angler title for completed collectors
-    if (this.almanac.claimed.includes('all') && this.character && this.character.setTitle) {
-      this.character.setTitle('master_angler');
-    }
+    // The trophy's persisted equipped flag controls title visibility.
   }
 
   async _saveFishingAlmanac() {
@@ -1221,7 +1227,7 @@ export class GameUI {
       uncommon: { gold: 8000 },
       rare: { gold: 20000 },
       legendary: { gold: 60000 },
-      all: { gold: 150000, item: { name: 'Master Angler Trophy', type: 'material', emoji: '🏆', rarity: 'legendary', price: 99999, desc: 'ถ้วยรางวัลสุดยอดนักตกปลา — จับปลาครบทุกชนิดในสมุดสะสม!' } },
+      all: { gold: 150000, item: { name: 'Master Angler Trophy', type: 'title', emoji: '🏆', rarity: 'legendary', price: 0, desc: 'ถ้วยรางวัลสุดยอดนักตกปลา — กดใช้เพื่อเปิด/ปิดป้าย Master Angler!' } },
     };
   }
 
@@ -1311,10 +1317,9 @@ export class GameUI {
     this.addCombatLog(`🏅 รับรางวัลสะสมปลา "${label}": +${(reward.gold || 0).toLocaleString()} Gold${reward.item ? ` + ${reward.item.emoji} ${reward.item.name}` : ''}!`, 'levelup');
     if (this.soundManager) this.soundManager.playLevelUpSound();
 
-    // Completing the whole almanac awards the glowing Master Angler title
+    // Award the title item; the player chooses when to show the nameplate.
     if (tier === 'all' && this.character && this.character.setTitle) {
-      this.character.setTitle('master_angler');
-      this.addCombatLog('👑 ปลดล็อกฉายา "🏆 Master Angler" — เรืองแสงเหนือหัวให้ทุกคนเห็น!', 'levelup');
+      this.addCombatLog('👑 ปลดล็อกป้าย "🏆 Master Angler" — เปิดใช้งานได้จากกระเป๋า!', 'levelup');
       if (this.triggerScreenShake) this.triggerScreenShake(true);
       try {
         if (window.particles && this.character.getPosition) window.particles.createExplosion(this.character.getPosition(), 0xffd24a);
@@ -2693,6 +2698,10 @@ export class GameUI {
       typeStr = 'Glasses · แว่นตา';
     } else if (item.item_type === 'pet') {
       typeStr = 'Pet · สัตว์เลี้ยง';
+    } else if (item.item_type === 'title' || ['Bug Hunter Emblem','Master Angler Trophy'].includes(item.item_name)) {
+      useBtn.style.display = 'block';
+      const titleLabel = item.item_name === 'Master Angler Trophy' ? 'Master Angler' : 'Bug Hunter';
+      useBtn.textContent = item.stats?.equipped === true ? `ปิดป้าย ${titleLabel}` : `เปิดป้าย ${titleLabel}`;
     } else if (item.item_type === 'card') {
       const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[ITEMS[item.item_name]?.cardSlot] || 'การ์ด';
       typeStr = 'Card · ' + catLabel;
@@ -2844,6 +2853,11 @@ export class GameUI {
     if (itemIdx === -1) return;
 
     const item = this.inventory[itemIdx];
+
+    if (item.item_type === 'title' || ['Bug Hunter Emblem','Master Angler Trophy'].includes(item.item_name)) {
+      await this._toggleTitleItem(item);
+      return;
+    }
 
     if (['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool', 'pet'].includes(item.item_type)) {
       await this._toggleEquipItem(item);
@@ -7232,7 +7246,7 @@ export class GameUI {
     // per-instance from the pet popup so each named pet is handled individually.
     // Cards are excluded — they can only be traded to other players via the
     // P2P market (My Card → ตั้งขายให้ผู้เล่น), never sold to the NPC shop.
-    const sellableItems = this.inventory.filter(i => !this._isItemEquipped(i) && i.item_type !== 'pet' && i.item_type !== 'card');
+    const sellableItems = this.inventory.filter(i => !this._isItemEquipped(i) && !['pet','card','title'].includes(i.item_type));
 
     sellableItems.forEach(item => {
       const slot = document.createElement('div');
@@ -7541,6 +7555,37 @@ export class GameUI {
 
   }
 
+  async _toggleTitleItem(item) {
+    if (!this.character) return;
+    const definitions = {
+      'Bug Hunter Emblem': { id:'bug_hunter',label:'Bug Hunter',icon:'🐞' },
+      'Master Angler Trophy': { id:'master_angler',label:'Master Angler',icon:'🏆' },
+    };
+    const definition = definitions[item.item_name];
+    if (!definition) return;
+    if (!item.stats) item.stats = {};
+    const enabled = item.stats.equipped !== true;
+    if (enabled) {
+      // Only one floating name title may be active at once.
+      for (const other of this.inventory) {
+        if (other !== item && definitions[other.item_name] && other.stats?.equipped === true) {
+          other.stats.equipped = false;
+          if (this.characterId) await setInventoryItemQuantity(this.characterId,other.item_name,'title',Math.max(1,Number(other.quantity)||1),other.stats);
+        }
+      }
+    }
+    item.stats.equipped = enabled;
+    item.item_type = 'title';
+    this.character.setTitle(enabled ? definition.id : null);
+    if (this.characterId) {
+      await setInventoryItemQuantity(this.characterId,item.item_name,'title',Math.max(1,Number(item.quantity)||1),item.stats);
+      await this.character.saveStatsToDatabase();
+    }
+    this.soundManager?.playUseItemSound?.();
+    this.addCombatLog(enabled?`${definition.icon} เปิดป้าย ${definition.label} เรืองแสงแล้ว!`:`ปิดป้าย ${definition.label} แล้ว`,'system');
+    this._renderInventory();
+  }
+
 
   // ============ P2P Marketplace Logic ============
   _setupMarketEvents() {
@@ -7720,7 +7765,7 @@ export class GameUI {
     // per-instance from the pet popup; cards are excluded entirely — they are
     // traded only player-to-player via the dedicated card P2P modal (My Card).
     const sellable = this.inventory.filter(item =>
-      item.item_type !== 'pet' && item.item_type !== 'card' && this._sellableQty(item) >= 1);
+      !['pet','card','title'].includes(item.item_type) && this._sellableQty(item) >= 1);
 
     if (sellable.length === 0) {
       grid.innerHTML = '<div style="grid-column:span 4;text-align:center;color:var(--text-dim);font-size:9.5px;padding:30px 0;">ไม่มีไอเทมที่สามารถตั้งขายได้ (ไอเทมที่สวมใส่อยู่จะไม่สามารถตั้งขายได้)</div>';
