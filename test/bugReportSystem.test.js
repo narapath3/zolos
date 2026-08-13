@@ -100,3 +100,9 @@ test('title rewards use shield art, standard tab styling, and no consumable quan
   assert.match(gameUi, /'tool', 'title'/);
   assert.match(adminApi, /UPDATE inventory SET quantity=1,item_type='title'/);
 });
+
+test('title reward detail exposes a working permanent on-off control', () => {
+  assert.match(gameUi, /const useBtn = document\.getElementById\('btn-use-item'\);[\s\S]*?let typeStr/);
+  assert.match(gameUi, /typeStr = 'Permanent Title'/);
+  assert.match(gameUi, /else if \(item\.item_type === 'title' \|\| \['Bug Hunter Emblem','Master Angler Trophy'\]\.includes\(item\.item_name\)\) \{[\s\S]*?useBtn\.style\.display = 'block';[\s\S]*?useBtn\.textContent = item\.stats\?\.equipped === true/);
+});

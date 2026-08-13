@@ -2688,6 +2688,7 @@ export class GameUI {
       nameEl.classList.add(`color-${item.rarity}`);
     }
 
+    const useBtn = document.getElementById('btn-use-item');
     let typeStr = 'Etc. Item';
     if (item.item_type === 'consumable') {
       typeStr = 'Usable Item';
@@ -2708,9 +2709,7 @@ export class GameUI {
     } else if (item.item_type === 'pet') {
       typeStr = 'Pet · สัตว์เลี้ยง';
     } else if (item.item_type === 'title' || ['Bug Hunter Emblem','Master Angler Trophy'].includes(item.item_name)) {
-      useBtn.style.display = 'block';
-      const titleLabel = item.item_name === 'Master Angler Trophy' ? 'Master Angler' : 'Bug Hunter';
-      useBtn.textContent = item.stats?.equipped === true ? `ปิดป้าย ${titleLabel}` : `เปิดป้าย ${titleLabel}`;
+      typeStr = 'Permanent Title';
     } else if (item.item_type === 'card') {
       const catLabel = { weapon: 'อาวุธ', armor: 'เกราะ', shield: 'โล่', accessory: 'เครื่องประดับ' }[ITEMS[item.item_name]?.cardSlot] || 'การ์ด';
       typeStr = 'Card · ' + catLabel;
@@ -2826,7 +2825,6 @@ export class GameUI {
     });
     document.getElementById('detail-price-val').textContent = item.price;
 
-    const useBtn = document.getElementById('btn-use-item');
     if (item.item_type === 'consumable') {
       useBtn.style.display = 'block';
       useBtn.textContent = `ใช้งาน (x${item.quantity})`;
@@ -2838,6 +2836,10 @@ export class GameUI {
     } else if (item.item_type === 'card') {
       useBtn.style.display = 'block';
       useBtn.textContent = 'ใส่การ์ด';
+    } else if (item.item_type === 'title' || ['Bug Hunter Emblem','Master Angler Trophy'].includes(item.item_name)) {
+      useBtn.style.display = 'block';
+      const titleLabel = item.item_name === 'Master Angler Trophy' ? 'Master Angler' : 'Bug Hunter';
+      useBtn.textContent = item.stats?.equipped === true ? `ปิดป้าย ${titleLabel}` : `เปิดป้าย ${titleLabel}`;
     } else {
       useBtn.style.display = 'none';
     }
