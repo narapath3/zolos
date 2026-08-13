@@ -80,7 +80,11 @@ export class BugReportUI {
     panel.querySelector('[data-remove]').onclick = () => { this.screenshot=''; this.renderShot(panel); };
     panel.querySelector('[data-history]').onclick = () => this.showHistory(panel);
     panel.querySelector('[data-form]').onsubmit = e => this.submit(e, panel);
-    await this.takeScreenshot(panel);
+    // Do not request screen-sharing permission while the report dialog opens.
+    // Some browsers keep getDisplayMedia pending behind their picker, making
+    // the game look frozen. Capturing is optional and starts only from the
+    // explicit "แคปหน้าจอใหม่" button below.
+    panel.querySelector('[data-status]').textContent = 'กรอกรายละเอียดได้ทันที • แนบภาพได้จากปุ่มแคปหน้าจอ';
   }
 
   async takeScreenshot(panel) {

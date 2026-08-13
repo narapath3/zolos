@@ -27,4 +27,5 @@ test('player capture is permission-driven and can be removed before submission',
   assert.match(ui, /getTracks\(\)\.forEach\(track => track\.stop\(\)\)/);
   assert.match(ui, /data-remove/);
   assert.match(ui, /toDataURL\('image\/jpeg', 0\.7\)/);
+  assert.doesNotMatch(ui, /await this\.takeScreenshot\(panel\);/);
 });
