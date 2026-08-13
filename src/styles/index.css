@@ -2791,6 +2791,25 @@ a,
   text-shadow: none;
 }
 
+.inv-tab--titles {
+  color: #ffd86b;
+  border-color: rgba(255, 205, 72, 0.45);
+}
+
+.inv-title-badge {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  padding: 2px 4px;
+  border: 1px solid #ffda68;
+  border-radius: 4px;
+  background: rgba(85, 32, 8, 0.92);
+  color: #fff1a6;
+  font: 700 7px/1 var(--font-pixel);
+  text-shadow: 0 0 5px #ff6a32;
+  pointer-events: none;
+}
+
 .wiki-search-box {
   margin-bottom: 12px;
 }
@@ -5942,9 +5961,14 @@ a,
   /* Tabs: shrink for mobile */
   .inventory-tabs {
     gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
   }
 
   .inv-tab {
+    flex: 0 0 auto;
+    min-width: 58px;
     font-size: 9px;
     padding: 5px 0;
   }

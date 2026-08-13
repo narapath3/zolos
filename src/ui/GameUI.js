@@ -1616,11 +1616,19 @@ export class GameUI {
       }
     } else if (this.currentTab === 'etc') {
       filtered = this.inventory.filter(i => i.item_type === 'material' || i.item_type === 'tool' || i.item_type === 'title');
+    } else if (this.currentTab === 'title') {
+      filtered = this.inventory.filter(i => i.item_type === 'title');
     } else if (this.currentTab === 'fish') {
       filtered = this.inventory.filter(i => i.item_type === 'fish');
     } else if (this.currentTab === 'pet') {
       // Expand each owned pet into its own slot so each can be named/summoned.
       filtered = this._allPetInstances().map(pi => ({ __pet: true, item: pi.item, inst: pi.inst }));
+    }
+
+    // Reward titles are rare and actionable: keep them at the front of mixed
+    // All/Etc views so players do not have to hunt through material stacks.
+    if (this.currentTab === 'all' || this.currentTab === 'etc') {
+      filtered.sort((a,b) => Number(b.item_type === 'title') - Number(a.item_type === 'title'));
     }
 
     // Fill inventory slots
@@ -1666,6 +1674,7 @@ export class GameUI {
                   ${itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji)}
                   <span class="inv-qty">${item.quantity}</span>
                   ${rfLvl > 0 ? `<span style="position:absolute;top:1px;left:3px;font-size:10px;font-weight:900;color:${refineTierColor(rfLvl)};text-shadow:0 1px 2px #000;">+${rfLvl}</span>` : ''}
+                  ${item.item_type === 'title' ? '<span class="inv-title-badge">TITLE</span>' : ''}
                   ${isEquipped ? '<span class="inv-equipped-badge">E</span>' : ''}
                 `;
         slot.title = `${item.item_name} x${item.quantity}${isEquipped ? ' (Equipped)' : ''}`;

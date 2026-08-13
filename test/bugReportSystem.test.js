@@ -8,6 +8,8 @@ const ui = fs.readFileSync(new URL('../src/ui/BugReportUI.js', import.meta.url),
 const gameUi = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 const character = fs.readFileSync(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
 const gameData = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
+const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
 
 test('bug reports authenticate ownership and bound screenshot input', () => {
   assert.match(playerApi, /authFromReq\(req\)/);
@@ -78,4 +80,13 @@ test('Master Angler Trophy uses the same persisted title toggle', () => {
   assert.match(gameUi, /Only one floating name title may be active/);
   assert.doesNotMatch(gameUi, /this\.almanac\.claimed\.includes\('all'\)[\s\S]{0,150}setTitle\('master_angler'\)/);
   assert.match(gameUi, /i\.item_type === 'material' \|\| i\.item_type === 'tool' \|\| i\.item_type === 'title'/);
+});
+
+test('reward titles are easy to find in a dedicated mobile-safe inventory tab', () => {
+  assert.match(html, /data-tab="title">🏅 Titles/);
+  assert.match(gameUi, /this\.currentTab === 'title'/);
+  assert.match(gameUi, /filtered\.sort\([\s\S]*?item_type === 'title'/);
+  assert.match(gameUi, /inv-title-badge/);
+  assert.match(css, /\.inv-title-badge/);
+  assert.match(css, /\.inventory-tabs[\s\S]*?overflow-x: auto/);
 });
