@@ -21,6 +21,7 @@ let cardFusionSocket = null;
 const pendingCardFusions = new Map();
 const pendingOreConversions = new Map();
 const pendingPetPurchases = new Map();
+const pendingNpcSales = new Map();
 let clientMeasuredPing = null;
 const inventoryMutationQueues = new Map();
 
@@ -65,6 +66,7 @@ function rejectPendingSocketRequests() {
     const message = 'การเชื่อมต่อหลุด กรุณารอให้เชื่อมต่อใหม่แล้วลองอีกครั้ง';
     rejectPendingMap(pendingOreConversions, message);
     rejectPendingMap(pendingPetPurchases, message);
+    rejectPendingMap(pendingNpcSales, message);
     rejectPendingMap(pendingCardFusions, message);
     rejectPendingMap(pendingCardRefines, message);
 }
@@ -162,6 +164,30 @@ function attachPetPurchaseListeners(socket) {
         clearTimeout(pending.timeout);
         pendingPetPurchases.delete(error.requestId);
         pending.reject(new Error(error?.message || 'ซื้อสัตว์เลี้ยงไม่สำเร็จ'));
+    });
+}
+
+export function requestNpcSale(itemName, quantity, requestId) {
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม');
+    if (pendingNpcSales.has(requestId)) throw new Error('กำลังดำเนินการขายนี้อยู่');
+    if (!socket._zolosNpcSaleListeners) {
+        socket._zolosNpcSaleListeners = true;
+        socket.on('npc_sell_result', result => {
+            const pending = pendingNpcSales.get(result?.requestId); if (!pending) return;
+            clearTimeout(pending.timeout); pendingNpcSales.delete(result.requestId);
+            if (!Number.isSafeInteger(result.gold) || !Number.isSafeInteger(result.remaining)) return pending.reject(new Error('ผลการขายไม่ถูกต้อง'));
+            pending.resolve(result);
+        });
+        socket.on('npc_sell_error', error => {
+            const pending = pendingNpcSales.get(error?.requestId); if (!pending) return;
+            clearTimeout(pending.timeout); pendingNpcSales.delete(error.requestId); pending.reject(new Error(error.message || 'ขายไม่สำเร็จ'));
+        });
+    }
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => { pendingNpcSales.delete(requestId); reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า ไอเทมยังไม่ถูกขาย')); }, 12000);
+        pendingNpcSales.set(requestId, { resolve, reject, timeout });
+        socket.emit('npc_sell', { itemName, quantity, requestId });
     });
 }
 

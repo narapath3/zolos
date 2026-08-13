@@ -1,6 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
 import { observeItemPortraits } from './ItemPortraitRenderer.js';
@@ -7492,6 +7492,21 @@ export class GameUI {
     const itemData = ITEMS[item.item_name] || {};
     const sellPrice = this._sellUnitPrice({ ...item, price: itemData.price || item.price || 10 });
     const totalGold = sellPrice * qty;
+
+    const isOnlineAccount = this.characterId && !String(this.characterId).startsWith('guest_') && !String(this.characterId).startsWith('local_');
+    if (isOnlineAccount) {
+      try {
+        const requestId = `npc-sell:${this.characterId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+        const result = await requestNpcSale(item.item_name, qty, requestId);
+        invItem.quantity = result.remaining;
+        if (invItem.quantity <= 0) { this.inventory = this.inventory.filter(i => i !== invItem); this.selectedSellShopItem = null; }
+        this.character.stats.gold = result.gold;
+        this._renderSellShop(); this._renderInventory(); this.updateHUD(this.character.stats); this.updateStats(this.character.stats);
+        this.addCombatLog(`💰 ขาย ${item.emoji || '📦'} ${item.item_name} x${qty} ได้ ${result.gold_gained.toLocaleString()} Zeny`, 'gold');
+        this.soundManager?.playBuySellSound?.();
+      } catch (error) { this.addCombatLog(`❌ ขายไม่สำเร็จ: ${error.message}`, 'warning'); }
+      return;
+    }
 
     invItem.quantity -= qty;
     if (invItem.quantity <= 0) {

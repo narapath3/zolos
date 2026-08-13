@@ -19,6 +19,7 @@ import { ensureMonsterTables, seedMonstersIfEmpty, ensurePronteraMountainExpansi
 import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconomy.js';
 import { ensureOreEconomy } from './api/oreEconomy.js';
 import { ensurePetEconomy, PET_CATALOG } from './api/petEconomy.js';
+import { ensureNpcSaleEconomy, sellItemToNpc } from './api/npcSale.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -1096,6 +1097,19 @@ io.on('connection', (socket) => {
         relayRequest('trade_request', { ...payload, senderCharacterId: sender.characterId }, sender);
     });
 
+    socket.on('npc_sell', async (payload) => {
+        const player = trustedSender(socket);
+        const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+        const reject = message => socket.emit('npc_sell_error', { requestId, message });
+        if (!player?.verified || !player.characterId) return reject('กรุณาเข้าสู่ระบบก่อนขาย');
+        if (!/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) return reject('รหัสคำขอไม่ถูกต้อง');
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'npc_sell', 8, 10000)) return reject('ขายถี่เกินไป กรุณารอสักครู่');
+        try {
+            const result = await sellItemToNpc({ characterId:player.characterId, userId:player.userId, itemName:String(payload.itemName || ''), quantity:payload.quantity, requestId });
+            socket.emit('npc_sell_result', result);
+        } catch (error) { reject(error.message || 'ขายไม่สำเร็จ'); }
+    });
+
     socket.on('trade_response', (payload) => {
         const sender = trustedSender(socket);
         if (!sender?.verified || !isTradeEnvelope(payload) || typeof payload.accepted !== 'boolean') return;
@@ -1848,6 +1862,7 @@ httpServer.listen(PORT, HOST, () => {
                 await ensureCardEconomy();
                 await ensureOreEconomy();
                 await ensurePetEconomy();
+                await ensureNpcSaleEconomy();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
         })();
