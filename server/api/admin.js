@@ -3,6 +3,7 @@
 // in through the normal /api/auth/login (reusing the in-game admin account),
 // then calls these endpoints with that bearer token.
 import express from 'express';
+import cors from 'cors';
 import { query, tx } from './db.js';
 import { authFromReq, httpErr } from './auth.js';
 import * as ipMonitor from './ipMonitor.js';
@@ -35,6 +36,14 @@ function clampNum(key, val) {
 
 export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorld } = {}) {
     const r = express.Router();
+    const allowedOrigins = new Set((process.env.CORS_ORIGINS || '').split(',').map(x => x.trim()).filter(Boolean));
+    r.use(cors({
+        origin: (origin, callback) => {
+            if (!origin || process.env.CORS_ALLOW_ALL === 'true' || allowedOrigins.has(origin)) return callback(null, true);
+            return callback(null, false);
+        },
+        credentials: true,
+    }));
     r.use(express.json({ limit: '256kb' }));
 
     // Called after any world-config edit: bump the version, tell the running

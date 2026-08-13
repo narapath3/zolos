@@ -51,7 +51,7 @@ export function registerBugReportRoutes(router, wrap) {
     router.get('/bug-reports/mine', wrap(async (req, res) => {
         const auth = authFromReq(req);
         if (!auth) throw httpErr(401, 'กรุณาเข้าสู่ระบบ');
-        const { rows } = await query(`SELECT id,category,title,status,admin_note,reward_item_name,reward_item_quantity,reward_gold,created_at,reviewed_at
+        const { rows } = await query(`SELECT id,category,title,details,screenshot_data,context,status,admin_note,reward_item_name,reward_item_quantity,reward_gold,created_at,reviewed_at
             FROM bug_reports WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20`, [String(auth.userId)]);
         res.json({ reports:rows });
     }));

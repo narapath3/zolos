@@ -32,7 +32,10 @@ export function createApiRouter() {
     // cards, quests, friends, almanac, marketplace, stalls, leaderboard), so
     // the window must comfortably fit several players loading at once.
     const onLimited = (req, res) => { ipMonitor.recordRateLimited(req.ip); res.status(429).json({ error: 'Too many requests' }); };
-    const generalLimiter = rateLimit({ windowMs: 60_000, max: 1200, standardHeaders: true, legacyHeaders: false, handler: onLimited });
+    // Bug reports have their own authenticated + database-backed quota. Do not
+    // let unrelated game polling behind carrier-grade NAT block report history.
+    const generalLimiter = rateLimit({ windowMs: 60_000, max: 1200, standardHeaders: true, legacyHeaders: false, handler: onLimited,
+        skip: req => req.path.startsWith('/bug-reports') });
     const authLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false, handler: onLimited });
     r.use(generalLimiter);
 

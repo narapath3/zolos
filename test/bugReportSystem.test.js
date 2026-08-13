@@ -40,3 +40,18 @@ test('bug report dialog is mobile safe and hides game controls while open', () =
   assert.match(ui, /updateMobileControlsVisibility/);
   assert.match(ui, /touch-action:manipulation/);
 });
+
+test('report history exposes clickable detail and explicit review states', () => {
+  assert.match(playerApi, /details,screenshot_data,context,status/);
+  assert.match(ui, /showHistoryDetail/);
+  assert.match(ui, /อนุมัติแล้ว/);
+  assert.match(ui, /ไม่อนุมัติ/);
+  assert.match(ui, /รอตรวจสอบ/);
+  assert.match(ui, /ข้อความจากแอดมิน/);
+});
+
+test('admin bug API enables configured cross-origin frontend access', () => {
+  assert.match(adminApi, /import cors from 'cors'/);
+  assert.match(adminApi, /allowedOrigins/);
+  assert.match(adminApi, /r\.use\(cors/);
+});

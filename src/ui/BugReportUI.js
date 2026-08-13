@@ -168,14 +168,42 @@ export class BugReportUI {
     try {
       const { reports } = await request('/bug-reports/mine');
       const zone = panel.querySelector('[data-shot-zone]'); zone.replaceChildren();
+      zone.style.maxHeight = '46dvh'; zone.style.overflow = 'auto';
       if (!reports.length) zone.textContent='ยังไม่มีประวัติการแจ้งบัค';
       for (const report of reports) {
-        const row=document.createElement('div'); row.style.cssText='text-align:left;padding:9px;border-bottom:1px solid #32445f';
-        const reward=report.status==='approved'?` • 🎁 ${report.reward_item_name} x${report.reward_item_quantity} + ${Number(report.reward_gold).toLocaleString()} Zeny`:'';
-        row.textContent=`${report.status==='approved'?'✅':report.status==='rejected'?'❌':'⏳'} ${report.title}${reward}`; zone.appendChild(row);
+        const row=document.createElement('button'); row.type='button';
+        row.style.cssText='display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:11px 8px;border:0;border-bottom:1px solid #32445f;background:transparent;color:#eef6ff';
+        const label=document.createElement('span'); label.style.cssText='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'; label.textContent=report.title;
+        const badge=document.createElement('span'); badge.style.cssText=`flex:none;padding:4px 8px;border-radius:999px;font-size:11px;background:${report.status==='approved'?'#176640':report.status==='rejected'?'#752e38':'#6b541d'}`;
+        badge.textContent=report.status==='approved'?'✅ อนุมัติแล้ว':report.status==='rejected'?'❌ ไม่อนุมัติ':'⏳ รอตรวจสอบ';
+        row.append(label,badge); row.onclick=()=>this.showHistoryDetail(panel,report,reports); zone.appendChild(row);
       }
-      status.textContent='';
+      status.textContent=reports.length?'แตะรายการเพื่อดูรายละเอียดและสถานะ':'';
     } catch(error) { status.textContent=`โหลดไม่สำเร็จ: ${error.message}`; }
+  }
+
+  showHistoryDetail(panel, report, reports) {
+    const zone=panel.querySelector('[data-shot-zone]'); zone.replaceChildren(); zone.style.maxHeight='50dvh'; zone.style.overflow='auto';
+    const back=document.createElement('button'); back.type='button'; back.textContent='← กลับไปประวัติ'; back.style.cssText='display:block;margin-bottom:10px;background:#263b5a;color:white;border:0;border-radius:7px;padding:8px 11px';
+    back.onclick=()=>this.renderHistoryList(panel,reports);
+    const title=document.createElement('h3'); title.textContent=report.title; title.style.cssText='text-align:left;margin:5px 0;color:#75c8ff';
+    const state=document.createElement('div'); state.style.cssText='text-align:left;font-weight:800;margin-bottom:9px'; state.textContent=`สถานะ: ${report.status==='approved'?'✅ อนุมัติแล้ว':report.status==='rejected'?'❌ ไม่อนุมัติ':'⏳ รอตรวจสอบ'}`;
+    const date=document.createElement('div'); date.style.cssText='text-align:left;color:#9eb0c8;font-size:12px;margin-bottom:9px'; date.textContent=`ส่งเมื่อ ${new Date(report.created_at).toLocaleString('th-TH')}${report.reviewed_at?` • ดำเนินการ ${new Date(report.reviewed_at).toLocaleString('th-TH')}`:''}`;
+    const details=document.createElement('div'); details.style.cssText='text-align:left;white-space:pre-wrap;padding:10px;background:#091121;border-radius:8px'; details.textContent=report.details;
+    zone.append(back,title,state,date,details);
+    if(report.screenshot_data){const image=new Image();image.src=report.screenshot_data;image.alt='ภาพประกอบรายงาน';image.style.cssText='display:block;max-width:100%;max-height:300px;margin:10px auto;border-radius:8px';zone.appendChild(image);}
+    if(report.admin_note){const note=document.createElement('div');note.style.cssText='text-align:left;margin-top:10px;padding:9px;border-left:3px solid #75c8ff;background:#162238';note.textContent=`ข้อความจากแอดมิน: ${report.admin_note}`;zone.appendChild(note);}
+    if(report.status==='approved'){const reward=document.createElement('div');reward.style.cssText='text-align:left;margin-top:10px;color:#8ff0b8;font-weight:800';reward.textContent=`🎁 รางวัล: ${report.reward_item_name} x${report.reward_item_quantity} + ${Number(report.reward_gold).toLocaleString()} Zeny`;zone.appendChild(reward);}
+  }
+
+  renderHistoryList(panel, reports) {
+    const zone=panel.querySelector('[data-shot-zone]'); zone.replaceChildren(); zone.style.maxHeight='46dvh'; zone.style.overflow='auto';
+    for(const report of reports){
+      const row=document.createElement('button');row.type='button';row.style.cssText='display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;text-align:left;padding:11px 8px;border:0;border-bottom:1px solid #32445f;background:transparent;color:#eef6ff';
+      const label=document.createElement('span');label.style.cssText='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';label.textContent=report.title;
+      const badge=document.createElement('span');badge.style.cssText=`flex:none;padding:4px 8px;border-radius:999px;font-size:11px;background:${report.status==='approved'?'#176640':report.status==='rejected'?'#752e38':'#6b541d'}`;badge.textContent=report.status==='approved'?'✅ อนุมัติแล้ว':report.status==='rejected'?'❌ ไม่อนุมัติ':'⏳ รอตรวจสอบ';
+      row.append(label,badge);row.onclick=()=>this.showHistoryDetail(panel,report,reports);zone.appendChild(row);
+    }
   }
 
   close() {
