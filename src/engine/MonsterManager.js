@@ -1548,6 +1548,9 @@ export class MonsterManager {
     spawnInitial(playerLevel) {
         // Server-authoritative mode owns spawning — skip the local spawner.
         if (this.serverMode) return;
+        // Event venues and heaven cities are permanent safe zones. Keep this
+        // guard here so water mobs cannot leak in through their separate table.
+        if (this.mapId === 'svarrga' || this.mapId === 'skyrail_bazaar') return;
         // Seed from the UTC date + this map → identical layout for EVERY player
         // on the map that day, regardless of their level. (playerLevel is
         // intentionally ignored here so no two players ever see different mobs.)
@@ -1572,7 +1575,7 @@ export class MonsterManager {
 
         // Spawn water monsters (most maps have a river). Svarrga (Heaven) is a
         // peaceful mining city — no monsters there.
-        if (this.mapId !== 'svarrga') {
+        if (this.mapId !== 'svarrga' && this.mapId !== 'skyrail_bazaar') {
             this._spawnWaterMonsters(rng);
         }
     }

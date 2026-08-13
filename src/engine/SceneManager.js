@@ -3754,7 +3754,7 @@ export class SceneManager {
             });
             const arch = new THREE.Mesh(new THREE.TorusGeometry(2.7, .22, 9, 40, Math.PI), crystal(color));
             arch.position.y = 3.1; gate.add(arch);
-            const label = this._makePortalLabel(name, new THREE.Color(color), `${icon} ACTIVITY ZONE`);
+            const label = this._makePortalLabel(name, new THREE.Color(color), `${icon} COMING SOON`);
             label.position.y = 7.25; gate.add(label);
             gate.position.set(Math.cos(a) * 19, .03, Math.sin(a) * 19);
             gate.rotation.y = -a + Math.PI / 2; root.add(gate);

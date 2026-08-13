@@ -138,6 +138,12 @@ function makeMonster(id, type, isWater) {
 
 // Build (or rebuild) a map's monster set from config.
 export function spawnMap(mapId) {
+    // Skyrail is a social event venue. Ignore even accidentally configured
+    // database spawns so the island remains monster-free in server mode.
+    if (mapId === 'skyrail_bazaar') {
+        worlds.set(mapId, { monsters: new Map() });
+        return;
+    }
     const spawns = cfg.spawnsByMap.get(mapId) || [];
     const mc = cfg.mapCfg.get(mapId) || { land_count: 0, water_count: 0 };
     const land = spawns.filter(s => !s.is_water);
