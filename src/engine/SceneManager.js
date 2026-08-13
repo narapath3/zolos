@@ -3890,9 +3890,9 @@ export class SceneManager {
                 { x: 25, z: -5, target: 'payon' },
                 { x: -25, z: 5, target: 'glast_heim' },
                 { x: -25, z: -22, target: 'svarrga' },
-                // Nightly festival entrance. Kept in Prontera so new players
-                // can discover it without already knowing the warp menu.
-                { x: 23, z: 22, target: 'skyrail_bazaar' },
+                // Rocket pad on the flat south-east field, away from the
+                // north-east mountain path and the player market street.
+                { x: 18, z: -20, target: 'skyrail_bazaar', transport: 'rocket' },
             ],
             payon: [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
             glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
@@ -3905,6 +3905,10 @@ export class SceneManager {
         const portalPositions = PORTAL_MAP[mapId] || [{ x: 25, z: 0, target: 'prontera' }];
 
         portalPositions.forEach(p => {
+            if (p.transport === 'rocket') {
+                this._createSkyrailRocket(p);
+                return;
+            }
             const group = new THREE.Group();
             group.userData.targetMap = p.target;
 
@@ -3998,6 +4002,49 @@ export class SceneManager {
             this.envObjects.push(group);
             this.portalMeshes.push(group);
         });
+    }
+
+    _createSkyrailRocket(p) {
+        const rocket = new THREE.Group();
+        rocket.name = 'skyrail-rocket';
+        rocket.position.set(p.x, 0, p.z);
+        rocket.userData.targetMap = p.target;
+        rocket.userData.transportType = 'skyrailRocket';
+        rocket.userData.destName = 'Skyrail Bazaar';
+        rocket.userData.collisionRadius = 1.45;
+
+        const white = new THREE.MeshStandardMaterial({ color: 0xf4f7fb, metalness: .72, roughness: .22 });
+        const dark = new THREE.MeshStandardMaterial({ color: 0x172234, metalness: .8, roughness: .18 });
+        const accent = new THREE.MeshStandardMaterial({ color: 0xff4f71, emissive: 0x751426, emissiveIntensity: .7 });
+        const glass = new THREE.MeshStandardMaterial({ color: 0x62c9ff, emissive: 0x174d78, emissiveIntensity: 1, metalness: .3, roughness: .08 });
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(.72, .9, 5.4, 24), white);
+        body.position.y = 3.25; body.castShadow = true; rocket.add(body);
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(.72, 1.8, 24), white);
+        nose.position.y = 6.85; nose.castShadow = true; rocket.add(nose);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(.91, .91, .34, 24), dark);
+        band.position.y = 1.15; rocket.add(band);
+        const windowMesh = new THREE.Mesh(new THREE.SphereGeometry(.31, 18, 12), glass);
+        windowMesh.scale.z = .25; windowMesh.position.set(0, 4.55, -.72); rocket.add(windowMesh);
+        [-1, 1].forEach(side => {
+            const fin = new THREE.Mesh(new THREE.BoxGeometry(.16, 1.7, 1.35), accent);
+            fin.position.set(side * .86, 1.15, .24); fin.rotation.z = side * -.18; rocket.add(fin);
+        });
+        const flameMat = new THREE.MeshBasicMaterial({ color: 0x66dcff, transparent: true, opacity: .82, blending: THREE.AdditiveBlending, depthWrite: false });
+        const flame = new THREE.Mesh(new THREE.ConeGeometry(.48, 1.7, 18), flameMat);
+        flame.rotation.x = Math.PI; flame.position.y = -.2; rocket.add(flame);
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.9, .35, 32), dark);
+        pad.position.y = .15; pad.receiveShadow = true; rocket.add(pad);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(2.3, .09, 8, 36), accent);
+        ring.rotation.x = Math.PI / 2; ring.position.y = .38; rocket.add(ring);
+        const label = this._makePortalLabel('Skyrail Bazaar', new THREE.Color(0x66dcff), '🚀 SKYRAIL LAUNCH');
+        label.position.set(0, 8.4, 0); rocket.add(label);
+        const light = new THREE.PointLight(0x66dcff, 1.8, 12); light.position.y = .7; rocket.add(light);
+
+        rocket.userData.anim = { rocket: true, flame, light, label };
+        this.scene.add(rocket);
+        this.envObjects.push(rocket);
+        this.portalMeshes.push(rocket);
     }
 
     // Radial energy-vortex texture for the portal's inner plane.
@@ -5582,6 +5629,14 @@ export class SceneManager {
         this.portalMeshes.forEach(portal => {
             const a = portal.userData.anim;
             if (!a) return;
+            if (a.rocket) {
+                const pulse = .8 + Math.sin(t * 10) * .18;
+                a.flame.scale.set(pulse, .85 + Math.sin(t * 13) * .22, pulse);
+                a.flame.material.opacity = .65 + Math.sin(t * 9) * .2;
+                a.light.intensity = 1.5 + Math.sin(t * 8) * .5;
+                a.label.position.y = 8.4 + Math.sin(t * 1.5) * .14;
+                return;
+            }
             if (a.swirl) {
                 a.swirl.rotation.z = t * 1.4;
                 a.swirl.material.opacity = 0.72 + Math.sin(t * 3) * 0.2;

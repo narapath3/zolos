@@ -29,10 +29,21 @@ test('entry validation allows the event map throughout QA mode', () => {
   assert.equal(canEnterSkyrail('prontera', closed), true);
 });
 
-test('Prontera exposes a physical portal to Skyrail Bazaar', () => {
+test('Prontera exposes a rocket launch away from the mountain route', () => {
   const sceneSource = readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
   assert.match(sceneSource, /target:\s*'skyrail_bazaar'/);
-  assert.match(sceneSource, /skyrail_bazaar:\s*0xff5ebc/);
+  assert.match(sceneSource, /x:\s*18,\s*z:\s*-20,\s*target:\s*'skyrail_bazaar',\s*transport:\s*'rocket'/);
+  assert.match(sceneSource, /_createSkyrailRocket/);
+  assert.match(sceneSource, /transportType = 'skyrailRocket'/);
+  assert.match(sceneSource, /🚀 SKYRAIL LAUNCH/);
+});
+
+test('Skyrail rocket performs a launch sequence before loading the floating island', () => {
+  const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(mainSource, /function launchSkyrailRocket\(rocket\)/);
+  assert.match(mainSource, /rocket\.position\.y = rocketStartY \+ eased \* 24/);
+  assert.match(mainSource, /else loadMapAndSpawn\('skyrail_bazaar'/);
+  assert.match(mainSource, /transportType === 'skyrailRocket'/);
 });
 
 test('client and standalone map server agree on QA availability', () => {

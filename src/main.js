@@ -2020,6 +2020,28 @@ function loadMapAndSpawn(targetMap, spawn) {
     if (window.stallManager) window.stallManager.refresh();
 }
 
+function launchSkyrailRocket(rocket) {
+    if (!rocket || rocket.userData.launching) return;
+    rocket.userData.launching = true;
+    portalCooldown = 4;
+    window.portalCooldown = 4;
+    autoPath = null;
+    if (character) character.state = 'idle';
+    if (gameUI) gameUI.addCombatLog('🚀 กำลังปล่อยจรวด Skyrail — มุ่งหน้าสู่เกาะลอยฟ้า!', 'levelup');
+    const start = performance.now();
+    const rocketStartY = rocket.position.y;
+    const playerStartY = character?.mesh.position.y || 1.2;
+    const animateLaunch = (now) => {
+        const progress = Math.min(1, (now - start) / 1600);
+        const eased = progress * progress * progress;
+        rocket.position.y = rocketStartY + eased * 24;
+        if (character?.mesh) character.mesh.position.y = playerStartY + eased * 24;
+        if (progress < 1) requestAnimationFrame(animateLaunch);
+        else loadMapAndSpawn('skyrail_bazaar', { x: 0, y: 1.2, z: 10 });
+    };
+    requestAnimationFrame(animateLaunch);
+}
+
 // ============ Warp To Friend ============
 // The player picked an online friend to warp to. sendWarpRequest() asks the
 // server for that friend's current map; the reply lands here via the
@@ -2872,8 +2894,12 @@ function stepWorld(dt) {
             if (character.getPosition().distanceTo(portal.position) < 1.8) {
                 const targetMap = portal.userData.targetMap;
                 if (targetMap) {
-                    console.log(`[Warp] Portal warp to ${targetMap}`);
-                    loadMapAndSpawn(targetMap, { x: 0, y: 1.2, z: 10 });
+                    if (portal.userData.transportType === 'skyrailRocket') {
+                        launchSkyrailRocket(portal);
+                    } else {
+                        console.log(`[Warp] Portal warp to ${targetMap}`);
+                        loadMapAndSpawn(targetMap, { x: 0, y: 1.2, z: 10 });
+                    }
                 }
             }
         });
