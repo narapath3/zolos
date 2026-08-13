@@ -3890,9 +3890,9 @@ export class SceneManager {
                 { x: 25, z: -5, target: 'payon' },
                 { x: -25, z: 5, target: 'glast_heim' },
                 { x: -25, z: -22, target: 'svarrga' },
-                // Rocket pad on the flat south-east field, away from the
-                // north-east mountain path and the player market street.
-                { x: 18, z: -20, target: 'skyrail_bazaar', transport: 'rocket' },
+                // Skyrail launches from the circular summit lookout. The
+                // approach trail remains open and the rocket becomes its goal.
+                { x: 43, z: 43, target: 'skyrail_bazaar', transport: 'rocket' },
             ],
             payon: [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
             glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
@@ -4007,7 +4007,8 @@ export class SceneManager {
     _createSkyrailRocket(p) {
         const rocket = new THREE.Group();
         rocket.name = 'skyrail-rocket';
-        rocket.position.set(p.x, 0, p.z);
+        // The lookout top sits 0.41 units above the mountain terrain.
+        rocket.position.set(p.x, this.getTerrainHeight(p.x, p.z) + 0.41, p.z);
         rocket.userData.targetMap = p.target;
         rocket.userData.transportType = 'skyrailRocket';
         rocket.userData.destName = 'Skyrail Bazaar';

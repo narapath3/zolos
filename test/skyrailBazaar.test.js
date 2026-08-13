@@ -29,10 +29,11 @@ test('entry validation allows the event map throughout QA mode', () => {
   assert.equal(canEnterSkyrail('prontera', closed), true);
 });
 
-test('Prontera exposes a rocket launch away from the mountain route', () => {
+test('Prontera exposes a rocket launch on the circular summit lookout', () => {
   const sceneSource = readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
   assert.match(sceneSource, /target:\s*'skyrail_bazaar'/);
-  assert.match(sceneSource, /x:\s*18,\s*z:\s*-20,\s*target:\s*'skyrail_bazaar',\s*transport:\s*'rocket'/);
+  assert.match(sceneSource, /x:\s*43,\s*z:\s*43,\s*target:\s*'skyrail_bazaar',\s*transport:\s*'rocket'/);
+  assert.match(sceneSource, /rocket\.position\.set\(p\.x, this\.getTerrainHeight\(p\.x, p\.z\) \+ 0\.41, p\.z\)/);
   assert.match(sceneSource, /_createSkyrailRocket/);
   assert.match(sceneSource, /transportType = 'skyrailRocket'/);
   assert.match(sceneSource, /🚀 SKYRAIL LAUNCH/);
