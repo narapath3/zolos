@@ -6,6 +6,7 @@ export const ONLINE_MAP_NAMES_TH = Object.freeze({
   mjolnir: 'เทือกเขามิโอลเนียร์',
   abyss_lake: 'ทะเลสาบห้วงลึก',
   svarrga: 'สรวงสวรรค์',
+  skyrail_bazaar: 'ตลาดเวหา Skyrail',
 });
 
 export function escapeOnlineText(value) {

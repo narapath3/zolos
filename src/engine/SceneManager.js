@@ -115,6 +115,22 @@ const MAP_CONFIGS = {
         waterColor: 0x9fd0ff,
         treeTypes: [],
         decorDensity: 1.0,
+    },
+    skyrail_bazaar: {
+        name: 'Skyrail Bazaar',
+        groundColor: 0x5b477a,
+        groundColor2: 0x30284f,
+        pathColor: 0xe0b65c,
+        fogColor: 0x33275c,
+        skyTop: new THREE.Color(0x17163f),
+        skyBottom: new THREE.Color(0x8c4d92),
+        skyHorizon: new THREE.Color(0xffbd73),
+        ambientColor: 0x8c77c8,
+        sunColor: 0xffd99a,
+        sunIntensity: 1.15,
+        waterColor: 0x613c88,
+        treeTypes: [],
+        decorDensity: 0.8,
     }
 };
 
@@ -410,6 +426,8 @@ export class SceneManager {
             this._createAbyssLakeEnvironment(config);
         } else if (mapId === 'svarrga') {
             this._createSvarrgaEnvironment(config);
+        } else if (mapId === 'skyrail_bazaar') {
+            this._createSkyrailBazaarEnvironment(config);
         } else {
             this._createEnvironment(config);
         }
@@ -3668,6 +3686,58 @@ export class SceneManager {
     }
 
     // ============ Svarrga (Heaven city) environment + ore nodes ============
+    _createSkyrailBazaarEnvironment(config) {
+        const root = new THREE.Group();
+        root.name = 'skyrail-bazaar';
+        const gold = new THREE.MeshLambertMaterial({ color: 0xd8a93d, emissive: 0x4a2d08, emissiveIntensity: 0.35 });
+        const wood = new THREE.MeshLambertMaterial({ color: 0x68405f });
+        const silkColors = [0xff5e9c, 0x55d9ff, 0xffce55, 0x9d75ff];
+
+        // Four bright market wings around a central festival platform.
+        for (let wing = 0; wing < 4; wing++) {
+            const angle = wing * Math.PI / 2;
+            for (let i = -2; i <= 2; i++) {
+                const stall = new THREE.Group();
+                const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 1.7), wood);
+                counter.position.y = 0.58;
+                stall.add(counter);
+                const canopy = new THREE.Mesh(
+                    new THREE.ConeGeometry(2.25, 1.15, 4),
+                    new THREE.MeshLambertMaterial({ color: silkColors[(wing + i + 4) % silkColors.length] })
+                );
+                canopy.position.y = 2.35;
+                canopy.rotation.y = Math.PI / 4;
+                stall.add(canopy);
+                const lamp = new THREE.PointLight(silkColors[(wing + i + 4) % silkColors.length], 0.7, 7);
+                lamp.position.set(0, 2.2, 0);
+                stall.add(lamp);
+                stall.position.set(Math.cos(angle) * 13 + Math.sin(angle) * i * 4.3, 0, Math.sin(angle) * 13 - Math.cos(angle) * i * 4.3);
+                stall.rotation.y = -angle + Math.PI / 2;
+                root.add(stall);
+            }
+        }
+
+        const stage = new THREE.Mesh(new THREE.CylinderGeometry(8, 9, 0.7, 32), gold);
+        stage.position.y = 0.35;
+        root.add(stage);
+        const rail = new THREE.Mesh(new THREE.TorusGeometry(20, 0.22, 8, 64), gold);
+        rail.rotation.x = Math.PI / 2;
+        rail.position.y = 0.35;
+        root.add(rail);
+
+        // Floating lanterns create the nightly festival silhouette.
+        for (let i = 0; i < 28; i++) {
+            const color = silkColors[i % silkColors.length];
+            const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color }));
+            const a = i / 28 * Math.PI * 2;
+            lantern.position.set(Math.cos(a) * (10 + i % 4 * 3), 4 + (i % 5) * 0.75, Math.sin(a) * (10 + i % 4 * 3));
+            root.add(lantern);
+        }
+        this.scene.add(root);
+        this.envObjects.push(root);
+        this.floatingIslands.push(root);
+    }
+
     _createSvarrgaEnvironment(config) {
         this.oreNodes = this.oreNodes || [];
 
@@ -3812,15 +3882,24 @@ export class SceneManager {
             mjolnir: 0xffa040,   // Orange — mountains
             abyss_lake: 0x2060ff, // Deep Blue — abyss
             svarrga: 0xffe14a,   // Gold — heaven
+            skyrail_bazaar: 0xff5ebc, // Pink-gold — nightly festival
         };
 
         const PORTAL_MAP = {
-            prontera: [{ x: 25, z: -5, target: 'payon' }, { x: -25, z: 5, target: 'glast_heim' }, { x: -25, z: -22, target: 'svarrga' }],
+            prontera: [
+                { x: 25, z: -5, target: 'payon' },
+                { x: -25, z: 5, target: 'glast_heim' },
+                { x: -25, z: -22, target: 'svarrga' },
+                // Nightly festival entrance. Kept in Prontera so new players
+                // can discover it without already knowing the warp menu.
+                { x: 23, z: 22, target: 'skyrail_bazaar' },
+            ],
             payon: [{ x: -25, z: 0, target: 'prontera' }, { x: 25, z: 0, target: 'mjolnir' }],
             glast_heim: [{ x: 25, z: 0, target: 'prontera' }, { x: -25, z: 0, target: 'abyss_lake' }],
             mjolnir: [{ x: -25, z: 0, target: 'payon' }, { x: 25, z: 0, target: 'abyss_lake' }],
             abyss_lake: [{ x: 25, z: 0, target: 'glast_heim' }, { x: -25, z: 0, target: 'mjolnir' }],
             svarrga: [{ x: -25, z: 0, target: 'prontera' }],
+            skyrail_bazaar: [{ x: 0, z: -24, target: 'prontera' }],
         };
 
         const portalPositions = PORTAL_MAP[mapId] || [{ x: 25, z: 0, target: 'prontera' }];

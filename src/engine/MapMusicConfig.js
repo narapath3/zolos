@@ -13,7 +13,8 @@ export const MAP_MUSIC_CONFIG = {
     'glast_heim': 'say good bye - ZolosOnline.mp3',
     'mjolnir': 'Robox Drift - ZolosOnline.mp3',
     'abyss_lake': 'Moonlit Save Point - ZolosOnline.mp3',
-    'svarrga': 'The Day We Said Yes - ZolosOnline.mp3'
+    'svarrga': 'The Day We Said Yes - ZolosOnline.mp3',
+    'skyrail_bazaar': 'Maple Market Loop - ZolosOnline.mp3'
 };
 
 // Map tracks mapping referencing local file names

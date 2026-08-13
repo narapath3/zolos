@@ -1928,6 +1928,10 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
                 console.error('[Warp DEBUG] warp_result received:', payload);
                 window.warpManager?.onWarpResult?.(payload);
             });
+            socket.on('skyrail_closed', () => {
+                window.gameUI?.addCombatLog?.('🚉 Skyrail Bazaar ปิดแล้ว พบกันทุกวัน 18:00–23:59 น.', 'warning');
+                if (window.sceneManager?.currentMap === 'skyrail_bazaar') window.gameUI?._doWarp?.('prontera');
+            });
 
             // ===== VENDING STALLS =====
             socket.on('stalls_update', () => window.stallManager?.refresh?.());

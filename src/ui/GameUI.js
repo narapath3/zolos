@@ -7,6 +7,7 @@ import { observeItemPortraits } from './ItemPortraitRenderer.js';
 import { LayoutManager } from './LayoutManager.js';
 import { PlayerProfileModal } from './PlayerProfileModal.js';
 import { CardAlbum } from './CardAlbum.js';
+import { SKYRAIL_ACTIVITIES, SKYRAIL_MAP_ID, getSkyrailStatus } from '../events/SkyrailBazaar.js';
 
 function petPortraitMarkup(key) {
   const order = ['poring','chick','kitten','puppy','sunfox','moss_turtle','owl','cloudling','moon_hare','baby_dragon','bloom_fairy','ember_phoenix'];
@@ -639,6 +640,35 @@ export class GameUI {
       // Refresh online players list when map changes to filter correctly
       this._renderOnlinePlayers();
     }
+    this._syncSkyrailHud();
+  }
+
+  _syncSkyrailHud() {
+    const active = this.currentMapId === SKYRAIL_MAP_ID;
+    let hud = document.getElementById('skyrail-event-hud');
+    if (!active) {
+      if (hud) hud.remove();
+      if (this._skyrailHudTimer) clearInterval(this._skyrailHudTimer);
+      this._skyrailHudTimer = null;
+      return;
+    }
+    if (!hud) {
+      hud = document.createElement('div');
+      hud.id = 'skyrail-event-hud';
+      hud.style.cssText = 'position:fixed;top:78px;left:50%;transform:translateX(-50%);z-index:850;width:min(520px,calc(100vw - 24px));padding:10px 14px;border:1px solid rgba(255,205,92,.55);border-radius:14px;background:linear-gradient(135deg,rgba(38,22,68,.94),rgba(90,39,91,.94));box-shadow:0 8px 30px rgba(0,0,0,.45);color:#fff;pointer-events:auto';
+      document.body.appendChild(hud);
+    }
+    const render = () => {
+      const status = getSkyrailStatus();
+      if (!status.isOpen) {
+        hud.innerHTML = '<b>🚉 Skyrail Bazaar ปิดแล้ว</b><div style="font-size:11px;color:#d6c8e8">เปิดอีกครั้งทุกวัน 18:00 น.</div>';
+        return;
+      }
+      const remaining = `${String(Math.floor(status.remainingSeconds / 60)).padStart(2, '0')}:${String(status.remainingSeconds % 60).padStart(2, '0')}`;
+      hud.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><span style="font-size:25px">${status.current.icon}</span><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:900;color:#ffe28a">${status.current.name}</div><div style="font-size:10px;color:#e1d8f1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${status.current.desc}</div></div><b style="font-size:14px;color:#7fffe0">${remaining}</b></div>${status.next ? `<div style="font-size:9px;color:#b9a8cf;margin-top:5px">ถัดไป ${status.next.start} · ${status.next.icon} ${status.next.name}</div>` : ''}`;
+    };
+    render();
+    if (!this._skyrailHudTimer) this._skyrailHudTimer = setInterval(render, 1000);
   }
 
   _updateHUDMapAndPing() {
@@ -651,6 +681,7 @@ export class GameUI {
       mjolnir: 'เทือกเขาหมิโอลนีร์',
       abyss_lake: 'ทะเลสาบห้วงลึก',
       svarrga: 'สรวงสวรรค์'
+      ,skyrail_bazaar: 'ตลาดเวหา Skyrail'
     };
     const mapName = MAP_NAMES_TH[mapId] || mapId;
     const el = document.getElementById('map-name');
@@ -10727,6 +10758,19 @@ export class GameUI {
       difficultyClass: 'safe',
       monsters: [],
     },
+    {
+      id: SKYRAIL_MAP_ID,
+      name: 'Skyrail Bazaar',
+      nameTh: 'ตลาดเวหายามค่ำคืน',
+      emoji: '🚉',
+      color: '#ff68c5',
+      bgGradient: 'linear-gradient(135deg, #21143f 0%, #713b7d 48%, #dd765f 100%)',
+      desc: 'ตลาดเทศกาลบนเกาะลอยฟ้า · กิจกรรมหมุนทุก 30 นาที · โหมดทดสอบเปิดตลอด 24 ชั่วโมง',
+      level: 'ทุกเลเวล · QA เปิดทั้งวัน',
+      difficulty: 'Daily Event',
+      difficultyClass: 'safe',
+      monsters: [],
+    },
   ];
 
   openWarpMap() {
@@ -10802,6 +10846,8 @@ export class GameUI {
           border-color: rgba(240, 192, 64, 0.8);
           box-shadow: 0 0 20px rgba(240, 192, 64, 0.3);
         }
+        .warp-tile.locked { filter: saturate(.55); opacity:.72; cursor:not-allowed; }
+        .warp-tile.locked .tile-warp-btn { background:#5c5670;color:#c7bfd7;cursor:not-allowed; }
         .warp-tile .tile-bg {
           position: absolute; inset: 0; z-index: 0;
         }
@@ -10898,12 +10944,14 @@ export class GameUI {
     const currentMapId = this.currentMapId || 'prontera';
     const maps = GameUI._WARP_MAPS;
     const playerLevel = Number(this.character?.stats?.level) || 1;
+    const skyrailStatus = getSkyrailStatus();
 
     const tiles = maps.map(m => {
       const isCurrent = m.id === currentMapId;
+      const isLocked = m.id === SKYRAIL_MAP_ID && !skyrailStatus.isOpen;
       const glowOpacity = isCurrent ? '0.5' : '0.2';
       return `
-        <div class="warp-tile ${isCurrent ? 'current' : ''}" data-map="${m.id}"
+        <div class="warp-tile ${isCurrent ? 'current' : ''} ${isLocked ? 'locked' : ''}" data-map="${m.id}"
              style="background: ${m.bgGradient};">
           <div class="tile-glow"
                style="background: radial-gradient(ellipse at 30% 20%, ${m.color}40 0%, transparent 70%);
@@ -10922,7 +10970,9 @@ export class GameUI {
               <span class="tile-level">${m.level}</span>
               ${isCurrent
           ? '<span style="font-size:10px;color:#9aa5c0;font-weight:600;">คุณอยู่ที่นี่</span>'
-          : `<button class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">🌀 วาร์ป</button>`
+          : isLocked
+            ? '<button class="tile-warp-btn" disabled>🔒 เปิด 18:00</button>'
+            : `<button class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">🌀 วาร์ป</button>`
         }
             </div>
             ${m.monsters.length > 0 ? `
@@ -11235,6 +11285,11 @@ export class GameUI {
   _doWarp(targetMap) {
     console.log('[GameUI] _doWarp called with', targetMap);
     if (!window.sceneManager || !window.character) return;
+    if (targetMap === SKYRAIL_MAP_ID && !getSkyrailStatus().isOpen) {
+      this.addCombatLog('🚉 Skyrail Bazaar เปิดทุกวันเวลา 18:00–23:59 น. (เวลาไทย)', 'warning');
+      this._renderWarpMap();
+      return;
+    }
     if (targetMap === window.sceneManager.currentMap) {
       this.addCombatLog('คุณอยู่ที่นี่แล้ว', 'system');
       return;

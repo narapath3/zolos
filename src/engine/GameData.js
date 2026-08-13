@@ -1657,7 +1657,7 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
     const table = [];
 
     // Svarrga (Heaven) is a peaceful mining city — no monsters.
-    if (mapId === 'svarrga') return table;
+    if (mapId === 'svarrga' || mapId === 'skyrail_bazaar') return table;
 
     if (mapId === 'payon') {
         table.push({ type: 'horn', weight: 30 });

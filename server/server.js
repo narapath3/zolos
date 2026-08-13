@@ -44,6 +44,7 @@ import {
 import { getCard } from './cards/CardCatalog.js';
 import { FUSION_COSTS } from './cards/CardProgression.js';
 import { buildHealthPayload } from './health.js';
+import { SKYRAIL_MAP_ID, canEnterSkyrail, getSkyrailStatus } from './events/SkyrailBazaar.js';
 
 // ============ Configuration ============
 const PORT = parseInt(process.env.PORT) || 3001;
@@ -410,7 +411,11 @@ io.on('connection', (socket) => {
         if (!data || !data.userId) return;
 
         let { userId } = data;
-        const normalizedPresence = normalizePresence(data);
+        let normalizedPresence = normalizePresence(data);
+        if (!canEnterSkyrail(normalizedPresence.mapId)) {
+            normalizedPresence = { ...normalizedPresence, mapId: 'prontera' };
+            socket.emit('skyrail_closed', getSkyrailStatus());
+        }
         let { username, level } = normalizedPresence;
 
         // AUTHENTICATE: verify the Supabase JWT so the client can't impersonate
@@ -769,13 +774,18 @@ io.on('connection', (socket) => {
         const player = onlinePlayers.get(socket.id);
         if (player) {
             const oldMapId = player.mapId;
+            const requestedMapId = data.mapId ?? player.mapId;
+            if (!canEnterSkyrail(requestedMapId)) {
+                socket.emit('skyrail_closed', getSkyrailStatus());
+                return;
+            }
             const normalized = normalizePresence({
                 // Verified identity/progression comes from the database. The
                 // client may only move maps; trusting repeated +2 updates lets
                 // an attacker walk server level to 300 and inflate PvE damage.
                 username: player.verified ? player.username : (data.username ?? player.username),
                 level: player.verified ? player.level : (data.level ?? player.level),
-                mapId: data.mapId ?? player.mapId,
+                mapId: requestedMapId,
             }, player.level);
             player.level = normalized.level;
             player.username = normalized.username;
@@ -1596,6 +1606,24 @@ function broadcastPlayerList(mapId) {
     }
     io.emit('players_global', allPlayers);
 }
+
+// Close the temporary festival cleanly at midnight Bangkok time. The server
+// moves remaining visitors before accepting any more map-scoped messages.
+setInterval(() => {
+    if (getSkyrailStatus().isOpen) return;
+    for (const [socketId, player] of onlinePlayers) {
+        if (player.mapId !== SKYRAIL_MAP_ID) continue;
+        const socket = io.sockets.sockets.get(socketId);
+        socket?.leave(`map:${SKYRAIL_MAP_ID}`);
+        player.mapId = 'prontera';
+        player.lastPos = { x: 0, y: 1.2, z: 10, mapId: 'prontera', teleported: true };
+        player.lastPosTime = Date.now();
+        socket?.join('map:prontera');
+        socket?.emit('skyrail_closed', getSkyrailStatus());
+    }
+    broadcastPlayerList(SKYRAIL_MAP_ID);
+    broadcastPlayerList('prontera');
+}, 30 * 1000);
 
 // ===== Latency (ping) measurement =====
 // Every few seconds, ping each socket. After a short delay (to let pong
