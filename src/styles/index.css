@@ -2791,11 +2791,6 @@ a,
   text-shadow: none;
 }
 
-.inv-tab--titles {
-  color: #ffd86b;
-  border-color: rgba(255, 205, 72, 0.45);
-}
-
 .inv-title-badge {
   position: absolute;
   left: 2px;

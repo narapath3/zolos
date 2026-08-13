@@ -291,7 +291,11 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorl
             if (action === 'approve') {
                 const inv = await client.query('SELECT id,quantity FROM inventory WHERE character_id=$1 AND item_name=$2 LIMIT 1 FOR UPDATE', [report.character_id,itemName]);
                 if (inv.rows[0]) {
-                    await client.query('UPDATE inventory SET quantity=quantity+$2 WHERE id=$1', [inv.rows[0].id,itemQty]);
+                    if (itemName === 'Bug Hunter Emblem') {
+                        await client.query("UPDATE inventory SET quantity=1,item_type='title' WHERE id=$1", [inv.rows[0].id]);
+                    } else {
+                        await client.query('UPDATE inventory SET quantity=quantity+$2 WHERE id=$1', [inv.rows[0].id,itemQty]);
+                    }
                 } else {
                     const rewardType = itemName === 'Bug Hunter Emblem' ? 'title' : 'special';
                     await client.query('INSERT INTO inventory (character_id,item_name,item_type,quantity,stats) VALUES ($1,$2,$3,$4,$5)', [report.character_id,itemName,rewardType,itemQty,{}]);

@@ -48,6 +48,8 @@ const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|
 export const ITEM_VISUALS = Object.freeze(Object.fromEntries([
   ...[...EQUIPMENT_NAMES, ...SHOP_VISUAL_NAMES].map(name => [name, Object.freeze({ icon: `/assets/items/equipment/${slug(name)}.png` })]),
   ...FISH_VISUAL_NAMES.map(name => [name, Object.freeze({ icon: `/assets/items/fish/${slug(name)}.png` })]),
+  ['Bug Hunter Emblem', Object.freeze({ icon: '/assets/items/titles/bug-hunter-emblem.png' })],
+  ['Master Angler Trophy', Object.freeze({ icon: '/assets/items/titles/master-angler-trophy.png' })],
 ]));
 
 export function canonicalItemName(itemOrName) {

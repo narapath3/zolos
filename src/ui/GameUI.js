@@ -905,7 +905,7 @@ export class GameUI {
       // the fix is durable. Harmless once quantities are already sane.
       // Pets are excluded: they no longer force-to-1 because each pet is now an
       // individual instance stored inside one row's stats (quantity = count).
-      const NON_STACK = new Set(['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool']);
+      const NON_STACK = new Set(['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses', 'tool', 'title']);
       const MAX_STACK = 9999;
       for (const it of this.inventory) {
         const before = it.quantity;
@@ -1672,7 +1672,7 @@ export class GameUI {
         const rfLvl = item.stats && item.stats.refine ? item.stats.refine : 0;
         slot.innerHTML = `
                   ${itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji)}
-                  <span class="inv-qty">${item.quantity}</span>
+                  ${item.item_type === 'title' ? '' : `<span class="inv-qty">${item.quantity}</span>`}
                   ${rfLvl > 0 ? `<span style="position:absolute;top:1px;left:3px;font-size:10px;font-weight:900;color:${refineTierColor(rfLvl)};text-shadow:0 1px 2px #000;">+${rfLvl}</span>` : ''}
                   ${item.item_type === 'title' ? '<span class="inv-title-badge">TITLE</span>' : ''}
                   ${isEquipped ? '<span class="inv-equipped-badge">E</span>' : ''}

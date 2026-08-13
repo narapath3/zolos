@@ -10,6 +10,7 @@ const character = fs.readFileSync(new URL('../src/engine/CharacterManager.js', i
 const gameData = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
+const itemVisuals = fs.readFileSync(new URL('../src/engine/ItemVisuals.js', import.meta.url), 'utf8');
 
 test('bug reports authenticate ownership and bound screenshot input', () => {
   assert.match(playerApi, /authFromReq\(req\)/);
@@ -89,4 +90,13 @@ test('reward titles are easy to find in a dedicated mobile-safe inventory tab', 
   assert.match(gameUi, /inv-title-badge/);
   assert.match(css, /\.inv-title-badge/);
   assert.match(css, /\.inventory-tabs[\s\S]*?overflow-x: auto/);
+});
+
+test('title rewards use shield art, standard tab styling, and no consumable quantity', () => {
+  assert.match(itemVisuals, /titles\/bug-hunter-emblem\.png/);
+  assert.match(itemVisuals, /titles\/master-angler-trophy\.png/);
+  assert.doesNotMatch(css, /\.inv-tab--titles\s*\{/);
+  assert.match(gameUi, /item\.item_type === 'title' \? '' : `<span class="inv-qty">/);
+  assert.match(gameUi, /'tool', 'title'/);
+  assert.match(adminApi, /UPDATE inventory SET quantity=1,item_type='title'/);
 });
