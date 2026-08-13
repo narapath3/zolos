@@ -42,9 +42,20 @@ test('Prontera exposes a rocket launch on the circular summit lookout', () => {
 test('Skyrail rocket performs a launch sequence before loading the floating island', () => {
   const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(mainSource, /function launchSkyrailRocket\(rocket\)/);
-  assert.match(mainSource, /rocket\.position\.y = rocketStartY \+ eased \* 24/);
+  assert.match(mainSource, /vehicle\.position\.y = vehicleStartY \+ eased \* 24/);
+  assert.match(mainSource, /rocket\.userData\.anim\.launchPower = 1/);
   assert.match(mainSource, /else loadMapAndSpawn\('skyrail_bazaar'/);
   assert.match(mainSource, /transportType === 'skyrailRocket'/);
+});
+
+test('Skyrail rocket has a visible dual-color engine plume during launch', () => {
+  const sceneSource = readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+  assert.match(sceneSource, /skyrail-rocket-vehicle/);
+  assert.match(sceneSource, /outerFlame/);
+  assert.match(sceneSource, /coreFlame/);
+  assert.match(sceneSource, /color: 0xff7a20/);
+  assert.match(sceneSource, /color: 0xdffcff/);
+  assert.match(sceneSource, /launchPower \* 5\.5/);
 });
 
 test('Skyrail is a purpose-built floating festival arena rather than generic terrain', () => {

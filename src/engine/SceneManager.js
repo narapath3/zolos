@@ -4085,31 +4085,37 @@ export class SceneManager {
         const dark = new THREE.MeshStandardMaterial({ color: 0x172234, metalness: .8, roughness: .18 });
         const accent = new THREE.MeshStandardMaterial({ color: 0xff4f71, emissive: 0x751426, emissiveIntensity: .7 });
         const glass = new THREE.MeshStandardMaterial({ color: 0x62c9ff, emissive: 0x174d78, emissiveIntensity: 1, metalness: .3, roughness: .08 });
+        const vehicle = new THREE.Group();
+        vehicle.name = 'skyrail-rocket-vehicle';
+        vehicle.position.y = .48;
+        rocket.add(vehicle);
 
         const body = new THREE.Mesh(new THREE.CylinderGeometry(.72, .9, 5.4, 24), white);
-        body.position.y = 3.25; body.castShadow = true; rocket.add(body);
+        body.position.y = 3.25; body.castShadow = true; vehicle.add(body);
         const nose = new THREE.Mesh(new THREE.ConeGeometry(.72, 1.8, 24), white);
-        nose.position.y = 6.85; nose.castShadow = true; rocket.add(nose);
+        nose.position.y = 6.85; nose.castShadow = true; vehicle.add(nose);
         const band = new THREE.Mesh(new THREE.CylinderGeometry(.91, .91, .34, 24), dark);
-        band.position.y = 1.15; rocket.add(band);
+        band.position.y = 1.15; vehicle.add(band);
         const windowMesh = new THREE.Mesh(new THREE.SphereGeometry(.31, 18, 12), glass);
-        windowMesh.scale.z = .25; windowMesh.position.set(0, 4.55, -.72); rocket.add(windowMesh);
+        windowMesh.scale.z = .25; windowMesh.position.set(0, 4.55, -.72); vehicle.add(windowMesh);
         [-1, 1].forEach(side => {
             const fin = new THREE.Mesh(new THREE.BoxGeometry(.16, 1.7, 1.35), accent);
-            fin.position.set(side * .86, 1.15, .24); fin.rotation.z = side * -.18; rocket.add(fin);
+            fin.position.set(side * .86, 1.15, .24); fin.rotation.z = side * -.18; vehicle.add(fin);
         });
-        const flameMat = new THREE.MeshBasicMaterial({ color: 0x66dcff, transparent: true, opacity: .82, blending: THREE.AdditiveBlending, depthWrite: false });
-        const flame = new THREE.Mesh(new THREE.ConeGeometry(.48, 1.7, 18), flameMat);
-        flame.rotation.x = Math.PI; flame.position.y = -.2; rocket.add(flame);
+        const outerFlame = new THREE.Mesh(new THREE.ConeGeometry(.62, 3.4, 20), new THREE.MeshBasicMaterial({ color: 0xff7a20, transparent: true, opacity: .72, blending: THREE.AdditiveBlending, depthWrite: false }));
+        outerFlame.rotation.x = Math.PI; outerFlame.position.y = -.9; vehicle.add(outerFlame);
+        const coreFlame = new THREE.Mesh(new THREE.ConeGeometry(.38, 2.4, 18), new THREE.MeshBasicMaterial({ color: 0xdffcff, transparent: true, opacity: .94, blending: THREE.AdditiveBlending, depthWrite: false }));
+        coreFlame.rotation.x = Math.PI; coreFlame.position.y = -.45; vehicle.add(coreFlame);
         const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.9, .35, 32), dark);
         pad.position.y = .15; pad.receiveShadow = true; rocket.add(pad);
         const ring = new THREE.Mesh(new THREE.TorusGeometry(2.3, .09, 8, 36), accent);
         ring.rotation.x = Math.PI / 2; ring.position.y = .38; rocket.add(ring);
         const label = this._makePortalLabel('Skyrail Bazaar', new THREE.Color(0x66dcff), '🚀 SKYRAIL LAUNCH');
         label.position.set(0, 8.4, 0); rocket.add(label);
-        const light = new THREE.PointLight(0x66dcff, 1.8, 12); light.position.y = .7; rocket.add(light);
+        const light = new THREE.PointLight(0xff9a40, 1.8, 14); light.position.y = -.25; vehicle.add(light);
 
-        rocket.userData.anim = { rocket: true, flame, light, label };
+        rocket.userData.vehicle = vehicle;
+        rocket.userData.anim = { rocket: true, vehicle, outerFlame, coreFlame, light, label, launchPower: 0 };
         this.scene.add(rocket);
         this.envObjects.push(rocket);
         this.portalMeshes.push(rocket);
@@ -5707,9 +5713,12 @@ export class SceneManager {
             if (!a) return;
             if (a.rocket) {
                 const pulse = .8 + Math.sin(t * 10) * .18;
-                a.flame.scale.set(pulse, .85 + Math.sin(t * 13) * .22, pulse);
-                a.flame.material.opacity = .65 + Math.sin(t * 9) * .2;
-                a.light.intensity = 1.5 + Math.sin(t * 8) * .5;
+                const thrust = .28 + a.launchPower * 1.35;
+                a.outerFlame.scale.set(pulse, thrust + Math.sin(t * 17) * .12, pulse);
+                a.coreFlame.scale.set(pulse * .72, thrust * .82 + Math.sin(t * 21) * .08, pulse * .72);
+                a.outerFlame.material.opacity = .42 + a.launchPower * .42 + Math.sin(t * 12) * .08;
+                a.coreFlame.material.opacity = .72 + a.launchPower * .24;
+                a.light.intensity = 1.2 + a.launchPower * 5.5 + Math.sin(t * 14) * .45;
                 a.label.position.y = 8.4 + Math.sin(t * 1.5) * .14;
                 return;
             }
