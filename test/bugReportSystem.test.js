@@ -30,3 +30,13 @@ test('player capture never waits for screen-sharing and supports image upload', 
   assert.match(ui, /data-remove/);
   assert.match(ui, /toDataURL\('image\/jpeg', 0\.7\)/);
 });
+
+test('bug report dialog is mobile safe and hides game controls while open', () => {
+  assert.match(ui, /safe-area-inset-bottom/);
+  assert.match(ui, /100dvh/);
+  assert.match(ui, /font-size:16px!important/);
+  assert.match(ui, /visualViewport/);
+  assert.match(ui, /modal-popup/);
+  assert.match(ui, /updateMobileControlsVisibility/);
+  assert.match(ui, /touch-action:manipulation/);
+});

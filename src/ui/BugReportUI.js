@@ -53,26 +53,62 @@ export class BugReportUI {
     this.gameUI = gameUI;
     this.screenshot = '';
     this.root = null;
+    this.viewportHandler = null;
+    this.previousBodyOverflow = '';
     document.getElementById('btn-bug-report')?.addEventListener('click', () => this.open());
   }
 
   async open() {
     this.close();
+    if (!document.getElementById('bug-report-mobile-style')) {
+      const style = document.createElement('style');
+      style.id = 'bug-report-mobile-style';
+      style.textContent = `
+        .bug-report-modal{box-sizing:border-box;overscroll-behavior:contain;touch-action:pan-y}
+        .bug-report-panel{box-sizing:border-box;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+        .bug-report-panel input,.bug-report-panel select,.bug-report-panel textarea{font-size:16px!important;min-height:44px}
+        .bug-report-panel button{min-height:44px;touch-action:manipulation;cursor:pointer}
+        .bug-report-actions{display:flex;flex-wrap:wrap;gap:8px}
+        .bug-report-footer{display:flex;justify-content:flex-end;gap:8px}
+        @media(max-width:600px){
+          .bug-report-modal{place-items:start center!important;padding:calc(6px + env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))!important}
+          .bug-report-panel{width:100%!important;max-height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;border-radius:11px!important;padding:14px!important}
+          .bug-report-panel h2{font-size:20px!important}.bug-report-panel p{font-size:12px;line-height:1.5}
+          .bug-report-actions>button,.bug-report-footer>button{flex:1 1 140px;min-height:48px;padding:11px 8px!important}
+          .bug-report-footer{flex-wrap:wrap}.bug-report-footer [type=submit]{order:-1;flex-basis:100%}
+          .bug-report-shot{max-height:31dvh;overflow:auto;padding:8px!important}
+          .bug-report-shot img{max-height:29dvh!important}
+        }
+        @media(max-width:380px){.bug-report-actions>button{flex-basis:100%}}
+      `;
+      document.head.appendChild(style);
+    }
     this.root = document.createElement('div');
+    this.root.className = 'bug-report-modal modal-popup';
     this.root.style.cssText = 'position:fixed;inset:0;z-index:12000;background:rgba(3,6,16,.82);display:grid;place-items:center;padding:12px';
     const panel = document.createElement('section');
+    panel.className = 'bug-report-panel';
     panel.style.cssText = 'width:min(720px,96vw);max-height:92vh;overflow:auto;background:#111a2d;border:1px solid #4fa3ff;border-radius:14px;padding:20px;color:#eef6ff;box-shadow:0 20px 70px #000';
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px"><div><h2 style="margin:0;color:#73c5ff">🐞 แจ้งบัคในเกม</h2><p style="margin:6px 0 16px;color:#abc">ภาพจะถูกส่งให้ทีมแอดมินเท่านั้น หากอนุมัติจะได้รับไอเทมพิเศษและ Zeny</p></div><button data-close aria-label="ปิด" style="height:34px;background:#26344c;color:white;border:0;border-radius:8px;padding:0 12px">✕</button></div>
       <form data-form style="display:grid;gap:12px">
         <label>ประเภท<select name="category" style="display:block;width:100%;margin-top:5px;padding:10px;background:#0b1220;color:white;border:1px solid #405573;border-radius:8px">${Object.entries(categoryLabels).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
         <label>หัวข้อ<input name="title" maxlength="100" required placeholder="เช่น ขายไอเทมแล้วเงินหายหลังเข้าใหม่" style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;background:#0b1220;color:white;border:1px solid #405573;border-radius:8px"></label>
         <label>รายละเอียดและขั้นตอนที่ทำให้เกิดปัญหา<textarea name="details" maxlength="4000" minlength="10" required rows="6" placeholder="เกิดอะไรขึ้น / ทำอะไรมาก่อน / ควรเป็นอย่างไร..." style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;background:#0b1220;color:white;border:1px solid #405573;border-radius:8px;resize:vertical"></textarea></label>
-        <div data-shot-zone style="border:1px dashed #53739b;border-radius:10px;padding:12px;text-align:center;color:#abc">ยังไม่มีภาพหน้าจอ</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" data-capture style="background:#275d91;color:white;border:0;border-radius:8px;padding:10px 14px">📸 แคปภาพเกม</button><button type="button" data-pick style="background:#3d4f6d;color:white;border:0;border-radius:8px;padding:10px 14px">🖼️ เลือกภาพจากเครื่อง</button><input data-file type="file" accept="image/png,image/jpeg,image/webp" hidden><button type="button" data-remove style="display:none;background:#633;color:white;border:0;border-radius:8px;padding:10px 14px">ลบภาพ</button><span data-status style="align-self:center;color:#8fc7ef"></span></div>
-        <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" data-history style="background:#26344c;color:white;border:0;border-radius:8px;padding:11px 16px">ประวัติของฉัน</button><button type="submit" style="background:#2b9c64;color:white;border:0;border-radius:8px;padding:11px 20px;font-weight:700">ส่งรายงาน</button></div>
+        <div class="bug-report-shot" data-shot-zone style="border:1px dashed #53739b;border-radius:10px;padding:12px;text-align:center;color:#abc">ยังไม่มีภาพหน้าจอ</div>
+        <div class="bug-report-actions"><button type="button" data-capture style="background:#275d91;color:white;border:0;border-radius:8px;padding:10px 14px">📸 แคปภาพเกม</button><button type="button" data-pick style="background:#3d4f6d;color:white;border:0;border-radius:8px;padding:10px 14px">🖼️ เลือกภาพจากเครื่อง</button><input data-file type="file" accept="image/png,image/jpeg,image/webp" hidden><button type="button" data-remove style="display:none;background:#633;color:white;border:0;border-radius:8px;padding:10px 14px">ลบภาพ</button><span data-status style="align-self:center;color:#8fc7ef"></span></div>
+        <div class="bug-report-footer"><button type="button" data-history style="background:#26344c;color:white;border:0;border-radius:8px;padding:11px 16px">ประวัติของฉัน</button><button type="submit" style="background:#2b9c64;color:white;border:0;border-radius:8px;padding:11px 20px;font-weight:700">ส่งรายงาน</button></div>
       </form>`;
     this.root.appendChild(panel);
     document.body.appendChild(this.root);
+    this.previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    this.gameUI?.updateMobileControlsVisibility?.();
+    this.viewportHandler = () => {
+      const viewport = window.visualViewport;
+      if (viewport) this.root.style.height = `${viewport.height}px`;
+    };
+    window.visualViewport?.addEventListener('resize', this.viewportHandler);
+    this.viewportHandler();
     panel.querySelector('[data-close]').onclick = () => this.close();
     this.root.addEventListener('click', e => { if (e.target === this.root) this.close(); });
     panel.querySelector('[data-capture]').onclick = () => this.takeScreenshot(panel);
@@ -142,5 +178,11 @@ export class BugReportUI {
     } catch(error) { status.textContent=`โหลดไม่สำเร็จ: ${error.message}`; }
   }
 
-  close() { this.root?.remove(); this.root=null; }
+  close() {
+    if (this.viewportHandler) window.visualViewport?.removeEventListener('resize', this.viewportHandler);
+    this.viewportHandler = null;
+    this.root?.remove(); this.root=null;
+    document.body.style.overflow = this.previousBodyOverflow;
+    this.gameUI?.updateMobileControlsVisibility?.();
+  }
 }
