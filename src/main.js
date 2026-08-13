@@ -613,6 +613,11 @@ async function initGame(charData) {
     // also clears any monsters the local spawner created before world_mode).
     window.onMonState = (payload) => {
         if (!monsters) return;
+        if (sceneManager?.currentMap === 'skyrail_bazaar') {
+            monsters.clearAll();
+            return;
+        }
+        if (payload?.mapId && payload.mapId !== sceneManager?.currentMap) return;
         if (window.__serverMonsters && !monsters.serverMode) monsters.setServerMode(true);
         monsters.applyServerState(payload);
     };
@@ -1251,6 +1256,7 @@ async function initGame(charData) {
 
     loadingOverlay.setProgress(85, '🐉 Spawning World Monsters & Realm Entities...');
     // Initial Monster Spawn
+    monsters.mapId = sceneManager.currentMap;
     if (window.__serverMonsters) monsters.setServerMode(true);
     monsters.spawnInitial(character.stats.level);
 

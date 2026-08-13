@@ -1384,6 +1384,12 @@ export class MonsterManager {
     // explicitly via killServerMonster (mon_dead).
     applyServerState(payload) {
         if (!this.serverMode || !payload || !Array.isArray(payload.mons)) return;
+        const currentMap = this.sceneManager?.currentMap || this.mapId;
+        if (currentMap === 'skyrail_bazaar') {
+            this.clearAll();
+            return;
+        }
+        if (payload.mapId && payload.mapId !== currentMap) return;
         if (!this._srvById) this._srvById = new Map();
         const snapshotIds = new Set(payload.mons.map(s => s && s.id).filter(Boolean));
         for (const s of payload.mons) {
@@ -1616,6 +1622,10 @@ export class MonsterManager {
     }
 
     update(dt, camera, player) {
+        if ((this.sceneManager?.currentMap || this.mapId) === 'skyrail_bazaar') {
+            if (this.monsters.length || this.waterMonsters.length || this.deadQueue.length) this.clearAll();
+            return;
+        }
         // Update alive land monsters
         for (const m of this.monsters) {
             m.update(dt, camera, this.sceneManager, player, this.onMonsterAttackPlayer);
@@ -1647,6 +1657,7 @@ export class MonsterManager {
     }
 
     queueRespawn(monster) {
+        if ((this.sceneManager?.currentMap || this.mapId) === 'skyrail_bazaar') return;
         if (!monster || monster._respawnQueued) return;
         monster._respawnQueued = true;
         if (!monster._cardDeathResolved) {

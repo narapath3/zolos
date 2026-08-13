@@ -264,7 +264,7 @@ function broadcastMap(mapId, world) {
             hp: m.hp, mhp: m.maxHp,
         });
     }
-    io.to(`map:${mapId}`).emit('mon_state', { v: cfg.version, mons });
+    io.to(`map:${mapId}`).emit('mon_state', { v: cfg.version, mapId, mons });
 }
 
 function tick() {

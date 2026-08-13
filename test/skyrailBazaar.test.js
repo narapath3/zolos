@@ -74,11 +74,16 @@ test('Skyrail is a purpose-built floating festival arena rather than generic ter
 });
 
 test('Skyrail remains monster-free in local and authoritative server modes', () => {
+  const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   const monsterManager = readFileSync(new URL('../src/engine/MonsterManager.js', import.meta.url), 'utf8');
   const monsterEngine = readFileSync(new URL('../server/game/monsterEngine.js', import.meta.url), 'utf8');
   assert.match(monsterManager, /if \(this\.mapId === 'svarrga' \|\| this\.mapId === 'skyrail_bazaar'\) return/);
   assert.match(monsterManager, /this\.mapId !== 'skyrail_bazaar'/);
   assert.match(monsterEngine, /if \(mapId === 'skyrail_bazaar'\) \{[\s\S]*?monsters: new Map\(\)/);
+  assert.match(monsterEngine, /emit\('mon_state', \{ v: cfg\.version, mapId, mons \}\)/);
+  assert.match(mainSource, /sceneManager\?\.currentMap === 'skyrail_bazaar'[\s\S]*?monsters\.clearAll\(\)/);
+  assert.match(mainSource, /payload\?\.mapId && payload\.mapId !== sceneManager\?\.currentMap/);
+  assert.match(monsterManager, /currentMap === 'skyrail_bazaar'[\s\S]*?this\.clearAll\(\)/);
 });
 
 test('client and standalone map server agree on QA availability', () => {
