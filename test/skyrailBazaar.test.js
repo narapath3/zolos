@@ -47,6 +47,20 @@ test('Skyrail rocket performs a launch sequence before loading the floating isla
   assert.match(mainSource, /transportType === 'skyrailRocket'/);
 });
 
+test('Skyrail is a purpose-built floating festival arena rather than generic terrain', () => {
+  const sceneSource = readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+  assert.match(sceneSource, /_createSkyrailIslandGround/);
+  assert.match(sceneSource, /skyrail-grand-island/);
+  assert.match(sceneSource, /skyrail-bazaar-grand-arena/);
+  assert.match(sceneSource, /SKY RACE/);
+  assert.match(sceneSource, /BOSS RUSH/);
+  assert.match(sceneSource, /LIVE STAGE/);
+  assert.match(sceneSource, /GRAND JACKPOT/);
+  assert.match(sceneSource, /CELESTIAL FESTIVAL ARENA/);
+  assert.match(sceneSource, /if \(this\.currentMap === 'skyrail_bazaar'\) \{[\s\S]*?this\.waterMesh = null/);
+  assert.match(sceneSource, /this\.skyrailArena\?\.userData\?\.skyrailAnim/);
+});
+
 test('client and standalone map server agree on QA availability', () => {
   for (const iso of ['2026-08-13T00:00:00Z', '2026-08-13T11:00:00Z', '2026-08-13T16:59:59Z']) {
     const client = getSkyrailStatus(new Date(iso));

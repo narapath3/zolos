@@ -377,6 +377,7 @@ export class SceneManager {
         this.cloudSprites = [];
         this.waterfalls = [];
         this.floatingIslands = [];
+        this.skyrailArena = null;
         this.auroraMat = null;
         this.fantasyMoon = null;
         this.celestialMotes = null;
@@ -1274,6 +1275,10 @@ export class SceneManager {
 
     // ============ Ground ============
     _createGround(config) {
+        if (this.currentMap === 'skyrail_bazaar') {
+            this._createSkyrailIslandGround(config);
+            return;
+        }
         // Main textured ground with vertex colors
         const size = this.currentMap === 'prontera' ? 110 : 70;
         const segments = this.currentMap === 'prontera' ? 90 : 60;
@@ -1413,6 +1418,10 @@ export class SceneManager {
 
     // ============ Water ============
     _createWater(config) {
+        if (this.currentMap === 'skyrail_bazaar') {
+            this.waterMesh = null;
+            return;
+        }
         // Large river water plane centered around z = -2, length 80, width 32
         const riverLength = this.currentMap === 'prontera' ? 116 : 80;
         const waterGeo = new THREE.PlaneGeometry(riverLength, 40, this.currentMap === 'prontera' ? 110 : 80, 30);
@@ -3686,56 +3695,114 @@ export class SceneManager {
     }
 
     // ============ Svarrga (Heaven city) environment + ore nodes ============
+    _createSkyrailIslandGround(config) {
+        const island = new THREE.Group();
+        island.name = 'skyrail-grand-island';
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x44366d, roughness: .72, metalness: .12, emissive: 0x190d36, emissiveIntensity: .38 });
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x282344, roughness: .94, flatShading: true });
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xe8b94f, emissive: 0x8b480b, emissiveIntensity: .7, metalness: .68, roughness: .26 });
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(29, 31, 1.3, 48), topMat);
+        top.position.y = -.6; top.receiveShadow = true; island.add(top);
+        for (let i = 0; i < 28; i++) {
+            const a = i / 28 * Math.PI * 2;
+            const radius = 20 + (i % 4) * 2.4;
+            const shard = new THREE.Mesh(new THREE.ConeGeometry(2.7 + (i % 3), 9 + (i % 5) * 1.6, 7), rockMat);
+            shard.position.set(Math.cos(a) * radius, -5.5 - (i % 3), Math.sin(a) * radius);
+            shard.rotation.z = Math.sin(a) * .18; shard.rotation.x = Math.cos(a) * .18; island.add(shard);
+        }
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(28.3, .24, 9, 96), rimMat);
+        rim.rotation.x = Math.PI / 2; rim.position.y = .08; island.add(rim);
+        this.groundMesh = top;
+        this.scene.add(island); this.envObjects.push(island);
+    }
+
     _createSkyrailBazaarEnvironment(config) {
         const root = new THREE.Group();
-        root.name = 'skyrail-bazaar';
-        const gold = new THREE.MeshLambertMaterial({ color: 0xd8a93d, emissive: 0x4a2d08, emissiveIntensity: 0.35 });
-        const wood = new THREE.MeshLambertMaterial({ color: 0x68405f });
-        const silkColors = [0xff5e9c, 0x55d9ff, 0xffce55, 0x9d75ff];
+        root.name = 'skyrail-bazaar-grand-arena';
+        const palette = [0x58e9ff, 0xff59bf, 0xffd45a, 0x9d78ff];
+        const gold = new THREE.MeshStandardMaterial({ color: 0xe6b84d, emissive: 0x75420b, emissiveIntensity: .68, metalness: .72, roughness: .24 });
+        const obsidian = new THREE.MeshStandardMaterial({ color: 0x201b3e, emissive: 0x130828, emissiveIntensity: .46, metalness: .54, roughness: .32 });
+        const crystal = color => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.35, transparent: true, opacity: .9, metalness: .35, roughness: .12 });
 
-        // Four bright market wings around a central festival platform.
-        for (let wing = 0; wing < 4; wing++) {
-            const angle = wing * Math.PI / 2;
-            for (let i = -2; i <= 2; i++) {
-                const stall = new THREE.Group();
-                const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 1.7), wood);
-                counter.position.y = 0.58;
-                stall.add(counter);
-                const canopy = new THREE.Mesh(
-                    new THREE.ConeGeometry(2.25, 1.15, 4),
-                    new THREE.MeshLambertMaterial({ color: silkColors[(wing + i + 4) % silkColors.length] })
-                );
-                canopy.position.y = 2.35;
-                canopy.rotation.y = Math.PI / 4;
-                stall.add(canopy);
-                const lamp = new THREE.PointLight(silkColors[(wing + i + 4) % silkColors.length], 0.7, 7);
-                lamp.position.set(0, 2.2, 0);
-                stall.add(lamp);
-                stall.position.set(Math.cos(angle) * 13 + Math.sin(angle) * i * 4.3, 0, Math.sin(angle) * 13 - Math.cos(angle) * i * 4.3);
-                stall.rotation.y = -angle + Math.PI / 2;
-                root.add(stall);
-            }
+        // Monumental circular event stage with a holographic energy core.
+        const stage = new THREE.Mesh(new THREE.CylinderGeometry(9.3, 10.2, 1.1, 48), obsidian);
+        stage.position.y = .55; stage.receiveShadow = true; root.add(stage);
+        [6.1, 8.6, 10.1].forEach((radius, i) => {
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, .12 + i * .025, 10, 72), crystal(palette[i]));
+            ring.rotation.x = Math.PI / 2; ring.position.y = 1.13 + i * .035; root.add(ring);
+        });
+        const core = new THREE.Mesh(new THREE.OctahedronGeometry(1.25, 2), crystal(0x70efff));
+        core.position.y = 3.3; root.add(core);
+        const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 3.4, 15, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0x73eaff, transparent: true, opacity: .09, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+        beam.position.y = 7.7; root.add(beam);
+
+        // Four activity gates: race, boss battle, dance/concert and jackpot.
+        const zoneLabels = [
+            ['SKY RACE', '🏁', 0x58e9ff], ['BOSS RUSH', '⚔️', 0xff5b72],
+            ['LIVE STAGE', '🎵', 0xc477ff], ['GRAND JACKPOT', '🌟', 0xffd45a],
+        ];
+        zoneLabels.forEach(([name, icon, color], i) => {
+            const a = i * Math.PI / 2;
+            const gate = new THREE.Group();
+            const floor = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.8, .45, 24), obsidian);
+            floor.position.y = .23; gate.add(floor);
+            [-2.7, 2.7].forEach(x => {
+                const tower = new THREE.Mesh(new THREE.CylinderGeometry(.34, .58, 5.8, 8), gold);
+                tower.position.set(x, 2.9, 0); gate.add(tower);
+                const gem = new THREE.Mesh(new THREE.OctahedronGeometry(.55), crystal(color));
+                gem.position.set(x, 6.15, 0); gate.add(gem);
+            });
+            const arch = new THREE.Mesh(new THREE.TorusGeometry(2.7, .22, 9, 40, Math.PI), crystal(color));
+            arch.position.y = 3.1; gate.add(arch);
+            const label = this._makePortalLabel(name, new THREE.Color(color), `${icon} ACTIVITY ZONE`);
+            label.position.y = 7.25; gate.add(label);
+            gate.position.set(Math.cos(a) * 19, .03, Math.sin(a) * 19);
+            gate.rotation.y = -a + Math.PI / 2; root.add(gate);
+        });
+
+        // Suspended skyrail arcs make the four zones read as one festival venue.
+        for (let i = 0; i < 4; i++) {
+            const a = i * Math.PI / 2 + Math.PI / 4;
+            const bridge = new THREE.Mesh(new THREE.BoxGeometry(3.2, .25, 10.5), gold);
+            bridge.position.set(Math.cos(a) * 13.7, .3, Math.sin(a) * 13.7);
+            bridge.rotation.y = -a; root.add(bridge);
         }
 
-        const stage = new THREE.Mesh(new THREE.CylinderGeometry(8, 9, 0.7, 32), gold);
-        stage.position.y = 0.35;
-        root.add(stage);
-        const rail = new THREE.Mesh(new THREE.TorusGeometry(20, 0.22, 8, 64), gold);
-        rail.rotation.x = Math.PI / 2;
-        rail.position.y = 0.35;
-        root.add(rail);
-
-        // Floating lanterns create the nightly festival silhouette.
-        for (let i = 0; i < 28; i++) {
-            const color = silkColors[i % silkColors.length];
-            const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), new THREE.MeshBasicMaterial({ color }));
-            const a = i / 28 * Math.PI * 2;
-            lantern.position.set(Math.cos(a) * (10 + i % 4 * 3), 4 + (i % 5) * 0.75, Math.sin(a) * (10 + i % 4 * 3));
+        // Crown spires and lantern constellation frame the skyline.
+        for (let i = 0; i < 24; i++) {
+            const a = i / 24 * Math.PI * 2;
+            const color = palette[i % palette.length];
+            const lantern = new THREE.Mesh(new THREE.IcosahedronGeometry(.25 + (i % 3) * .06), crystal(color));
+            lantern.position.set(Math.cos(a) * (12 + i % 4 * 3.7), 5 + (i % 6) * .85, Math.sin(a) * (12 + i % 4 * 3.7));
             root.add(lantern);
         }
-        this.scene.add(root);
-        this.envObjects.push(root);
-        this.floatingIslands.push(root);
+        for (let i = 0; i < 8; i++) {
+            const a = i / 8 * Math.PI * 2 + Math.PI / 8;
+            const spire = new THREE.Mesh(new THREE.ConeGeometry(.65, 6.5, 7), gold);
+            spire.position.set(Math.cos(a) * 26, 3.25, Math.sin(a) * 26); root.add(spire);
+        }
+
+        // Cloud ocean and satellite islands sell the altitude beyond the rim.
+        const cloudMat = new THREE.MeshLambertMaterial({ color: 0xf4eaff, transparent: true, opacity: .48, depthWrite: false });
+        for (let i = 0; i < 18; i++) {
+            const cloud = new THREE.Group();
+            for (let p = 0; p < 4; p++) {
+                const puff = new THREE.Mesh(new THREE.SphereGeometry(1.3 + (p % 2) * .7, 8, 6), cloudMat);
+                puff.position.set((p - 1.5) * 1.25, Math.sin(p) * .35, Math.cos(p) * .7); puff.scale.y = .55; cloud.add(puff);
+            }
+            const a = i / 18 * Math.PI * 2;
+            cloud.position.set(Math.cos(a) * (34 + i % 4 * 4), -3 + i % 3, Math.sin(a) * (34 + i % 4 * 4));
+            root.add(cloud);
+        }
+
+        const title = this._makePortalLabel('SKYRAIL BAZAAR', new THREE.Color(0xffd45a), '✦ CELESTIAL FESTIVAL ARENA ✦');
+        title.position.set(0, 11.5, 0); title.scale.set(1.45, 1.45, 1); root.add(title);
+        const key = new THREE.PointLight(0xff65c4, 2.1, 42); key.position.set(-7, 10, 3); root.add(key);
+        const fill = new THREE.PointLight(0x62eaff, 2.1, 42); fill.position.set(8, 9, -5); root.add(fill);
+
+        root.userData.skyrailAnim = { core, beam, startY: core.position.y };
+        this.skyrailArena = root;
+        this.scene.add(root); this.envObjects.push(root);
     }
 
     _createSvarrgaEnvironment(config) {
@@ -5627,6 +5694,14 @@ export class SceneManager {
 
         // Animate portals (swirl spin, ring/halo pulse, rising motes, label bob)
         const t = this.time;
+        if (this.skyrailArena?.userData?.skyrailAnim) {
+            const a = this.skyrailArena.userData.skyrailAnim;
+            a.core.rotation.y = t * .85;
+            a.core.rotation.x = Math.sin(t * .55) * .22;
+            a.core.position.y = a.startY + Math.sin(t * 1.4) * .38;
+            a.core.scale.setScalar(1 + Math.sin(t * 2.2) * .08);
+            a.beam.material.opacity = .07 + Math.sin(t * 1.8) * .025;
+        }
         this.portalMeshes.forEach(portal => {
             const a = portal.userData.anim;
             if (!a) return;
