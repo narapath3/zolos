@@ -7180,8 +7180,9 @@ export class GameUI {
     this.updateHUD(this.character.stats);
   }
 
-  // ============ Sell Shop Logic ============
-  _setupSellShopEvents() {
+  // Legacy NPC shop implementation retained only for old saved UI layouts.
+  // The active implementation is the single "NPC Sell Shop Logic" path below.
+  _setupSellShopEventsLegacy() {
     const qtyInput = document.getElementById('sell-shop-qty-input');
     if (qtyInput) {
       qtyInput.addEventListener('input', () => this._updateSellShopTotal());
@@ -7215,7 +7216,7 @@ export class GameUI {
     return Math.floor((item.price || 0) * 0.8);
   }
 
-  _renderSellShop() {
+  _renderSellShopLegacy() {
     const grid = document.getElementById('sell-shop-inventory-grid');
     if (!grid) return;
     grid.innerHTML = '';
@@ -7256,7 +7257,7 @@ export class GameUI {
     this._updateSellShopDetail();
   }
 
-  _updateSellShopDetail() {
+  _updateSellShopDetailLegacy() {
     const placeholder = document.getElementById('sell-shop-detail-placeholder');
     const content = document.getElementById('sell-shop-detail-content');
     if (!placeholder || !content) return;
@@ -7295,7 +7296,7 @@ export class GameUI {
     this._updateSellShopTotal();
   }
 
-  _updateSellShopTotal() {
+  _updateSellShopTotalLegacy() {
     if (!this.selectedSellShopItem) return;
     const qtyInput = document.getElementById('sell-shop-qty-input');
     const totalDisplay = document.getElementById('sell-shop-total-price');
@@ -7306,7 +7307,7 @@ export class GameUI {
     totalDisplay.textContent = (unitPrice * qty).toLocaleString();
   }
 
-  async _performSellShopAction() {
+  async _performSellShopActionLegacy() {
     if (!this.selectedSellShopItem || !this.character) return;
 
     const qtyInput = document.getElementById('sell-shop-qty-input');
@@ -7412,8 +7413,7 @@ export class GameUI {
         slot.classList.add('selected');
       }
 
-      const basePrice = itemData.price || item.price || 10;
-      const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
+      const sellPrice = this._sellUnitPrice({ ...item, price: itemData.price || item.price || 10 });
 
       slot.innerHTML = `
         <span class="slot-emoji">${itemIconMarkup(item, item.emoji || itemData.emoji || '📦')}</span>
@@ -7456,8 +7456,7 @@ export class GameUI {
 
     const item = this.selectedSellShopItem;
     const itemData = ITEMS[item.item_name] || {};
-    const basePrice = itemData.price || item.price || 10;
-    const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
+    const sellPrice = this._sellUnitPrice({ ...item, price: itemData.price || item.price || 10 });
 
     document.getElementById('sell-shop-detail-icon').innerHTML = itemIconMarkup(item, item.emoji || itemData.emoji || '📦', 'item-visual--detail');
     document.getElementById('sell-shop-detail-name').textContent = item.item_name;
@@ -7491,8 +7490,7 @@ export class GameUI {
     const qty = Math.min(Math.max(1, parseInt(qtyInput?.value) || 1), invItem.quantity);
 
     const itemData = ITEMS[item.item_name] || {};
-    const basePrice = itemData.price || item.price || 10;
-    const sellPrice = Math.max(1, Math.floor(basePrice * 0.5));
+    const sellPrice = this._sellUnitPrice({ ...item, price: itemData.price || item.price || 10 });
     const totalGold = sellPrice * qty;
 
     invItem.quantity -= qty;
@@ -7501,13 +7499,21 @@ export class GameUI {
       this.selectedSellShopItem = null;
     }
 
-    this.character.stats.gold += totalGold;
+    this.character.stats.gold = (Number(this.character.stats.gold) || 0) + totalGold;
+
+    // Reflect the completed transaction immediately. Persistence can involve a
+    // network round trip and must never leave the player looking at stale gold.
+    this._renderSellShop();
+    this._renderInventory();
+    this.updateHUD(this.character.stats);
+    this.updateStats(this.character.stats);
 
     if (this.characterId) {
       await saveInventoryItem(this.characterId, item.item_name, itemData.type || item.item_type || 'etc', -qty);
-      if (this.character.saveStatsToDatabase) {
-        await this.character.saveStatsToDatabase();
-      }
+      // Online direct stat writes are intentionally skipped; push the trusted
+      // socket snapshot now instead of waiting up to three minutes for autosave.
+      if (typeof window.zolosSaveNow === 'function') window.zolosSaveNow();
+      else if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
     }
 
     this.addCombatLog(`💰 ขาย ${item.emoji || '📦'} ${item.item_name} x${qty} ได้ ${totalGold.toLocaleString()} Zeny`, 'gold');
@@ -7516,10 +7522,6 @@ export class GameUI {
       else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
     }
 
-    this._renderSellShop();
-    this._renderInventory();
-    this.updateHUD(this.character.stats);
-    this.updateStats(this.character.stats);
   }
 
 

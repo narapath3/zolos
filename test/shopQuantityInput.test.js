@@ -25,15 +25,37 @@ test('sell shop refreshes only the total while typing instead of re-clamping the
   assert.match(gameUi, /qtyInput\.addEventListener\('input', \(\) => this\._updateSellShopTotal\(\)\)/);
   assert.match(gameUi, /qtyInput\.addEventListener\('change', \(\) => this\._updateSellShopDetail\(\)\)/);
   assert.match(gameUi, /qtyInput\.addEventListener\('blur', \(\) => this\._updateSellShopDetail\(\)\)/);
-  // The stack-size clamp still exists, it just no longer runs per keystroke.
+  // The active detail path bounds the field without rewriting what the player
+  // is still typing; the transaction itself clamps to the real stack.
   const detail = gameUi.match(/_updateSellShopDetail\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
-  assert.match(detail, /if \(parseInt\(qtyInput\.value\) > item\.quantity\) qtyInput\.value = item\.quantity;/);
+  assert.match(detail, /if \(qtyInput\) qtyInput\.max = ownedQty;/);
+  assert.doesNotMatch(detail, /qtyInput\.value\s*=/);
 });
 
 test('selling still validates the quantity against the real inventory stack', () => {
   const perform = gameUi.match(/async _performSellShopAction\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
-  assert.match(perform, /if \(sellQty <= 0\) return;/);
-  assert.match(perform, /if \(!invItem \|\| invItem\.quantity < sellQty\)/);
+  assert.match(perform, /if \(!invItem \|\| invItem\.quantity <= 0\)/);
+  assert.match(perform, /Math\.min\(Math\.max\(1, parseInt\(qtyInput\?\.value\) \|\| 1\), invItem\.quantity\)/);
+});
+
+test('NPC sale uses one price helper, numeric gold, immediate HUD, and immediate save snapshot', () => {
+  const perform = gameUi.match(/async _performSellShopAction\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
+  assert.match(perform, /const sellPrice = this\._sellUnitPrice/);
+  assert.match(perform, /stats\.gold = \(Number\(this\.character\.stats\.gold\) \|\| 0\) \+ totalGold/);
+  assert.match(perform, /this\.updateHUD\(this\.character\.stats\)/);
+  assert.match(perform, /typeof window\.zolosSaveNow === 'function'/);
+  assert.match(perform, /window\.zolosSaveNow\(\)/);
+  assert.ok(
+    perform.indexOf('this.updateHUD(this.character.stats)') < perform.indexOf('await saveInventoryItem'),
+    'gold HUD must refresh before persistence waits',
+  );
+});
+
+test('active NPC shop definitions are unique', () => {
+  assert.equal((gameUi.match(/\n  _setupSellShopEvents\(\) \{/g) || []).length, 1);
+  assert.equal((gameUi.match(/\n  _renderSellShop\(\) \{/g) || []).length, 1);
+  assert.equal((gameUi.match(/\n  _updateSellShopDetail\(\) \{/g) || []).length, 1);
+  assert.equal((gameUi.match(/\n  async _performSellShopAction\(\) \{/g) || []).length, 1);
 });
 
 test('the quantity field wins the row instead of being squeezed by its buttons', () => {
