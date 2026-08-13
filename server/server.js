@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createPgClient } from './api/pgClient.js';
 import { createApiRouter } from './api/index.js';
 import { createAdminRouter } from './api/admin.js';
+import { ensureBugReportTables } from './api/bugReports.js';
 import * as ipMonitor from './api/ipMonitor.js';
 import { startSnapshotScheduler } from './api/statSnapshots.js';
 import { startMarketExpiryScheduler } from './api/marketExpiry.js';
@@ -1863,6 +1864,7 @@ httpServer.listen(PORT, HOST, () => {
                 await ensureOreEconomy();
                 await ensurePetEconomy();
                 await ensureNpcSaleEconomy();
+                await ensureBugReportTables();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }
         })();

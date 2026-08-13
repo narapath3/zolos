@@ -89,6 +89,8 @@ export class AdminUI {
             await this.loadUsers();
         } else if (this.currentTab === 'items') {
             await this.loadItems();
+        } else if (this.currentTab === 'bugs') {
+            await this.loadBugReports();
         }
         this._renderContent();
     }
@@ -362,9 +364,11 @@ export class AdminUI {
         const userTab = this._createTabBtn('👥 Players', 'users');
         const itemTab = this._createTabBtn('📦 Items', 'items');
         const announcementTab = this._createTabBtn('📢 Announcements', 'announcements');
+        const bugTab = this._createTabBtn('🐞 Bug Reports', 'bugs');
         tabs.appendChild(userTab);
         tabs.appendChild(itemTab);
         tabs.appendChild(announcementTab);
+        tabs.appendChild(bugTab);
 
         this.content = document.createElement('div');
         this.content.className = 'admin-content';
@@ -418,10 +422,11 @@ export class AdminUI {
     _updateTabs() {
         const btns = this.container.querySelectorAll('button');
         btns.forEach(b => {
-            if (b.innerText.includes('Players') || b.innerText.includes('Items') || b.innerText.includes('Announcements')) {
+            if (b.innerText.includes('Players') || b.innerText.includes('Items') || b.innerText.includes('Announcements') || b.innerText.includes('Bug Reports')) {
                 const isActive = (b.innerText.includes('Players') && this.currentTab === 'users') ||
                     (b.innerText.includes('Items') && this.currentTab === 'items') ||
-                    (b.innerText.includes('Announcements') && this.currentTab === 'announcements');
+                    (b.innerText.includes('Announcements') && this.currentTab === 'announcements') ||
+                    (b.innerText.includes('Bug Reports') && this.currentTab === 'bugs');
                 b.style.color = isActive ? '#ffd700' : '#aaa';
                 b.style.borderBottomColor = isActive ? '#ffd700' : 'transparent';
                 b.setAttribute('aria-selected', String(isActive));
@@ -437,7 +442,74 @@ export class AdminUI {
             this._renderItemList();
         } else if (this.currentTab === 'announcements') {
             this._renderAnnouncementPanel();
+        } else if (this.currentTab === 'bugs') {
+            this._renderBugReports();
         }
+    }
+
+    _adminApi(path, options = {}) {
+        const token = localStorage.getItem('zolos_jwt');
+        const adminOrigin = new URL(apiBaseUrl).origin;
+        return fetch(`${adminOrigin}/admin/api${path}`, {
+            ...options,
+            headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token || ''}`, ...(options.headers || {}) },
+        }).then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+            return data;
+        });
+    }
+
+    async loadBugReports() {
+        try { this.bugReports = (await this._adminApi('/bug-reports?status=all')).reports || []; }
+        catch (error) { this.bugReports = []; this.bugReportError = error.message; }
+    }
+
+    _renderBugReports() {
+        this.content.replaceChildren();
+        if (this.bugReportError) {
+            const error = document.createElement('p'); error.style.color='#ff8080'; error.textContent=`โหลดรายงานไม่สำเร็จ: ${this.bugReportError}`; this.content.appendChild(error);
+        }
+        const reports = this.bugReports || [];
+        if (!reports.length && !this.bugReportError) this.content.textContent='ยังไม่มีรายงานบัค';
+        for (const report of reports) {
+            const card = document.createElement('article');
+            card.style.cssText='background:#151b2b;border:1px solid #3a4965;border-radius:10px;padding:14px;margin-bottom:12px;color:#e9f0ff';
+            const heading = document.createElement('h3'); heading.style.cssText='margin:0 0 8px;color:#7ec8ff'; heading.textContent=`${report.status==='pending'?'⏳':report.status==='approved'?'✅':'❌'} ${report.title}`;
+            const meta = document.createElement('div'); meta.style.cssText='font-size:12px;color:#9eb0cc;margin-bottom:8px'; meta.textContent=`${report.character_name} • ${report.category} • ${new Date(report.created_at).toLocaleString('th-TH')}`;
+            const details = document.createElement('div'); details.style.cssText='white-space:pre-wrap;margin-bottom:10px'; details.textContent=report.details;
+            card.append(heading,meta,details);
+            if (report.screenshot_data) {
+                const image = new Image(); image.src=report.screenshot_data; image.alt='ภาพประกอบบัค'; image.style.cssText='display:block;max-width:100%;max-height:360px;border-radius:8px;margin:8px 0'; card.appendChild(image);
+            }
+            if (report.status === 'pending') {
+                const controls=document.createElement('div'); controls.style.cssText='display:grid;grid-template-columns:minmax(160px,2fr) 80px 130px;gap:8px;margin-top:10px';
+                const item=document.createElement('input'); item.placeholder='ชื่อไอเทมพิเศษ'; item.value='Bug Hunter Emblem';
+                const qty=document.createElement('input'); qty.type='number'; qty.min='1'; qty.max='99'; qty.value='1';
+                const gold=document.createElement('input'); gold.type='number'; gold.min='1'; gold.max='100000000'; gold.value='10000';
+                const note=document.createElement('textarea'); note.placeholder='หมายเหตุถึงผู้เล่น'; note.style.gridColumn='1/-1';
+                for (const el of [item,qty,gold,note]) el.style.cssText+='background:#0b1020;color:white;border:1px solid #465875;border-radius:6px;padding:8px';
+                const actions=document.createElement('div'); actions.style.cssText='grid-column:1/-1;display:flex;gap:8px';
+                const approve=document.createElement('button'); approve.textContent='✅ Approve + ให้รางวัล'; approve.style.cssText='background:#268657;color:white;border:0;border-radius:7px;padding:9px 13px';
+                const reject=document.createElement('button'); reject.textContent='❌ Reject'; reject.style.cssText='background:#8a3943;color:white;border:0;border-radius:7px;padding:9px 13px';
+                approve.onclick=()=>this.reviewBugReport(report.id,'approve',{item_name:item.value,item_quantity:qty.value,gold:gold.value,note:note.value},approve);
+                reject.onclick=()=>this.reviewBugReport(report.id,'reject',{note:note.value},reject);
+                actions.append(approve,reject); controls.append(item,qty,gold,note,actions); card.appendChild(controls);
+            } else {
+                const result=document.createElement('div'); result.style.color='#b8c6da';
+                result.textContent=report.status==='approved'?`รางวัล: ${report.reward_item_name} x${report.reward_item_quantity} + ${Number(report.reward_gold).toLocaleString()} Zeny${report.admin_note?` • ${report.admin_note}`:''}`:`เหตุผล: ${report.admin_note || '-'}`;
+                card.appendChild(result);
+            }
+            this.content.appendChild(card);
+        }
+    }
+
+    async reviewBugReport(id, action, values, button) {
+        button.disabled=true;
+        try {
+            await this._adminApi(`/bug-reports/${encodeURIComponent(id)}/review`, { method:'POST',body:JSON.stringify({ action,...values }) });
+            await this.refreshData();
+        } catch(error) { alert(`ตรวจสอบรายงานไม่สำเร็จ: ${error.message}`); button.disabled=false; }
     }
 
     async _renderAnnouncementPanel() {

@@ -7,6 +7,7 @@ import * as auth from './auth.js';
 import { runQuery } from './data.js';
 import { callRpc } from './rpc.js';
 import * as ipMonitor from './ipMonitor.js';
+import { registerBugReportRoutes } from './bugReports.js';
 
 export function createApiRouter() {
     const r = express.Router();
@@ -22,7 +23,7 @@ export function createApiRouter() {
         credentials: true,
     }));
 
-    r.use(express.json({ limit: '256kb' }));
+    r.use(express.json({ limit: '1mb' }));
 
     // Per-IP limiters. Generous because carrier-grade NAT (esp. Thai mobile)
     // puts many legitimate players behind ONE public IP — a tight cap would
@@ -43,6 +44,8 @@ export function createApiRouter() {
         if (status >= 500) console.error('[api] error:', err.message);
         res.status(status).json({ error: err.message || 'server error' });
     });
+
+    registerBugReportRoutes(r, wrap);
 
     // ---- auth ----
     r.post('/auth/signup', authLimiter, wrap(async (req, res) => {

@@ -29,6 +29,7 @@ import {
 } from './CardTradeRecipient.js';
 import { migrateLegacyCards } from '../cards/CardMigration.js';
 import { getCard } from '../cards/CardCatalog.js';
+import { BugReportUI } from './BugReportUI.js';
 
 // Maps each skill id to a line-art glyph in the #ic-* SVG sprite (index.html),
 // so the skill bar shows clean professional icons instead of emoji.
@@ -94,6 +95,7 @@ export class GameUI {
     this._setupChat();
     this._setupMinimap();
     this._setupProfileEditor();
+    this.bugReportUI = new BugReportUI(this);
     this.playerProfileModal = new PlayerProfileModal();
     this._setupLeaderboardTabs();
     this._setupOnlineTabs();

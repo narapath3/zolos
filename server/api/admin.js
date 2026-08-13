@@ -250,6 +250,60 @@ export function createAdminRouter({ io, onlinePlayers, userSocketMap, reloadWorl
         res.json({ ok: true });
     }));
 
+    // ================= BUG REPORTS =================
+    r.get('/bug-reports', requireAdmin, wrap(async (req, res) => {
+        const allowed = new Set(['pending', 'approved', 'rejected', 'all']);
+        const status = allowed.has(req.query.status) ? req.query.status : 'pending';
+        const params = [];
+        const where = status === 'all' ? '' : `WHERE status=$${params.push(status)}`;
+        const { rows } = await query(`SELECT id,user_id,character_id,character_name,category,title,details,
+            screenshot_data,context,status,admin_note,reward_item_name,reward_item_quantity,reward_gold,
+            reviewed_by,created_at,reviewed_at FROM bug_reports ${where}
+            ORDER BY CASE WHEN status='pending' THEN 0 ELSE 1 END,created_at DESC LIMIT 100`, params);
+        res.json({ reports: rows });
+    }));
+
+    r.post('/bug-reports/:id/review', requireAdmin, wrap(async (req, res) => {
+        const action = req.body?.action;
+        if (action !== 'approve' && action !== 'reject') throw httpErr(400, 'action ไม่ถูกต้อง');
+        const note = String(req.body?.note || '').trim().slice(0, 1000);
+        const itemName = String(req.body?.item_name || '').trim().slice(0, 64);
+        const itemQty = Math.min(99, Math.max(0, Math.floor(Number(req.body?.item_quantity) || 0)));
+        const gold = Math.min(100_000_000, Math.max(0, Math.floor(Number(req.body?.gold) || 0)));
+        if (action === 'approve' && (!itemName || itemQty < 1 || gold < 1)) {
+            throw httpErr(400, 'การอนุมัติต้องระบุไอเทม จำนวน และ Zeny รางวัล');
+        }
+
+        const reviewed = await tx(async (client) => {
+            const locked = await client.query('SELECT * FROM bug_reports WHERE id=$1 FOR UPDATE', [req.params.id]);
+            const report = locked.rows[0];
+            if (!report) throw httpErr(404, 'ไม่พบรายงานบัค');
+            if (report.status !== 'pending') throw httpErr(409, 'รายงานนี้ตรวจสอบไปแล้ว จึงไม่สามารถให้รางวัลซ้ำได้');
+            if (action === 'approve') {
+                const inv = await client.query('SELECT id,quantity FROM inventory WHERE character_id=$1 AND item_name=$2 LIMIT 1 FOR UPDATE', [report.character_id,itemName]);
+                if (inv.rows[0]) {
+                    await client.query('UPDATE inventory SET quantity=quantity+$2 WHERE id=$1', [inv.rows[0].id,itemQty]);
+                } else {
+                    await client.query('INSERT INTO inventory (character_id,item_name,item_type,quantity,stats) VALUES ($1,$2,$3,$4,$5)', [report.character_id,itemName,'special',itemQty,{}]);
+                }
+                const money = await client.query('UPDATE characters SET gold=gold+$2,updated_at=now() WHERE id=$1 RETURNING gold', [report.character_id,gold]);
+                if (!money.rows[0]) throw httpErr(404, 'ไม่พบตัวละครผู้แจ้งบัค');
+            }
+            const updated = await client.query(`UPDATE bug_reports SET status=$2,admin_note=$3,
+                reward_item_name=$4,reward_item_quantity=$5,reward_gold=$6,reviewed_by=$7,reviewed_at=now()
+                WHERE id=$1 RETURNING *`, [report.id,action==='approve'?'approved':'rejected',note,
+                action==='approve'?itemName:null,action==='approve'?itemQty:0,action==='approve'?gold:0,String(req.admin.userId)]);
+            return updated.rows[0];
+        });
+        const socketId = userSocketMap?.get(reviewed.user_id);
+        if (socketId && io) io.to(socketId).emit('bug_report_reviewed', {
+            id: reviewed.id,status: reviewed.status,itemName: reviewed.reward_item_name,
+            itemQuantity: reviewed.reward_item_quantity,gold: Number(reviewed.reward_gold),note: reviewed.admin_note,
+        });
+        console.log(`[Admin] ${req.admin.username} ${reviewed.status} bug report ${reviewed.id}`);
+        res.json({ ok:true,report:reviewed });
+    }));
+
     // ================= ECONOMY =================
     r.get('/economy', requireAdmin, wrap(async (_req, res) => {
         const [rich, recent, topZol, activity] = await Promise.all([
