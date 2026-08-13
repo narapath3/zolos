@@ -667,10 +667,22 @@ export class GameUI {
         return;
       }
       const remaining = `${String(Math.floor(status.remainingSeconds / 60)).padStart(2, '0')}:${String(status.remainingSeconds % 60).padStart(2, '0')}`;
-      hud.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><span style="font-size:25px">${status.current.icon}</span><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:900;color:#ffe28a">${status.current.name}</div><div style="font-size:10px;color:#e1d8f1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${status.current.desc}</div></div><b style="font-size:14px;color:#7fffe0">${remaining}</b></div>${status.next ? `<div style="font-size:9px;color:#b9a8cf;margin-top:5px">ถัดไป ${status.next.start} · ${status.next.icon} ${status.next.name}</div>` : ''}`;
+      const progress = this._skyrailActivityState;
+      let objective = 'เดินเข้าสู่จุดหมายเพื่อเริ่มกิจกรรม';
+      if (progress?.completed) objective = '✅ เคลียร์กิจกรรมแล้ว';
+      else if (progress?.nextCheckpoint) {
+        objective = progress.dwellTarget
+          ? `ยืนที่ ${progress.nextCheckpoint.name} ${Math.floor(progress.dwellSeconds)}/${progress.dwellTarget} วินาที`
+          : `จุดถัดไป: ${progress.nextCheckpoint.name} (${progress.current}/${progress.total})`;
+      }
+      hud.innerHTML = `<div style="display:flex;gap:10px;align-items:center"><span style="font-size:25px">${status.current.icon}</span><div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:900;color:#ffe28a">${status.current.name}</div><div style="font-size:10px;color:#e1d8f1">${status.current.desc}</div><div style="font-size:11px;font-weight:800;color:#7fffe0;margin-top:4px">${objective}</div></div><b style="font-size:14px;color:#7fffe0">${remaining}</b></div>${status.next ? `<div style="font-size:9px;color:#b9a8cf;margin-top:5px">ถัดไป ${status.next.start} · ${status.next.icon} ${status.next.name}</div>` : ''}`;
     };
     render();
     if (!this._skyrailHudTimer) this._skyrailHudTimer = setInterval(render, 1000);
+  }
+
+  setSkyrailActivityState(state) {
+    this._skyrailActivityState = state;
   }
 
   _updateHUDMapAndPing() {

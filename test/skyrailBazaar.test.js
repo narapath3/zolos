@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKYRAIL_ACTIVITIES, canEnterSkyrail, getSkyrailStatus } from '../src/events/SkyrailBazaar.js';
+import { SKYRAIL_ACTIVITIES, SkyrailActivitySession, canEnterSkyrail, getSkyrailRoute, getSkyrailStatus } from '../src/events/SkyrailBazaar.js';
 import { readFileSync } from 'node:fs';
 import { getSkyrailStatus as getServerSkyrailStatus } from '../server/events/SkyrailBazaar.js';
 
@@ -15,7 +15,7 @@ test('Skyrail Bazaar stays open all day while QA mode is enabled', () => {
 });
 
 test('schedule covers the full six-hour session without gaps', () => {
-  assert.equal(SKYRAIL_ACTIVITIES.length, 12);
+  assert.equal(SKYRAIL_ACTIVITIES.length, 4);
   assert.equal(SKYRAIL_ACTIVITIES[0].start, '18:00');
   assert.equal(SKYRAIL_ACTIVITIES.at(-1).end, '24:00');
   for (let i = 1; i < SKYRAIL_ACTIVITIES.length; i++) {
@@ -63,14 +63,40 @@ test('Skyrail is a purpose-built floating festival arena rather than generic ter
   assert.match(sceneSource, /_createSkyrailIslandGround/);
   assert.match(sceneSource, /skyrail-grand-island/);
   assert.match(sceneSource, /skyrail-bazaar-grand-arena/);
-  assert.match(sceneSource, /SKY RACE/);
-  assert.match(sceneSource, /BOSS RUSH/);
-  assert.match(sceneSource, /LIVE STAGE/);
-  assert.match(sceneSource, /GRAND JACKPOT/);
+  assert.match(sceneSource, /EAST CHECKPOINT/);
+  assert.match(sceneSource, /NORTH CHECKPOINT/);
+  assert.match(sceneSource, /WEST CHECKPOINT/);
+  assert.match(sceneSource, /SOUTH CHECKPOINT/);
   assert.match(sceneSource, /CELESTIAL FESTIVAL ARENA/);
   assert.match(sceneSource, /if \(this\.currentMap === 'skyrail_bazaar'\) \{[\s\S]*?this\.waterMesh = null/);
   assert.match(sceneSource, /this\.skyrailArena\?\.userData\?\.skyrailAnim/);
-  assert.match(sceneSource, /`\$\{icon\} COMING SOON`/);
+  assert.match(sceneSource, /`\$\{icon\} ACTIVE COURSE`/);
+  assert.doesNotMatch(sceneSource, /COMING SOON/);
+});
+
+test('every advertised activity has a route made from real arena coordinates', () => {
+  for (const activity of SKYRAIL_ACTIVITIES) assert.ok(getSkyrailRoute(activity.id).length > 0, activity.id);
+  for (const removed of ['poring_race', 'fishing_storm', 'pet_parade', 'mimic_hunt', 'skyrail_defense', 'grand_jackpot']) {
+    assert.equal(getSkyrailRoute(removed).length, 0);
+  }
+});
+
+test('Skyrail Circuit can be completed by walking through the four physical pads', () => {
+  const session = new SkyrailActivitySession();
+  for (const position of [{ x: 19, z: 0 }, { x: 0, z: 19 }, { x: -19, z: 0 }, { x: 0, z: -19 }]) {
+    session.update('skyrail_circuit', position, 0.1);
+  }
+  assert.equal(session.snapshot().completed, true);
+  assert.equal(session.snapshot().current, 4);
+});
+
+test('Core Calibration requires an uninterrupted 15-second hold in the center', () => {
+  const session = new SkyrailActivitySession();
+  session.update('core_calibration', { x: 0, z: 0 }, 8);
+  session.update('core_calibration', { x: 10, z: 0 }, 1);
+  assert.equal(session.snapshot().dwellSeconds, 0);
+  session.update('core_calibration', { x: 0, z: 0 }, 15);
+  assert.equal(session.snapshot().completed, true);
 });
 
 test('Skyrail remains monster-free in local and authoritative server modes', () => {
@@ -91,6 +117,7 @@ test('client and standalone map server agree on QA availability', () => {
     const client = getSkyrailStatus(new Date(iso));
     const server = getServerSkyrailStatus(new Date(iso));
     assert.equal(server.isOpen, client.isOpen);
+    assert.equal(server.activityId, client.current?.id || null);
     assert.equal(server.testAlwaysOpen, client.testAlwaysOpen);
     assert.equal(server.timeZone, client.timeZone);
   }

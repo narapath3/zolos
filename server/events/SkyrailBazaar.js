@@ -6,12 +6,10 @@ export const SKYRAIL_CLOSE_MINUTE = 24 * 60;
 export const SKYRAIL_TEST_ALWAYS_OPEN = true;
 
 const ACTIVITY_WINDOWS = Object.freeze([
-  ['18:00', '18:30', 'opening_market'], ['18:30', '19:00', 'poring_race'],
-  ['19:00', '19:30', 'fishing_storm'], ['19:30', '20:00', 'crystal_rush'],
-  ['20:00', '20:30', 'pet_parade'], ['20:30', '21:00', 'mimic_hunt'],
-  ['21:00', '21:30', 'skyrail_defense'], ['21:30', '22:00', 'dance_party'],
-  ['22:00', '22:30', 'fishing_storm_2'], ['22:30', '23:00', 'mimic_hunt_2'],
-  ['23:00', '23:30', 'skyrail_defense_2'], ['23:30', '24:00', 'grand_jackpot'],
+  ['18:00', '19:30', 'skyrail_circuit'],
+  ['19:30', '21:00', 'crystal_relay'],
+  ['21:00', '22:30', 'core_calibration'],
+  ['22:30', '24:00', 'grand_tour'],
 ]);
 
 function bangkokParts(now) {

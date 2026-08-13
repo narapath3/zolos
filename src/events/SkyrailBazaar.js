@@ -7,19 +7,69 @@ export const SKYRAIL_CLOSE_MINUTE = 24 * 60;
 export const SKYRAIL_TEST_ALWAYS_OPEN = true;
 
 export const SKYRAIL_ACTIVITIES = Object.freeze([
-  { start: '18:00', end: '18:30', id: 'opening_market', icon: '🎆', name: 'พิธีเปิดตลาดเวหา', desc: 'เช็กอิน รับบัฟ Festival Luck และชมร้านค้าพิเศษเปิดตลาด' },
-  { start: '18:30', end: '19:00', id: 'poring_race', icon: '🏁', name: 'Poring Sky Race', desc: 'เลือกเชียร์ Poring นักแข่ง ลุ้นผลการแข่งขันประจำรอบ' },
-  { start: '19:00', end: '19:30', id: 'fishing_storm', icon: '🎣', name: 'Fishing Storm', desc: 'ฝูงปลาหายากผ่านเกาะลอย อัตราพบปลาและสมบัติเพิ่มขึ้น' },
-  { start: '19:30', end: '20:00', id: 'crystal_rush', icon: '💎', name: 'Crystal Rush', desc: 'ขุด Sky Crystal แข่งกับเวลา พร้อมโบนัสการช่วยกันทั้งแมพ' },
-  { start: '20:00', end: '20:30', id: 'pet_parade', icon: '🐾', name: 'Pet Parade', desc: 'พาสัตว์เลี้ยงเดินพาเหรด รับ XP สัตว์เลี้ยงและคะแนนความนิยม' },
-  { start: '20:30', end: '21:00', id: 'mimic_hunt', icon: '🎁', name: 'Mimic Hunt', desc: 'ตามหาหีบปลอมที่ซ่อนทั่วตลาดก่อนมันย้ายตำแหน่ง' },
-  { start: '21:00', end: '21:30', id: 'skyrail_defense', icon: '🛡️', name: 'Skyrail Defense', desc: 'ร่วมป้องกันแกนพลังงานจากโจรสลัดเวหาและ Mini Boss' },
-  { start: '21:30', end: '22:00', id: 'dance_party', icon: '🎶', name: 'Starlight Dance Party', desc: 'ปาร์ตี้กลางลาน รับ Social Buff เมื่ออยู่ร่วมกับผู้เล่นคนอื่น' },
-  { start: '22:00', end: '22:30', id: 'fishing_storm_2', icon: '🎣', name: 'Fishing Storm: Moonlight', desc: 'ปลารอบค่ำและหีบ Moonlight ปรากฏเฉพาะช่วงนี้' },
-  { start: '22:30', end: '23:00', id: 'mimic_hunt_2', icon: '🔎', name: 'Golden Mimic Hunt', desc: 'ล่าหีบทองหายาก โบนัส Token สูงกว่ารอบปกติ' },
-  { start: '23:00', end: '23:30', id: 'skyrail_defense_2', icon: '🐉', name: 'Skyrail Defense: Final Wave', desc: 'ศึกป้องกันรอบใหญ่ ปิดท้ายด้วยกัปตันโจรสลัดเวหา' },
-  { start: '23:30', end: '24:00', id: 'grand_jackpot', icon: '🌟', name: 'Grand Bazaar Finale', desc: 'สรุปแต้มทั้งคืน เปิดหีบรวม และถ่ายรูปพลุส่งท้ายตลาด' },
+  { start: '18:00', end: '19:30', id: 'skyrail_circuit', icon: '🏁', name: 'Skyrail Circuit', desc: 'วิ่งผ่านลานทั้ง 4 ตามลำดับ: ตะวันออก → เหนือ → ตะวันตก → ใต้' },
+  { start: '19:30', end: '21:00', id: 'crystal_relay', icon: '💎', name: 'Crystal Relay', desc: 'ส่งพลังย้อนวงแหวน: ใต้ → ตะวันตก → เหนือ → ตะวันออก → แกนกลาง' },
+  { start: '21:00', end: '22:30', id: 'core_calibration', icon: '⚡', name: 'Core Calibration', desc: 'เข้าถึงแกนกลางและยืนรักษาสมดุลพลังงานให้ครบ 15 วินาที' },
+  { start: '22:30', end: '24:00', id: 'grand_tour', icon: '🌟', name: 'Grand Bazaar Tour', desc: 'สำรวจแกนกลางและลานครบทั้ง 4 จุดเพื่อเคลียร์รอบสุดท้าย' },
 ]);
+
+export const SKYRAIL_CHECKPOINTS = Object.freeze({
+  east: Object.freeze({ id: 'east', name: 'ลานตะวันออก', x: 19, z: 0, radius: 5 }),
+  north: Object.freeze({ id: 'north', name: 'ลานเหนือ', x: 0, z: 19, radius: 5 }),
+  west: Object.freeze({ id: 'west', name: 'ลานตะวันตก', x: -19, z: 0, radius: 5 }),
+  south: Object.freeze({ id: 'south', name: 'ลานใต้', x: 0, z: -19, radius: 5 }),
+  core: Object.freeze({ id: 'core', name: 'แกนพลังงานกลาง', x: 0, z: 0, radius: 6 }),
+});
+
+const SKYRAIL_ROUTES = Object.freeze({
+  skyrail_circuit: Object.freeze(['east', 'north', 'west', 'south']),
+  crystal_relay: Object.freeze(['south', 'west', 'north', 'east', 'core']),
+  core_calibration: Object.freeze(['core']),
+  grand_tour: Object.freeze(['core', 'east', 'north', 'west', 'south']),
+});
+
+export function getSkyrailRoute(activityId) {
+  return SKYRAIL_ROUTES[activityId] || Object.freeze([]);
+}
+
+export class SkyrailActivitySession {
+  constructor() { this.reset(null); }
+  reset(activityId) {
+    this.activityId = activityId;
+    this.route = getSkyrailRoute(activityId);
+    this.index = 0;
+    this.dwellSeconds = 0;
+    this.completed = false;
+    this.justCompleted = false;
+  }
+  update(activityId, position, dt = 0) {
+    if (activityId !== this.activityId) this.reset(activityId);
+    this.justCompleted = false;
+    if (this.completed || !position || this.route.length === 0) return this.snapshot();
+    const checkpoint = SKYRAIL_CHECKPOINTS[this.route[this.index]];
+    const dx = Number(position.x) - checkpoint.x;
+    const dz = Number(position.z) - checkpoint.z;
+    const inside = Number.isFinite(dx) && Number.isFinite(dz) && dx * dx + dz * dz <= checkpoint.radius * checkpoint.radius;
+    if (activityId === 'core_calibration') {
+      this.dwellSeconds = inside ? Math.min(15, this.dwellSeconds + Math.max(0, Number(dt) || 0)) : 0;
+      if (this.dwellSeconds >= 15) this._complete();
+    } else if (inside) {
+      this.index += 1;
+      if (this.index >= this.route.length) this._complete();
+    }
+    return this.snapshot();
+  }
+  _complete() { this.completed = true; this.justCompleted = true; }
+  snapshot() {
+    const nextId = this.completed ? null : this.route[this.index];
+    return {
+      activityId: this.activityId, completed: this.completed, justCompleted: this.justCompleted,
+      current: Math.min(this.index, this.route.length), total: this.route.length,
+      dwellSeconds: this.dwellSeconds, dwellTarget: this.activityId === 'core_calibration' ? 15 : 0,
+      nextCheckpoint: nextId ? SKYRAIL_CHECKPOINTS[nextId] : null,
+    };
+  }
+}
 
 function bangkokParts(now) {
   const date = now instanceof Date ? now : new Date(now);

@@ -3736,10 +3736,10 @@ export class SceneManager {
         const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 3.4, 15, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0x73eaff, transparent: true, opacity: .09, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
         beam.position.y = 7.7; root.add(beam);
 
-        // Four activity gates: race, boss battle, dance/concert and jackpot.
+        // Four physical checkpoints used by every playable Skyrail route.
         const zoneLabels = [
-            ['SKY RACE', '🏁', 0x58e9ff], ['BOSS RUSH', '⚔️', 0xff5b72],
-            ['LIVE STAGE', '🎵', 0xc477ff], ['GRAND JACKPOT', '🌟', 0xffd45a],
+            ['EAST CHECKPOINT', '①', 0x58e9ff], ['NORTH CHECKPOINT', '②', 0xff5b72],
+            ['WEST CHECKPOINT', '③', 0xc477ff], ['SOUTH CHECKPOINT', '④', 0xffd45a],
         ];
         zoneLabels.forEach(([name, icon, color], i) => {
             const a = i * Math.PI / 2;
@@ -3754,7 +3754,7 @@ export class SceneManager {
             });
             const arch = new THREE.Mesh(new THREE.TorusGeometry(2.7, .22, 9, 40, Math.PI), crystal(color));
             arch.position.y = 3.1; gate.add(arch);
-            const label = this._makePortalLabel(name, new THREE.Color(color), `${icon} COMING SOON`);
+            const label = this._makePortalLabel(name, new THREE.Color(color), `${icon} ACTIVE COURSE`);
             label.position.y = 7.25; gate.add(label);
             gate.position.set(Math.cos(a) * 19, .03, Math.sin(a) * 19);
             gate.rotation.y = -a + Math.PI / 2; root.add(gate);

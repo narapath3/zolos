@@ -50,6 +50,7 @@ import { AuthUI } from './ui/AuthUI.js';
 import { loadingOverlay } from './ui/LoadingOverlay.js';
 import { announcementSystem } from './ui/AnnouncementSystem.js';
 import { SKILLS, ITEMS } from './engine/GameData.js';
+import { SkyrailActivitySession, getSkyrailStatus } from './events/SkyrailBazaar.js';
 
 // Filled in by loadGameModules(). Declared here so the existing call sites and
 // `new X(...)` uses below keep working untouched — every one of them runs
@@ -123,6 +124,7 @@ function loadGameModules() {
 // ============ App State ============
 let sceneManager, character, monsters, particles, gameUI, authUI;
 let soundManager, combatSystem, inputManager;
+const skyrailActivitySession = new SkyrailActivitySession();
 let globalAnnouncements = null;
 let isGameStarted = false;
 let lastTime = 0;
@@ -2940,6 +2942,17 @@ function stepWorld(dt) {
         updateOreTargeting(dt);       // ore in range + AUTO walks to ore and mines
         gameUI.updateMining();        // timed mining "job" (also runs while hidden)
         gameUI.updateAutoPotion(dt);  // auto HP/SP potions (also while hidden)
+    }
+    if (gameUI && sceneManager.currentMap === 'skyrail_bazaar') {
+        const status = getSkyrailStatus();
+        const activityState = skyrailActivitySession.update(status.current?.id || null, character.getPosition(), dt);
+        gameUI.setSkyrailActivityState(activityState);
+        if (activityState.justCompleted) {
+            gameUI.addCombatLog(`✅ เคลียร์ ${status.current?.name || 'Skyrail Activity'} สำเร็จ!`, 'levelup');
+        }
+    } else if (gameUI) {
+        skyrailActivitySession.reset(null);
+        gameUI.setSkyrailActivityState(null);
     }
     if (positionBeforeMovement && sceneManager?.resolvePlayerCollisions) {
         sceneManager.resolvePlayerCollisions(character.mesh.position, positionBeforeMovement);
