@@ -30,23 +30,22 @@ function resizeFrame(source, width, height) {
   return canvas.toDataURL('image/jpeg', 0.7);
 }
 
-async function captureScreen() {
-  if (navigator.mediaDevices?.getDisplayMedia) {
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false, preferCurrentTab: true });
-      const video = document.createElement('video');
-      video.srcObject = stream;
-      await video.play();
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      return resizeFrame(video, video.videoWidth, video.videoHeight);
-    } finally {
-      stream?.getTracks().forEach(track => track.stop());
-    }
-  }
+function captureGameCanvas() {
   const canvas = document.querySelector('#game-screen canvas, canvas');
-  if (!canvas) throw new Error('เบราว์เซอร์นี้ไม่รองรับการแคปหน้าจอ');
+  if (!canvas || !canvas.width || !canvas.height) throw new Error('ไม่พบภาพเกม กรุณาเลือกภาพจากเครื่องแทน');
   return resizeFrame(canvas, canvas.width, canvas.height);
+}
+
+function imageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\/(?:jpeg|png|webp)$/i.test(file.type)) return reject(new Error('รองรับเฉพาะ JPG, PNG และ WebP'));
+    if (file.size > 8_000_000) return reject(new Error('ภาพต้นฉบับต้องไม่เกิน 8 MB'));
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { try { resolve(resizeFrame(image,image.naturalWidth,image.naturalHeight)); } finally { URL.revokeObjectURL(url); } };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('เปิดไฟล์ภาพไม่สำเร็จ')); };
+    image.src = url;
+  });
 }
 
 export class BugReportUI {
@@ -69,7 +68,7 @@ export class BugReportUI {
         <label>หัวข้อ<input name="title" maxlength="100" required placeholder="เช่น ขายไอเทมแล้วเงินหายหลังเข้าใหม่" style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;background:#0b1220;color:white;border:1px solid #405573;border-radius:8px"></label>
         <label>รายละเอียดและขั้นตอนที่ทำให้เกิดปัญหา<textarea name="details" maxlength="4000" minlength="10" required rows="6" placeholder="เกิดอะไรขึ้น / ทำอะไรมาก่อน / ควรเป็นอย่างไร..." style="display:block;width:100%;box-sizing:border-box;margin-top:5px;padding:10px;background:#0b1220;color:white;border:1px solid #405573;border-radius:8px;resize:vertical"></textarea></label>
         <div data-shot-zone style="border:1px dashed #53739b;border-radius:10px;padding:12px;text-align:center;color:#abc">ยังไม่มีภาพหน้าจอ</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" data-capture style="background:#275d91;color:white;border:0;border-radius:8px;padding:10px 14px">📸 แคปหน้าจอใหม่</button><button type="button" data-remove style="display:none;background:#633;color:white;border:0;border-radius:8px;padding:10px 14px">ลบภาพ</button><span data-status style="align-self:center;color:#8fc7ef"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" data-capture style="background:#275d91;color:white;border:0;border-radius:8px;padding:10px 14px">📸 แคปภาพเกม</button><button type="button" data-pick style="background:#3d4f6d;color:white;border:0;border-radius:8px;padding:10px 14px">🖼️ เลือกภาพจากเครื่อง</button><input data-file type="file" accept="image/png,image/jpeg,image/webp" hidden><button type="button" data-remove style="display:none;background:#633;color:white;border:0;border-radius:8px;padding:10px 14px">ลบภาพ</button><span data-status style="align-self:center;color:#8fc7ef"></span></div>
         <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" data-history style="background:#26344c;color:white;border:0;border-radius:8px;padding:11px 16px">ประวัติของฉัน</button><button type="submit" style="background:#2b9c64;color:white;border:0;border-radius:8px;padding:11px 20px;font-weight:700">ส่งรายงาน</button></div>
       </form>`;
     this.root.appendChild(panel);
@@ -77,21 +76,28 @@ export class BugReportUI {
     panel.querySelector('[data-close]').onclick = () => this.close();
     this.root.addEventListener('click', e => { if (e.target === this.root) this.close(); });
     panel.querySelector('[data-capture]').onclick = () => this.takeScreenshot(panel);
+    const fileInput = panel.querySelector('[data-file]');
+    panel.querySelector('[data-pick]').onclick = () => fileInput.click();
+    fileInput.onchange = () => this.pickScreenshot(panel,fileInput.files?.[0]);
     panel.querySelector('[data-remove]').onclick = () => { this.screenshot=''; this.renderShot(panel); };
     panel.querySelector('[data-history]').onclick = () => this.showHistory(panel);
     panel.querySelector('[data-form]').onsubmit = e => this.submit(e, panel);
-    // Do not request screen-sharing permission while the report dialog opens.
-    // Some browsers keep getDisplayMedia pending behind their picker, making
-    // the game look frozen. Capturing is optional and starts only from the
-    // explicit "แคปหน้าจอใหม่" button below.
-    panel.querySelector('[data-status]').textContent = 'กรอกรายละเอียดได้ทันที • แนบภาพได้จากปุ่มแคปหน้าจอ';
+    panel.querySelector('[data-status]').textContent = 'กรอกรายละเอียดได้ทันที • ไม่ต้องอนุญาตแชร์หน้าจอ';
   }
 
-  async takeScreenshot(panel) {
+  takeScreenshot(panel) {
     const status = panel.querySelector('[data-status]');
-    status.textContent = 'กำลังเปิดตัวเลือกหน้าจอ…';
-    try { this.screenshot = await captureScreen(); status.textContent = 'แคปภาพแล้ว ✓'; }
+    status.textContent = 'กำลังแคปภาพเกม…';
+    try { this.screenshot = captureGameCanvas(); status.textContent = 'แคปภาพเกมแล้ว ✓'; }
     catch (error) { status.textContent = `ยังไม่ได้แคปภาพ: ${error.message}`; }
+    this.renderShot(panel);
+  }
+
+  async pickScreenshot(panel, file) {
+    const status = panel.querySelector('[data-status]');
+    status.textContent = 'กำลังเตรียมภาพ…';
+    try { this.screenshot = await imageFromFile(file); status.textContent = 'แนบภาพแล้ว ✓'; }
+    catch (error) { status.textContent = `แนบภาพไม่สำเร็จ: ${error.message}`; }
     this.renderShot(panel);
   }
 

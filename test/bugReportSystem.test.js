@@ -22,10 +22,11 @@ test('approval locks the report and grants inventory and Zeny atomically once', 
   assert.match(adminApi, /await tx\(async \(client\)/);
 });
 
-test('player capture is permission-driven and can be removed before submission', () => {
-  assert.match(ui, /getDisplayMedia/);
-  assert.match(ui, /getTracks\(\)\.forEach\(track => track\.stop\(\)\)/);
+test('player capture never waits for screen-sharing and supports image upload', () => {
+  assert.doesNotMatch(ui, /getDisplayMedia/);
+  assert.match(ui, /captureGameCanvas/);
+  assert.match(ui, /data-file/);
+  assert.match(ui, /imageFromFile/);
   assert.match(ui, /data-remove/);
   assert.match(ui, /toDataURL\('image\/jpeg', 0\.7\)/);
-  assert.doesNotMatch(ui, /await this\.takeScreenshot\(panel\);/);
 });
