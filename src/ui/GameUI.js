@@ -1615,7 +1615,7 @@ export class GameUI {
         filtered = filtered.filter(i => getEquipSlot(i.item_name) === this.equipSlotFilter);
       }
     } else if (this.currentTab === 'etc') {
-      filtered = this.inventory.filter(i => i.item_type === 'material' || i.item_type === 'tool');
+      filtered = this.inventory.filter(i => i.item_type === 'material' || i.item_type === 'tool' || i.item_type === 'title');
     } else if (this.currentTab === 'fish') {
       filtered = this.inventory.filter(i => i.item_type === 'fish');
     } else if (this.currentTab === 'pet') {

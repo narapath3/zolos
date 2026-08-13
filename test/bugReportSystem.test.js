@@ -77,4 +77,5 @@ test('Master Angler Trophy uses the same persisted title toggle', () => {
   assert.match(gameUi, /'Master Angler Trophy': \{ id:'master_angler'/);
   assert.match(gameUi, /Only one floating name title may be active/);
   assert.doesNotMatch(gameUi, /this\.almanac\.claimed\.includes\('all'\)[\s\S]{0,150}setTitle\('master_angler'\)/);
+  assert.match(gameUi, /i\.item_type === 'material' \|\| i\.item_type === 'tool' \|\| i\.item_type === 'title'/);
 });
