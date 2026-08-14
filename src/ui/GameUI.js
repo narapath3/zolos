@@ -8996,9 +8996,9 @@ export class GameUI {
     return `<span class="wiki-monster-portrait ${large ? 'large' : ''}${flags}" style="--monster-color:${hex}" data-family="${family}"><i class="wiki-model-fallback"></i><img data-monster-model="${key}" alt="โมเดล ${monster.name || 'monster'}" loading="lazy"></span>`;
   }
 
-  _wikiItemPortrait(item, large = false) {
+  _wikiItemPortrait(itemName, item, large = false) {
     const rarity = item.rarity || 'common';
-    return `<span class="wiki-item-portrait ${large ? 'large' : ''} rarity-${rarity}">${itemIconMarkup(item, '', large ? 'item-visual--detail' : '')}<i></i></span>`;
+    return `<span class="wiki-item-portrait ${large ? 'large' : ''} rarity-${rarity}">${itemIconMarkup(itemName, item.emoji || '', large ? 'item-visual--detail' : '')}<i></i></span>`;
   }
 
   // How-to-play guide with the game's real formulas (kept in sync with
@@ -9143,7 +9143,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
         slot.innerHTML = `
-          ${this._wikiItemPortrait(item)}
+          ${this._wikiItemPortrait(key, item)}
           <span class="wiki-slot-name">${key}</span>
         `;
         slot.title = key;
@@ -9168,7 +9168,7 @@ export class GameUI {
           slot.classList.add('selected');
         }
         slot.innerHTML = `
-          ${this._wikiItemPortrait(item)}
+          ${this._wikiItemPortrait(key, item)}
           <span class="wiki-slot-name">${key}</span>
         `;
         slot.title = key;
@@ -9313,7 +9313,7 @@ export class GameUI {
 
       content.innerHTML = `
         <div class="detail-row">
-          ${this._wikiItemPortrait(item, true)}
+          ${this._wikiItemPortrait(key, item, true)}
           <div class="detail-info-block">
             <div class="wiki-detail-title color-${item.rarity || 'common'}">${key}</div>
             <div class="detail-type color-${item.rarity || 'common'}">${item.type.toUpperCase()} (${item.rarity || 'common'})</div>

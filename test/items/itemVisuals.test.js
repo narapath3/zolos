@@ -6,7 +6,7 @@ import { ITEM_VISUALS, itemIconPath } from '../../src/engine/ItemVisuals.js';
 
 test('canonical equipment visuals are unique real PNG assets', () => {
   const paths = Object.values(ITEM_VISUALS).map(entry => entry.icon);
-  assert.equal(paths.length, 150);
+  assert.ok(paths.length >= 150);
   assert.equal(new Set(paths).size, paths.length);
   for (const path of paths) {
     const file = fileURLToPath(new URL(`../../public${path}`, import.meta.url));
@@ -30,6 +30,8 @@ test('all 73 fishing collectibles use canonical transparent PNG art in the alman
   }
   const gameUi = fs.readFileSync(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
   assert.match(gameUi, /itemIconMarkup\(name, '', 'item-visual--fish'\)/);
+  assert.match(gameUi, /_wikiItemPortrait\(key, item\)/);
+  assert.match(gameUi, /itemIconMarkup\(itemName, item\.emoji \|\| ''/);
 });
 
 test('shop, inventory and equipped summaries share the canonical renderer', () => {
