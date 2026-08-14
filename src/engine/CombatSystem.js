@@ -17,6 +17,41 @@ export function buildAutoSearchWaypoints({ halfExtent = 46, step = 11, isBlocked
     return points;
 }
 
+export function getPortalAvoidanceWaypoint(from, target, portals = [], radius = 3.4) {
+    if (!from || !target) return target;
+    const ax = Number(from.x) || 0, az = Number(from.z) || 0;
+    const bx = Number(target.x) || 0, bz = Number(target.z) || 0;
+    const dx = bx - ax, dz = bz - az;
+    const lengthSq = dx * dx + dz * dz;
+    if (lengthSq < 0.0001) return target;
+
+    let threat = null;
+    let nearestAlongPath = Infinity;
+    for (const entry of portals || []) {
+        const portal = entry?.position || entry;
+        if (!portal) continue;
+        const px = Number(portal.x) || 0, pz = Number(portal.z) || 0;
+        const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / lengthSq));
+        const cx = ax + dx * t, cz = az + dz * t;
+        const pathDistanceSq = (px - cx) ** 2 + (pz - cz) ** 2;
+        const fromDistanceSq = (px - ax) ** 2 + (pz - az) ** 2;
+        if ((t > 0.02 && t < 0.98 && pathDistanceSq < radius * radius) || fromDistanceSq < radius * radius) {
+            if (t < nearestAlongPath) { nearestAlongPath = t; threat = portal; }
+        }
+    }
+    if (!threat) return target;
+
+    const length = Math.sqrt(lengthSq);
+    const nx = -dz / length, nz = dx / length;
+    const clearance = radius + 0.9;
+    const left = new THREE.Vector3(threat.x + nx * clearance, target.y ?? from.y ?? 0, threat.z + nz * clearance);
+    const right = new THREE.Vector3(threat.x - nx * clearance, target.y ?? from.y ?? 0, threat.z - nz * clearance);
+    const routeLength = point => Math.hypot(point.x - ax, point.z - az) + Math.hypot(bx - point.x, bz - point.z);
+    const leftLength = routeLength(left), rightLength = routeLength(right);
+    if (Math.abs(leftLength - rightLength) < 0.01) return ((Number(threat.x) || 0) + (Number(threat.z) || 0) >= 0) ? left : right;
+    return leftLength < rightLength ? left : right;
+}
+
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
         this.character = characterManager;
@@ -101,8 +136,14 @@ export class CombatSystem {
         this.autoSearchStuckTime = moved < 0.0025 ? this.autoSearchStuckTime + dt : 0;
         if (this.autoSearchStuckTime > 2.5) this._nextAutoSearchTarget();
         this.autoSearchLastPosition = pos.clone();
-        this.character.moveToward(this.autoSearchTarget, dt);
+        this._moveAutoToward(this.autoSearchTarget, dt);
         return true;
+    }
+
+    _moveAutoToward(target, dt) {
+        const portals = this.sceneManager?.getPortals?.() || [];
+        const waypoint = getPortalAvoidanceWaypoint(this.character.getPosition(), target, portals);
+        return this.character.moveToward(waypoint, dt);
     }
 
     toggleFishing() {
@@ -305,7 +346,7 @@ export class CombatSystem {
             if (distance > range) {
                 // Auto-farm moves toward target automatically
                 if (this.autoFarm) {
-                    this.character.moveToward(targetPos, clampedDt);
+                    this._moveAutoToward(targetPos, clampedDt);
                 }
             } else {
                 // In range — face the target
