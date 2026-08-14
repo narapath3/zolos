@@ -687,6 +687,16 @@ async function initGame(charData) {
         gameUI.addItemLocal?.(item, payload.quantity || 1);
         gameUI.addCombatLog?.(`🎁 ได้รับ: ${payload.emoji || ''} ${payload.item_name}${payload.quantity > 1 ? ' ×' + payload.quantity : ''}`, 'loot');
     };
+    // Shared server strike presentation: everyone on the map sees the monster
+    // participate, while authoritative damage is still private to its target.
+    window.onMonAtkFx = (payload) => {
+        if (!payload || !monsters || !particles) return;
+        const mon = monsters.getServerMonster?.(payload.id);
+        if (!mon || !mon.alive) return;
+        const style = mon.triggerAttackPresentation?.() || 'lunge';
+        const target = new THREE.Vector3(Number(payload.x) || 0, character?.baseY || 1.2, Number(payload.z) || 0);
+        particles.spawnMonsterAttackEffect?.(mon.getPosition(), target, style, mon.data?.color);
+    };
     // A server monster struck us while chasing (server-driven aggro).
     window.onMonAtk = (payload) => {
         if (!character || !character.isAlive || !character.isAlive() || !payload) return;

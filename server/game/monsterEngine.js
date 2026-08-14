@@ -215,6 +215,9 @@ function stepMonster(m, mapId, now, dtSec) {
                 }
             } else if (now >= m.atkReadyAt) {
                 m.atkReadyAt = now + ATTACK_CD_MS;
+                io.to(`map:${mapId}`).emit('mon_atk_fx', {
+                    id: m.id, targetCharacterId: m.aggroChar, x: pp.x, z: pp.z,
+                });
                 const sock = socketForChar(m.aggroChar);
                 if (sock && def) sock.emit('mon_atk', { id: m.id, atk: def.atk });
             }
@@ -292,6 +295,7 @@ function respawnMonster(m, mapId) {
     m.hp = m.maxHp = def ? def.hp : 100;
     m.alive = true; m.respawnAt = 0;
     m.aggroChar = null; m.aggroUntil = 0;
+    m.atkReadyAt = 0;
     m.dmgByChar = new Map();
     m.hitCadenceByChar = new Map();
 }

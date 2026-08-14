@@ -1993,6 +1993,7 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             socket.on('mon_loot', (payload) => { if (payload) window.onMonLoot?.(payload); });
             // A server monster struck us while chasing.
             socket.on('mon_atk', (payload) => { if (payload) window.onMonAtk?.(payload); });
+            socket.on('mon_atk_fx', (payload) => { if (payload) window.onMonAtkFx?.(payload); });
             // Admin changed world config — refetch defs if the version moved.
             socket.on('world_config', (payload) => { if (payload) window.onWorldConfig?.(payload); });
 

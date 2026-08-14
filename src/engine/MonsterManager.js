@@ -1032,6 +1032,11 @@ export class Monster {
         this.isCriticalHit = isCritical;
     }
 
+    triggerAttackPresentation() {
+        this._attackAnim = this._attackAnimDuration;
+        return getMonsterAttackStyle(this);
+    }
+
     // Render-only update for server-controlled monsters: smooth toward the last
     // server position, keep the idle bounce + hit flash + HP-bar billboarding,
     // but run no AI, wander, aggro, or collision.
@@ -1176,7 +1181,7 @@ export class Monster {
                     this._atkCd -= dt;
                     if (this._atkCd <= 0) {
                         this._atkCd = 1.3;
-                        this._attackAnim = this._attackAnimDuration;
+                        this.triggerAttackPresentation();
                         if (onAttackPlayer) onAttackPlayer(this);
                     }
                 }
@@ -1451,6 +1456,7 @@ export class MonsterManager {
             const revived = !m.alive;
             if (revived) {
                 m.alive = true;
+                m._attackAnim = 0;
                 m._awaitingServerRespawn = false;
                 m._seenAbsentSinceDeath = false;
                 m.mesh.visible = true;
@@ -1500,6 +1506,7 @@ export class MonsterManager {
         const m = this._srvById && this._srvById.get(id);
         if (!m || !m.alive) return null;
         m.alive = false;
+        m._attackAnim = 0;
         m._awaitingServerRespawn = true;
         m._seenAbsentSinceDeath = false;
         if (m.mesh) m.mesh.visible = false;
@@ -1511,6 +1518,10 @@ export class MonsterManager {
         this.monsters = this.monsters.filter(x => x !== m);
         this.waterMonsters = this.waterMonsters.filter(x => x !== m);
         if (this._srvById) this._srvById.delete(m.id);
+    }
+
+    getServerMonster(id) {
+        return this._srvById?.get(id) || null;
     }
 
     _getRandomPositionForMonster(type, rng) {
