@@ -85,15 +85,19 @@ export function sampleAttackPose(style, progress) {
     const leapProgress = Math.max(0, Math.min(1, (p - 0.22) / 0.5));
     const leap = Math.sin(leapProgress * Math.PI) * active;
     return {
-        rightX: (-1.25 * windup) + (1.05 * cut),
-        rightZ: (-0.72 * windup) + (0.48 * cut),
-        leftX: -0.3 * active,
-        leftZ: 0.22 * active,
-        bodyLean: (0.18 * windup) - (0.34 * cut),
-        bodyTwist: (-0.32 * windup) + (0.42 * cut),
-        recoil: leap * 0.34 - windup * 0.08,
-        leftLegX: -0.42 * windup + 0.3 * cut,
-        rightLegX: 0.62 * windup - 0.48 * cut,
+        rightX: (-1.9 * windup) + (1.75 * cut),
+        rightZ: (-1.05 * windup) + (0.82 * cut),
+        leftX: -0.55 * active + 0.38 * cut,
+        leftZ: 0.4 * active,
+        bodyLean: (0.28 * windup) - (0.48 * cut),
+        bodyTwist: (-0.52 * windup) + (0.72 * cut),
+        rootPitch: (0.14 * windup) - (0.3 * cut),
+        rootRoll: (-0.08 * windup) + (0.14 * cut),
+        scaleX: 1 + windup * 0.1 - cut * 0.05,
+        scaleY: 1 - windup * 0.13 + cut * 0.1,
+        recoil: leap * 0.62 - windup * 0.12,
+        leftLegX: -0.68 * windup + 0.5 * cut,
+        rightLegX: 0.92 * windup - 0.72 * cut,
     };
 }
 
@@ -3058,8 +3062,20 @@ export class CharacterManager {
             this.body.rotation.y = damp(this.body.rotation.y, pose.bodyTwist || 0, 24, dt);
             this.leftLeg.rotation.x = damp(this.leftLeg.rotation.x, pose.leftLegX || 0, 24, dt);
             this.rightLeg.rotation.x = damp(this.rightLeg.rotation.x, pose.rightLegX || 0, 24, dt);
+            this.mesh.rotation.x = damp(this.mesh.rotation.x, pose.rootPitch || 0, 26, dt);
+            this.mesh.rotation.z = damp(this.mesh.rotation.z, pose.rootRoll || 0, 26, dt);
+            this.mesh.scale.x = damp(this.mesh.scale.x, pose.scaleX || 1, 24, dt);
+            this.mesh.scale.y = damp(this.mesh.scale.y, pose.scaleY || 1, 24, dt);
+            this.mesh.scale.z = damp(this.mesh.scale.z, pose.scaleX || 1, 24, dt);
             this.mesh.position.y = damp(this.mesh.position.y, this.baseY + pose.recoil, 24, dt);
             if (this.attackAnimElapsed >= this.attackAnimDuration && this.state === 'attacking') this.state = 'idle';
+        } else {
+            // Restore the whole-body attack transforms. Facing remains on Y.
+            this.mesh.rotation.x = damp(this.mesh.rotation.x, 0, 18, dt);
+            this.mesh.rotation.z = damp(this.mesh.rotation.z, 0, 18, dt);
+            this.mesh.scale.x = damp(this.mesh.scale.x, 1, 18, dt);
+            this.mesh.scale.y = damp(this.mesh.scale.y, 1, 18, dt);
+            this.mesh.scale.z = damp(this.mesh.scale.z, 1, 18, dt);
         }
 
         // Removed old HP regen in favor of Step 7 logic above
@@ -3071,7 +3087,7 @@ export class CharacterManager {
     triggerAttack(style = null) {
         const resolved = style || this.getWeaponClass?.() || 'melee';
         this.attackAnimStyle = resolved === 'thief' ? 'melee' : resolved;
-        this.attackAnimDuration = resolved === 'gun' ? 0.42 : (resolved === 'bow' ? 0.72 : 0.62);
+        this.attackAnimDuration = resolved === 'gun' ? 0.5 : (resolved === 'bow' ? 0.78 : (resolved === 'melee' || resolved === 'thief' ? 0.88 : 0.72));
         this.attackAnimElapsed = 0;
         this.state = 'attacking';
     }
