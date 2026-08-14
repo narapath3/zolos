@@ -50,12 +50,12 @@ test('melee attacks visibly crouch, leap, twist, and strike instead of walking i
   const hit = sampleAttackPose('melee', 0.48);
   assert.ok(windup.rightLegX > 0.3);
   assert.ok(windup.recoil < hit.recoil);
-  assert.ok(hit.recoil > 0.2);
+  assert.ok(hit.recoil > 0.1 && hit.recoil < 0.3);
   assert.ok(Math.abs(hit.bodyTwist - windup.bodyTwist) > 0.2);
   assert.ok(hit.bodyLean < -0.1);
-  assert.ok(windup.scaleY < 0.95);
-  assert.ok(hit.scaleY > 1.05);
-  assert.ok(Math.abs(hit.rootPitch) > 0.15);
+  assert.ok(windup.scaleY > 0.97);
+  assert.ok(hit.scaleY < 1.03);
+  assert.ok(Math.abs(hit.rootPitch) < 0.15);
   assert.ok(Math.abs(hit.rightX - windup.rightX) > 2);
 });
 

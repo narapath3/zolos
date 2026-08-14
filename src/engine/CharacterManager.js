@@ -85,19 +85,20 @@ export function sampleAttackPose(style, progress) {
     const leapProgress = Math.max(0, Math.min(1, (p - 0.22) / 0.5));
     const leap = Math.sin(leapProgress * Math.PI) * active;
     return {
-        rightX: (-1.9 * windup) + (1.75 * cut),
-        rightZ: (-1.05 * windup) + (0.82 * cut),
-        leftX: -0.55 * active + 0.38 * cut,
-        leftZ: 0.4 * active,
-        bodyLean: (0.28 * windup) - (0.48 * cut),
-        bodyTwist: (-0.52 * windup) + (0.72 * cut),
-        rootPitch: (0.14 * windup) - (0.3 * cut),
-        rootRoll: (-0.08 * windup) + (0.14 * cut),
-        scaleX: 1 + windup * 0.1 - cut * 0.05,
-        scaleY: 1 - windup * 0.13 + cut * 0.1,
-        recoil: leap * 0.62 - windup * 0.12,
-        leftLegX: -0.68 * windup + 0.5 * cut,
-        rightLegX: 0.92 * windup - 0.72 * cut,
+        rightX: (-1.65 * windup) + (1.45 * cut),
+        rightZ: (-0.82 * windup) + (0.62 * cut),
+        leftX: -0.42 * active + 0.26 * cut,
+        leftZ: 0.3 * active,
+        bodyLean: (0.18 * windup) - (0.3 * cut),
+        bodyTwist: (-0.34 * windup) + (0.48 * cut),
+        rootPitch: (0.06 * windup) - (0.12 * cut),
+        rootRoll: (-0.03 * windup) + (0.055 * cut),
+        // Keep the silhouette firm: only a tiny weight shift, not a jelly bounce.
+        scaleX: 1 + windup * 0.018 - cut * 0.01,
+        scaleY: 1 - windup * 0.025 + cut * 0.018,
+        recoil: leap * 0.24 - windup * 0.045,
+        leftLegX: -0.46 * windup + 0.34 * cut,
+        rightLegX: 0.62 * windup - 0.48 * cut,
     };
 }
 
@@ -3087,7 +3088,7 @@ export class CharacterManager {
     triggerAttack(style = null) {
         const resolved = style || this.getWeaponClass?.() || 'melee';
         this.attackAnimStyle = resolved === 'thief' ? 'melee' : resolved;
-        this.attackAnimDuration = resolved === 'gun' ? 0.5 : (resolved === 'bow' ? 0.78 : (resolved === 'melee' || resolved === 'thief' ? 0.88 : 0.72));
+        this.attackAnimDuration = resolved === 'gun' ? 0.5 : (resolved === 'bow' ? 0.76 : (resolved === 'melee' || resolved === 'thief' ? 0.74 : 0.7));
         this.attackAnimElapsed = 0;
         this.state = 'attacking';
     }
