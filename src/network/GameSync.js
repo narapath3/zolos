@@ -2452,18 +2452,31 @@ export async function fetchVendingStalls() {
     }
 }
 
-export async function openVendingStall(characterId, ownerName, shopName, appearance) {
+export async function openVendingStall(characterId, ownerName, shopName, appearance, requestedSlot = null) {
     if (isOfflineMode || !supabase) return { ok: false, reason: 'offline' };
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { ok: false, reason: 'guest' };
 
-        // Find a free slot (0..7)
+        // Use the stand the player clicked. Calls without a requested stand keep
+        // the old first-free fallback for backwards compatibility.
         const { data: taken } = await supabase.from('vending_stalls').select('slot, user_id');
         const mine = (taken || []).find(s => s.user_id === user.id);
-        const usedSlots = new Set((taken || []).map(s => s.slot));
-        let slot = mine ? mine.slot : -1;
-        if (slot < 0) {
+        let slot = -1;
+        if (requestedSlot !== null && requestedSlot !== undefined) {
+            const chosenSlot = Number(requestedSlot);
+            if (!Number.isInteger(chosenSlot) || chosenSlot < 0 || chosenSlot >= 8) {
+                return { ok: false, reason: 'invalid_slot' };
+            }
+            const occupiedByAnother = (taken || []).some(
+                s => Number(s.slot) === chosenSlot && s.user_id !== user.id
+            );
+            if (occupiedByAnother) return { ok: false, reason: 'taken' };
+            slot = chosenSlot;
+        } else if (mine) {
+            slot = Number(mine.slot);
+        } else {
+            const usedSlots = new Set((taken || []).map(s => Number(s.slot)));
             for (let i = 0; i < 8; i++) { if (!usedSlots.has(i)) { slot = i; break; } }
             if (slot < 0) return { ok: false, reason: 'full' };
         }
@@ -2482,7 +2495,7 @@ export async function openVendingStall(characterId, ownerName, shopName, appeara
         // Nudge everyone to refresh their stall view
         const socket = getSocket();
         if (socket && isSocketConnected()) socket.emit('stall_change', {});
-        return { ok: true, slot };
+        return { ok: true, slot, moved: !!mine && Number(mine.slot) !== slot };
     } catch (e) {
         console.error('[Zolos] Failed to open vending stall:', e.message);
         return { ok: false, reason: e.message };

@@ -1784,7 +1784,7 @@ function handleMouseInteraction(event) {
         if (gameUI) {
             if (hit.object && hit.object.empty) {
                 // Vacant stand → offer to open your own shop here
-                gameUI._openVendingStallSetup();
+                gameUI._openVendingStallSetup(hit.object.slot);
             } else {
                 gameUI.openStallShop(hit.object);
             }

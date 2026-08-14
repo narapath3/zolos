@@ -50,3 +50,11 @@ test('stall timestamp comes from server and expiry is enforced on startup and pu
   assert.match(serverSource, /startMarketExpiryScheduler\(\{ io \}\)/);
   assert.match(rpcSource, /fn === 'buy_market_item'.*cleanupExpiredVendingStalls\(\)/s);
 });
+
+test('players can choose any vacant vending stand while retaining one shop per user', () => {
+  const openStallBlock = syncSource.match(/export async function openVendingStall[\s\S]*?\n}\r?\n\r?\nexport async function closeVendingStall/)?.[0] || '';
+  assert.match(openStallBlock, /requestedSlot\s*=\s*null/);
+  assert.match(openStallBlock, /slot\s*=\s*chosenSlot/);
+  assert.match(openStallBlock, /reason:\s*'taken'/);
+  assert.match(openStallBlock, /upsert\(row,\s*\{\s*onConflict:\s*'user_id'\s*\}\)/);
+});

@@ -450,7 +450,9 @@ export class GameUI {
 
     const btnVendingStall = document.getElementById('btn-vending-stall');
     if (btnVendingStall) {
-      btnVendingStall.addEventListener('click', () => this._openVendingStallSetup());
+      btnVendingStall.addEventListener('click', () => {
+        this.addCombatLog('🏪 เดินไปแตะแผงว่างหลังที่ต้องการเปิดร้าน — เปิดได้คนละ 1 ร้าน', 'system');
+      });
     }
 
     const btnWarp = document.getElementById('btn-warp');
@@ -6880,7 +6882,7 @@ export class GameUI {
     };
   }
 
-  async _openVendingStallSetup() {
+  async _openVendingStallSetup(requestedSlot = null) {
     if (!this.character) return;
     // Guests can't own a stall — the row needs a real auth user for RLS
     const uid = this.character.userId || '';
@@ -6894,11 +6896,15 @@ export class GameUI {
     const { openVendingStall } = await import('../network/GameSync.js');
     const res = await openVendingStall(this.characterId, this.character.stats.name, name, {
       bodyColor: app.bodyColor, hairColor: app.hairColor, pantsColor: app.pantsColor, gender: app.gender,
-    });
+    }, requestedSlot);
     if (res.ok) {
       this.addCombatLog(`🏪✨ เปิดแผง "${name}" ที่ถนนตลาดแล้ว! (ช่องที่ ${res.slot + 1}) — ร้านมีอายุ 48 ชั่วโมง ครบกำหนดจะคืนสินค้าทั้งหมดเข้ากระเป๋าและเก็บแผงอัตโนมัติ`, 'levelup');
       if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
       if (window.stallManager) window.stallManager.refresh();
+    } else if (res.reason === 'taken') {
+      this.addCombatLog('❌ แผงนี้มีเจ้าของแล้ว กรุณาเลือกแผงว่างหลังอื่น', 'warning');
+    } else if (res.reason === 'invalid_slot') {
+      this.addCombatLog('❌ ไม่พบตำแหน่งแผงนี้ กรุณาเลือกแผงว่างอีกครั้ง', 'warning');
     } else if (res.reason === 'full') {
       this.addCombatLog('❌ ถนนตลาดเต็ม (8 แผง) — ลองใหม่ภายหลัง', 'warning');
     } else if (res.reason === 'guest') {
