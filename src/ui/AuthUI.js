@@ -1,5 +1,4 @@
 import { signUp, signIn, signInAnonymously, getSession, getProfile, subscribeOnlineCount, getDeterministicGuestName, isPlaceholderName, sendPasswordResetEmail } from '../network/SupabaseClient.js';
-import { LoginShowcase3D } from '../engine/LoginShowcase3D.js';
 
 export class AuthUI {
     constructor(onAuthSuccess) {
@@ -20,13 +19,6 @@ export class AuthUI {
         this._bgmMuted = false;
         this._autoplayTrigger = null;
         this._bgmFadeInterval = null;
-
-        // The live game-model MV follows the real soundtrack timeline.
-        this._bgCanvas = new LoginShowcase3D('auth-bg-canvas');
-        if (this._bgCanvas) {
-            this._bgCanvas.setSoundtrack(this._bgm);
-            this._bgCanvas.start();
-        }
 
         this._pingInterval = null;
         this._pingEl = null;
@@ -776,9 +768,6 @@ export class AuthUI {
     }
 
     hide() {
-        if (this._bgCanvas) {
-            this._bgCanvas.stop();
-        }
         if (this._unsubOnlineCount) {
             this._unsubOnlineCount();
             this._unsubOnlineCount = null;
@@ -794,9 +783,6 @@ export class AuthUI {
         this._bgmFadeInterval = null;
         this.screen.style.display = 'flex';
         this._subscribeOnlineCount();
-        if (this._bgCanvas) {
-            this._bgCanvas.start();
-        }
         if (this._bgm) {
             this._bgm.volume = 0.3;
             this._bgmPlayed = false;

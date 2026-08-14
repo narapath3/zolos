@@ -61,8 +61,6 @@ export class LoadingOverlay {
             this.overlayEl.className = 'intro-loading-overlay';
             this.overlayEl.innerHTML = `
                 <div class="loading-vignette"></div>
-                <canvas id="loading-ambient-canvas" class="loading-ambient-canvas"></canvas>
-                
                 <!-- Rotating Rune Matrices Background -->
                 <div class="loading-rune-matrix matrix-outer"></div>
                 <div class="loading-rune-matrix matrix-inner"></div>
@@ -250,10 +248,13 @@ export class LoadingOverlay {
         if (this._animationFrame) cancelAnimationFrame(this._animationFrame);
         this._animationFrame = null;
         this._isVisible = true;
+        this._progress = 0;
+        this._targetProgress = 0;
         this.overlayEl.style.display = 'flex';
         this.overlayEl.classList.remove('fade-out-warp');
         this.overlayEl.classList.add('active');
         this.setProgress(0, 'Initializing world...');
+        this._renderProgressUI();
         this._updateTips();
 
         if (!this._tipInterval) {

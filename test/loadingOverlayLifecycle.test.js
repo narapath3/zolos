@@ -30,3 +30,12 @@ test('character load failure uses LoadingOverlay hide instead of bypassing lifec
   assert.match(failureHandler, /loadingOverlay\.hide\(\)/);
   assert.doesNotMatch(failureHandler, /introOv\.style\.display/);
 });
+
+test('loading transition always paints a full-screen themed surface without another canvas', () => {
+  const css = fs.readFileSync(new URL('../src/styles/login-new.css', import.meta.url), 'utf8');
+  assert.match(css, /\.intro-loading-overlay\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?inset:\s*0;[\s\S]*?background:\s*#070817/);
+  assert.match(css, /\.intro-loading-overlay::before[\s\S]*?login_environment_ro_desktop_v1\.jpg/);
+  assert.match(css, /@media \(orientation:\s*portrait\)[\s\S]*?login_environment_ro_mobile_v1\.jpg/);
+  assert.doesNotMatch(source, /<canvas[^>]*loading-ambient-canvas/);
+  assert.match(source, /this\._progress\s*=\s*0;[\s\S]*this\._renderProgressUI\(\)/);
+});

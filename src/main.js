@@ -43,8 +43,6 @@ window.addEventListener('contextmenu', (e) => {
 // real CharacterManager/MonsterManager models — those two stay static. Every
 // other engine and UI module is game-only, so they are pulled in by
 // loadGameModules() below once the player is actually entering the world.
-import { CharacterManager } from './engine/CharacterManager.js';
-import { MonsterManager } from './engine/MonsterManager.js';
 import * as THREE from 'three';
 import { AuthUI } from './ui/AuthUI.js';
 import { loadingOverlay } from './ui/LoadingOverlay.js';
@@ -55,7 +53,7 @@ import { SkyrailActivitySession, getSkyrailStatus } from './events/SkyrailBazaar
 // Filled in by loadGameModules(). Declared here so the existing call sites and
 // `new X(...)` uses below keep working untouched — every one of them runs
 // after the loader has resolved.
-let SceneManager, CombatSystem, ParticleSystem, SoundManager, AdaptiveRendererSystem;
+let CharacterManager, MonsterManager, SceneManager, CombatSystem, ParticleSystem, SoundManager, AdaptiveRendererSystem;
 let GameUI, AdminUI, TutorialSystem, GlobalAnnouncements, initBGMHUD;
 import { applyWorldBossCardEffects } from './cards/CardEffects.js';
 import { resolveCardDrops } from './cards/CardDrops.js';
@@ -79,8 +77,10 @@ let gameModulesPromise = null;
 function loadGameModules() {
     if (gameModulesPromise) return gameModulesPromise;
     gameModulesPromise = (async () => {
-        const [scene, combat, particle, sound, adaptive, ui, bgm, admin, tutorial, announce, sync] =
+        const [characterModule, monsterModule, scene, combat, particle, sound, adaptive, ui, bgm, admin, tutorial, announce, sync] =
             await Promise.all([
+                import('./engine/CharacterManager.js'),
+                import('./engine/MonsterManager.js'),
                 import('./engine/SceneManager.js'),
                 import('./engine/CombatSystem.js'),
                 import('./engine/ParticleSystem.js'),
@@ -94,6 +94,8 @@ function loadGameModules() {
                 import('./network/GameSync.js'),
             ]);
 
+        CharacterManager = characterModule.CharacterManager;
+        MonsterManager = monsterModule.MonsterManager;
         SceneManager = scene.SceneManager;
         CombatSystem = combat.CombatSystem;
         ParticleSystem = particle.ParticleSystem;

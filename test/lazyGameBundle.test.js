@@ -7,6 +7,8 @@ const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8')
 // Everything the login screen does not need. Each of these is imported only by
 // main.js, so a static import here drags it back into the initial bundle.
 const GAME_ONLY = [
+  'engine/CharacterManager.js',
+  'engine/MonsterManager.js',
   'engine/SceneManager.js',
   'engine/CombatSystem.js',
   'engine/ParticleSystem.js',
@@ -31,11 +33,11 @@ test('main.js does not statically import any game-only module', () => {
   }
 });
 
-test('the login screen still gets the models its 3D showcase renders', () => {
-  // LoginShowcase3D builds real heroes and monsters; deferring these would
-  // leave the login screen empty.
-  assert.match(main, /^import \{ CharacterManager \} from '\.\/engine\/CharacterManager\.js';$/m);
-  assert.match(main, /^import \{ MonsterManager \} from '\.\/engine\/MonsterManager\.js';$/m);
+test('login defers character and monster builders until game entry', () => {
+  assert.doesNotMatch(main, /^import \{ CharacterManager \} from '\.\/engine\/CharacterManager\.js';$/m);
+  assert.doesNotMatch(main, /^import \{ MonsterManager \} from '\.\/engine\/MonsterManager\.js';$/m);
+  assert.match(main, /import\('\.\/engine\/CharacterManager\.js'\)/);
+  assert.match(main, /import\('\.\/engine\/MonsterManager\.js'\)/);
 });
 
 test('every lazily bound symbol is assigned by loadGameModules', () => {
@@ -51,7 +53,7 @@ test('every lazily bound symbol is assigned by loadGameModules', () => {
   // Only the names this test cares about — app state vars are declared the same
   // way, so restrict to the ones the loader is responsible for.
   const lazy = [
-    'SceneManager', 'CombatSystem', 'ParticleSystem', 'SoundManager',
+    'CharacterManager', 'MonsterManager', 'SceneManager', 'CombatSystem', 'ParticleSystem', 'SoundManager',
     'AdaptiveRendererSystem', 'GameUI', 'AdminUI', 'TutorialSystem',
     'GlobalAnnouncements', 'initBGMHUD',
     'loadCharacter', 'saveCharacter', 'loadCharacterCards', 'saveInventoryItem',

@@ -3,6 +3,175 @@
    Dark Fantasy Cinematic Theme
    ============================================================ */
 
+/* ---- Game-entry loading transition ---------------------------------------
+   This overlay is created before the game bundle is fetched. Keep it entirely
+   CSS-based so slow phones always paint a complete frame without starting a
+   second canvas renderer while WebGL and the game world are being prepared. */
+.intro-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: max(20px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  color: #f7f1ff;
+  background: #070817;
+  opacity: 1;
+  isolation: isolate;
+}
+
+.intro-loading-overlay::before {
+  content: '';
+  position: absolute;
+  inset: -3%;
+  z-index: -3;
+  background: linear-gradient(rgba(5, 7, 20, .72), rgba(7, 5, 20, .91)), url('/src/assets/login_environment_ro_desktop_v1.jpg') center / cover no-repeat;
+  transform: scale(1.04);
+}
+
+.intro-loading-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(90, 226, 255, .22), transparent 30%),
+    radial-gradient(circle at 50% 72%, rgba(173, 91, 255, .2), transparent 38%),
+    linear-gradient(180deg, transparent 55%, rgba(2, 3, 12, .72));
+}
+
+.loading-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  box-shadow: inset 0 0 min(24vw, 240px) rgba(0, 0, 0, .86);
+  pointer-events: none;
+}
+
+.loading-content {
+  width: min(560px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: clamp(22px, 5vw, 42px);
+  border: 1px solid rgba(255, 217, 115, .28);
+  border-radius: 26px;
+  background: linear-gradient(155deg, rgba(16, 20, 48, .82), rgba(8, 8, 25, .9));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .62), inset 0 1px rgba(255, 255, 255, .08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.loading-crest-wrap {
+  position: relative;
+  width: clamp(72px, 18vw, 108px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+
+.loading-crest-img {
+  width: 76%;
+  height: 76%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(255, 210, 86, .55));
+}
+
+.crest-glow-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 218, 108, .62);
+  border-left-color: rgba(89, 229, 255, .8);
+  border-radius: 50%;
+  animation: loadingRing 3s linear infinite;
+}
+
+.loading-title {
+  margin: 0;
+  color: #ffe28a;
+  font: 800 clamp(30px, 8vw, 48px)/1 'Chakra Petch', sans-serif;
+  letter-spacing: .2em;
+  text-indent: .2em;
+  text-shadow: 0 0 24px rgba(255, 203, 76, .38);
+}
+
+.loading-subtitle {
+  margin-top: 7px;
+  color: #a9eaff;
+  font: 600 clamp(9px, 2.8vw, 12px)/1.2 'Chakra Petch', sans-serif;
+  letter-spacing: .22em;
+}
+
+.loading-bar-wrapper { width: 100%; margin-top: clamp(24px, 6vh, 38px); }
+.loading-bar-track {
+  height: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(130, 223, 255, .35);
+  border-radius: 999px;
+  background: rgba(1, 3, 15, .72);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .6), 0 0 18px rgba(64, 206, 255, .12);
+}
+
+.loading-bar-fill {
+  position: relative;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #715bff, #4ce7ff 58%, #ffe07b);
+  box-shadow: 0 0 18px rgba(80, 225, 255, .72);
+  transition: width .18s linear;
+}
+
+.bar-spark-head { position: absolute; right: 0; top: 50%; width: 5px; height: 20px; transform: translateY(-50%); border-radius: 50%; background: white; box-shadow: 0 0 16px 5px #9df5ff; }
+.loading-info-row { display: flex; justify-content: space-between; gap: 14px; margin-top: 10px; text-align: left; }
+.loading-status-txt { color: #d9e9ff; font: 500 12px/1.35 'Kanit', sans-serif; }
+.loading-percent-txt { flex: 0 0 auto; color: #ffe28a; font: 800 14px/1 'Chakra Petch', sans-serif; }
+
+.loading-tip-card {
+  width: 100%;
+  min-height: 76px;
+  margin-top: 24px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  border: 1px solid rgba(166, 126, 255, .28);
+  border-radius: 14px;
+  background: rgba(5, 7, 24, .56);
+  text-align: left;
+}
+
+.tip-header { margin-bottom: 7px; }
+.tip-badge { color: #d1b9ff; font: 800 9px/1 'Chakra Petch', sans-serif; letter-spacing: .14em; }
+.tip-body { display: flex; align-items: center; gap: 12px; }
+.tip-icon { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; transition: opacity .25s, transform .25s; }
+.tip-text { color: #dce5f5; font: 400 12px/1.55 'Kanit', sans-serif; transition: opacity .25s; }
+
+.loading-rune-matrix { position: absolute; z-index: -1; border: 1px dashed rgba(112, 226, 255, .14); border-radius: 50%; pointer-events: none; }
+.matrix-outer { width: min(86vw, 760px); aspect-ratio: 1; animation: loadingRing 28s linear infinite; }
+.matrix-inner { width: min(62vw, 520px); aspect-ratio: 1; border-color: rgba(255, 211, 102, .13); animation: loadingRing 22s linear infinite reverse; }
+
+.intro-loading-overlay.fade-out-warp { opacity: 0; transform: scale(1.035); transition: opacity .75s ease, transform .9s ease; pointer-events: none; }
+
+@keyframes loadingRing { to { transform: rotate(360deg); } }
+
+@media (orientation: portrait) {
+  .intro-loading-overlay::before { background-image: linear-gradient(rgba(5, 7, 20, .7), rgba(7, 5, 20, .92)), url('/src/assets/login_environment_ro_mobile_v1.jpg'); }
+}
+
+@media (max-width: 480px) {
+  .loading-content { padding: 22px 18px; border-radius: 20px; }
+  .loading-tip-card { margin-top: 18px; }
+  .loading-status-txt { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crest-glow-ring, .loading-rune-matrix { animation: none; }
+  .intro-loading-overlay.fade-out-warp { transform: none; transition-duration: .2s; }
+}
+
 /* ---- Base Screen ---- */
 #auth-screen {
   position: fixed;
@@ -33,12 +202,6 @@
   pointer-events: none;
 }
 
-/* Environment art remains visible behind the transparent game-model canvas. */
-#auth-screen.auth-has-live-game-art .auth-bg-img {
-  opacity: 1;
-  animation: none;
-}
-
 /* Art-directed portrait artwork avoids destructively cropping desktop key art. */
 @media (orientation: portrait) {
   .auth-bg-img {
@@ -59,17 +222,6 @@
   100% {
     transform: scale(1.05) translate(10px, 5px);
   }
-}
-
-/* ---- Fullscreen Interactive Canvas Layer ---- */
-#auth-bg-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  pointer-events: none;
-  filter: saturate(1.06) contrast(1.03);
 }
 
 /* ---- Cinematic Background Layers ---- */
