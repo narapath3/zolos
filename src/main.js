@@ -2256,12 +2256,13 @@ function initBossUI() {
     #boss-toast .bt-title{font-size:40px;font-weight:900;color:#ff6a2a;
       text-shadow:0 0 24px rgba(255,80,20,.9),0 4px 10px rgba(0,0,0,.9);}
     #boss-toast .bt-sub{font-size:16px;color:#ffe0b0;margin-top:6px;text-shadow:0 2px 8px rgba(0,0,0,.9);}
-    #boss-summary{position:fixed;inset:0;z-index:2100;display:none;align-items:center;justify-content:center;
-      background:rgba(0,0,0,.62);backdrop-filter:blur(3px);}
-    #boss-summary .bs-card{width:min(430px,92vw);max-height:86vh;overflow:auto;border-radius:18px;
+    #boss-summary{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;
+      padding:max(12px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+      box-sizing:border-box;background:rgba(0,0,0,.72);backdrop-filter:blur(3px);pointer-events:auto!important;touch-action:manipulation;overscroll-behavior:contain;}
+    #boss-summary .bs-card{position:relative;z-index:1;width:min(430px,92vw);max-height:86dvh;overflow:auto;border-radius:18px;
       background:linear-gradient(160deg,#241019,#1a0f22);border:1.5px solid #8a3b2a;
       box-shadow:0 20px 60px rgba(0,0,0,.7);padding:20px 18px;text-align:center;
-      animation:bsPop .4s cubic-bezier(.2,1.3,.4,1);}
+      animation:bsPop .4s cubic-bezier(.2,1.3,.4,1);pointer-events:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;}
     @keyframes bsPop{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
     #boss-summary .bs-crown{font-size:38px}
     #boss-summary .bs-title{font-size:20px;font-weight:900;color:#ffcf6a;margin:4px 0}
@@ -2277,8 +2278,11 @@ function initBossUI() {
     #boss-summary .bs-mine{margin-top:12px;padding:10px;border-radius:12px;
       background:linear-gradient(135deg,rgba(255,180,60,.18),rgba(255,90,40,.1));border:1px solid #ff8a2e;
       color:#ffe6c0;font-weight:700;font-size:13px;}
-    #boss-summary .bs-close{margin-top:14px;padding:9px 26px;border:none;border-radius:22px;cursor:pointer;
-      background:linear-gradient(135deg,#ff7a2e,#ff3b30);color:#fff;font-weight:800;font-size:14px;}
+    #boss-summary .bs-close{position:relative;z-index:2;width:min(100%,280px);min-height:48px;margin-top:14px;padding:11px 26px;border:none;border-radius:24px;cursor:pointer;
+      background:linear-gradient(135deg,#ff7a2e,#ff3b30);color:#fff;font-weight:800;font-size:15px;pointer-events:auto!important;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+    #boss-summary .bs-close:active{transform:scale(.97);filter:brightness(1.12)}
+    @media(max-width:600px){#boss-summary{align-items:flex-start;padding-top:max(10px,env(safe-area-inset-top));padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+      #boss-summary .bs-card{width:100%;max-height:calc(100dvh - 116px);padding:16px 13px}#boss-summary .bs-row{font-size:11px}}
     `;
     document.head.appendChild(style);
 
@@ -2297,8 +2301,16 @@ function initBossUI() {
 
     const summary = document.createElement('div');
     summary.id = 'boss-summary';
+    summary.setAttribute('role', 'dialog');
+    summary.setAttribute('aria-modal', 'true');
+    summary.setAttribute('aria-label', 'รางวัลบอสโลก');
     summary.innerHTML = `<div class="bs-card"></div>`;
-    summary.addEventListener('click', (e) => { if (e.target === summary) summary.style.display = 'none'; });
+    summary.addEventListener('click', (e) => {
+        if (e.target === summary) {
+            summary.style.display = 'none';
+            gameUI?.updateMobileControlsVisibility?.();
+        }
+    });
     document.body.appendChild(summary);
 }
 
@@ -2481,10 +2493,15 @@ window.worldBossManager = {
             <div class="bs-killer">⚔️ ผู้ปิดจ๊อบ: ${escapeHtml(p.killerName || '-')}</div>
             ${rows}
             ${mineHtml}
-            <button class="bs-close">รับรางวัล</button>`;
-        card.querySelector('.bs-close').onclick = () => { box.style.display = 'none'; };
+            <button type="button" class="bs-close">รับรางวัล</button>`;
+        const closeSummary = () => {
+            box.style.display = 'none';
+            gameUI?.updateMobileControlsVisibility?.();
+        };
+        card.querySelector('.bs-close').addEventListener('click', closeSummary);
         box.style.display = 'flex';
-        setTimeout(() => { if (box.style.display === 'flex') box.style.display = 'none'; }, 12000);
+        gameUI?.updateMobileControlsVisibility?.();
+        setTimeout(() => { if (box.style.display === 'flex') closeSummary(); }, 12000);
     },
 };
 

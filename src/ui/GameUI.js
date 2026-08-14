@@ -7597,6 +7597,13 @@ export class GameUI {
         }
       }
     }
+
+    // Standalone world-boss reward dialog must suppress mobile control layers.
+    const bossSummary = document.getElementById('boss-summary');
+    if (bossSummary) {
+      const display = bossSummary.style.display || window.getComputedStyle(bossSummary).display;
+      if (display !== 'none') anyPanelOpen = true;
+    }
     item.stats.equipped = enabled;
     item.item_type = 'title';
     this.character.setTitle(enabled ? definition.id : null);
@@ -8639,7 +8646,7 @@ export class GameUI {
       const target = e.target;
       if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
         target.closest('#hud-bottom') || target.closest('.side-panel') || target.closest('#pet-boutique-modal') ||
-        target.closest('.modal-popup') || target.closest('#hud-top') ||
+        target.closest('.modal-popup') || target.closest('#boss-summary') || target.closest('#hud-top') ||
         target.closest('#minimap-container') || target.closest('#target-indicator') ||
         target.closest('#fps-counter') || target.closest('#kill-counter') ||
         target.closest('#chat-panel') || target.closest('#tutorial-tooltip') ||

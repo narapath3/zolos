@@ -22,3 +22,13 @@ test('boss HUD is compact, non-interactive, and identifies its map', () => {
   assert.match(source, /bh-location'\)\.textContent = `📍 \$\{bossState\.mapName\}`/);
   assert.match(source, /bar\.setAttribute\('role', 'status'\)/);
 });
+
+test('boss reward dialog remains tappable on mobile above joystick controls', () => {
+  const ui = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+  assert.match(source, /#boss-summary\{[^}]*z-index:100000[^}]*pointer-events:auto!important[^}]*touch-action:manipulation/);
+  assert.match(source, /#boss-summary \.bs-close\{[^}]*min-height:48px[^}]*pointer-events:auto!important[^}]*touch-action:manipulation/);
+  assert.match(source, /<button type="button" class="bs-close">/);
+  assert.match(source, /gameUI\?\.updateMobileControlsVisibility\?\.\(\)/);
+  assert.match(ui, /target\.closest\('#boss-summary'\)/);
+  assert.match(ui, /const bossSummary = document\.getElementById\('boss-summary'\)/);
+});
