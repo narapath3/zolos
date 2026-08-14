@@ -366,6 +366,14 @@ async function initGame(charData) {
         const dmg = Math.max(1, atk - Math.floor(def * 0.3) + Math.floor(Math.random() * 3));
         const actual = character.takeDamage(dmg, { preMitigated: true });
         if (particles) {
+            particles.spawnMonsterAttackEffect?.(
+                mon.getPosition(),
+                character.getPosition(),
+                mon.data?.family === 'construct' ? 'slam'
+                    : (['dragon', 'demon', 'undead'].includes(mon.data?.family) ? 'energy'
+                        : (['beast', 'insect', 'aquatic'].includes(mon.data?.family) ? 'lunge' : 'burst')),
+                mon.data?.color
+            );
             const sp = worldToScreen(character.getPosition(), 1.6);
             particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
             particles.spawnHitEffect(character.getPosition(), false);

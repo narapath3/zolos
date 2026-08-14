@@ -64,6 +64,14 @@ function getDailySeed() {
     return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
 }
 
+export function getMonsterAttackStyle(monster) {
+    const family = monster?.data?.family || monster?.family || 'unknown';
+    if (family === 'dragon' || family === 'demon' || family === 'undead') return 'energy';
+    if (family === 'construct') return 'slam';
+    if (family === 'beast' || family === 'insect' || family === 'aquatic') return 'lunge';
+    return 'burst';
+}
+
 export class Monster {
     constructor(scene, type, position) {
         this.scene = scene;
@@ -98,6 +106,8 @@ export class Monster {
         // Aggro state (chase + attack the player when provoked or approached).
         this._aggroUntil = 0;
         this._atkCd = 0;
+        this._attackAnim = 0;
+        this._attackAnimDuration = 0.72;
         // Reused for environment probes during movement. Avoid producing
         // short-lived Vector3 objects for every active monster and frame.
         this._environmentProbe = new THREE.Vector3();
@@ -1051,6 +1061,26 @@ export class Monster {
         this.bodyMesh.scale.y = 1 + bounce * 0.5;
         this.bodyMesh.scale.x = 1 - bounce * 0.15;
         this.bodyMesh.scale.z = 1 - bounce * 0.15;
+
+        // Full-body monster strike: anticipation -> forceful release -> recovery.
+        // This is visual only; combat timing and damage remain authoritative.
+        if (this._attackAnim > 0) {
+            this._attackAnim = Math.max(0, this._attackAnim - dt);
+            const p = 1 - this._attackAnim / this._attackAnimDuration;
+            const windup = p < 0.34 ? p / 0.34 : Math.max(0, 1 - (p - 0.34) / 0.18);
+            const strike = p < 0.34 ? 0 : Math.sin(Math.min(1, (p - 0.34) / 0.5) * Math.PI);
+            const style = getMonsterAttackStyle(this);
+            const hop = style === 'slam' ? Math.sin(Math.min(1, p / 0.55) * Math.PI) * 0.28 : strike * 0.14;
+            this.bodyMesh.position.y += hop * this.data.size;
+            this.bodyMesh.rotation.x = -windup * 0.24 + strike * (style === 'lunge' ? 0.48 : 0.28);
+            this.bodyMesh.rotation.z = (style === 'energy' ? Math.sin(p * Math.PI * 2) * 0.16 : -windup * 0.12 + strike * 0.18);
+            this.bodyMesh.scale.y *= 1 - windup * 0.09 + strike * 0.08;
+            this.bodyMesh.scale.x *= 1 + windup * 0.06 - strike * 0.04;
+            this.bodyMesh.scale.z *= 1 + windup * 0.06 - strike * 0.04;
+        } else {
+            this.bodyMesh.rotation.x *= Math.max(0, 1 - dt * 15);
+            this.bodyMesh.rotation.z *= Math.max(0, 1 - dt * 15);
+        }
         animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this.hitFlash > 0);
 
         this._applyHitFlash();
@@ -1146,6 +1176,7 @@ export class Monster {
                     this._atkCd -= dt;
                     if (this._atkCd <= 0) {
                         this._atkCd = 1.3;
+                        this._attackAnim = this._attackAnimDuration;
                         if (onAttackPlayer) onAttackPlayer(this);
                     }
                 }
@@ -1278,7 +1309,7 @@ export class Monster {
             this.isMoving = false;
         }
 
-        animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this.hitFlash > 0);
+        animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this._attackAnim > 0);
 
         // Billboard HP bar to camera (throttled: update every 3rd frame)
         if (camera) {
@@ -1309,6 +1340,9 @@ export class Monster {
         // Prevents monster from immediately attacking player after respawn
         this._aggroUntil = 0;
         this._atkCd = 0;
+        this._attackAnim = 0;
+        this.bodyMesh.rotation.x = 0;
+        this.bodyMesh.rotation.z = 0;
         this.wanderTarget = null;
         this.wanderTimer = 0;
         this._localContributed = false; // fresh monster — no shared-damage credit yet

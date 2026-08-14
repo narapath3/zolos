@@ -281,6 +281,44 @@ export class ParticleSystem {
         }
     }
 
+    spawnMonsterAttackEffect(startPosition, targetPosition, style = 'lunge', color = 0xff6848) {
+        if (!this.effectsEnabled || this._throttleEffect(false)) return;
+        const start = startPosition.clone ? startPosition.clone() : new THREE.Vector3(startPosition.x, startPosition.y, startPosition.z);
+        const target = targetPosition.clone ? targetPosition.clone() : new THREE.Vector3(targetPosition.x, targetPosition.y, targetPosition.z);
+        start.y += 0.8;
+        target.y += 0.75;
+        const fxColor = Number(color) || 0xff6848;
+
+        if (style === 'energy') {
+            const direction = new THREE.Vector3().subVectors(target, start);
+            const length = direction.length();
+            const beam = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.055, 0.16, length, 7),
+                new THREE.MeshBasicMaterial({ color: fxColor, transparent: true, opacity: 0.82, depthWrite: false })
+            );
+            beam.position.copy(start).add(target).multiplyScalar(0.5);
+            beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+            this.scene.add(beam);
+            this.hitEffects.push({ mesh: beam, velocity: new THREE.Vector3(), gravity: 0, life: 0.32, maxLife: 0.32 });
+            this._fxRing(start, fxColor, 0.45, start.y - 0.72, 0.18, 0.85);
+        } else if (style === 'slam') {
+            this._fxRing(start, fxColor, 0.55, 0.05, 0.35, 2.2);
+            this._fxRing(target, 0xffd080, 0.45, 0.05, 0.18, 1.1);
+        } else if (style === 'lunge') {
+            const arc = new THREE.Mesh(
+                new THREE.TorusGeometry(0.72, 0.065, 7, 22, Math.PI * 1.15),
+                new THREE.MeshBasicMaterial({ color: fxColor, transparent: true, opacity: 0.9, depthWrite: false })
+            );
+            arc.position.copy(target);
+            arc.rotation.set(0.25, Math.atan2(target.x - start.x, target.z - start.z), -0.55);
+            this.scene.add(arc);
+            this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(), gravity: 0, life: 0.28, maxLife: 0.28 });
+        } else {
+            this._fxRing(start, fxColor, 0.4, 0.05, 0.15, 0.9);
+        }
+        this._fxBurst(target, fxColor, this.perfMonitor.isLowEndDevice ? 6 : 12, 4.5, { life: 0.48, yOff: 0.2, size: 0.1, useGlow: true });
+    }
+
     // Spawn floating damage number (using DOM overlay)
     spawnDamageNumber(screenX, screenY, text, type = 'player-dmg', colorHex = null) {
         const el = document.createElement('div');
