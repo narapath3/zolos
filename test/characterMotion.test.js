@@ -45,6 +45,16 @@ test('attack poses have readable anticipation, impact and weapon-specific motion
   assert.ok(sampleAttackPose('magic', 0.4).leftZ > 0);
 });
 
+test('melee attacks visibly crouch, leap, twist, and strike instead of walking into the target', () => {
+  const windup = sampleAttackPose('melee', 0.2);
+  const hit = sampleAttackPose('melee', 0.42);
+  assert.ok(windup.rightLegX > 0.3);
+  assert.ok(windup.recoil < hit.recoil);
+  assert.ok(hit.recoil > 0.2);
+  assert.ok(Math.abs(hit.bodyTwist - windup.bodyTwist) > 0.2);
+  assert.ok(hit.bodyLean < -0.1);
+});
+
 test('remote rotation smoothing uses constant-time wrapped angle math', () => {
   const update = mainSource.slice(mainSource.indexOf('function updateRemotePlayers'), mainSource.indexOf('// ============ Auto-Skill'));
   assert.match(update, /Math\.atan2\([\s\S]*Math\.sin\(rp\.targetRotY - rp\.mesh\.rotation\.y\)[\s\S]*Math\.cos\(rp\.targetRotY - rp\.mesh\.rotation\.y\)/);

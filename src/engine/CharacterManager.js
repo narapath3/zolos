@@ -67,25 +67,33 @@ export function sampleAttackPose(style, progress) {
     const recovery = p < 0.48 ? 0 : Math.min(1, (p - 0.48) / 0.52);
     const active = (1 - recovery);
     if (style === 'bow') {
-        return { rightX: -1.25 * active, rightZ: -0.25, leftX: -1.28 * active, leftZ: 0.38, bodyLean: 0.03, recoil: strike * active * 0.08 };
+        return { rightX: -1.25 * active, rightZ: -0.25, leftX: -1.28 * active, leftZ: 0.38, bodyLean: 0.03, bodyTwist: -0.12 * active, recoil: strike * active * 0.08, leftLegX: -0.12 * active, rightLegX: 0.18 * active };
     }
     if (style === 'gun') {
         const kick = Math.sin(strike * Math.PI) * active;
-        return { rightX: -1.42 * active + kick * 0.22, rightZ: -0.08, leftX: -1.0 * active, leftZ: 0.18, bodyLean: -kick * 0.06, recoil: kick * 0.08 };
+        return { rightX: -1.42 * active + kick * 0.22, rightZ: -0.08, leftX: -1.0 * active, leftZ: 0.18, bodyLean: -kick * 0.06, bodyTwist: -0.1 * active, recoil: kick * 0.08, leftLegX: -0.1 * active, rightLegX: 0.16 * active };
     }
     if (style === 'magic' || style === 'acolyte') {
         const cast = Math.sin(Math.min(1, p / 0.58) * Math.PI) * active;
-        return { rightX: -1.55 * cast, rightZ: -0.5 * cast, leftX: -1.2 * cast, leftZ: 0.5 * cast, bodyLean: -0.04 * cast, recoil: cast * 0.1 };
+        return { rightX: -1.55 * cast, rightZ: -0.5 * cast, leftX: -1.2 * cast, leftZ: 0.5 * cast, bodyLean: -0.04 * cast, bodyTwist: 0, recoil: cast * 0.14, leftLegX: -0.08 * cast, rightLegX: 0.08 * cast };
     }
     const windup = anticipation * (1 - strike);
     const cut = strike * active;
+    // A compact leap-slash: crouch during anticipation, spring off the ground
+    // into the hit, then land during recovery. This reads as an intentional
+    // melee action without moving the authoritative world position into the mob.
+    const leapProgress = Math.max(0, Math.min(1, (p - 0.22) / 0.5));
+    const leap = Math.sin(leapProgress * Math.PI) * active;
     return {
         rightX: (-1.25 * windup) + (1.05 * cut),
         rightZ: (-0.72 * windup) + (0.48 * cut),
         leftX: -0.3 * active,
         leftZ: 0.22 * active,
-        bodyLean: (0.08 * windup) - (0.14 * cut),
-        recoil: Math.sin(strike * Math.PI) * active * 0.12,
+        bodyLean: (0.18 * windup) - (0.34 * cut),
+        bodyTwist: (-0.32 * windup) + (0.42 * cut),
+        recoil: leap * 0.34 - windup * 0.08,
+        leftLegX: -0.42 * windup + 0.3 * cut,
+        rightLegX: 0.62 * windup - 0.48 * cut,
     };
 }
 
@@ -3047,6 +3055,9 @@ export class CharacterManager {
             this.leftArm.rotation.x = damp(this.leftArm.rotation.x, pose.leftX, 24, dt);
             this.leftArm.rotation.z = damp(this.leftArm.rotation.z, pose.leftZ, 24, dt);
             this.body.rotation.x = damp(this.body.rotation.x, pose.bodyLean, 20, dt);
+            this.body.rotation.y = damp(this.body.rotation.y, pose.bodyTwist || 0, 24, dt);
+            this.leftLeg.rotation.x = damp(this.leftLeg.rotation.x, pose.leftLegX || 0, 24, dt);
+            this.rightLeg.rotation.x = damp(this.rightLeg.rotation.x, pose.rightLegX || 0, 24, dt);
             this.mesh.position.y = damp(this.mesh.position.y, this.baseY + pose.recoil, 24, dt);
             if (this.attackAnimElapsed >= this.attackAnimDuration && this.state === 'attacking') this.state = 'idle';
         }
