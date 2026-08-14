@@ -11,7 +11,7 @@ test('expired particle effects release geometry and material resources', () => {
   assert.match(dispose, /material\.dispose\(\)/);
 
   const update = source.match(/update\(deltaTime\) \{([\s\S]*?)\/\/ ============ Performance Control/)?.[1] || '';
-  assert.equal((update.match(/this\._disposeEffectObject\(/g) || []).length, 7);
+  assert.equal((update.match(/this\._disposeEffectObject\(/g) || []).length, 8);
   assert.doesNotMatch(update, /this\.scene\.remove\(/);
 });
 

@@ -2816,6 +2816,9 @@ document.addEventListener('visibilitychange', () => {
 // Everything the world needs to advance, independent of rendering. Both the
 // visible rAF loop and the hidden-tab background loop call this with a dt, so
 // the game behaves identically whether or not the tab is in the foreground.
+let footstepTravel = 0;
+let previousFootstepEnvironment = null;
+let wetFootstepTime = 0;
 function stepWorld(dt) {
     // Dead-state guard: only effects/combat cleanup advance while dead.
     if (character && !character.isAlive()) {
@@ -2877,6 +2880,27 @@ function stepWorld(dt) {
 
     // 2. Environment Check (Water)
     const env = sceneManager.getEnvironmentAt(character.getPosition());
+    const movedThisStep = positionBeforeMovement
+        ? Math.hypot(character.mesh.position.x - positionBeforeMovement.x, character.mesh.position.z - positionBeforeMovement.z)
+        : 0;
+    if (previousFootstepEnvironment === 'water' && env !== 'water') wetFootstepTime = 4.5;
+    previousFootstepEnvironment = env;
+    wetFootstepTime = Math.max(0, wetFootstepTime - dt);
+    if (movedThisStep > 0.001) {
+        footstepTravel += movedThisStep;
+        const stride = character.moveSpeed >= 7 ? 0.82 : 0.62;
+        if (footstepTravel >= stride) {
+            footstepTravel %= stride;
+            const surface = env === 'water' ? 'water' : (wetFootstepTime > 0 ? 'wet' : env);
+            const footPos = character.getPosition();
+            if (env !== 'water') {
+                footPos.y = 1.2 + sceneManager.getWalkableHeight(footPos.x, footPos.z);
+            }
+            particles?.spawnFootstep?.(footPos, surface);
+        }
+    } else if (footstepTravel > 0) {
+        footstepTravel = Math.min(footstepTravel, 0.3);
+    }
     if (env === 'water') {
         character.state = 'swimming';
         character.moveSpeed = 2.2;

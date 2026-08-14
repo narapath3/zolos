@@ -51,6 +51,7 @@ export class ParticleSystem {
         this.hitEffects = [];
         this.shockwaves = [];
         this.splashEffects = [];
+        this.groundMarks = [];
         this.projectiles = [];
         this.slashes = [];
         this.splashCooldown = 0;
@@ -79,7 +80,7 @@ export class ParticleSystem {
     _liveEffects() {
         return this.shockwaves.length + this.hitEffects.length +
             this.deathEffects.length + this.slashes.length +
-            this.splashEffects.length;
+            this.splashEffects.length + this.groundMarks.length;
     }
 
     // True → skip spawning this effect to protect the frame rate.
@@ -242,6 +243,42 @@ export class ParticleSystem {
         ripple.rotation.x = -Math.PI / 2;
         this.scene.add(ripple);
         this.shockwaves.push({ mesh: ripple, life: 0.5, maxLife: 0.5 });
+    }
+
+    // Small stride-synchronised terrain feedback. These are deliberately much
+    // cheaper than combat effects so walking remains smooth on mobile/iOS.
+    spawnFootstep(position, surface = 'ground') {
+        if (!this.effectsEnabled || this._throttleEffect(false)) return;
+        const wet = surface === 'wet';
+        const water = surface === 'water';
+        const count = this.perfMonitor.isLowEndDevice ? 2 : (water ? 4 : 3);
+        const color = water ? 0x91d9ff : (wet ? 0x70b6d8 : (surface === 'cave' ? 0x8b8179 : 0xb9a98b));
+        const groundY = water ? 0.02 : position.y - 1.14;
+
+        for (let i = 0; i < count; i++) {
+            const size = water ? 0.025 : 0.035 + Math.random() * 0.025;
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(size, 4, 3),
+                new THREE.MeshBasicMaterial({ color, transparent: true, opacity: water ? 0.72 : 0.42, depthWrite: false })
+            );
+            mesh.position.set(position.x + (Math.random() - 0.5) * 0.32, groundY + 0.04, position.z + (Math.random() - 0.5) * 0.32);
+            const angle = Math.random() * Math.PI * 2;
+            const speed = water ? 0.45 : 0.22;
+            this.scene.add(mesh);
+            this.splashEffects.push({ mesh, velocity: new THREE.Vector3(Math.cos(angle) * speed, water ? 0.65 : 0.28, Math.sin(angle) * speed), life: water ? 0.38 : 0.48 });
+        }
+
+        if (wet) {
+            const mark = new THREE.Mesh(
+                new THREE.CircleGeometry(0.16, 10),
+                new THREE.MeshBasicMaterial({ color: 0x315e70, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide })
+            );
+            mark.rotation.x = -Math.PI / 2;
+            mark.scale.set(0.65, 1, 1);
+            mark.position.set(position.x, groundY + 0.012, position.z);
+            this.scene.add(mark);
+            this.groundMarks.push({ mesh: mark, life: 2.2, maxLife: 2.2 });
+        }
     }
 
     // Spawn floating damage number (using DOM overlay)
@@ -1424,6 +1461,17 @@ export class ParticleSystem {
             }
         }
 
+        // Damp footprints left briefly after stepping out of water.
+        for (let i = this.groundMarks.length - 1; i >= 0; i--) {
+            const mark = this.groundMarks[i];
+            mark.life -= deltaTime;
+            mark.mesh.material.opacity = 0.2 * Math.max(0, mark.life / mark.maxLife);
+            if (mark.life <= 0) {
+                this._disposeEffectObject(mark.mesh);
+                this.groundMarks.splice(i, 1);
+            }
+        }
+
         // Update shockwaves (and layered click indicators)
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
             const wave = this.shockwaves[i];
@@ -1561,7 +1609,7 @@ export class ParticleSystem {
     }
 
     destroy() {
-        const collections = [this.projectiles, this.splashEffects, this.shockwaves,
+        const collections = [this.projectiles, this.splashEffects, this.groundMarks, this.shockwaves,
             this.hitEffects, this.deathEffects, this.slashes, this.particles];
         const objects = new Set();
         for (const collection of collections) {
