@@ -45,6 +45,20 @@ test('attack poses have readable anticipation, impact and weapon-specific motion
   assert.ok(sampleAttackPose('magic', 0.4).leftZ > 0);
 });
 
+test('bow draw and staff casting use distinct readable weapon actions', () => {
+  const bowDraw = sampleAttackPose('bow', 0.2);
+  const bowLoose = sampleAttackPose('bow', 0.38);
+  const staffRaise = sampleAttackPose('magic', 0.25);
+  const staffRelease = sampleAttackPose('magic', 0.48);
+  const holyRaise = sampleAttackPose('acolyte', 0.25);
+  assert.ok(bowDraw.leftZ > 0.4);
+  assert.ok(bowLoose.leftZ < bowDraw.leftZ);
+  assert.ok(staffRaise.rightX < -1.5);
+  assert.ok(staffRelease.rightZ > staffRaise.rightZ);
+  assert.ok(holyRaise.leftZ > staffRaise.leftZ);
+  assert.notDeepEqual(bowDraw, staffRaise);
+});
+
 test('melee attacks visibly crouch, leap, twist, and strike instead of walking into the target', () => {
   const windup = sampleAttackPose('melee', 0.2);
   const hit = sampleAttackPose('melee', 0.48);

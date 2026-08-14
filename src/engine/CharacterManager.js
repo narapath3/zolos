@@ -67,15 +67,39 @@ export function sampleAttackPose(style, progress) {
     const recovery = p < 0.48 ? 0 : Math.min(1, (p - 0.48) / 0.52);
     const active = (1 - recovery);
     if (style === 'bow') {
-        return { rightX: -1.25 * active, rightZ: -0.25, leftX: -1.28 * active, leftZ: 0.38, bodyLean: 0.03, bodyTwist: -0.12 * active, recoil: strike * active * 0.08, leftLegX: -0.12 * active, rightLegX: 0.18 * active };
+        // Bow hand presents the bow while the off hand draws back across the
+        // chest. The brief release snap makes the shot readable at game scale.
+        const draw = anticipation * active;
+        const loose = Math.sin(strike * Math.PI) * active;
+        return {
+            rightX: -1.35 * draw, rightZ: -0.38 * draw,
+            leftX: -1.5 * draw + 0.58 * loose, leftZ: 0.72 * draw - 0.46 * loose,
+            bodyLean: 0.06 * draw - 0.08 * loose, bodyTwist: -0.28 * draw + 0.18 * loose,
+            rootRoll: -0.025 * draw, recoil: 0.045 * loose,
+            leftLegX: -0.18 * draw, rightLegX: 0.25 * draw,
+        };
     }
     if (style === 'gun') {
         const kick = Math.sin(strike * Math.PI) * active;
         return { rightX: -1.42 * active + kick * 0.22, rightZ: -0.08, leftX: -1.0 * active, leftZ: 0.18, bodyLean: -kick * 0.06, bodyTwist: -0.1 * active, recoil: kick * 0.08, leftLegX: -0.1 * active, rightLegX: 0.16 * active };
     }
     if (style === 'magic' || style === 'acolyte') {
-        const cast = Math.sin(Math.min(1, p / 0.58) * Math.PI) * active;
-        return { rightX: -1.55 * cast, rightZ: -0.5 * cast, leftX: -1.2 * cast, leftZ: 0.5 * cast, bodyLean: -0.04 * cast, bodyTwist: 0, recoil: cast * 0.14, leftLegX: -0.08 * cast, rightLegX: 0.08 * cast };
+        // Raise the staff/rod overhead to gather power, then sweep it toward the
+        // target. Acolytes mirror the free hand as a blessing/casting gesture.
+        const charge = Math.sin(Math.min(1, p / 0.42) * Math.PI / 2) * active;
+        const release = strike * active;
+        const holy = style === 'acolyte' ? 1 : 0;
+        return {
+            rightX: -2.35 * charge + 0.72 * release,
+            rightZ: -0.58 * charge + 0.82 * release,
+            leftX: (-1.05 - holy * 0.32) * charge,
+            leftZ: (0.48 + holy * 0.22) * charge,
+            bodyLean: -0.1 * charge + 0.16 * release,
+            bodyTwist: -0.2 * charge + 0.32 * release,
+            rootPitch: -0.045 * charge, rootRoll: 0.035 * charge,
+            recoil: 0.1 * charge,
+            leftLegX: -0.12 * charge, rightLegX: 0.15 * charge,
+        };
     }
     const windup = anticipation * (1 - strike);
     const cut = strike * active;
@@ -448,6 +472,8 @@ export class CharacterManager {
         if (this.stats.job === 'mage') return 'magic';
         if (this.stats.job === 'thief') return 'thief';
         if (this.stats.job === 'acolyte') return 'acolyte';
+        if (w === 'Mage Staff' || w === 'Genesis Staff') return 'magic';
+        if (w === 'Holy Rod' || w === 'Seraph Rod') return 'acolyte';
         if (w === 'Gun') return 'gun';
         if (w === 'Bow' || w === 'Crossbow' || w === 'Great Bow' || w === 'Rudra Bow' || w === 'Stormcaller Bow') return 'bow';
         return 'melee';
