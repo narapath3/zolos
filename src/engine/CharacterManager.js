@@ -28,12 +28,16 @@ export function sampleLocomotionPose(state, phase, blend = 1) {
     const moving = state === 'walking' || running;
     const weight = moving ? Math.max(0, Math.min(1, blend)) : 0;
     const stride = Math.sin(phase);
-    const leftLift = Math.max(0, -Math.cos(phase)) * weight;
-    const rightLift = Math.max(0, Math.cos(phase)) * weight;
-    const stepPulse = Math.abs(Math.sin(phase * 2));
-    const amp = (running ? 0.82 : 0.5) * weight;
-    const travel = (running ? 0.18 : 0.11) * weight;
-    const liftHeight = running ? 0.17 : 0.1;
+    // Each foot has a planted half-cycle and a rounded swing half-cycle. Tying
+    // phase to distance travelled (see update) keeps the planted foot from
+    // skating backwards while the character moves through the world.
+    const leftLift = Math.pow(Math.max(0, -Math.cos(phase)), 1.35) * weight;
+    const rightLift = Math.pow(Math.max(0, Math.cos(phase)), 1.35) * weight;
+    const stepPulse = Math.pow(Math.abs(Math.sin(phase)), 1.6);
+    const amp = (running ? 0.94 : 0.58) * weight;
+    const travel = (running ? 0.25 : 0.16) * weight;
+    const liftHeight = running ? 0.23 : 0.14;
+    const impact = Math.pow(Math.abs(Math.cos(phase)), 8) * weight;
     return {
         leftLegX: stride * amp,
         rightLegX: -stride * amp,
@@ -45,9 +49,13 @@ export function sampleLocomotionPose(state, phase, blend = 1) {
         rightLegZ: -stride * travel,
         leftFootLift: leftLift,
         rightFootLift: rightLift,
-        bob: stepPulse * (running ? 0.065 : 0.032) * weight,
-        lean: (running ? 0.13 : 0.035) * weight,
-        sway: Math.sin(phase * 0.5) * (running ? 0.045 : 0.025) * weight,
+        leftFootPitch: (-stride * (running ? 0.42 : 0.28) - leftLift * 0.16) * weight,
+        rightFootPitch: (stride * (running ? 0.42 : 0.28) - rightLift * 0.16) * weight,
+        bob: (stepPulse * (running ? 0.085 : 0.048) - impact * (running ? 0.025 : 0.012)) * weight,
+        lean: (running ? 0.18 : 0.045) * weight,
+        sway: Math.sin(phase) * (running ? 0.065 : 0.04) * weight,
+        torsoTwist: -stride * (running ? 0.12 : 0.075) * weight,
+        shoulderDrop: Math.sin(phase) * (running ? 0.035 : 0.02) * weight,
     };
 }
 
@@ -143,6 +151,9 @@ export class CharacterManager {
         this.attackAnimStyle = 'melee';
         this.locomotionPhase = 0;
         this.locomotionBlend = 0;
+        this.locomotionSpeed = 0;
+        this._lastLocomotionX = null;
+        this._lastLocomotionZ = null;
         this.attackCooldown = 1.0; // seconds between attacks
         this.target = null;
         this.moveSpeed = 5.5;
@@ -2501,9 +2512,10 @@ export class CharacterManager {
         const tz = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, targetPoint.z));
         const dir = new THREE.Vector3(tx - this.mesh.position.x, 0, tz - this.mesh.position.z);
 
-        if (dir.length() > 0.1) {
+        const distance = dir.length();
+        if (distance > 0.1) {
             dir.normalize();
-            this.mesh.position.add(dir.multiplyScalar(this.moveSpeed * dt));
+            this.mesh.position.add(dir.multiplyScalar(Math.min(distance, this.moveSpeed * dt)));
             clampToWorld(this.mesh.position);
 
             // Rotate to face movement direction
@@ -2514,7 +2526,7 @@ export class CharacterManager {
             this.mesh.rotation.y += turn * (1 - Math.exp(-14 * dt));
 
             // Set walking state
-            this.state = this.moveSpeed > 5 ? 'running' : 'walking';
+            this.state = this.moveSpeed >= 7 ? 'running' : 'walking';
             return true;
         } else {
             this.state = 'idle';
@@ -2537,7 +2549,7 @@ export class CharacterManager {
             while (turn < -Math.PI) turn += Math.PI * 2;
             this.mesh.rotation.y += turn * (1 - Math.exp(-16 * dt));
 
-            this.state = this.moveSpeed > 5 ? 'running' : 'walking';
+            this.state = this.moveSpeed >= 7 ? 'running' : 'walking';
             return true;
         } else {
             this.state = 'idle';
@@ -2925,11 +2937,24 @@ export class CharacterManager {
         // idle to a sine-wave walk, making the hero look weightless. Phase is
         // advanced from the real movement mode and all limbs ease into/out of it.
         if (this.state === 'idle' || this.state === 'walking' || this.state === 'running' || this.state === 'attacking') {
-            const moving = this.state === 'walking' || this.state === 'running';
-            this.locomotionBlend = damp(this.locomotionBlend, moving ? 1 : 0, moving ? 10 : 7, dt);
-            const cadence = this.state === 'running' ? 12.5 : 8.2;
-            this.locomotionPhase += dt * cadence * Math.max(0.18, this.locomotionBlend);
-            const pose = sampleLocomotionPose(this.state, this.locomotionPhase, this.locomotionBlend);
+            if (this._lastLocomotionX === null) {
+                this._lastLocomotionX = this.mesh.position.x;
+                this._lastLocomotionZ = this.mesh.position.z;
+            }
+            const motionDx = this.mesh.position.x - this._lastLocomotionX;
+            const motionDz = this.mesh.position.z - this._lastLocomotionZ;
+            const travelled = Math.hypot(motionDx, motionDz);
+            this._lastLocomotionX = this.mesh.position.x;
+            this._lastLocomotionZ = this.mesh.position.z;
+            const measuredSpeed = dt > 0 ? Math.min(12, travelled / dt) : 0;
+            this.locomotionSpeed = damp(this.locomotionSpeed, measuredSpeed, measuredSpeed > this.locomotionSpeed ? 16 : 9, dt);
+            const moving = this.locomotionSpeed > 0.08;
+            const locomotionState = this.locomotionSpeed >= 7 ? 'running' : 'walking';
+            this.locomotionBlend = damp(this.locomotionBlend, moving ? 1 : 0, moving ? 13 : 9, dt);
+            // Distance-driven cadence: one complete walk cycle per ~1.3 world
+            // units and one run cycle per ~1.65. This is the foot-locking piece.
+            if (travelled > 0.0001) this.locomotionPhase += Math.min(travelled, dt * 12) * (locomotionState === 'running' ? 3.8 : 4.8);
+            const pose = sampleLocomotionPose(locomotionState, this.locomotionPhase, this.locomotionBlend);
             const breathe = Math.sin(this.animTimer * 2.1) * 0.018 * (1 - this.locomotionBlend);
             this.mesh.position.y = damp(this.mesh.position.y, this.baseY + pose.bob + breathe, 18, dt);
             this.leftLeg.rotation.x = damp(this.leftLeg.rotation.x, pose.leftLegX, 18, dt);
@@ -2942,8 +2967,13 @@ export class CharacterManager {
             this.rightArm.rotation.x = damp(this.rightArm.rotation.x, pose.rightArmX, 16, dt);
             this.leftArm.rotation.z = damp(this.leftArm.rotation.z, -pose.sway, 12, dt);
             this.rightArm.rotation.z = damp(this.rightArm.rotation.z, pose.sway, 12, dt);
+            this.leftFoot.rotation.x = damp(this.leftFoot.rotation.x, Math.PI / 2 + pose.leftFootPitch, 22, dt);
+            this.rightFoot.rotation.x = damp(this.rightFoot.rotation.x, Math.PI / 2 + pose.rightFootPitch, 22, dt);
             this.body.rotation.x = damp(this.body.rotation.x, pose.lean, 10, dt);
             this.body.rotation.z = damp(this.body.rotation.z, pose.sway * 0.6, 10, dt);
+            this.body.rotation.y = damp(this.body.rotation.y, pose.torsoTwist, 13, dt);
+            this.leftArm.position.y = damp(this.leftArm.position.y, 1.0 - pose.shoulderDrop, 14, dt);
+            this.rightArm.position.y = damp(this.rightArm.position.y, 1.0 + pose.shoulderDrop, 14, dt);
             const feetGear = this.gearMeshes?.feet;
             if (feetGear) {
                 for (const rig of feetGear.children) {

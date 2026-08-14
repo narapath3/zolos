@@ -18,6 +18,16 @@ test('walk and run poses carry weight and use opposing limbs', () => {
   assert.ok(Math.abs(run.leftLegX) > Math.abs(walk.leftLegX));
   assert.ok(Math.max(runStep.leftLegY, runStep.rightLegY) > Math.max(walkStep.leftLegY, walkStep.rightLegY));
   assert.ok(run.lean > walk.lean);
+  assert.ok(Math.abs(run.leftFootPitch) > Math.abs(walk.leftFootPitch));
+  assert.ok(Math.abs(walk.torsoTwist) > 0);
+});
+
+test('locomotion cadence follows travelled distance and normal movement is walking', () => {
+  assert.match(characterSource, /const travelled = Math\.hypot\(motionDx, motionDz\)/);
+  assert.match(characterSource, /this\.locomotionPhase \+= Math\.min\(travelled, dt \* 12\)/);
+  assert.doesNotMatch(characterSource, /this\.locomotionPhase \+= dt \* cadence/);
+  assert.match(characterSource, /this\.moveSpeed >= 7 \? 'running' : 'walking'/);
+  assert.match(characterSource, /Math\.min\(distance, this\.moveSpeed \* dt\)/);
 });
 
 test('attack timelines trigger from real swings and do not loop during cooldown', () => {
