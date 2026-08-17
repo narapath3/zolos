@@ -3235,3 +3235,86 @@
     max-width: calc(100vw - 44px) !important;
   }
 }
+
+
+/* ============================================================
+   DESKTOP WIDE-SCREEN COMPOSITION — compact vertical lockup
+   ============================================================ */
+@media (min-width: 681px) and (max-height: 980px) {
+  #auth-screen .auth-container {
+    width: min(520px, 42vw);
+    max-width: 520px;
+    max-height: calc(100svh - 24px);
+    padding: 12px;
+    margin-right: clamp(24px, 4.5vw, 76px);
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #auth-screen .auth-logo {
+    margin-bottom: 4px;
+  }
+
+  #auth-screen .auth-logo .auth-logo-emblem {
+    width: clamp(62px, 8svh, 78px) !important;
+    height: clamp(62px, 8svh, 78px) !important;
+    margin-bottom: 0 !important;
+  }
+
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(100%, calc(100svh * .48), 470px) !important;
+    max-width: 100% !important;
+    margin: 4px auto 6px !important;
+  }
+
+  #auth-screen .auth-logo .game-subtitle {
+    margin-top: 0 !important;
+    font-size: clamp(8px, 1.6vh, 11px);
+  }
+
+  #auth-screen .auth-logo .game-tagline {
+    margin: 2px 0 5px;
+    font-size: clamp(9px, 1.5vh, 12px);
+  }
+
+  #auth-screen #auth-form-wrapper {
+    padding: 18px 24px 16px;
+    border-radius: 24px;
+  }
+
+  #auth-screen #auth-form-wrapper .auth-form {
+    gap: 9px;
+  }
+
+  #auth-screen #auth-form-wrapper .ro-input-wrap {
+    min-height: 48px;
+  }
+
+  #auth-screen #auth-form-wrapper .btn-primary,
+  #auth-screen #auth-form-wrapper .btn-secondary,
+  #auth-screen #auth-form-wrapper .btn-guest {
+    min-height: 48px;
+  }
+
+  #auth-screen #auth-form-wrapper .auth-divider {
+    margin: 5px 0;
+  }
+
+  #auth-screen[data-auth-state="login"] #auth-form-wrapper,
+  #auth-screen[data-auth-state="forgot"] #auth-form-wrapper,
+  #auth-screen[data-auth-state="reset_password"] #auth-form-wrapper {
+    padding-top: 16px;
+    padding-bottom: 14px;
+  }
+}
+
+@media (min-width: 1200px) and (max-height: 980px) {
+  #auth-screen .auth-container {
+    width: min(540px, 30vw);
+    max-width: 540px;
+  }
+
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(100%, calc(100svh * .48), 490px) !important;
+  }
+}
