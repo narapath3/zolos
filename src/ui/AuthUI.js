@@ -4,6 +4,7 @@ export class AuthUI {
     constructor(onAuthSuccess) {
         this.onAuthSuccess = onAuthSuccess;
         this.screen = document.getElementById('auth-screen');
+        this.screen?.setAttribute('data-auth-state', 'title');
         this.statusEl = document.getElementById('auth-status');
         this._unsubOnlineCount = null;
         this._isRegisterMode = false;
@@ -108,6 +109,7 @@ export class AuthUI {
 
                 setTimeout(() => {
                     this._splashEl.style.display = 'none';
+                    this.screen?.setAttribute('data-auth-state', 'login');
                     this._setMode('login');
                     this._formWrapperEl.style.display = 'block';
                     this._formWrapperEl.classList.add('fade-in');
@@ -120,6 +122,7 @@ export class AuthUI {
             this._splashSwitchBtn.addEventListener('click', () => {
                 this._hideWelcomeChip();
                 this._splashEl.style.display = 'none';
+                this.screen?.setAttribute('data-auth-state', 'login');
                 this._setMode('login');
                 this._formWrapperEl.style.display = 'block';
                 this._formWrapperEl.classList.add('fade-in');
@@ -205,6 +208,7 @@ export class AuthUI {
         if (this._formWrapperEl) {
             this._formWrapperEl.setAttribute('data-auth-mode', mode);
         }
+        this.screen?.setAttribute('data-auth-state', mode);
 
         const usernameInput = document.getElementById('auth-username');
         const passwordWrapper = document.getElementById('auth-password').parentElement.parentElement;

@@ -3144,3 +3144,94 @@
     margin-bottom: 7px !important;
   }
 }
+
+
+/* ============================================================
+   RESPONSIVE BRAND LOCKUP — fluid sizing, no viewport overflow
+   ============================================================ */
+#auth-screen .auth-logo {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#auth-screen .auth-logo .auth-wordmark-image {
+  box-sizing: border-box;
+  display: block !important;
+  width: min(100%, 560px) !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  height: auto !important;
+  margin-inline: auto !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+@media (min-width: 681px) {
+  #auth-screen {
+    align-items: center;
+    padding-bottom: 0;
+  }
+
+  #auth-screen .auth-container {
+    width: min(560px, 43vw);
+    max-width: 560px;
+    max-height: calc(100svh - 32px);
+    margin-right: clamp(24px, 5vw, 88px);
+    margin-bottom: 0;
+    justify-content: center;
+  }
+
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(100%, calc(100svh * .56), 560px) !important;
+    max-width: 100% !important;
+  }
+
+  #auth-screen[data-auth-state="login"] .auth-logo .auth-wordmark-image,
+  #auth-screen[data-auth-state="register"] .auth-logo .auth-wordmark-image,
+  #auth-screen[data-auth-state="forgot"] .auth-logo .auth-wordmark-image,
+  #auth-screen[data-auth-state="reset_password"] .auth-logo .auth-wordmark-image {
+    width: min(100%, calc(100svh * .52), 520px) !important;
+  }
+}
+
+@media (max-width: 680px) {
+  #auth-screen .auth-container {
+    width: min(92vw, 440px);
+    max-width: calc(100vw - 24px);
+    overflow: visible;
+  }
+
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(calc(100vw - 28px), max(220px, calc(100svh * .52)), 520px) !important;
+    max-width: calc(100vw - 28px) !important;
+  }
+
+  #auth-screen[data-auth-state="login"] .auth-logo .auth-wordmark-image,
+  #auth-screen[data-auth-state="register"] .auth-logo .auth-wordmark-image,
+  #auth-screen[data-auth-state="forgot"] .auth-logo .auth-wordmark-image,
+  #auth-screen[data-auth-state="reset_password"] .auth-logo .auth-wordmark-image {
+    width: min(calc(100vw - 44px), max(220px, calc(100svh * .38)), 390px) !important;
+    max-width: calc(100vw - 44px) !important;
+  }
+
+  #auth-screen[data-auth-state="login"] .auth-logo,
+  #auth-screen[data-auth-state="register"] .auth-logo,
+  #auth-screen[data-auth-state="forgot"] .auth-logo,
+  #auth-screen[data-auth-state="reset_password"] .auth-logo {
+    max-height: calc(100svh - 330px);
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 680px) and (orientation: landscape) {
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(calc(100vw - 32px), calc(100svh * .72), 440px) !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+
+  #auth-screen[data-auth-state="login"] .auth-logo .auth-wordmark-image {
+    width: min(calc(100vw - 44px), calc(100svh * .58), 360px) !important;
+    max-width: calc(100vw - 44px) !important;
+  }
+}
