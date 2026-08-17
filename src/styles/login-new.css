@@ -2486,3 +2486,53 @@
   background: rgba(191, 233, 251, .92) !important;
   border-color: #2f8fc5 !important;
 }
+
+
+/* ============================================================
+   SECONDARY ACTION CONTRAST — visible on bright fantasy artwork
+   ============================================================ */
+#auth-screen .btn-change-account {
+  opacity: 1 !important;
+  color: #164c75 !important;
+  background: rgba(255, 255, 255, .94) !important;
+  border: 2px solid #3b91c5 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 5px 14px rgba(24, 96, 151, .2), inset 0 1px rgba(255,255,255,.98) !important;
+  text-shadow: none !important;
+  font-weight: 800 !important;
+}
+#auth-screen .btn-change-account:hover,
+#auth-screen .btn-change-account:focus-visible {
+  color: #103b5d !important;
+  background: #ffffff !important;
+  border-color: #e6aa39 !important;
+  box-shadow: 0 7px 18px rgba(24, 96, 151, .27), 0 0 0 3px rgba(230, 170, 57, .18) !important;
+  transform: translateY(-1px);
+}
+#auth-screen #btn-guest,
+#auth-screen .btn-guest {
+  opacity: 1 !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #f48fb6 0%, #d94f91 100%) !important;
+  border: 2px solid rgba(255, 255, 255, .96) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 7px 16px rgba(191, 54, 116, .28), inset 0 1px rgba(255,255,255,.62) !important;
+  text-shadow: 0 1px 2px rgba(116, 30, 76, .55) !important;
+  font-weight: 900 !important;
+}
+#auth-screen #btn-guest:hover,
+#auth-screen #btn-guest:focus-visible,
+#auth-screen .btn-guest:hover,
+#auth-screen .btn-guest:focus-visible {
+  background: linear-gradient(180deg, #ffaccb 0%, #e85b9d 100%) !important;
+  box-shadow: 0 10px 22px rgba(191, 54, 116, .36), 0 0 0 3px rgba(255, 255, 255, .34) !important;
+  transform: translateY(-1px);
+}
+@media (max-width: 680px) {
+  #auth-screen .btn-change-account,
+  #auth-screen #btn-guest,
+  #auth-screen .btn-guest {
+    min-height: 44px;
+    font-size: 12px;
+  }
+}
