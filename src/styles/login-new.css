@@ -3087,3 +3087,51 @@
     margin-bottom: 7px !important;
   }
 }
+
+
+/* ============================================================
+   TITLE SCREEN FOCAL POINT — wordmark leads the visual hierarchy
+   ============================================================ */
+.auth-logo .auth-wordmark-image {
+  display: block !important;
+  width: min(100%, 500px) !important;
+  max-width: 92vw !important;
+  height: auto !important;
+  object-fit: contain;
+  margin: 12px auto 14px !important;
+  transform: none !important;
+  filter: drop-shadow(0 7px 16px rgba(255, 197, 72, .42)) !important;
+}
+
+.auth-logo .game-subtitle {
+  margin-top: 2px !important;
+  opacity: .9;
+}
+
+.auth-logo .game-tagline {
+  margin-top: 4px !important;
+  opacity: .84;
+}
+
+@media (min-width: 681px) {
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(100%, 500px) !important;
+    max-width: 500px !important;
+  }
+}
+
+@media (max-width: 680px) {
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: 100% !important;
+    max-width: 94vw !important;
+    margin: 10px auto 12px !important;
+  }
+}
+
+@media (max-height: 600px) {
+  #auth-screen .auth-logo .auth-wordmark-image {
+    width: min(100%, 410px) !important;
+    margin-top: 5px !important;
+    margin-bottom: 7px !important;
+  }
+}
