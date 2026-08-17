@@ -2756,3 +2756,104 @@
   #auth-screen #auth-splash::before { bottom: 18px; height: 42px; }
   #auth-screen #auth-splash::after { bottom: 0; padding: 7px 12px; font-size: 8px; }
 }
+
+
+/* ============================================================
+   UX10 PASS — three clear states and mobile bottom-sheet auth
+   ============================================================ */
+.auth-status {
+  min-height: 0;
+  margin: 0;
+  color: #2b6382 !important;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.35;
+}
+[data-auth-mode="register"] .auth-status {
+  margin: 2px 0 4px;
+  color: #23648a !important;
+}
+[data-auth-mode="register"] .auth-divider,
+[data-auth-mode="register"] #btn-guest {
+  display: none !important;
+}
+[data-auth-mode="register"] .class-selector-label span,
+[data-auth-mode="register"] .class-selector-label small {
+  color: #1d587e !important;
+}
+[data-auth-mode="register"] .class-badge {
+  color: #1d587e;
+  background: rgba(255,255,255,.86);
+  border-color: rgba(79, 164, 204, .46);
+  box-shadow: 0 5px 14px rgba(41, 121, 166, .12), inset 0 1px rgba(255,255,255,.9);
+}
+[data-auth-mode="register"] .class-badge.active {
+  background: linear-gradient(135deg, #fff8d7, #d9f5ff);
+  border-color: #f0b43b;
+  box-shadow: 0 7px 18px rgba(240, 180, 59, .22), 0 0 0 3px rgba(240, 180, 59, .13);
+}
+[data-auth-mode="register"] .class-badge .badge-copy strong { color: #174d73; }
+[data-auth-mode="register"] .class-badge .badge-copy small { color: #527b96; }
+[data-auth-mode="register"] #btn-login { order: 20; }
+[data-auth-mode="register"] #btn-register { order: 19; }
+
+@media (max-width: 680px) {
+  #auth-screen #auth-form-wrapper {
+    position: fixed;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 56svh;
+    box-sizing: border-box;
+    overflow-y: auto;
+    margin: 0;
+    padding: 22px 18px max(18px, env(safe-area-inset-bottom));
+    border-radius: 26px 26px 0 0;
+    border: 1px solid rgba(255,255,255,.96) !important;
+    background: rgba(244, 252, 255, .96) !important;
+    box-shadow: 0 -12px 36px rgba(28, 111, 166, .2), inset 0 1px rgba(255,255,255,.98) !important;
+    animation: authSheetIn .34s cubic-bezier(.2,.8,.2,1) both;
+  }
+  #auth-screen #auth-form-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    width: 42px;
+    height: 4px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: #9ed2e8;
+  }
+  #auth-screen #auth-form-wrapper .auth-form { gap: 10px; }
+  #auth-screen #auth-form-wrapper .auth-card-footer-line,
+  #auth-screen #auth-form-wrapper .online-count { display: none; }
+  #auth-screen #auth-form-wrapper .btn-primary,
+  #auth-screen #auth-form-wrapper .btn-secondary,
+  #auth-screen #auth-form-wrapper .btn-guest { min-height: 48px; }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] {
+    max-height: 86svh;
+    padding-top: 24px;
+  }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] .auth-form { gap: 8px; }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] .class-badges-grid { gap: 7px; }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] .class-badge {
+    min-height: 56px;
+    padding: 7px;
+    border-radius: 14px;
+  }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] .class-art { width: 34px; height: 34px; flex-basis: 34px; }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] .auth-status { margin: 2px 0 5px; }
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] #btn-login,
+  #auth-screen #auth-form-wrapper[data-auth-mode="register"] #btn-register { min-height: 46px; }
+}
+@keyframes authSheetIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #auth-screen #auth-form-wrapper { animation: none; }
+}

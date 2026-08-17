@@ -220,7 +220,7 @@ export class AuthUI {
 
             this._loginBtn.style.display = 'inline-flex';
             this._loginBtn.className = 'btn-primary';
-            this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg><span>SEND RESET LINK / ส่งลิงก์รีเซ็ต</span>`;
+            this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg><span>ส่งลิงก์รีเซ็ตรหัสผ่าน</span>`;
 
             this._registerBtn.style.display = 'inline-flex';
             this._registerBtn.className = 'btn-secondary';
@@ -247,7 +247,7 @@ export class AuthUI {
 
             this._loginBtn.style.display = 'inline-flex';
             this._loginBtn.className = 'btn-primary';
-            this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>SAVE NEW PASSWORD</span>`;
+            this._loginBtn.innerHTML = `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span>บันทึกรหัสผ่านใหม่</span>`;
 
             this._registerBtn.style.display = 'none';
             if (this._forgotPwBtn) this._forgotPwBtn.style.display = 'none';
@@ -282,16 +282,16 @@ export class AuthUI {
 
             const dividers = document.querySelectorAll('.auth-divider');
             const guestBtn = document.getElementById('btn-guest');
-            dividers.forEach(el => el.style.display = '');
-            if (guestBtn) guestBtn.style.display = '';
+            dividers.forEach(el => el.style.display = isRegister ? 'none' : '');
+            if (guestBtn) guestBtn.style.display = isRegister ? 'none' : '';
             this._registerBtn.innerHTML = isRegister
-                ? `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>Create Account</span>`
-                : `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>REGISTER ACCOUNT</span>`;
+                ? `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>สร้างตัวละคร</span>`
+                : `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="13" y2="15"/></svg><span>สร้างบัญชีใหม่</span>`;
             this._loginBtn.innerHTML = isRegister
-                ? `<span>← Back to Login</span>`
-                : `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span>LOGIN TO REALM</span>`;
+                ? `<span>← กลับเข้าสู่ระบบ</span>`
+                : `<svg class="svg-icon btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-3-3-5 5z"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/><path d="M11 5L5 3 3 9l3 3 5-5z"/></svg><span>เข้าสู่โลก ZOLOS</span>`;
 
-            this._setStatus(isRegister ? 'Choose your character name & starter class!' : '', 'info');
+            this._setStatus(isRegister ? 'ตั้งชื่อตัวละครและเลือกอาชีพเริ่มต้น' : '', 'info');
             if (isRegister) this._charnameEl.focus();
         }
     }
