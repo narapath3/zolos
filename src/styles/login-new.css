@@ -3094,13 +3094,15 @@
    ============================================================ */
 .auth-logo .auth-wordmark-image {
   display: block !important;
-  width: min(100%, 500px) !important;
-  max-width: 92vw !important;
+  width: min(120%, 640px) !important;
+  max-width: none !important;
+  max-height: none !important;
   height: auto !important;
   object-fit: contain;
+  animation: none !important;
   margin: 12px auto 14px !important;
   transform: none !important;
-  filter: drop-shadow(0 7px 16px rgba(255, 197, 72, .42)) !important;
+  filter: drop-shadow(0 8px 18px rgba(255, 197, 72, .48)) !important;
 }
 
 .auth-logo .game-subtitle {
@@ -3115,22 +3117,29 @@
 
 @media (min-width: 681px) {
   #auth-screen .auth-logo .auth-wordmark-image {
-    width: min(100%, 500px) !important;
-    max-width: 500px !important;
+    width: 100% !important;
+    max-width: 560px !important;
+    max-height: none !important;
   }
 }
 
 @media (max-width: 680px) {
   #auth-screen .auth-logo .auth-wordmark-image {
-    width: 100% !important;
-    max-width: 94vw !important;
+    width: calc(100% + 64px) !important;
+    max-width: calc(100vw - 18px) !important;
+    max-height: none !important;
     margin: 10px auto 12px !important;
+  }
+  #auth-screen .auth-logo .auth-logo-emblem {
+    width: clamp(64px, 14vw, 86px) !important;
+    height: clamp(64px, 14vw, 86px) !important;
   }
 }
 
 @media (max-height: 600px) {
   #auth-screen .auth-logo .auth-wordmark-image {
-    width: min(100%, 410px) !important;
+    width: min(120%, 520px) !important;
+    max-height: none !important;
     margin-top: 5px !important;
     margin-bottom: 7px !important;
   }
