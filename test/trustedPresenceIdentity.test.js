@@ -15,7 +15,8 @@ test('verified presence updates can change map but not identity or progression',
   const update = source.match(/socket\.on\('update_presence'[\s\S]*?\n    \}\);/)?.[0] || '';
   assert.match(update, /username: player\.verified \? player\.username/);
   assert.match(update, /level: player\.verified \? player\.level/);
-  assert.match(update, /mapId: data\.mapId \?\? player\.mapId/);
+  assert.match(update, /const requestedMapId = data\.mapId \?\? player\.mapId/);
+  assert.match(update, /mapId: requestedMapId/);
 });
 
 test('duplicate login preserves the old socket disconnect lifecycle', () => {

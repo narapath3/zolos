@@ -1308,7 +1308,7 @@ async function saveInventoryItemNow(characterId, itemName, itemType, quantity, s
         }
         localDb.set(`inventory_${characterId}`, inv);
         console.log(`[Zolos] 📦 [offline] saveInventoryItem completed for ${itemName}`);
-        return;
+        return true;
     }
 
     try {
@@ -1370,7 +1370,9 @@ async function saveInventoryItemNow(characterId, itemName, itemType, quantity, s
         }
     } catch (e) {
         console.error(`[Zolos] ❌ saveInventoryItem FAILED for characterId=${characterId}, itemName=${itemName}:`, e.message);
+        return false;
     }
+    return true;
 }
 
 export function saveInventoryItem(characterId, itemName, itemType, quantity, stats = {}) {
@@ -1405,7 +1407,7 @@ async function setInventoryItemQuantityNow(characterId, itemName, itemType, quan
             });
         }
         localDb.set(`inventory_${characterId}`, inv);
-        return;
+        return true;
     }
 
     try {
@@ -1419,23 +1421,28 @@ async function setInventoryItemQuantityNow(characterId, itemName, itemType, quan
 
         if (fetchError && fetchError.code === 'PGRST116') {
             if (qty > 0) {
-                await supabase.from('inventory')
+                const { error: insertError } = await supabase.from('inventory')
                     .insert({ character_id: characterId, item_name: itemName, item_type: itemType, quantity: qty, stats });
+                if (insertError) throw insertError;
             }
         } else if (fetchError) {
             throw fetchError;
         } else if (qty <= 0) {
-            await supabase.from('inventory').delete()
+            const { error: deleteError } = await supabase.from('inventory').delete()
                 .eq('character_id', characterId)
                 .eq('item_name', itemName);
+            if (deleteError) throw deleteError;
         } else {
-            await supabase.from('inventory')
+            const { error: updateError } = await supabase.from('inventory')
                 .update({ quantity: qty, stats })
                 .eq('id', existing.id);
+            if (updateError) throw updateError;
         }
     } catch (e) {
         console.error(`[Zolos] ❌ setInventoryItemQuantity FAILED for characterId=${characterId}, itemName=${itemName}:`, e.message);
+        return false;
     }
+    return true;
 }
 
 export function setInventoryItemQuantity(characterId, itemName, itemType, quantity, stats = {}) {
@@ -1454,7 +1461,7 @@ async function updateInventoryItemStatsNow(characterId, itemName, stats) {
             localDb.set(`inventory_${characterId}`, inv);
         }
         console.log(`[Zolos] 🔄 [offline] updateInventoryItemStats completed for ${itemName}`);
-        return;
+        return true;
     }
 
     try {
@@ -1471,7 +1478,9 @@ async function updateInventoryItemStatsNow(characterId, itemName, stats) {
         console.log(`[Zolos] 🔄 updateInventoryItemStats succeeded for ${itemName} on characterId ${characterId}`);
     } catch (e) {
         console.error(`[Zolos] ❌ updateInventoryItemStats threw for characterId=${characterId}, itemName=${itemName}:`, e.message);
+        return false;
     }
+    return true;
 }
 
 export function updateInventoryItemStats(characterId, itemName, stats) {

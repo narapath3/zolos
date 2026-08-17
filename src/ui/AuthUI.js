@@ -108,11 +108,9 @@ export class AuthUI {
 
                 setTimeout(() => {
                     this._splashEl.style.display = 'none';
+                    this._setMode('login');
                     this._formWrapperEl.style.display = 'block';
                     this._formWrapperEl.classList.add('fade-in');
-                    if (this._formWrapperEl) {
-                        this._formWrapperEl.setAttribute('data-auth-mode', 'login');
-                    }
                 }, 400);
             });
         }
@@ -122,11 +120,9 @@ export class AuthUI {
             this._splashSwitchBtn.addEventListener('click', () => {
                 this._hideWelcomeChip();
                 this._splashEl.style.display = 'none';
+                this._setMode('login');
                 this._formWrapperEl.style.display = 'block';
                 this._formWrapperEl.classList.add('fade-in');
-                if (this._formWrapperEl) {
-                    this._formWrapperEl.setAttribute('data-auth-mode', 'login');
-                }
                 this._handleSignOut();
             });
         }

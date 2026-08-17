@@ -34,6 +34,16 @@
     <!-- Lightweight static login artwork; 3D models load only after game entry. -->
     <div id="auth-bg-img" class="auth-bg-img"></div>
     <div class="auth-overlay-vignette"></div>
+    <div class="auth-hero-copy" aria-hidden="true">
+      <div class="auth-hero-eyebrow"><span></span> THE PROMISED REALM <span></span></div>
+      <h2>YOUR LEGEND<br /><em>BEGINS HERE</em></h2>
+      <p>Enter a living world of ancient magic, forgotten gods, and heroes who refuse to fade.</p>
+      <div class="auth-hero-stats">
+        <span><strong>01</strong> REALM</span>
+        <span><strong>24/7</strong> WORLD</span>
+        <span><strong>∞</strong> ADVENTURES</span>
+      </div>
+    </div>
     <div id="auth-particles"></div>
 
     <!-- Cinematic light beams -->
@@ -92,11 +102,12 @@
       <div class="ro-card-corner bottom-left"></div>
       <div class="ro-card-corner bottom-right"></div>
 
+      <div class="auth-card-kicker"><span class="kicker-line"></span> WELCOME, ADVENTURER <span class="kicker-line"></span></div>
       <div class="auth-logo">
         <div class="logo-aura"></div>
         <div class="logo-aura-outer"></div>
-        <img src="/assets/zolos_icon.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="Zolos Icon"
-          class="auth-icon-img" />
+        <img src="/src/assets/zolos_soft_mascot_emblem.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="ZOLOS emblem"
+          class="auth-icon-img auth-logo-emblem" />
         <h1 class="game-title-new" data-text="ZOLOS.ONLINE">ZOLOS.ONLINE</h1>
         <p class="game-subtitle">~ PROMISED REALM OF MIDGARD ~</p>
         <p class="game-tagline">
@@ -266,9 +277,10 @@
             </svg>
             <span>PLAY AS GUEST</span>
           </button>
+          <div class="auth-status" id="auth-status"></div>
         </div>
       </div>
-      <div class="auth-status" id="auth-status"></div>
+      <div class="auth-card-footer-line"><span></span><small>SECURE GATEWAY · REALM ONLINE</small><span></span></div>
       <div class="online-count">
         <span class="pulse-dot"></span>
         <span id="online-players-auth">0</span> Adventurers Online in Midgard

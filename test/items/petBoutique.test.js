@@ -32,7 +32,8 @@ test('Prontera has a clickable showcase boutique and dedicated gallery UI', () =
   assert.doesNotMatch(ui.match(/function petPortraitMarkup[\s\S]*?\n\}/)?.[0] || '', /<svg/);
   const mobileVisibility = ui.slice(ui.indexOf('updateMobileControlsVisibility() {'), ui.indexOf('// ============ Map Name Update'));
   const fishStart = ui.indexOf('recordFishCatch(item) {');
-  const fishCatch = ui.slice(fishStart, ui.indexOf('_almanacOwnedCount(', fishStart));
+  const fishEnd = ui.indexOf('  _notifyAlmanacCompletions() {', fishStart);
+  const fishCatch = ui.slice(fishStart, fishEnd);
   assert.ok(mobileVisibility.length > 200);
   assert.ok(fishCatch.length > 200);
   assert.match(mobileVisibility, /pet-boutique-modal', 'divine-shop-modal/);
