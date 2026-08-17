@@ -56,3 +56,9 @@ Copy หลักของ Login/Register ถูกปรับให้เป�
 ปรับ Login mobile ให้ไม่ใช้ overflow scroll ในโหมด Login และลดความสูงของ input, forgot password, CTA และ divider. Register ยังคงใช้ scroll เฉพาะเมื่อจำเป็น. Preview หลัง patch แสดง input, Login, Register และ Guest เป็นองค์ประกอบครบใน panel เดียว โดยไม่ตัด Guest จาก flow Login.
 
 ผล automated tests: 433 ผ่าน, 0 ล้มเหลว. Build ผ่าน.
+
+## Desktop fit-to-frame verification
+
+ขยาย desktop auth container เป็น auth zone กว้างขึ้นและเพิ่ม panel padding/input/CTA sizing. Preview หลัง patch แสดง panel ด้านขวาใหญ่ขึ้นและสมดุลกับ artwork มากกว่าเดิม โดยยังเห็น Login, Register และ Guest actions ครบ และไม่กระทบ Title screen.
+
+ผล automated tests: 433 ผ่าน, 0 ล้มเหลว. Build ผ่าน.
