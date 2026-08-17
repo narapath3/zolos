@@ -50,3 +50,9 @@ P3: ปรับ copy และ language policy ให้เป็นภาษ�
 Copy หลักของ Login/Register ถูกปรับให้เป็นภาษาไทยมากขึ้น ได้แก่ เข้าสู่โลก ZOLOS, สร้างบัญชีใหม่, สร้างตัวละคร และ กลับเข้าสู่ระบบ ส่วน server/BGM ยังเป็น utility ที่มีน้ำหนักต่ำกว่า CTA
 
 ผล automated tests: 433 ผ่าน, 0 ล้มเหลว. Build ผ่าน.
+
+## Fit-to-frame verification
+
+ปรับ Login mobile ให้ไม่ใช้ overflow scroll ในโหมด Login และลดความสูงของ input, forgot password, CTA และ divider. Register ยังคงใช้ scroll เฉพาะเมื่อจำเป็น. Preview หลัง patch แสดง input, Login, Register และ Guest เป็นองค์ประกอบครบใน panel เดียว โดยไม่ตัด Guest จาก flow Login.
+
+ผล automated tests: 433 ผ่าน, 0 ล้มเหลว. Build ผ่าน.
