@@ -3031,3 +3031,59 @@
   outline: 2px solid #e5b94f !important;
   outline-offset: 2px;
 }
+
+
+/* ============================================================
+   BRAND EMPHASIS — make ZOLOS.ONLINE the primary focal point
+   ============================================================ */
+.auth-logo .game-title-new,
+.auth-logo .auth-wordmark,
+.auth-logo .auth-wordmark-image,
+.auth-logo img[alt="ZOLOS.ONLINE"] {
+  width: min(100%, 360px) !important;
+  max-width: 86vw !important;
+  height: auto !important;
+  margin-top: 8px !important;
+  margin-bottom: 10px !important;
+  transform: scale(1.16) !important;
+  transform-origin: center center;
+  filter: drop-shadow(0 5px 12px rgba(255, 197, 72, .32)) !important;
+}
+
+.auth-logo .auth-logo-emblem,
+.auth-logo .auth-icon-img {
+  margin-bottom: 4px !important;
+}
+
+.auth-logo .game-subtitle {
+  margin-top: 6px !important;
+}
+
+@media (max-width: 680px) {
+  .auth-logo .game-title-new,
+  .auth-logo .auth-wordmark,
+  .auth-logo img[alt="ZOLOS.ONLINE"] {
+    width: min(88vw, 350px) !important;
+    max-width: 88vw !important;
+    transform: scale(1.22) !important;
+    margin-top: 12px !important;
+    margin-bottom: 13px !important;
+  }
+  .auth-logo .auth-logo-emblem,
+  .auth-logo .auth-icon-img {
+    margin-bottom: 2px !important;
+  }
+  .auth-logo .game-subtitle {
+    margin-top: 8px !important;
+  }
+}
+
+@media (max-height: 600px) {
+  .auth-logo .game-title-new,
+  .auth-logo .auth-wordmark,
+  .auth-logo img[alt="ZOLOS.ONLINE"] {
+    transform: scale(1.08) !important;
+    margin-top: 5px !important;
+    margin-bottom: 7px !important;
+  }
+}
