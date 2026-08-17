@@ -2942,3 +2942,92 @@
     overflow-y: auto;
   }
 }
+
+
+/* ============================================================
+   BORDER CLEANUP — one visual edge per control
+   Removes legacy wrapper borders and decorative pseudo-frames that
+   produced double lines on desktop and mobile.
+   ============================================================ */
+.auth-container::before,
+.auth-container::after,
+#auth-form-wrapper::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* The wrapper is a layout shell; the input owns the visible edge. */
+.ro-input-wrap,
+.ro-input-wrap:focus-within {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.auth-form input,
+[data-auth-mode="register"] .auth-form input {
+  border: 1px solid rgba(115, 185, 211, .58) !important;
+  border-radius: 14px !important;
+  background: rgba(248, 253, 255, .94) !important;
+  color: #14516b !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85) !important;
+}
+
+.auth-form input:focus {
+  border-color: #e5b94f !important;
+  box-shadow: 0 0 0 2px rgba(229, 185, 79, .18), inset 0 1px 0 rgba(255, 255, 255, .9) !important;
+}
+
+.auth-form input::placeholder {
+  color: #47758a !important;
+  opacity: 1 !important;
+}
+
+/* One edge for each class card; selection is communicated by color/glow. */
+.class-badge,
+.class-badge.active {
+  border-width: 1px !important;
+  box-shadow: 0 5px 14px rgba(26, 99, 125, .12) !important;
+}
+
+.class-badge.active {
+  border-color: rgb(var(--class-rgb)) !important;
+  box-shadow: 0 0 0 2px rgba(var(--class-rgb), .16), 0 7px 18px rgba(var(--class-rgb), .14) !important;
+}
+
+.class-art {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.class-badge:focus-visible {
+  outline: 2px solid #e5b94f !important;
+  outline-offset: 2px;
+}
+
+.ro-gender-btn,
+.ro-gender-btn.active {
+  border: 1px solid rgba(115, 185, 211, .58) !important;
+  box-shadow: none !important;
+}
+
+.ro-gender-btn.active {
+  border-color: #159cca !important;
+  box-shadow: 0 0 0 2px rgba(21, 156, 202, .16) !important;
+}
+
+/* Buttons use their own border only; no inherited outline-like shadow. */
+.btn-primary,
+.btn-secondary,
+.btn-guest {
+  outline: none !important;
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-guest:focus-visible {
+  outline: 2px solid #e5b94f !important;
+  outline-offset: 2px;
+}

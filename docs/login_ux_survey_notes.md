@@ -62,3 +62,9 @@ Copy หลักของ Login/Register ถูกปรับให้เป�
 ขยาย desktop auth container เป็น auth zone กว้างขึ้นและเพิ่ม panel padding/input/CTA sizing. Preview หลัง patch แสดง panel ด้านขวาใหญ่ขึ้นและสมดุลกับ artwork มากกว่าเดิม โดยยังเห็น Login, Register และ Guest actions ครบ และไม่กระทบ Title screen.
 
 ผล automated tests: 433 ผ่าน, 0 ล้มเหลว. Build ผ่าน.
+
+## Border cleanup verification
+
+ตรวจพบสาเหตุกรอบซ้อนจาก `.ro-input-wrap` ที่มี border/background/box-shadow พร้อมกับ border ของ input และจาก pseudo-frame ของ auth container. เพิ่มท้ายไฟล์เป็น border system ชั้นเดียว: wrapper ไม่มีเส้น, input เป็นเจ้าของเส้น, class art ไม่มีเส้นเพิ่ม, selected state ใช้ glow แทน border ซ้อน และ gender button ใช้เส้นเดียว.
+
+Preview หลัง patch แสดง input และ control edges สะอาดขึ้นบน desktop. Automated tests: 433 ผ่าน, 0 ล้มเหลว. Build ผ่าน.
