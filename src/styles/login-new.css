@@ -1972,7 +1972,6 @@
    PREMIUM WORLD LOGIN — restrained global-game presentation
    ============================================================ */
 .auth-bg-img {
-  background-image: url('/src/assets/login_cinematic_premium.jpg');
   background-position: center center;
   filter: brightness(.72) contrast(1.08) saturate(.94);
   animation: premiumWorldDrift 32s ease-in-out infinite alternate;
@@ -2334,4 +2333,156 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-bg-img, .auth-container { animation: none; }
+}
+
+
+/* Crisp pass: keep the colorful key art sharp and stable. */
+.auth-bg-img {
+  animation: none !important;
+  filter: brightness(1) saturate(1.04) contrast(1.04) !important;
+  transform: none !important;
+  image-rendering: auto;
+}
+.auth-logo .auth-logo-emblem {
+  filter: drop-shadow(0 4px 10px rgba(20, 113, 214, .24)) drop-shadow(0 0 5px rgba(255, 210, 76, .32));
+  transform: none !important;
+}
+.auth-logo .game-title-new {
+  text-shadow: 0 2px 0 #d99e29, 0 4px 10px rgba(45, 114, 187, .24);
+}
+#auth-form-wrapper {
+  backdrop-filter: blur(9px) saturate(1.08);
+  -webkit-backdrop-filter: blur(9px) saturate(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-bg-img { animation: none !important; transform: none !important; }
+}
+
+
+/* ============================================================
+   COLOR HARMONY PASS — one coherent sky / navy / gold palette
+   ============================================================ */
+:root {
+  --login-ink: #173f66;
+  --login-ink-soft: #356789;
+  --login-blue: #2d86c7;
+  --login-blue-light: #bfe9fb;
+  --login-gold: #f2b94b;
+  --login-gold-soft: #ffe9a3;
+  --login-surface: rgba(246, 252, 255, .78);
+}
+.auth-logo .game-title-new {
+  color: #fff4c5;
+  -webkit-text-stroke: 1px rgba(31, 87, 139, .72);
+  text-shadow: 0 2px 0 #d69b2d, 0 4px 10px rgba(27, 84, 132, .3);
+}
+.auth-logo .game-subtitle {
+  color: #edfaff;
+  text-shadow: 0 1px 3px rgba(18, 67, 111, .55);
+}
+#auth-form-wrapper {
+  border: 1px solid rgba(255, 255, 255, .78);
+  background: rgba(242, 250, 255, .42);
+  box-shadow: 0 18px 50px rgba(27, 91, 148, .2), inset 0 1px rgba(255, 255, 255, .9);
+}
+#auth-form-wrapper::before {
+  color: #27638d;
+  text-shadow: none;
+}
+.ro-input-wrap {
+  background: var(--login-surface);
+  border: 1px solid rgba(45, 134, 199, .42);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .72);
+}
+.auth-form input {
+  color: var(--login-ink);
+  caret-color: var(--login-blue);
+  text-shadow: none;
+}
+.auth-form input::placeholder { color: #5a7d98; opacity: 1; }
+.ro-input-icon { color: var(--login-blue); filter: none; }
+.ro-input-wrap:focus-within {
+  border-color: var(--login-gold);
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 0 0 3px rgba(242, 185, 75, .2), inset 0 1px rgba(255, 255, 255, .9);
+}
+.btn-forgot-pw { color: #236c9d; text-shadow: none; }
+.btn-forgot-pw:hover { color: #9a6819; text-shadow: none; }
+.auth-status { color: #26668e; text-shadow: none; }
+.auth-divider { color: #527b98; }
+.auth-divider::before, .auth-divider::after { background: rgba(55, 125, 171, .28); }
+.auth-card-footer-line { color: #4e7b96; }
+.auth-card-footer-line span { background: linear-gradient(90deg, transparent, rgba(45, 134, 199, .32)); }
+.auth-card-footer-line span:last-child { background: linear-gradient(90deg, rgba(45, 134, 199, .32), transparent); }
+.btn-primary {
+  color: #5b3a0e;
+  background: linear-gradient(180deg, #ffe98a 0%, #f6bd4b 55%, #e7a23d 100%);
+  border-color: #fff3bd;
+}
+.btn-secondary {
+  color: #fff;
+  background: linear-gradient(180deg, #58b9eb 0%, #3184c2 100%);
+  border-color: rgba(255, 255, 255, .8);
+}
+.btn-guest {
+  color: #fff;
+  background: linear-gradient(180deg, #ef94b8 0%, #d9649c 100%);
+  border-color: rgba(255, 255, 255, .78);
+}
+
+
+/* ============================================================
+   HIGH-CONTRAST FORM PASS — no dark fields, no white-on-white text
+   ============================================================ */
+#auth-form-wrapper {
+  background: rgba(240, 250, 255, .84) !important;
+  border: 1px solid rgba(255, 255, 255, .94) !important;
+  box-shadow: 0 18px 46px rgba(36, 100, 151, .24), inset 0 1px rgba(255, 255, 255, .96) !important;
+}
+#auth-form-wrapper::before {
+  color: #1d5278 !important;
+  text-shadow: none !important;
+}
+#auth-screen .auth-form input,
+#auth-screen #auth-username,
+#auth-screen #auth-password,
+#auth-screen #auth-charname {
+  background: rgba(250, 254, 255, .96) !important;
+  color: #123f67 !important;
+  -webkit-text-fill-color: #123f67 !important;
+  border: 1px solid rgba(39, 119, 174, .42) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.98) !important;
+  text-shadow: none !important;
+}
+#auth-screen .auth-form input::placeholder,
+#auth-screen #auth-username::placeholder,
+#auth-screen #auth-password::placeholder,
+#auth-screen #auth-charname::placeholder {
+  color: #47718d !important;
+  -webkit-text-fill-color: #47718d !important;
+  opacity: 1 !important;
+}
+#auth-screen .ro-input-wrap:focus-within {
+  background: #ffffff !important;
+  border-color: #e8ae35 !important;
+  box-shadow: 0 0 0 3px rgba(232, 174, 53, .22), inset 0 1px rgba(255,255,255,.98) !important;
+}
+#auth-screen .ro-input-icon { color: #267db4 !important; filter: none !important; }
+#auth-screen .btn-forgot-pw,
+#auth-screen .auth-status,
+#auth-screen .auth-divider,
+#auth-screen .class-selector-label,
+#auth-screen .class-selector-label small {
+  color: #1d587e !important;
+  text-shadow: none !important;
+}
+#auth-screen .ro-gender-btn {
+  color: #174e76 !important;
+  background: rgba(252, 254, 255, .72) !important;
+  border-color: rgba(39, 119, 174, .35) !important;
+}
+#auth-screen .ro-gender-btn.active {
+  color: #174e76 !important;
+  background: rgba(191, 233, 251, .92) !important;
+  border-color: #2f8fc5 !important;
 }
