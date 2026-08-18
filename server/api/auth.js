@@ -4,7 +4,18 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from './db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-insecure-secret-change-me';
+const DEV_JWT_SECRET = 'dev-insecure-secret-change-me';
+const configuredJwtSecret = String(process.env.JWT_SECRET || '').trim();
+const isProduction = process.env.NODE_ENV === 'production'
+    || process.env.RAILWAY_ENVIRONMENT === 'production'
+    || process.env.USE_LOCAL_DB === 'true'
+    || Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+if (isProduction && configuredJwtSecret.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters in production');
+}
+// Keep a development-only fallback so local tests and explicitly local runs are
+// usable, but never allow a predictable signing key in a deployed server.
+const JWT_SECRET = configuredJwtSecret || DEV_JWT_SECRET;
 const TOKEN_TTL = '30d';
 
 function signToken(user) {

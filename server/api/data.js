@@ -28,6 +28,9 @@ const POLICIES = {
     },
     profiles: {
         read: 'public',
+        // is_admin is never public data. Admin checks use the gated admin API
+        // or /auth/me, not the generic public profile reader.
+        publicColumns: ['id', 'username', 'gender', 'created_at'],
         write: 'own', ownerCol: 'id',
         writable: ['username', 'gender'], // is_admin intentionally NOT writable
     },
@@ -126,7 +129,18 @@ export async function runQuery(spec, userId) {
             whereParts.push(own);
         }
         let sel = '*';
-        if (Array.isArray(spec.columns)) sel = spec.columns.map(c => ident(c, cols)).join(', ');
+        const publicColumns = policy.read === 'public' && Array.isArray(policy.publicColumns)
+            ? new Set(policy.publicColumns)
+            : null;
+        if (Array.isArray(spec.columns)) {
+            if (publicColumns) {
+                const denied = spec.columns.filter(column => !publicColumns.has(column));
+                if (denied.length) throw httpErr(403, `public column not available: ${denied.join(', ')}`);
+            }
+            sel = spec.columns.map(c => ident(c, cols)).join(', ');
+        } else if (publicColumns) {
+            sel = [...publicColumns].map(c => ident(c, cols)).join(', ');
+        }
         let sql = `SELECT ${sel} FROM "${table}"`;
         if (whereParts.length) sql += ' WHERE ' + whereParts.join(' AND ');
         // Multi-column ORDER BY: accept an array of {col,asc} (chained .order())

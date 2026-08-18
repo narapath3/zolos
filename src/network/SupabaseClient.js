@@ -54,16 +54,30 @@ export const localDb = {
   }
 };
 
+async function hashOfflinePassword(password) {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle || typeof TextEncoder === 'undefined') {
+    throw new Error('Offline authentication requires Web Crypto support');
+  }
+  const bytes = new TextEncoder().encode(String(password));
+  const digest = await subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 // ============ Auth Helpers ============
 export async function signUp(email, password, username, gender = 'male') {
   if (isOfflineMode || !supabase) {
-    // Simulating offline sign up
+    if (String(password || '').length < 6) {
+      throw new Error('Password must be at least 6 characters');
+    }
+    // Simulating offline sign up. Store only a one-way hash; never persist the
+    // raw password in localStorage, which is readable by every script on origin.
     const users = localDb.get('users') || {};
     if (users[username]) {
       throw new Error('Username already exists (Offline Database)');
     }
     const userId = 'local_' + Math.random().toString(36).substring(2, 15);
-    users[username] = { userId, password, email };
+    users[username] = { userId, password_hash: await hashOfflinePassword(password), email };
     localDb.set('users', users);
 
     // Save profile locally
@@ -98,8 +112,16 @@ export async function signIn(email, password) {
   if (isOfflineMode || !supabase) {
     const users = localDb.get('users') || {};
     const user = users[username];
-    if (!user || user.password !== password) {
+    const passwordHash = user?.password_hash || (user?.password ? await hashOfflinePassword(user.password) : null);
+    const suppliedHash = await hashOfflinePassword(password);
+    if (!user || !passwordHash || passwordHash !== suppliedHash) {
       throw new Error('Invalid login credentials (Offline Database)');
+    }
+    // Migrate legacy local accounts that stored plaintext credentials.
+    if (user.password) {
+      delete user.password;
+      user.password_hash = passwordHash;
+      localDb.set('users', users);
     }
     saveActiveSession(user.userId);
     return { user: { id: user.userId, is_anonymous: false } };

@@ -33,11 +33,23 @@ export class AdminUI {
         this.isAdmin = false;
         if (!isOfflineMode && userId && !userId.startsWith('guest_') && !userId.startsWith('local_')) {
             try {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('username, is_admin')
-                    .eq('id', userId)
-                    .single();
+                let data = null;
+                let error = null;
+                if (isSelfHostMode && supabase?.auth?.getUser) {
+                    // Self-host /db public profiles deliberately redacts is_admin.
+                    // /auth/me is authenticated and returns the admin claim safely.
+                    const result = await supabase.auth.getUser();
+                    data = result?.data?.user || null;
+                    error = result?.error || null;
+                } else {
+                    const result = await supabase
+                        .from('profiles')
+                        .select('username, is_admin')
+                        .eq('id', userId)
+                        .single();
+                    data = result.data;
+                    error = result.error;
+                }
                 if (!error && data) {
                     this.currentUsername = data.username || 'Unknown';
                     this.isDbAdmin = data.is_admin === true;

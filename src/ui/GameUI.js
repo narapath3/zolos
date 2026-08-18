@@ -8382,6 +8382,11 @@ export class GameUI {
     }
 
     s.job = jobId;
+    // Job modifiers can change max HP/SP immediately. Clamp current resources
+    // before the next HUD tick so a new class never starts with SP/HP above its
+    // displayed maximum.
+    s.hp = Math.min(Number(s.max_hp) || 100, Math.max(0, Number(s.hp) || 0));
+    s.sp = Math.min(Number(s.max_sp) || 50, Math.max(0, Number(s.sp) || 0));
     // Rebuild the class silhouette (hat/robe/cape/quiver/halo). Broadcasts to
     // others automatically via getAppearance() on the next position tick.
     if (this.character._applyJobAppearance) this.character._applyJobAppearance();

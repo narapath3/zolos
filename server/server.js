@@ -68,9 +68,11 @@ const SAVE_INTERVAL_MS = 30 * 1000; // 30s — local Postgres is cheap; shrinks 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const USE_LOCAL_DB = process.env.USE_LOCAL_DB === 'true';
-// Server-authoritative monster engine (Phase 2). Off by default → legacy
-// client-side spawner runs. Requires local DB (the config + inventory writes).
-const WORLD_MONSTERS = USE_LOCAL_DB && process.env.WORLD_MONSTERS === 'true';
+// Server-authoritative monster engine (Phase 2). Secure by default when the
+// server owns a local Postgres database: the legacy client-side spawner can be
+// enabled only as an explicit rollback with WORLD_MONSTERS=false. Without an
+// authoritative engine, the browser can award itself EXP, gold, and loot.
+const WORLD_MONSTERS = USE_LOCAL_DB && process.env.WORLD_MONSTERS !== 'false';
 let supabase = null;
 if (USE_LOCAL_DB) {
     supabase = createPgClient();
@@ -1854,7 +1856,8 @@ httpServer.listen(PORT, HOST, () => {
         startMarketExpiryScheduler({ io }).catch(e => console.error('[MarketExpiry] scheduler failed:', e.message));
         startCheatGuard().catch(e => console.error('[CheatGuard] scheduler failed:', e.message));
         // World-monster config (Phase 1): create + seed tables from GameData.
-        // Phase 2: if WORLD_MONSTERS is on, start the authoritative engine.
+        // Phase 2: authoritative mode is the secure default on local Postgres;
+        // set WORLD_MONSTERS=false only for an explicit rollback.
         (async () => {
             try {
                 await ensureMonsterTables();
