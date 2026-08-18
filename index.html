@@ -24,6 +24,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;500;600;700&family=Kanit:wght@300;400;500;600;700&display=swap"
     rel="stylesheet" />
+  <link rel="stylesheet" href="/src/styles/zolos-tokens.css" />
   <link rel="stylesheet" href="/src/styles/index.css" />
   <link rel="stylesheet" href="/src/styles/login-new.css" />
 </head>
@@ -1032,6 +1033,28 @@
         <div class="popup-body">
           <!-- Tab 1: Profile -->
           <div id="tab-content-profile" class="tab-pane">
+            <section class="profile-character-hero" aria-label="Character summary">
+              <div class="profile-hero-avatar" aria-hidden="true"><span id="profile-hero-job-emoji">🌱</span></div>
+              <div class="profile-hero-identity">
+                <div class="profile-hero-kicker">CHARACTER PROFILE</div>
+                <div id="profile-hero-name" class="profile-hero-name">Adventurer</div>
+                <div class="profile-hero-meta">
+                  <span id="profile-hero-level">Lv.1</span>
+                  <span class="profile-hero-separator">•</span>
+                  <span id="profile-hero-job">Novice</span>
+                </div>
+                <div class="profile-hero-status-row">
+                  <span id="profile-hero-status" class="profile-hero-status is-online">● ONLINE</span>
+                  <span id="profile-hero-guest" class="profile-hero-guest" hidden>GUEST ACCOUNT</span>
+                </div>
+                <div id="profile-hero-uid" class="profile-hero-uid">UID: #--------</div>
+              </div>
+              <div class="profile-hero-power">
+                <span>COMBAT</span>
+                <strong id="profile-hero-power">ATK 0 · DEF 0</strong>
+              </div>
+            </section>
+
             <div class="form-group">
               <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
               <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />

@@ -1,0 +1,491 @@
+/*
+ * ZOLOS Design System Tokens
+ *
+ * One shared language for six UI modes:
+ * soft-mascot, adventure, economy, combat, social and admin.
+ *
+ * Usage:
+ *   <section data-zolos-mode="soft-mascot">...</section>
+ *   <div class="zolos-panel zolos-mode-economy">...</div>
+ *
+ * The token layer is intentionally additive. Existing legacy variables and
+ * selectors continue to work while new screens can migrate incrementally.
+ */
+
+:root {
+  /* ================================================================
+     Primitive palette
+     ================================================================ */
+  --zolos-color-ink-950: #050812;
+  --zolos-color-ink-900: #071126;
+  --zolos-color-ink-850: #0b1c3a;
+  --zolos-color-ink-800: #10284b;
+  --zolos-color-slate-700: #284765;
+  --zolos-color-slate-500: #6f9ab2;
+  --zolos-color-slate-300: #a9c7d5;
+  --zolos-color-white: #f5fcff;
+  --zolos-color-cloud: #e7f8fc;
+
+  --zolos-color-sky-500: #63dff1;
+  --zolos-color-sky-400: #8be9f7;
+  --zolos-color-sky-300: #b9f3fb;
+  --zolos-color-blue-500: #4c9de8;
+  --zolos-color-blue-700: #2864b8;
+
+  --zolos-color-gold-500: #ffd35b;
+  --zolos-color-gold-400: #ffe9a3;
+  --zolos-color-gold-700: #d79521;
+  --zolos-color-coral-500: #ff718b;
+  --zolos-color-coral-700: #c8405c;
+  --zolos-color-mint-500: #75e7ac;
+  --zolos-color-mint-700: #2aab70;
+  --zolos-color-violet-500: #b58aff;
+  --zolos-color-orange-500: #ff9f5b;
+
+  /* Alpha primitives */
+  --zolos-alpha-white-04: rgba(255, 255, 255, .04);
+  --zolos-alpha-white-08: rgba(255, 255, 255, .08);
+  --zolos-alpha-white-14: rgba(255, 255, 255, .14);
+  --zolos-alpha-ink-45: rgba(3, 12, 31, .45);
+  --zolos-alpha-ink-72: rgba(3, 12, 31, .72);
+  --zolos-alpha-sky-12: rgba(99, 223, 241, .12);
+  --zolos-alpha-gold-14: rgba(255, 211, 91, .14);
+  --zolos-alpha-coral-14: rgba(255, 113, 139, .14);
+  --zolos-alpha-mint-14: rgba(117, 231, 172, .14);
+
+  /* ================================================================
+     Global scale
+     ================================================================ */
+  --zolos-space-1: 4px;
+  --zolos-space-2: 8px;
+  --zolos-space-3: 12px;
+  --zolos-space-4: 16px;
+  --zolos-space-5: 20px;
+  --zolos-space-6: 24px;
+  --zolos-space-7: 28px;
+  --zolos-space-8: 32px;
+  --zolos-space-10: 40px;
+  --zolos-space-12: 48px;
+
+  --zolos-radius-xs: 8px;
+  --zolos-radius-sm: 12px;
+  --zolos-radius-md: 16px;
+  --zolos-radius-lg: 20px;
+  --zolos-radius-xl: 26px;
+  --zolos-radius-pill: 999px;
+
+  --zolos-border-1: 1px;
+  --zolos-border-2: 2px;
+  --zolos-ring-width: 3px;
+
+  --zolos-font-display: 'Chakra Petch', 'Kanit', system-ui, sans-serif;
+  --zolos-font-body: 'Kanit', 'Chakra Petch', system-ui, sans-serif;
+  --zolos-font-mono: 'Press Start 2P', ui-monospace, monospace;
+  --zolos-font-size-xs: clamp(.625rem, .58rem + .2vw, .75rem);
+  --zolos-font-size-sm: clamp(.75rem, .70rem + .2vw, .875rem);
+  --zolos-font-size-md: clamp(.875rem, .82rem + .25vw, 1rem);
+  --zolos-font-size-lg: clamp(1rem, .92rem + .35vw, 1.25rem);
+  --zolos-font-size-xl: clamp(1.25rem, 1.05rem + .8vw, 1.8rem);
+  --zolos-leading-tight: 1.2;
+  --zolos-leading-ui: 1.45;
+
+  --zolos-duration-fast: 140ms;
+  --zolos-duration-base: 220ms;
+  --zolos-duration-slow: 360ms;
+  --zolos-ease-standard: cubic-bezier(.2, .8, .2, 1);
+  --zolos-ease-emphasis: cubic-bezier(.16, 1, .3, 1);
+
+  --zolos-shadow-xs: 0 2px 8px rgba(0, 12, 35, .18);
+  --zolos-shadow-sm: 0 6px 18px rgba(0, 15, 42, .24);
+  --zolos-shadow-md: 0 14px 36px rgba(0, 15, 42, .34);
+  --zolos-shadow-lg: 0 24px 70px rgba(0, 15, 42, .46);
+  --zolos-glow-sky: 0 0 18px rgba(99, 223, 241, .24);
+  --zolos-glow-gold: 0 0 18px rgba(255, 211, 91, .24);
+  --zolos-glow-coral: 0 0 18px rgba(255, 113, 139, .24);
+
+  /* ================================================================
+     Semantic defaults — Adventure Utility is the safest gameplay base
+     ================================================================ */
+  --zolos-mode-bg: var(--zolos-color-ink-950);
+  --zolos-mode-surface: rgba(16, 40, 75, .84);
+  --zolos-mode-surface-raised: rgba(31, 69, 108, .82);
+  --zolos-mode-surface-soft: rgba(99, 223, 241, .09);
+  --zolos-mode-border: rgba(115, 222, 255, .26);
+  --zolos-mode-border-strong: rgba(115, 222, 255, .54);
+  --zolos-mode-text: var(--zolos-color-white);
+  --zolos-mode-text-muted: var(--zolos-color-slate-300);
+  --zolos-mode-text-subtle: var(--zolos-color-slate-500);
+  --zolos-mode-accent: var(--zolos-color-sky-500);
+  --zolos-mode-accent-strong: var(--zolos-color-blue-500);
+  --zolos-mode-highlight: var(--zolos-color-gold-500);
+  --zolos-mode-success: var(--zolos-color-mint-500);
+  --zolos-mode-warning: var(--zolos-color-gold-500);
+  --zolos-mode-danger: var(--zolos-color-coral-500);
+  --zolos-mode-focus: var(--zolos-color-sky-400);
+  --zolos-mode-overlay: rgba(2, 9, 24, .72);
+  --zolos-mode-panel-shadow: var(--zolos-shadow-md);
+  --zolos-mode-panel-glow: var(--zolos-glow-sky);
+
+  /* ================================================================
+     Component tokens
+     ================================================================ */
+  --zolos-panel-radius: var(--zolos-radius-lg);
+  --zolos-panel-padding: var(--zolos-space-4);
+  --zolos-panel-border: var(--zolos-mode-border);
+  --zolos-panel-background: var(--zolos-mode-surface);
+  --zolos-panel-shadow: var(--zolos-mode-panel-shadow);
+
+  --zolos-button-height: 44px;
+  --zolos-button-radius: var(--zolos-radius-sm);
+  --zolos-button-padding-x: var(--zolos-space-4);
+  --zolos-button-font-size: var(--zolos-font-size-sm);
+  --zolos-button-primary-bg: var(--zolos-mode-accent);
+  --zolos-button-primary-text: var(--zolos-color-ink-950);
+  --zolos-button-secondary-bg: var(--zolos-mode-surface-soft);
+  --zolos-button-secondary-text: var(--zolos-mode-text);
+  --zolos-button-danger-bg: var(--zolos-alpha-coral-14);
+
+  --zolos-tab-height: 46px;
+  --zolos-tab-radius: var(--zolos-radius-sm);
+  --zolos-tab-gap: var(--zolos-space-2);
+  --zolos-tab-active-bg: var(--zolos-mode-highlight);
+  --zolos-tab-active-text: var(--zolos-color-ink-950);
+
+  --zolos-input-height: 44px;
+  --zolos-input-radius: var(--zolos-radius-sm);
+  --zolos-input-background: rgba(3, 15, 39, .72);
+  --zolos-input-border: var(--zolos-mode-border);
+  --zolos-input-focus-ring: 0 0 0 var(--zolos-ring-width) rgba(99, 223, 241, .14);
+
+  --zolos-item-radius: var(--zolos-radius-sm);
+  --zolos-item-background: rgba(3, 15, 39, .46);
+  --zolos-item-border: rgba(115, 222, 255, .22);
+  --zolos-item-selected-border: var(--zolos-mode-highlight);
+  --zolos-item-equipped-border: var(--zolos-color-mint-500);
+  --zolos-item-locked-opacity: .48;
+
+  --zolos-chip-radius: var(--zolos-radius-pill);
+  --zolos-chip-height: 28px;
+  --zolos-chip-padding-x: var(--zolos-space-3);
+
+  --zolos-modal-overlay: var(--zolos-mode-overlay);
+  --zolos-modal-radius: var(--zolos-radius-xl);
+  --zolos-modal-max-width: min(760px, calc(100vw - 24px));
+  --zolos-modal-shadow: var(--zolos-shadow-lg);
+  --zolos-modal-backdrop: blur(8px);
+
+  /* Rarity is shared by Inventory, Cards, Shop, Trade and Profile. */
+  --zolos-rarity-common: #c6d2dc;
+  --zolos-rarity-uncommon: #75e7ac;
+  --zolos-rarity-rare: #65b9ff;
+  --zolos-rarity-epic: #b58aff;
+  --zolos-rarity-legendary: #ffd35b;
+  --zolos-rarity-mythic: #ff718b;
+}
+
+/* ================================================================
+   Six UI Modes
+   Apply either data-zolos-mode="..." or .zolos-mode-...
+   ================================================================ */
+[data-zolos-mode="soft-mascot"],
+.zolos-mode-soft-mascot {
+  --zolos-mode-bg: #bfeafa;
+  --zolos-mode-surface: rgba(242, 253, 255, .88);
+  --zolos-mode-surface-raised: rgba(255, 255, 255, .94);
+  --zolos-mode-surface-soft: rgba(77, 190, 224, .14);
+  --zolos-mode-border: rgba(55, 157, 198, .34);
+  --zolos-mode-border-strong: rgba(39, 139, 188, .68);
+  --zolos-mode-text: #123b5b;
+  --zolos-mode-text-muted: #47718b;
+  --zolos-mode-text-subtle: #6b99ad;
+  --zolos-mode-accent: #3bbde0;
+  --zolos-mode-accent-strong: #2589ca;
+  --zolos-mode-highlight: #ffd35b;
+  --zolos-mode-success: #31c781;
+  --zolos-mode-warning: #edaa2f;
+  --zolos-mode-danger: #ed5f7b;
+  --zolos-mode-focus: #1daed4;
+  --zolos-mode-overlay: rgba(9, 37, 70, .38);
+  --zolos-mode-panel-shadow: 0 18px 54px rgba(18, 91, 126, .24);
+  --zolos-mode-panel-glow: 0 0 22px rgba(92, 221, 242, .20);
+}
+
+[data-zolos-mode="adventure"],
+.zolos-mode-adventure {
+  --zolos-mode-bg: var(--zolos-color-ink-950);
+  --zolos-mode-surface: rgba(16, 40, 75, .84);
+  --zolos-mode-surface-raised: rgba(31, 69, 108, .82);
+  --zolos-mode-surface-soft: rgba(99, 223, 241, .09);
+  --zolos-mode-border: rgba(115, 222, 255, .26);
+  --zolos-mode-border-strong: rgba(115, 222, 255, .54);
+  --zolos-mode-text: var(--zolos-color-white);
+  --zolos-mode-text-muted: var(--zolos-color-slate-300);
+  --zolos-mode-text-subtle: var(--zolos-color-slate-500);
+  --zolos-mode-accent: var(--zolos-color-sky-500);
+  --zolos-mode-accent-strong: var(--zolos-color-blue-500);
+  --zolos-mode-highlight: var(--zolos-color-gold-500);
+  --zolos-mode-success: var(--zolos-color-mint-500);
+  --zolos-mode-warning: var(--zolos-color-gold-500);
+  --zolos-mode-danger: var(--zolos-color-coral-500);
+  --zolos-mode-focus: var(--zolos-color-sky-400);
+  --zolos-mode-overlay: rgba(2, 9, 24, .72);
+  --zolos-mode-panel-shadow: var(--zolos-shadow-md);
+  --zolos-mode-panel-glow: var(--zolos-glow-sky);
+}
+
+[data-zolos-mode="economy"],
+.zolos-mode-economy {
+  --zolos-mode-bg: #0b1020;
+  --zolos-mode-surface: rgba(28, 31, 52, .94);
+  --zolos-mode-surface-raised: rgba(51, 48, 70, .94);
+  --zolos-mode-surface-soft: rgba(255, 211, 91, .09);
+  --zolos-mode-border: rgba(255, 211, 91, .24);
+  --zolos-mode-border-strong: rgba(255, 211, 91, .58);
+  --zolos-mode-text: #fff8e7;
+  --zolos-mode-text-muted: #d1c5aa;
+  --zolos-mode-text-subtle: #948b78;
+  --zolos-mode-accent: #ffd35b;
+  --zolos-mode-accent-strong: #e8a52f;
+  --zolos-mode-highlight: #fff0ac;
+  --zolos-mode-success: #75e7ac;
+  --zolos-mode-warning: #ffd35b;
+  --zolos-mode-danger: #ff718b;
+  --zolos-mode-focus: #ffe9a3;
+  --zolos-mode-overlay: rgba(8, 8, 18, .78);
+  --zolos-mode-panel-shadow: 0 18px 54px rgba(0, 0, 0, .46);
+  --zolos-mode-panel-glow: var(--zolos-glow-gold);
+}
+
+[data-zolos-mode="combat"],
+.zolos-mode-combat {
+  --zolos-mode-bg: #070b16;
+  --zolos-mode-surface: rgba(12, 20, 39, .94);
+  --zolos-mode-surface-raised: rgba(25, 36, 63, .94);
+  --zolos-mode-surface-soft: rgba(76, 157, 232, .10);
+  --zolos-mode-border: rgba(107, 153, 214, .28);
+  --zolos-mode-border-strong: rgba(255, 113, 139, .62);
+  --zolos-mode-text: #f4f8ff;
+  --zolos-mode-text-muted: #afc0d8;
+  --zolos-mode-text-subtle: #71809a;
+  --zolos-mode-accent: #65cfff;
+  --zolos-mode-accent-strong: #4c9de8;
+  --zolos-mode-highlight: #ffd35b;
+  --zolos-mode-success: #75e7ac;
+  --zolos-mode-warning: #ffb25b;
+  --zolos-mode-danger: #ff5f78;
+  --zolos-mode-focus: #8be9f7;
+  --zolos-mode-overlay: rgba(1, 5, 14, .84);
+  --zolos-mode-panel-shadow: 0 18px 54px rgba(0, 0, 0, .58);
+  --zolos-mode-panel-glow: var(--zolos-glow-coral);
+}
+
+[data-zolos-mode="social"],
+.zolos-mode-social {
+  --zolos-mode-bg: #08152b;
+  --zolos-mode-surface: rgba(19, 56, 91, .86);
+  --zolos-mode-surface-raised: rgba(33, 86, 126, .86);
+  --zolos-mode-surface-soft: rgba(117, 231, 172, .10);
+  --zolos-mode-border: rgba(111, 211, 226, .30);
+  --zolos-mode-border-strong: rgba(117, 231, 172, .60);
+  --zolos-mode-text: #efffff;
+  --zolos-mode-text-muted: #b8d9e0;
+  --zolos-mode-text-subtle: #7da7b8;
+  --zolos-mode-accent: #63dff1;
+  --zolos-mode-accent-strong: #43b7d0;
+  --zolos-mode-highlight: #75e7ac;
+  --zolos-mode-success: #75e7ac;
+  --zolos-mode-warning: #ffd35b;
+  --zolos-mode-danger: #ff718b;
+  --zolos-mode-focus: #b9f3fb;
+  --zolos-mode-overlay: rgba(3, 18, 38, .68);
+  --zolos-mode-panel-shadow: 0 18px 54px rgba(0, 29, 56, .42);
+  --zolos-mode-panel-glow: 0 0 18px rgba(117, 231, 172, .20);
+}
+
+[data-zolos-mode="admin"],
+.zolos-mode-admin {
+  --zolos-mode-bg: #10151e;
+  --zolos-mode-surface: #1a222e;
+  --zolos-mode-surface-raised: #242f3d;
+  --zolos-mode-surface-soft: rgba(139, 233, 247, .08);
+  --zolos-mode-border: rgba(174, 196, 215, .24);
+  --zolos-mode-border-strong: rgba(139, 233, 247, .58);
+  --zolos-mode-text: #edf4fa;
+  --zolos-mode-text-muted: #b1c0cc;
+  --zolos-mode-text-subtle: #7d8e9c;
+  --zolos-mode-accent: #8be9f7;
+  --zolos-mode-accent-strong: #5bb5c8;
+  --zolos-mode-highlight: #d9e4ee;
+  --zolos-mode-success: #75e7ac;
+  --zolos-mode-warning: #ffd35b;
+  --zolos-mode-danger: #ff718b;
+  --zolos-mode-focus: #b9f3fb;
+  --zolos-mode-overlay: rgba(3, 7, 13, .76);
+  --zolos-mode-panel-shadow: 0 16px 40px rgba(0, 0, 0, .38);
+  --zolos-mode-panel-glow: 0 0 14px rgba(139, 233, 247, .14);
+}
+
+/* ================================================================
+   Reusable component foundations
+   ================================================================ */
+.zolos-panel {
+  color: var(--zolos-mode-text);
+  background: var(--zolos-panel-background);
+  border: var(--zolos-border-1) solid var(--zolos-panel-border);
+  border-radius: var(--zolos-panel-radius);
+  box-shadow: var(--zolos-panel-shadow);
+}
+
+.zolos-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zolos-space-3);
+  min-height: 52px;
+  padding: var(--zolos-space-3) var(--zolos-panel-padding);
+  color: var(--zolos-mode-text);
+  border-bottom: var(--zolos-border-1) solid var(--zolos-mode-border);
+  background: linear-gradient(90deg, var(--zolos-mode-surface-soft), transparent 78%);
+}
+
+.zolos-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--zolos-space-2);
+  color: var(--zolos-mode-highlight);
+  font-family: var(--zolos-font-display);
+  font-size: var(--zolos-font-size-sm);
+  font-weight: 800;
+  letter-spacing: .35px;
+}
+
+.zolos-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--zolos-mode-border), transparent);
+}
+
+.zolos-tabbar {
+  display: flex;
+  gap: var(--zolos-tab-gap);
+  padding: var(--zolos-space-2);
+}
+
+.zolos-tab {
+  min-height: var(--zolos-tab-height);
+  flex: 1 1 0;
+  padding: 0 var(--zolos-space-3);
+  color: var(--zolos-mode-text-muted);
+  background: var(--zolos-mode-surface-soft);
+  border: var(--zolos-border-1) solid var(--zolos-mode-border);
+  border-radius: var(--zolos-tab-radius);
+  font: 700 var(--zolos-font-size-sm)/var(--zolos-leading-tight) var(--zolos-font-body);
+  cursor: pointer;
+  transition: transform var(--zolos-duration-fast) var(--zolos-ease-standard), background var(--zolos-duration-base) var(--zolos-ease-standard), border-color var(--zolos-duration-base) var(--zolos-ease-standard), color var(--zolos-duration-base) var(--zolos-ease-standard);
+}
+
+.zolos-tab:hover { color: var(--zolos-mode-text); border-color: var(--zolos-mode-border-strong); }
+.zolos-tab:active { transform: translateY(1px); }
+.zolos-tab[aria-selected="true"], .zolos-tab.is-active {
+  color: var(--zolos-tab-active-text);
+  background: var(--zolos-tab-active-bg);
+  border-color: var(--zolos-mode-highlight);
+  box-shadow: var(--zolos-mode-panel-glow);
+}
+
+.zolos-btn {
+  min-height: var(--zolos-button-height);
+  padding: 0 var(--zolos-button-padding-x);
+  border: var(--zolos-border-1) solid var(--zolos-mode-border);
+  border-radius: var(--zolos-button-radius);
+  color: var(--zolos-button-secondary-text);
+  background: var(--zolos-button-secondary-bg);
+  font: 700 var(--zolos-button-font-size)/var(--zolos-leading-tight) var(--zolos-font-body);
+  cursor: pointer;
+  transition: transform var(--zolos-duration-fast) var(--zolos-ease-standard), filter var(--zolos-duration-base) var(--zolos-ease-standard), box-shadow var(--zolos-duration-base) var(--zolos-ease-standard), background var(--zolos-duration-base) var(--zolos-ease-standard);
+}
+
+.zolos-btn:hover { filter: brightness(1.08); box-shadow: var(--zolos-shadow-xs); }
+.zolos-btn:active { transform: translateY(1px); }
+.zolos-btn:focus-visible, .zolos-tab:focus-visible { outline: none; box-shadow: var(--zolos-input-focus-ring), var(--zolos-mode-panel-glow); }
+.zolos-btn-primary { color: var(--zolos-button-primary-text); background: var(--zolos-button-primary-bg); border-color: transparent; }
+.zolos-btn-success { color: #06210f; background: var(--zolos-mode-success); border-color: transparent; }
+.zolos-btn-danger { color: #fff; background: var(--zolos-button-danger-bg); border-color: color-mix(in srgb, var(--zolos-mode-danger) 62%, transparent); }
+.zolos-btn-ghost { background: transparent; }
+
+.zolos-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--zolos-chip-height);
+  padding: 0 var(--zolos-chip-padding-x);
+  border: var(--zolos-border-1) solid var(--zolos-mode-border);
+  border-radius: var(--zolos-chip-radius);
+  color: var(--zolos-mode-text-muted);
+  background: var(--zolos-mode-surface-soft);
+  font: 800 var(--zolos-font-size-xs)/1 var(--zolos-font-body);
+  white-space: nowrap;
+}
+.zolos-chip-success { color: var(--zolos-mode-success); border-color: color-mix(in srgb, var(--zolos-mode-success) 42%, transparent); background: color-mix(in srgb, var(--zolos-mode-success) 12%, transparent); }
+.zolos-chip-warning { color: var(--zolos-mode-warning); border-color: color-mix(in srgb, var(--zolos-mode-warning) 42%, transparent); background: color-mix(in srgb, var(--zolos-mode-warning) 12%, transparent); }
+.zolos-chip-danger { color: var(--zolos-mode-danger); border-color: color-mix(in srgb, var(--zolos-mode-danger) 42%, transparent); background: color-mix(in srgb, var(--zolos-mode-danger) 12%, transparent); }
+
+.zolos-item-card {
+  position: relative;
+  display: grid;
+  gap: var(--zolos-space-2);
+  min-width: 0;
+  padding: var(--zolos-space-3);
+  color: var(--zolos-mode-text);
+  background: var(--zolos-item-background);
+  border: var(--zolos-border-1) solid var(--zolos-item-border);
+  border-radius: var(--zolos-item-radius);
+  transition: transform var(--zolos-duration-fast) var(--zolos-ease-standard), border-color var(--zolos-duration-base) var(--zolos-ease-standard), background var(--zolos-duration-base) var(--zolos-ease-standard), box-shadow var(--zolos-duration-base) var(--zolos-ease-standard);
+}
+.zolos-item-card:hover { transform: translateY(-2px); border-color: var(--zolos-mode-border-strong); box-shadow: var(--zolos-shadow-sm); }
+.zolos-item-card.is-selected { border-color: var(--zolos-item-selected-border); box-shadow: var(--zolos-mode-panel-glow); }
+.zolos-item-card.is-equipped { border-color: var(--zolos-item-equipped-border); }
+.zolos-item-card.is-locked { opacity: var(--zolos-item-locked-opacity); filter: saturate(.55); }
+.zolos-item-card__icon { display: grid; place-items: center; min-height: 42px; font-size: 28px; }
+.zolos-item-card__name { overflow: hidden; color: var(--zolos-mode-text); font-size: var(--zolos-font-size-sm); font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.zolos-item-card__meta { color: var(--zolos-mode-text-muted); font-size: var(--zolos-font-size-xs); }
+
+.zolos-field {
+  width: 100%;
+  min-height: var(--zolos-input-height);
+  padding: 0 var(--zolos-space-3);
+  color: var(--zolos-mode-text);
+  background: var(--zolos-input-background);
+  border: var(--zolos-border-1) solid var(--zolos-input-border);
+  border-radius: var(--zolos-input-radius);
+  font: 500 var(--zolos-font-size-sm)/var(--zolos-leading-ui) var(--zolos-font-body);
+}
+.zolos-field::placeholder { color: var(--zolos-mode-text-subtle); }
+.zolos-field:focus { outline: none; border-color: var(--zolos-mode-focus); box-shadow: var(--zolos-input-focus-ring); }
+
+.zolos-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  padding: var(--zolos-space-3);
+  background: var(--zolos-modal-overlay);
+  backdrop-filter: var(--zolos-modal-backdrop);
+}
+.zolos-modal__card { width: var(--zolos-modal-max-width); max-height: calc(100dvh - var(--zolos-space-6)); overflow: hidden auto; border-radius: var(--zolos-modal-radius); box-shadow: var(--zolos-modal-shadow); }
+
+@media (prefers-reduced-motion: reduce) {
+  .zolos-btn, .zolos-tab, .zolos-item-card { transition: none; }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --zolos-panel-padding: var(--zolos-space-3);
+    --zolos-button-height: 46px;
+    --zolos-tab-height: 44px;
+  }
+  .zolos-tabbar { overflow-x: auto; }
+  .zolos-tab { flex: 0 0 auto; min-width: 116px; }
+}
