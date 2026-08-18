@@ -7661,3 +7661,43 @@ a,
     max-height: calc(100dvh - max(8px, var(--safe-top)) - max(8px, var(--safe-bottom)));
   }
 }
+
+
+/* ============================================================
+   Profile action footer — never float over equipment
+   The footer lives at the end of .popup-body and scrolls with the
+   profile content instead of overlaying the paper-doll.
+   ============================================================ */
+.profile-editor-content > .popup-body > .popup-actions,
+.profile-editor-content .popup-actions {
+  position: static;
+  z-index: auto;
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin: 22px 0 0;
+  padding: 16px 0 calc(18px + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent, rgba(7, 18, 42, .88) 28%);
+  border-top: 1px solid rgba(105, 208, 238, .22);
+  box-sizing: border-box;
+}
+.profile-editor-content .popup-actions > button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+}
+
+@media (max-width: 720px) {
+  .profile-editor-content > .popup-body > .popup-actions,
+  .profile-editor-content .popup-actions {
+    position: static;
+    margin: 18px 0 0;
+    padding: 14px 0 calc(20px + var(--safe-bottom));
+    gap: 8px;
+  }
+  .profile-editor-content .popup-actions > button {
+    min-height: 50px;
+    font-size: 13px;
+  }
+}
