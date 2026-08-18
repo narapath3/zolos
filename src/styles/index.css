@@ -4692,6 +4692,49 @@ a,
   }
 }
 
+/* iPad landscape: keep the AUTO/FISH rail beside, not above or inside,
+   the skill/attack action zone. The horizontal separation is intentional:
+   percentage-positioned skill buttons cannot collide with this rail. */
+@media (min-width: 769px) and (max-width: 1180px) and (orientation: landscape) {
+  :root {
+    --zolos-bottom-nav-clearance: calc(72px + var(--safe-bottom));
+    --zolos-action-zone-size: clamp(170px, 25vw, 196px);
+    --zolos-action-bottom: calc(var(--zolos-bottom-nav-clearance) + 4px);
+  }
+
+  #mobile-actions {
+    width: var(--zolos-action-zone-size);
+    height: var(--zolos-action-zone-size);
+    right: calc(16px + var(--safe-right));
+    bottom: var(--zolos-action-bottom) !important;
+  }
+
+  #auto-farm-container {
+    right: calc(16px + var(--safe-right) + var(--zolos-action-zone-size) + 12px) !important;
+    bottom: var(--zolos-action-bottom) !important;
+    top: auto !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: center;
+    isolation: isolate;
+    z-index: 1600 !important;
+  }
+
+  #auto-farm-container > .btn-auto,
+  #auto-farm-container > .btn-fishing {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .btn-auto,
+  .btn-fishing {
+    width: clamp(44px, 5vw, 52px);
+    height: clamp(44px, 5vw, 52px);
+  }
+}
+
 /* Extra small phones: iPhone SE, Galaxy A series */
 @media (max-width: 375px) {
   .auth-container {

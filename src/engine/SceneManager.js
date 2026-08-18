@@ -50,10 +50,15 @@ function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSiz
         }
         text = `${chars.join('')}…`;
     }
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x - maxWidth / 2 - 2, baseline - size * 1.35, maxWidth + 4, size * 1.55);
+    ctx.clip();
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.fillText(text, x, baseline);
+    ctx.restore();
 }
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)

@@ -38,4 +38,14 @@ test('in-world stall signs use high-DPI Thai-safe fitted canvas text', () => {
   assert.match(scene, /drawFittedCanvasText\(ctx, `ร้านของ \$\{stall\.owner_name/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 44px Arial'/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 30px Arial'/);
+  assert.match(scene, /ctx\.rect\(x - maxWidth \/ 2 - 2, baseline - size \* 1\.35/);
+});
+
+test('iPad landscape separates the auto rail from the skill and attack zone', () => {
+  assert.match(css, /@media \(min-width: 769px\) and \(max-width: 1180px\) and \(orientation: landscape\)/);
+  assert.match(css, /#auto-farm-container\s*\{[\s\S]*right: calc\(16px \+ var\(--safe-right\) \+ var\(--zolos-action-zone-size\) \+ 12px\)/);
+  assert.match(css, /#mobile-actions\s*\{[\s\S]*right: calc\(16px \+ var\(--safe-right\)\)/);
+  assert.match(css, /\.btn-auto,[\s\S]*\.btn-fishing\s*\{[\s\S]*width: clamp\(44px, 5vw, 52px\)/);
+  assert.match(css, /#auto-farm-container > \.btn-auto,[\s\S]*#auto-farm-container > \.btn-fishing[\s\S]*position: relative;[\s\S]*flex: 0 0 auto/);
+  assert.match(css, /#auto-farm-container\s*\{[\s\S]*isolation: isolate;[\s\S]*z-index: 1600 !important/);
 });
