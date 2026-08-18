@@ -69,8 +69,33 @@ const CHARACTER_CREATE_DEFAULTS = Object.freeze({
     level: 1, exp: 0, hp: 100, max_hp: 100, sp: 50, max_sp: 50,
     atk: 10, def: 5, gold: 0, zol: 0, total_kills: 0, play_time: 0,
 });
+const SYSTEM_INVENTORY_ITEMS = new Set([
+    'daily_quests', 'friends_list', 'fishing_almanac', 'adventure_journal', 'login_streak',
+]);
 
-function assertClientWriteAllowed(table, action, values) {
+function assertClientWriteAllowed(table, action, values, filters = []) {
+    if (table === 'inventory') {
+        const input = values || {};
+        const itemNameFilter = (filters || []).find(f => f?.col === 'item_name' && f?.op === 'eq')?.val;
+        const isSystemSnapshot = SYSTEM_INVENTORY_ITEMS.has(input.item_name)
+            || SYSTEM_INVENTORY_ITEMS.has(itemNameFilter);
+        if (['insert', 'upsert'].includes(action)) {
+            const isSystemSnapshotWrite = input.item_type === 'system' && SYSTEM_INVENTORY_ITEMS.has(input.item_name);
+            const isStarterSword = input.item_name === 'Sword' && input.item_type === 'weapon'
+                && Number(input.quantity) === 1;
+            if (!isSystemSnapshotWrite && !isStarterSword) {
+                throw httpErr(403, 'inventory grants must come from server-authoritative rewards');
+            }
+        } else if (action === 'update') {
+            if (Object.hasOwn(input, 'quantity')) {
+                throw httpErr(403, 'inventory quantity is server-authoritative');
+            }
+            if (Object.hasOwn(input, 'stats') && !isSystemSnapshot) {
+                throw httpErr(403, 'inventory item stats are server-authoritative');
+            }
+        }
+        return;
+    }
     if (table !== 'characters') return;
     const input = values || {};
     if (['update', 'upsert'].includes(action)) {
@@ -193,7 +218,7 @@ export async function runQuery(spec, userId) {
         const values = Array.isArray(spec.values) ? spec.values : [spec.values || {}];
         const results = [];
         for (const v of values) {
-            assertClientWriteAllowed(table, action, v);
+            assertClientWriteAllowed(table, action, v, []);
             const row = sanitizeWrite(policy, v, cols);
             // stamp/verify ownership
             await enforceInsertOwnership(policy, row, userId);
@@ -230,7 +255,7 @@ export async function runQuery(spec, userId) {
     }
 
     if (action === 'update') {
-        assertClientWriteAllowed(table, action, spec.values || {});
+        assertClientWriteAllowed(table, action, spec.values || {}, spec.filters || []);
         const row = sanitizeWrite(policy, spec.values || {}, cols);
         const keys = Object.keys(row);
         if (!keys.length) throw httpErr(400, 'no writable fields');

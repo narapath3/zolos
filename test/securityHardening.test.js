@@ -47,7 +47,7 @@ test('connected sessions block local monster progression without server authorit
 test('generic character writes reject client-owned progression and freshness fields', () => {
   assert.match(data, /SERVER_AUTHORITATIVE_CHARACTER_FIELDS/);
   assert.match(data, /server-authoritative character fields/);
-  assert.match(data, /assertClientWriteAllowed\(table, action, spec\.values \|\| \{\}\)/);
+  assert.match(data, /assertClientWriteAllowed\(table, action, spec\.values \|\| \{\}, spec\.filters \|\| \[\]\)/);
 });
 
 const rpc = read('../server/api/rpc.js');
@@ -99,4 +99,12 @@ test('self-host card mail locks the inventory row before escrow', () => {
 test('character card collection is read-only through the generic data API', () => {
   assert.match(data, /character_cards:[\s\S]*?write: false/);
   assert.match(data, /Collection counts, stars, and pity are server-owned/);
+});
+
+test('generic inventory writes cannot grant items or forge quantity/stats', () => {
+  assert.match(data, /inventory grants must come from server-authoritative rewards/);
+  assert.match(data, /inventory quantity is server-authoritative/);
+  assert.match(data, /inventory item stats are server-authoritative/);
+  assert.match(data, /SYSTEM_INVENTORY_ITEMS/);
+  assert.match(data, /isStarterSword/);
 });
