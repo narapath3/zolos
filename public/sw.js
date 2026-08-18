@@ -11,8 +11,12 @@
  *  - Cross-origin requests (Supabase, the Socket.io server, YouTube, fonts)
  *    are never intercepted.
  */
-const CACHE = 'zolos-cache-v2-world-remaster';
+const CACHE = 'zolos-cache-v3-ios-shop-label';
 const CORE = ['/', '/index.html', '/manifest.webmanifest', '/favicon.svg', '/icon-192.png', '/icon-512.png'];
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'ZOLOS_SKIP_WAITING') self.skipWaiting();
+});
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

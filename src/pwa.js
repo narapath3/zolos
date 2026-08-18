@@ -6,10 +6,33 @@
 export function initPWA() {
   // Register the service worker (root scope so it controls the whole origin).
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((e) => {
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+        await registration.update();
+        let reloaded = false;
+        const activate = () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', activate, { once: true });
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'ZOLOS_SKIP_WAITING' });
+        }
+        registration.addEventListener('updatefound', () => {
+          const worker = registration.installing;
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              worker.postMessage({ type: 'ZOLOS_SKIP_WAITING' });
+              activate();
+            }
+          });
+        });
+      } catch (e) {
         console.warn('[PWA] Service worker registration failed:', e?.message);
-      });
+      }
     });
   }
 
