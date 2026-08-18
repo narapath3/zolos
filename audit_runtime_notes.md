@@ -63,3 +63,10 @@ Browser screenshot รอบ game หลัง loading ไม่อัปโห�
 
 
 Console smoke รอบ responsive: browser context รายงาน viewport 1280×1100, landscape, DPR 1 แต่ query ณ เวลาตรวจไม่พบ `#hud-bottom`, `#mobile-actions`, `#auto-farm-container` หรือ `#stall-modal` จึงน่าจะอยู่ระหว่าง loading/คนละ document lifecycle ไม่ใช่หลักฐานว่ากฎ CSS ไม่ทำงาน และยังไม่ใช้แทนการทดสอบบน iPad Safari จริง
+
+
+## Deployment mismatch finding — 2026-08-18
+
+ตรวจ `https://zolos.online/` หลังผู้ใช้แจ้งว่ายังเห็น layout เดิม พบว่า Vercel live HTML ยังอ้าง asset เก่า `index-CsT5Y7BY.js` และ `index-Cpzu_E93.css` ซึ่งไม่มี markers ของ responsive batch (`zolos-action-bottom`, iPad market rules, high-DPI stall text helpers)
+
+GitHub deployment record ของ commit `acd0bda` มีสถานะ `failure` และ target preview เป็น Vercel URL ที่ต้อง login จึงยังดึง build log จาก sandbox ไม่ได้ การ push GitHub สำเร็จแล้ว แต่ Vercel production ยังไม่ได้ deploy commit นี้ ดังนั้นผู้ใช้จึงเห็น layout เดิมจริง ไม่ใช่เพียง cache ของ iPad
