@@ -11,7 +11,7 @@ import { MAP_TRACKS } from './MapMusicConfig.js';
 import { youtubeBGM } from './YouTubeBGM.js';
 import { buildPet } from './PetModels.js';
 
-const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", Arial, sans-serif';
+const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, Arial, sans-serif';
 
 /**
  * Canvas text is rendered separately from DOM text. iPad Safari can choose a
@@ -30,33 +30,37 @@ function createHiDPICanvas(width, height) {
     return { canvas, ctx };
 }
 
-function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSize, color, weight = 700) {
+function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSize, color, weight = 700, padding = 18) {
     if (!ctx) return;
     const original = String(value || '').trim() || 'ร้านค้า';
     const family = CANVAS_UI_FONT;
+    const safeWidth = Math.max(1, maxWidth - (padding * 2));
     let text = original;
     let size = maxSize;
 
     const setFont = () => { ctx.font = `${weight} ${size}px ${family}`; };
     setFont();
-    while (size > minSize && ctx.measureText(text).width > maxWidth) {
+    while (size > minSize && ctx.measureText(text).width > safeWidth) {
         size -= 1;
         setFont();
     }
-    if (ctx.measureText(text).width > maxWidth) {
+    if (ctx.measureText(text).width > safeWidth) {
         const chars = Array.from(text);
-        while (chars.length > 2 && ctx.measureText(`${chars.join('')}…`).width > maxWidth) {
+        while (chars.length > 2 && ctx.measureText(`${chars.join('')}…`).width > safeWidth) {
             chars.pop();
         }
         text = `${chars.join('')}…`;
     }
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x - maxWidth / 2 - 2, baseline - size * 1.35, maxWidth + 4, size * 1.55);
+    // Keep a real inset from the decorative border. This prevents Safari's
+    // emoji/Thai fallback metrics from touching or escaping the sign frame.
+    ctx.rect(x - maxWidth / 2 + padding, baseline - size * 1.35, safeWidth, size * 1.55);
     ctx.clip();
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
+    ctx.direction = 'ltr';
     ctx.fillText(text, x, baseline);
     ctx.restore();
 }
@@ -4929,9 +4933,15 @@ export class SceneManager {
                 ctx.roundRect(36, 15, 696, 132, 26); ctx.stroke();
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 18;
-                drawFittedCanvasText(ctx, `🏪 ${stall.shop_name || 'ร้านค้า'}`, 384, 102, 640, 66, 30, '#ffd97a', 700);
+                // Draw the decorative marker separately so an iOS emoji glyph
+                // can never consume width reserved for the player shop name.
+                ctx.fillStyle = '#ffd97a';
+                ctx.beginPath();
+                ctx.arc(82, 96, 9, 0, Math.PI * 2);
+                ctx.fill();
+                drawFittedCanvasText(ctx, stall.shop_name || 'ร้านค้า', 384, 102, 640, 62, 26, '#ffd97a', 700, 24);
                 ctx.shadowBlur = 0;
-                drawFittedCanvasText(ctx, `ร้านของ ${stall.owner_name || '???'}`, 384, 207, 640, 44, 22, '#cfe0f0', 700);
+                drawFittedCanvasText(ctx, `ร้านของ ${stall.owner_name || '???'}`, 384, 207, 640, 42, 20, '#cfe0f0', 700, 24);
             }
             const sign = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: new THREE.CanvasTexture(canvas), transparent: true

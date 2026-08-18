@@ -32,13 +32,15 @@ test('stall modal uses iPad-safe wrapping and stacked owner actions', () => {
 });
 
 test('in-world stall signs use high-DPI Thai-safe fitted canvas text', () => {
-  assert.match(scene, /CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", Arial, sans-serif'/);
+  assert.match(scene, /CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, Arial, sans-serif'/);
   assert.match(scene, /createHiDPICanvas\(width, height\)/);
-  assert.match(scene, /drawFittedCanvasText\(ctx, `🏪 \$\{stall\.shop_name/);
+  assert.match(scene, /drawFittedCanvasText\(ctx, stall\.shop_name/);
   assert.match(scene, /drawFittedCanvasText\(ctx, `ร้านของ \$\{stall\.owner_name/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 44px Arial'/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 30px Arial'/);
-  assert.match(scene, /ctx\.rect\(x - maxWidth \/ 2 - 2, baseline - size \* 1\.35/);
+  assert.match(scene, /const safeWidth = Math\.max\(1, maxWidth - \(padding \* 2\)\)/);
+  assert.match(scene, /ctx\.rect\(x - maxWidth \/ 2 \+ padding, baseline - size \* 1\.35/);
+  assert.match(scene, /ctx\.direction = 'ltr'/);
   assert.match(scene, /const isTouchViewport = \/Android\|iPad\|iPhone\|iPod\/i\.test\(navigator\.userAgent\)/);
   assert.match(scene, /const signScale = isTouchViewport \? 2\.55 : 3\.2/);
 });
