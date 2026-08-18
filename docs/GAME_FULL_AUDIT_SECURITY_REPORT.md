@@ -45,7 +45,7 @@ Guest login เข้าสู่เกมจริง สร้างตัว�
 
 ### 3.4 Guest Semantics
 
-ปุ่ม `เล่นเป็น Guest` จาก splash ที่มี guest session อยู่แล้วสร้าง guest identity ใหม่และเริ่ม progress ใหม่แทนการ resume identity เดิม พฤติกรรมนี้อาจตั้งใจให้เป็น “เริ่ม Guest ใหม่” แต่ข้อความบนปุ่มยังไม่ชัดเจนพอ ควรแยกเป็น `Resume Guest` และ `New Guest` หรือเพิ่ม confirmation ก่อนล้างความคาดหวังของผู้เล่น
+ปุ่มจาก splash ที่มี guest session อยู่แล้วสร้าง guest identity ใหม่และเริ่ม progress ใหม่แทนการ resume identity เดิม พฤติกรรมนี้ยังคงเป็น “เริ่ม Guest ใหม่” ตาม implementation แต่แก้ข้อความเป็น `Guest ใหม่` พร้อม aria-label/title ที่ระบุว่า `START GAME` ใช้สำหรับกลับเข้า session เดิม จึงลดความกำกวมด้าน account expectation แล้ว
 
 ## 4. Security Findings และการแก้ไข
 
@@ -56,9 +56,9 @@ Guest login เข้าสู่เกมจริง สร้างตัว�
 | **High/P1** | Generic public profile query เปิดโอกาสอ่าน `profiles.is_admin` | **แก้แล้ว** | เพิ่ม public column allowlist และปฏิเสธการขอคอลัมน์ sensitive; AdminUI self-host ใช้ authenticated `/auth/me` |
 | **Medium/P2** | Offline fallback เก็บ password plaintext ใน localStorage | **แก้แล้วบางส่วน** | บัญชีใหม่เก็บ SHA-256 digest และบัญชี legacy จะ migrate เมื่อ login; สำหรับระบบ production ควรหลีกเลี่ยง offline password auth หรือใช้ PBKDF2/Argon2 พร้อม salt |
 | **Medium/P2** | Server runtime dependencies ไม่อยู่ใน package manifest ครบ | **แก้แล้ว** | เพิ่ม `express`, `socket.io`, `jsonwebtoken`, `bcryptjs`, `cors`, `express-rate-limit` และตรวจ `npm audit` จนเป็น 0 |
-| **Medium/P2** | Generic public `characters` response ยังมีข้อมูล gameplay หลายฟิลด์ | **ยังต้องออกแบบต่อ** | ปัจจุบันระบบตั้งใจให้ profile/leaderboard อ่านข้อมูลตัวละครสาธารณะ แต่ควรเปลี่ยนเป็น public DTO ที่ไม่คืนเศรษฐกิจละเอียดหรือ internal identifiers เกินจำเป็น |
-| **Medium/P2** | Economy หลายส่วนยังมี client fallback | **ต้องทดสอบต่อบน production mode** | Fishing, local fallback และบาง legacy flow ต้องตรวจว่า reward ผ่าน atomic server RPC หรือไม่ทุกเส้นทาง |
-| **Low/P3** | Guest action สร้าง identity ใหม่โดยไม่มีข้อความชัด | **ยังไม่แก้** | เป็น UX/account expectation risk มากกว่าช่องโหว่โดยตรง |
+| **Medium/P2** | Generic public `characters` response ยังมีข้อมูล gameplay หลายฟิลด์ | **Leaderboard path แก้แล้ว; generic DTO ยังต้องลดต่อ** | Leaderboard ไม่ส่ง `user_id` แล้วและใช้ public character `id` สำหรับ profile lookup; generic authenticated character reads ยังต้องทบทวน economy fields และ internal state |
+| **Medium/P2** | Economy หลายส่วนยังมี client fallback | **ลดความเสี่ยงแล้ว; RPC migration ยัง pending** | Fishing loot, quest claim และ roulette ถูก fail-closed เมื่อ socket connected แต่ยังไม่มี `__serverRewards`; NPC sale ใช้ server request สำหรับ account path ส่วน Supabase/VPS RPC migration และ staging receipts ยังต้อง verify |
+| **Low/P3** | Guest action สร้าง identity ใหม่โดยไม่มีข้อความชัด | **แก้แล้ว** | ปุ่มแสดง `Guest ใหม่`; `START GAME` คือ resume path และมี aria-label/title อธิบายความแตกต่าง |
 | **Low/P3** | Browser กลับ `about:blank` หลัง Start Game ซ้ำ | **ยังไม่สรุป root cause** | ต้อง reproduce ใน browser ปกติและเก็บ console stack/network trace ก่อนแก้ |
 
 ## 5. จุดแก้ไขที่ทำใน repository
@@ -93,7 +93,7 @@ Guest login เข้าสู่เกมจริง สร้างตัว�
 
 4. ทำ two-account staging test สำหรับ market, vending, card mail, duel, matchmaking, reconnect, duplicate request และ simultaneous claim โดยตรวจยอดเงินจริงใน database หลังทุก transaction ไม่ควรใช้เพียงผลลัพธ์จาก UI
 
-5. ย้าย reward ทุกชนิดที่ยังใช้ client fallback ไปเป็น server-authoritative atomic RPC ได้แก่ fishing rewards, NPC sale, quest claim, daily reward, pet purchase, card refine/fusion และ inventory mutation ที่เกี่ยวกับเศรษฐกิจ
+5. ย้าย reward ที่ยังใช้ client fallback ไปเป็น server-authoritative atomic RPC ได้แก่ fishing rewards, quest claim, daily reward และ roulette; ใน interim release นี้ fishing/quest/roulette จะ fail-closed ใน connected sessions และ NPC sale account path ใช้ server request แล้ว ส่วน pet purchase/card refine/fusion ต้องตรวจ receipt/idempotency บน production staging ต่อ
 
 6. แยก public DTO ออกจาก database row โดยเฉพาะ characters, profiles, marketplace และ vending stalls เพื่อลดการรั่วของ user IDs, internal state, economy values และ configuration fields
 
