@@ -1050,9 +1050,13 @@
                 <div id="profile-hero-uid" class="profile-hero-uid">UID: #--------</div>
               </div>
               <div class="profile-hero-power">
-                <span>COMBAT</span>
-                <strong id="profile-hero-power">ATK 0 · DEF 0</strong>
+                <span>COMBAT STATS</span>
+                <button id="profile-combat-details-toggle" class="profile-combat-details-toggle" type="button" aria-expanded="false" aria-controls="profile-combat-breakdown">
+                  <strong id="profile-hero-power">ATK 0 · DEF 0</strong>
+                  <small>รายละเอียดค่าพลัง <span aria-hidden="true">›</span></small>
+                </button>
               </div>
+              <div id="profile-combat-breakdown" class="profile-combat-breakdown" hidden></div>
             </section>
 
             <div class="form-group">

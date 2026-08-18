@@ -4983,6 +4983,18 @@ export class GameUI {
       const bindPass = document.getElementById('link-account-password');
       const bindStatus = document.getElementById('link-account-status');
 
+      const combatDetailsToggle = document.getElementById('profile-combat-details-toggle');
+      const combatBreakdown = document.getElementById('profile-combat-breakdown');
+      if (combatDetailsToggle && combatBreakdown) {
+        combatDetailsToggle.addEventListener('click', () => {
+          const willOpen = combatBreakdown.hidden;
+          this._renderCombatStatBreakdown();
+          combatBreakdown.hidden = !willOpen;
+          combatDetailsToggle.setAttribute('aria-expanded', String(willOpen));
+          combatDetailsToggle.classList.toggle('is-expanded', willOpen);
+        });
+      }
+
       if (bindBtn) {
         bindBtn.addEventListener('click', async () => {
           const email = bindEmail?.value.trim();
@@ -5309,6 +5321,7 @@ export class GameUI {
         }
         if (heroUid && uidDisplay) heroUid.textContent = uidDisplay.textContent;
         if (heroPower) heroPower.textContent = `ATK ${Number(heroStats.atk) || 0} · DEF ${Number(heroStats.def) || 0}`;
+        this._renderCombatStatBreakdown();
 
         if (nameInput) nameInput.value = this.character.stats?.name || '';
         if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
@@ -8407,6 +8420,78 @@ export class GameUI {
       setTimeout(() => window.tutorialSystem.initTutorialFlow(), 1000);
     }
     */
+  }
+
+  _renderCombatStatBreakdown() {
+    const panel = document.getElementById('profile-combat-breakdown');
+    const character = this.character;
+    if (!panel || !character) return;
+
+    const stats = character.stats || {};
+    const inventory = this.inventory || [];
+    const refine = character.equipRefine || {};
+    const job = JOBS[stats.job] || null;
+    const modifiers = job?.mods || { atk: 1, def: 1 };
+    const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+    const format = (value) => Math.round(number(value)).toLocaleString('en-US');
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+    const build = (field, baseKey, defaultBase) => {
+      const bonusKey = `${field}Bonus`;
+      let equipment = 0;
+      let refineBonus = 0;
+      let legacyCardBonus = 0;
+      const equippedNames = [];
+
+      const addItem = (name, slot, requireSlot = false) => {
+        if (!name || !ITEMS[name]) return;
+        const item = ITEMS[name];
+        const baseBonus = number(item[bonusKey]);
+        const refineLevel = number(refine[slot]);
+        const scaledBonus = baseBonus ? Math.round(baseBonus * getRefineMult(refineLevel)) : 0;
+        equipment += baseBonus;
+        refineBonus += scaledBonus - baseBonus;
+        if (baseBonus > 0) equippedNames.push({ name, value: scaledBonus, refineLevel });
+
+        const inventoryItem = inventory.find((entry) => entry.item_name === name && entry.stats?.equipped === true && (!requireSlot || entry.stats?.slot === slot));
+        for (const cardName of inventoryItem?.stats?.cards || []) {
+          legacyCardBonus += number(ITEMS[cardName]?.[bonusKey]);
+        }
+      };
+
+      addItem(character.equippedWeapon, 'weapon');
+      addItem(character.equippedShield, 'shield');
+      for (const [slot, name] of Object.entries(character.equippedGear || {})) addItem(name, slot, true);
+
+      const canonicalCardBonus = number(character.getCardTotal?.(bonusKey));
+      const cards = canonicalCardBonus + legacyCardBonus;
+      const base = number(stats[baseKey], defaultBase);
+      const jobMultiplier = number(modifiers[field], 1) || 1;
+      const buffMultiplier = 1 + number(character.getBuffPct?.(field), 0);
+      const total = Math.floor((base + equipment + refineBonus + cards) * jobMultiplier * buffMultiplier);
+
+      return { base, equipment, refineBonus, cards, jobMultiplier, buffMultiplier, total, equippedNames };
+    };
+
+    const atk = build('atk', '_baseAtk', 10);
+    const def = build('def', '_baseDef', 5);
+    const statCard = (label, icon, data, tone) => `
+      <article class="profile-stat-breakdown-card ${tone}">
+        <header><span>${icon} ${label}</span><strong>${format(data.total)}</strong></header>
+        <div class="profile-stat-breakdown-grid">
+          <span>Base</span><b>${format(data.base)}</b>
+          <span>Equipment</span><b>+${format(data.equipment)}</b>
+          <span>Refine</span><b>+${format(data.refineBonus)}</b>
+          <span>Cards</span><b>+${format(data.cards)}</b>
+          <span>Job ×${data.jobMultiplier.toFixed(2)}</span><b>${data.buffMultiplier !== 1 ? `Buff ×${data.buffMultiplier.toFixed(2)}` : '—'}</b>
+        </div>
+        <div class="profile-stat-breakdown-items">${data.equippedNames.length ? data.equippedNames.map((entry) => `${escapeHtml(entry.name)}${entry.refineLevel ? ` +${entry.refineLevel}` : ''}`).join(' · ') : 'ยังไม่มีโบนัสจากอุปกรณ์'}</div>
+      </article>`;
+
+    panel.innerHTML = `
+      <div class="profile-stat-breakdown-head"><span>รายละเอียด Combat Stats</span><small>ค่าปัจจุบันจากตัวละครและอุปกรณ์ที่สวมใส่</small></div>
+      <div class="profile-stat-breakdown-cards">${statCard('ATK', '⚔️', atk, 'is-atk')}${statCard('DEF', '🛡️', def, 'is-def')}</div>
+      <div class="profile-stat-breakdown-formula">สูตร: (Base + Equipment + Refine + Cards) × Job Modifier × Buff</div>`;
   }
 
   // Fill the Job row in the Profile tab and wire its change button.

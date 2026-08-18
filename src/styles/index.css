@@ -7701,3 +7701,155 @@ a,
     font-size: 13px;
   }
 }
+
+
+/* ============================================================
+   Combat stat breakdown
+   The hero keeps a compact summary; details open in-flow below it.
+   ============================================================ */
+.profile-hero-power {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+.profile-combat-details-toggle {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-align: right;
+}
+.profile-combat-details-toggle strong {
+  display: block;
+  margin: 0;
+  color: #fff4c7;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.profile-combat-details-toggle small {
+  color: #8fe4ef;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .15px;
+  opacity: .88;
+}
+.profile-combat-details-toggle small span {
+  display: inline-block;
+  margin-left: 2px;
+  font-size: 13px;
+  line-height: .7;
+  transition: transform .18s ease;
+}
+.profile-combat-details-toggle:hover small,
+.profile-combat-details-toggle:focus-visible small { color: #fff1a5; opacity: 1; }
+.profile-combat-details-toggle:focus-visible {
+  outline: 2px solid rgba(125, 228, 242, .9);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.profile-combat-details-toggle.is-expanded small span { transform: rotate(90deg); }
+.profile-combat-breakdown {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(105, 208, 238, .24);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(10, 45, 75, .82), rgba(5, 19, 46, .88));
+  box-shadow: inset 0 1px rgba(255, 255, 255, .08), 0 8px 22px rgba(0, 18, 50, .18);
+}
+.profile-combat-breakdown[hidden] { display: none; }
+.profile-stat-breakdown-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.profile-stat-breakdown-head span {
+  color: #ffe28a;
+  font-size: 10px;
+  font-weight: 900;
+}
+.profile-stat-breakdown-head small {
+  color: #8ebaca;
+  font-size: 8px;
+  text-align: right;
+}
+.profile-stat-breakdown-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.profile-stat-breakdown-card {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(105, 208, 238, .2);
+  border-radius: 10px;
+  background: rgba(2, 16, 39, .52);
+}
+.profile-stat-breakdown-card.is-atk { border-color: rgba(255, 173, 112, .32); }
+.profile-stat-breakdown-card.is-def { border-color: rgba(112, 202, 255, .34); }
+.profile-stat-breakdown-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  margin-bottom: 6px;
+  color: #ffd58a;
+  font-size: 10px;
+  font-weight: 900;
+}
+.profile-stat-breakdown-card.is-def header { color: #8edbff; }
+.profile-stat-breakdown-card header strong { color: #fff; font-size: 14px; }
+.profile-stat-breakdown-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+  color: #a9c9d8;
+  font-size: 8px;
+}
+.profile-stat-breakdown-grid b { color: #eefbff; font-size: 9px; text-align: right; }
+.profile-stat-breakdown-items {
+  overflow: hidden;
+  margin-top: 7px;
+  color: #86b7c8;
+  font-size: 7px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-stat-breakdown-formula {
+  margin-top: 8px;
+  color: #7eafc1;
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .profile-hero-power { min-width: 0; }
+  .profile-combat-details-toggle { align-items: stretch; text-align: left; }
+  .profile-combat-details-toggle strong { font-size: 10px; }
+  .profile-combat-details-toggle small { text-align: left; }
+  .profile-combat-breakdown { padding: 8px; }
+  .profile-stat-breakdown-head { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .profile-stat-breakdown-head small { text-align: left; }
+  .profile-stat-breakdown-cards { grid-template-columns: 1fr; gap: 6px; }
+  .profile-stat-breakdown-card { padding: 7px; }
+  .profile-stat-breakdown-items { font-size: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-combat-details-toggle small span { transition: none; }
+}
