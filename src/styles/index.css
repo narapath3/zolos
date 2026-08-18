@@ -49,6 +49,11 @@
   --safe-right: max(8px, env(safe-area-inset-right, 0px));
   --safe-bottom: max(0px, env(safe-area-inset-bottom, 0px));
   --safe-left: max(8px, env(safe-area-inset-left, 0px));
+  /* Shared mobile/tablet clearance: every floating control derives from the
+     same bottom-nav and action-zone anchors instead of competing fixed offsets. */
+  --zolos-bottom-nav-clearance: calc(66px + var(--safe-bottom));
+  --zolos-action-zone-size: clamp(160px, 30vw, 220px);
+  --zolos-action-bottom: calc(var(--zolos-bottom-nav-clearance) + 8px);
   --radius: 12px;
   --radius-sm: 10px;
   --radius-xl: 40px;
@@ -4173,10 +4178,10 @@ a,
 
 #mobile-actions {
   position: fixed;
-  bottom: calc(15px + env(safe-area-inset-bottom));
-  right: calc(20px + env(safe-area-inset-right));
-  width: clamp(160px, 30vw, 220px);
-  height: clamp(160px, 30vw, 220px);
+  bottom: var(--zolos-action-bottom);
+  right: calc(20px + var(--safe-right));
+  width: var(--zolos-action-zone-size);
+  height: var(--zolos-action-zone-size);
   pointer-events: auto;
   user-select: none;
   touch-action: none;
@@ -4305,27 +4310,29 @@ a,
     display: none !important;
   }
 
-  /* Tablet: bottom menu bar — single scrollable row, no wrap */
+  /* Tablet/mobile bottom menu: one bounded row. It may scroll on very
+     narrow devices, but each button remains a flex item and can never cover
+     its neighbour. */
   #hud-bottom {
     display: flex;
     flex-wrap: nowrap;
     justify-content: flex-start;
     align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
-    bottom: calc(8px + env(safe-area-inset-bottom));
+    gap: clamp(2px, 0.8vw, 6px);
+    padding: 6px clamp(6px, 1vw, 10px);
+    bottom: calc(8px + var(--safe-bottom));
     left: 50%;
     transform: translateX(-50%);
-    width: auto;
-    max-width: 95vw;
-    min-width: unset;
+    width: min(600px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    min-width: 0;
     grid-template-columns: unset;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
     z-index: 1700;
-    /* Ensure menu bar is above mobile controls if they overlap */
   }
 
   /* Lift mobile actions above menu bar for tablet/larger mobile screens */
@@ -4339,9 +4346,15 @@ a,
   }
 
   .hud-btn {
-    padding: 5px 6px;
-    min-width: 54px;
-    flex: 0 0 auto;
+    padding: 5px clamp(2px, 0.7vw, 6px);
+    min-width: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  #hud-bottom .hud-menu-group {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .hud-btn span {
@@ -4350,9 +4363,13 @@ a,
 
   .hud-btn small {
     display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-family: var(--font-ui);
     font-weight: 500;
-    font-size: 7.5px;
+    font-size: clamp(6.5px, 1.6vw, 8px);
+    line-height: 1.15;
     white-space: nowrap;
   }
 
@@ -4396,8 +4413,8 @@ a,
   }
 
   #auto-farm-container {
-    bottom: 220px !important;
-    /* Override: position above skill bar on tablet */
+    bottom: calc(var(--zolos-action-bottom) + var(--zolos-action-zone-size) + 12px) !important;
+    /* Reserve a separate vertical rail above the full action zone. */
     top: auto !important;
     left: auto !important;
     right: 12px !important;
@@ -4493,9 +4510,15 @@ a,
   }
 
   .hud-btn {
-    padding: 5px 6px;
-    min-width: 52px;
-    flex: 0 0 auto;
+    padding: 5px clamp(2px, 1.2vw, 6px);
+    min-width: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  #hud-bottom .hud-menu-group {
+    flex: 1 1 0;
+    min-width: 0;
   }
 
   .hud-btn span {
@@ -4504,16 +4527,20 @@ a,
 
   .hud-btn small {
     display: block !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-family: var(--font-ui);
     font-weight: 600;
-    font-size: 7.5px;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    line-height: 1.15;
     white-space: nowrap;
   }
 
-  /* Lift mobile controls above the bottom menu bar */
+  /* Keep the action zone above the nav on compact phones too. */
   #mobile-actions {
-    bottom: calc(60px + env(safe-area-inset-bottom));
-    right: calc(8px + env(safe-area-inset-right));
+    bottom: var(--zolos-action-bottom);
+    right: calc(8px + var(--safe-right));
   }
 
   /* Mobile minimap — even smaller */
@@ -4577,6 +4604,66 @@ a,
     width: 100%;
     box-sizing: border-box;
     isolation: isolate;
+  }
+}
+
+/* Tablet/iPad market rows: every grid track may shrink, while long Thai names
+   stay inside their own cell instead of pushing the CTA into its neighbour. */
+@media (max-width: 1024px) {
+  .market-list-header,
+  .market-item-row {
+    grid-template-columns: minmax(0, 2fr) minmax(28px, .75fr) minmax(52px, 1.25fr) minmax(0, 1.55fr) minmax(54px, 1fr);
+  }
+
+  .market-list-header > *,
+  .market-item-row > * {
+    min-width: 0;
+  }
+
+  .market-item-name-cell,
+  .market-item-seller-cell {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.2;
+  }
+
+  .market-item-name-text {
+    min-width: 0;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .market-item-action-cell {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .btn-market-buy,
+  .btn-market-cancel {
+    width: 100%;
+    min-width: 0;
+    padding: 5px 4px;
+    line-height: 1.2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 1024px) and (orientation: portrait) {
+  .market-list-header {
+    font-size: clamp(6px, 1.6vw, 7.5px);
+    letter-spacing: 0;
+  }
+
+  .market-item-row {
+    font-size: clamp(8px, 1.9vw, 10px);
+    padding-inline: 5px;
   }
 }
 
@@ -4919,11 +5006,17 @@ a,
 @media (max-width: 480px) {
 
   /* Smaller screens: tighter action button area */
+  :root {
+    --zolos-bottom-nav-clearance: calc(55px + var(--safe-bottom));
+    --zolos-action-zone-size: clamp(140px, 38vw, 180px);
+    --zolos-action-bottom: calc(var(--zolos-bottom-nav-clearance) + 6px);
+  }
+
   #mobile-actions {
-    width: clamp(140px, 38vw, 180px);
-    height: clamp(140px, 38vw, 180px);
-    bottom: calc(55px + env(safe-area-inset-bottom));
-    right: calc(6px + env(safe-area-inset-right));
+    width: var(--zolos-action-zone-size);
+    height: var(--zolos-action-zone-size);
+    bottom: var(--zolos-action-bottom);
+    right: calc(6px + var(--safe-right));
   }
 
   /* Even smaller minimap */
@@ -4944,11 +5037,17 @@ a,
 
 /* Adjustments for low-height landscape screens */
 @media (max-height: 480px) {
+  :root {
+    --zolos-bottom-nav-clearance: calc(50px + var(--safe-bottom));
+    --zolos-action-zone-size: clamp(130px, 28vh, 180px);
+    --zolos-action-bottom: calc(var(--zolos-bottom-nav-clearance) + 6px);
+  }
+
   #mobile-actions {
-    width: clamp(130px, 28vh, 180px);
-    height: clamp(130px, 28vh, 180px);
-    bottom: calc(50px + env(safe-area-inset-bottom));
-    right: calc(8px + env(safe-area-inset-right));
+    width: var(--zolos-action-zone-size);
+    height: var(--zolos-action-zone-size);
+    bottom: var(--zolos-action-bottom);
+    right: calc(8px + var(--safe-right));
   }
 
   #hud-bottom {
@@ -4957,11 +5056,17 @@ a,
 }
 
 @media (max-height: 380px) {
+  :root {
+    --zolos-bottom-nav-clearance: calc(45px + var(--safe-bottom));
+    --zolos-action-zone-size: clamp(110px, 25vh, 160px);
+    --zolos-action-bottom: calc(var(--zolos-bottom-nav-clearance) + 5px);
+  }
+
   #mobile-actions {
-    width: clamp(110px, 25vh, 160px);
-    height: clamp(110px, 25vh, 160px);
-    bottom: calc(45px + env(safe-area-inset-bottom));
-    right: calc(6px + env(safe-area-inset-right));
+    width: var(--zolos-action-zone-size);
+    height: var(--zolos-action-zone-size);
+    bottom: var(--zolos-action-bottom);
+    right: calc(6px + var(--safe-right));
   }
 }
 

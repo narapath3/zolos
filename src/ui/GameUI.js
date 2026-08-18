@@ -6846,13 +6846,23 @@ export class GameUI {
         #stall-card .stall-listing-name{font-weight:800;font-size:12px;line-height:1.4;
           overflow-wrap:anywhere;word-break:break-word;}
         #stall-card .stall-price{font-size:11px;color:#ffd97a;font-weight:700;font-variant-numeric:tabular-nums;}
-        #stall-card .stall-action{flex:0 0 auto;min-width:58px;min-height:44px;white-space:normal;line-height:1.25;}
+        #stall-card .stall-action{flex:0 1 auto;min-width:58px;min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.25;}
         #stall-card #stall-close{flex:0 0 44px;width:44px;height:44px;}
+        #stall-card .stall-owner-actions{display:flex;gap:8px;margin-top:10px;}
+        #stall-card .stall-owner-actions>button{min-width:0;flex:1 1 0;line-height:1.25;overflow-wrap:anywhere;}
         @media (max-width:768px){
-          #stall-modal{align-items:flex-start;padding:8px 8px 116px;}
+          #stall-modal{align-items:flex-start;padding:8px 8px calc(116px + env(safe-area-inset-bottom));}
           #stall-card{width:100%;max-height:calc(100vh - 132px);max-height:calc(100dvh - 132px);}
           #stall-card .stall-body{padding:12px!important;}
-          #stall-card .stall-listing{align-items:flex-start;gap:8px;}
+          #stall-card .stall-listing{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(56px,auto);align-items:start;gap:8px;}
+          #stall-card .stall-action{width:100%;min-width:0;padding-inline:8px!important;}
+          #stall-card .stall-owner-actions{display:grid;grid-template-columns:1fr;gap:8px;}
+          #stall-card .stall-owner-actions>button{width:100%;}
+        }
+        @media (min-width:769px) and (max-width:1180px) and (pointer:coarse){
+          #stall-card{width:min(680px,calc(100vw - 32px));}
+          #stall-card .stall-listing{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(64px,auto);align-items:start;}
+          #stall-card .stall-owner-actions>button{min-height:48px;}
         }`;
       document.head.appendChild(st);
     }
@@ -6928,7 +6938,7 @@ export class GameUI {
     }).join('') : `<div style="text-align:center;color:#8a7a5a;font-size:12px;padding:22px;">😴 ตอนนี้ไม่มีสินค้าวางขาย</div>`;
 
     const ownerBar = mine ? `
-      <div style="display:flex;gap:8px;margin-top:10px;">
+      <div class="stall-owner-actions">
         <button id="stall-add-items" style="flex:1;border:none;border-radius:10px;padding:9px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(74,163,255,.2);border:1px solid #4aa3ff;color:#9fccff;">➕ เพิ่มสินค้า (ตั้งขายในตลาด)</button>
         <button id="stall-close-shop" style="flex:1;border:none;border-radius:10px;padding:9px;cursor:pointer;font-weight:800;font-size:11px;background:rgba(224,72,58,.2);border:1px solid #e0483a;color:#ffb0a8;">🚫 ปิดร้าน (เก็บแผง)</button>
       </div>` : '';

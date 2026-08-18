@@ -11,6 +11,51 @@ import { MAP_TRACKS } from './MapMusicConfig.js';
 import { youtubeBGM } from './YouTubeBGM.js';
 import { buildPet } from './PetModels.js';
 
+const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", Arial, sans-serif';
+
+/**
+ * Canvas text is rendered separately from DOM text. iPad Safari can choose a
+ * different fallback font and text metric than Android, so never rely on a
+ * single fixed-size fillText for player-controlled Thai shop names.
+ */
+function createHiDPICanvas(width, height) {
+    const canvas = document.createElement('canvas');
+    const dpr = Math.min(2, Math.max(1, Number(globalThis.devicePixelRatio) || 1));
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { canvas, ctx };
+}
+
+function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSize, color, weight = 700) {
+    if (!ctx) return;
+    const original = String(value || '').trim() || 'ร้านค้า';
+    const family = CANVAS_UI_FONT;
+    let text = original;
+    let size = maxSize;
+
+    const setFont = () => { ctx.font = `${weight} ${size}px ${family}`; };
+    setFont();
+    while (size > minSize && ctx.measureText(text).width > maxWidth) {
+        size -= 1;
+        setFont();
+    }
+    if (ctx.measureText(text).width > maxWidth) {
+        const chars = Array.from(text);
+        while (chars.length > 2 && ctx.measureText(`${chars.join('')}…`).width > maxWidth) {
+            chars.pop();
+        }
+        text = `${chars.join('')}…`;
+    }
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(text, x, baseline);
+}
+
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
 export const PET_BOUTIQUE_POSITION = Object.freeze({ x: -10, z: -7 });
@@ -4853,14 +4898,14 @@ export class SceneManager {
             // Featured wares on the counter (up to 3 item emojis)
             const items = stall.items || [];
             if (items.length) {
-                const ic = document.createElement('canvas');
-                ic.width = 384; ic.height = 128;
-                const ictx = ic.getContext('2d');
-                ictx.font = '84px Arial';
-                ictx.textAlign = 'center';
+                const { canvas: ic, ctx: ictx } = createHiDPICanvas(384, 128);
+                if (ictx) {
+                    ictx.font = `84px ${CANVAS_UI_FONT}`;
+                    ictx.textAlign = 'center';
+                }
                 items.slice(0, 3).forEach((it, i) => {
                     const meta = (typeof ITEMS !== 'undefined' && ITEMS[it.item_name]) || null;
-                    ictx.fillText((meta && meta.emoji) || '📦', 64 + i * 128, 96);
+                    if (ictx) ictx.fillText((meta && meta.emoji) || '📦', 64 + i * 128, 96);
                 });
                 const itemSprite = new THREE.Sprite(new THREE.SpriteMaterial({
                     map: new THREE.CanvasTexture(ic), transparent: true
@@ -4871,22 +4916,18 @@ export class SceneManager {
             }
 
             // Glowing shop sign
-            const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 160;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(20, 12, 6, 0.8)';
-            ctx.roundRect(24, 10, 464, 88, 18); ctx.fill();
-            ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 5;
-            ctx.roundRect(24, 10, 464, 88, 18); ctx.stroke();
-            ctx.textAlign = 'center';
-            ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 14;
-            ctx.font = 'bold 44px Arial';
-            ctx.fillStyle = '#ffd97a';
-            ctx.fillText(`🏪 ${stall.shop_name || 'ร้านค้า'}`, 256, 68);
-            ctx.shadowBlur = 0;
-            ctx.font = 'bold 30px Arial';
-            ctx.fillStyle = '#cfe0f0';
-            ctx.fillText(`ร้านของ ${stall.owner_name || '???'}`, 256, 138);
+            const { canvas, ctx } = createHiDPICanvas(768, 240);
+            if (ctx) {
+                ctx.fillStyle = 'rgba(20, 12, 6, 0.8)';
+                ctx.roundRect(36, 15, 696, 132, 26); ctx.fill();
+                ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 7;
+                ctx.roundRect(36, 15, 696, 132, 26); ctx.stroke();
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 18;
+                drawFittedCanvasText(ctx, `🏪 ${stall.shop_name || 'ร้านค้า'}`, 384, 102, 640, 66, 30, '#ffd97a', 700);
+                ctx.shadowBlur = 0;
+                drawFittedCanvasText(ctx, `ร้านของ ${stall.owner_name || '???'}`, 384, 207, 640, 44, 22, '#cfe0f0', 700);
+            }
             const sign = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: new THREE.CanvasTexture(canvas), transparent: true
             }));
@@ -4936,17 +4977,14 @@ export class SceneManager {
         awning.position.set(0, 2.45, 0.1); awning.rotation.x = -0.12;
         group.add(awning);
 
-        const canvas = document.createElement('canvas');
-        canvas.width = 512; canvas.height = 96;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(20, 16, 10, 0.65)';
-        ctx.roundRect(64, 8, 384, 80, 16); ctx.fill();
-        ctx.strokeStyle = '#9a8a6a'; ctx.lineWidth = 4;
-        ctx.roundRect(64, 8, 384, 80, 16); ctx.stroke();
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 36px Arial';
-        ctx.fillStyle = '#cfc4a8';
-        ctx.fillText('🏪 แผงว่าง — เปิดร้านได้!', 256, 60);
+        const { canvas, ctx } = createHiDPICanvas(768, 144);
+        if (ctx) {
+            ctx.fillStyle = 'rgba(20, 16, 10, 0.65)';
+            ctx.roundRect(96, 12, 576, 120, 24); ctx.fill();
+            ctx.strokeStyle = '#9a8a6a'; ctx.lineWidth = 6;
+            ctx.roundRect(96, 12, 576, 120, 24); ctx.stroke();
+            drawFittedCanvasText(ctx, '🏪 แผงว่าง — เปิดร้านได้!', 384, 90, 520, 54, 24, '#cfc4a8', 700);
+        }
         const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
         sign.position.y = 3.1;
         sign.scale.set(2.8, 0.55, 1);

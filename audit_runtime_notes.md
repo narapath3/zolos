@@ -53,3 +53,13 @@ The `เล่นเป็น Guest` action from the persisted splash successful
 การทดสอบต่อจาก game screen: กด Inventory แล้ว browser กลับ `about:blank` อีกครั้ง โดย click screenshot upload ล้มเหลวและ browser_view ยืนยัน URL เป็น about:blank ไม่มี DOM จึงเป็น repeatable lifecycle/runtime finding ไม่ใช่แค่ visual mismatch ต้องตรวจ console/runtime stack และ event handler ของ Inventory ต่อ
 
 รอบ smoke ใหม่หลังเริ่ม phase Inventory/Profile: browser_navigate แสดง splash ปกติพร้อม Guest_6HM8B แต่ click START GAME รายงาน screenshot upload ล้มเหลว และ browser_view ทันทีหลังจากนั้นยืนยัน URL `about:blank` ไม่มี DOM อีกครั้ง จึงพบอาการหลุด blank ซ้ำทั้งที่มีบางรอบก่อนหน้านี้เข้า game ได้ ต้องถือเป็น runtime blocker ที่ยังไม่ผ่าน ไม่ควรแก้ Inventory โดยสันนิษฐานว่า panel handler เป็นสาเหตุจนกว่าจะตรวจ lifecycle/console ของ start-game
+
+
+## Responsive HUD smoke — 2026-08-18
+
+Local app ที่ `127.0.0.1:3001` ตอบ HTTP 200 และหน้า splash แสดงปุ่ม `Guest ใหม่` ตาม implementation ล่าสุด กด START GAME แล้วเข้าสู่ loading/game initialization ได้ โดย extracted DOM แสดง HUD ใหม่ครบ ได้แก่ Bag, My Card, ผจญภัย, สังคม, ระบบ, AUTO และ skill keys 1/2/3
+
+Browser screenshot รอบ game หลัง loading ไม่อัปโหลด จึงยังไม่มี visual confirmation จาก sandbox สำหรับ iPad-sized viewport การยืนยัน iPad จริงต้องทดสอบบน Safari/iPad ภายนอก รอบนี้ไม่พบหลักฐานว่า responsive CSS ทำให้ transition crash แต่ยังไม่ถือเป็น acceptance ของ iPad portrait/landscape
+
+
+Console smoke รอบ responsive: browser context รายงาน viewport 1280×1100, landscape, DPR 1 แต่ query ณ เวลาตรวจไม่พบ `#hud-bottom`, `#mobile-actions`, `#auto-farm-container` หรือ `#stall-modal` จึงน่าจะอยู่ระหว่าง loading/คนละ document lifecycle ไม่ใช่หลักฐานว่ากฎ CSS ไม่ทำงาน และยังไม่ใช้แทนการทดสอบบน iPad Safari จริง
