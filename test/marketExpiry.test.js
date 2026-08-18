@@ -54,7 +54,8 @@ test('stall timestamp comes from server and expiry is enforced on startup and pu
 test('players can choose any vacant vending stand while retaining one shop per user', () => {
   const openStallBlock = syncSource.match(/export async function openVendingStall[\s\S]*?\n}\r?\n\r?\nexport async function closeVendingStall/)?.[0] || '';
   assert.match(openStallBlock, /requestedSlot\s*=\s*null/);
-  assert.match(openStallBlock, /slot\s*=\s*chosenSlot/);
-  assert.match(openStallBlock, /reason:\s*'taken'/);
-  assert.match(openStallBlock, /upsert\(row,\s*\{\s*onConflict:\s*'user_id'\s*\}\)/);
+  assert.match(openStallBlock, /supabase\.rpc\('open_vending_stall'/);
+  assert.match(openStallBlock, /p_requested_slot:\s*requestedSlot/);
+  assert.match(rpcSource, /openVendingStall[\s\S]*?reason: 'taken'/);
+  assert.match(rpcSource, /ON CONFLICT \(user_id\) DO UPDATE/);
 });

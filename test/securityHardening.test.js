@@ -127,3 +127,14 @@ test('character data requires authentication and uses a field allowlist', () => 
   assert.match(data, /characters:[\s\S]*?publicColumns:/);
   assert.match(data, /policy\.read === 'authenticated'/);
 });
+
+const vendingMigration = read('../migrations/20260818_vending_authority.sql');
+
+test('vending stalls use authoritative RPCs instead of generic row writes', () => {
+  assert.match(data, /vending_stalls:[\s\S]*?write: false/);
+  assert.match(gameSync, /supabase\.rpc\('open_vending_stall'/);
+  assert.match(gameSync, /supabase\.rpc\('close_vending_stall'/);
+  assert.match(vendingMigration, /pg_advisory_xact_lock/);
+  assert.match(vendingMigration, /user_id = auth\.uid\(\)/);
+  assert.match(vendingMigration, /REVOKE INSERT, UPDATE, DELETE ON public\.vending_stalls/);
+});

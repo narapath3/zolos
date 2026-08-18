@@ -2483,44 +2483,19 @@ export async function openVendingStall(characterId, ownerName, shopName, appeara
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { ok: false, reason: 'guest' };
 
-        // Use the stand the player clicked. Calls without a requested stand keep
-        // the old first-free fallback for backwards compatibility.
-        const { data: taken } = await supabase.from('vending_stalls').select('slot, user_id');
-        const mine = (taken || []).find(s => s.user_id === user.id);
-        let slot = -1;
-        if (requestedSlot !== null && requestedSlot !== undefined) {
-            const chosenSlot = Number(requestedSlot);
-            if (!Number.isInteger(chosenSlot) || chosenSlot < 0 || chosenSlot >= 8) {
-                return { ok: false, reason: 'invalid_slot' };
-            }
-            const occupiedByAnother = (taken || []).some(
-                s => Number(s.slot) === chosenSlot && s.user_id !== user.id
-            );
-            if (occupiedByAnother) return { ok: false, reason: 'taken' };
-            slot = chosenSlot;
-        } else if (mine) {
-            slot = Number(mine.slot);
-        } else {
-            const usedSlots = new Set((taken || []).map(s => Number(s.slot)));
-            for (let i = 0; i < 8; i++) { if (!usedSlots.has(i)) { slot = i; break; } }
-            if (slot < 0) return { ok: false, reason: 'full' };
-        }
-
-        const row = {
-            user_id: user.id,
-            character_id: characterId,
-            owner_name: ownerName,
-            shop_name: (shopName || 'ร้านค้า').slice(0, 24),
-            slot,
-            appearance: appearance || {},
-        };
-        const { error } = await supabase.from('vending_stalls').upsert(row, { onConflict: 'user_id' });
+        const { data, error } = await supabase.rpc('open_vending_stall', {
+            p_character_id: characterId,
+            p_shop_name: (shopName || 'ร้านค้า').slice(0, 24),
+            p_appearance: appearance || {},
+            p_requested_slot: requestedSlot,
+        });
         if (error) throw error;
+        if (!data?.ok) return data || { ok: false, reason: 'unknown' };
 
         // Nudge everyone to refresh their stall view
         const socket = getSocket();
         if (socket && isSocketConnected()) socket.emit('stall_change', {});
-        return { ok: true, slot, moved: !!mine && Number(mine.slot) !== slot };
+        return data;
     } catch (e) {
         console.error('[Zolos] Failed to open vending stall:', e.message);
         return { ok: false, reason: e.message };
@@ -2532,8 +2507,9 @@ export async function closeVendingStall() {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return false;
-        const { error } = await supabase.from('vending_stalls').delete().eq('user_id', user.id);
+        const { data, error } = await supabase.rpc('close_vending_stall');
         if (error) throw error;
+        if (!data?.ok) return false;
         const socket = getSocket();
         if (socket && isSocketConnected()) socket.emit('stall_change', {});
         return true;

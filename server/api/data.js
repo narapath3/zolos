@@ -56,8 +56,8 @@ const POLICIES = {
     },
     vending_stalls: {
         read: 'public',
-        write: 'own', ownerCol: 'user_id',
-        writable: ['character_id', 'owner_name', 'shop_name', 'slot', 'appearance'],
+        // Stall placement and metadata are checked atomically by vending RPCs.
+        write: false,
     },
     market_history: { read: 'public', write: false },
     character_cards: {

@@ -16,6 +16,8 @@ const RPCS = {
     admin_give_item: ['target_char_id', 'p_item_name', 'p_item_type', 'p_qty', 'p_stats'],
     create_market_listing: ['p_character_id', 'p_item_name', 'p_quantity', 'p_price'],
     cancel_market_listing: ['p_listing_id'],
+    open_vending_stall: ['p_character_id', 'p_shop_name', 'p_appearance', 'p_requested_slot'],
+    close_vending_stall: [],
 };
 
 async function createMarketListing(body, userId) {
@@ -63,6 +65,74 @@ async function createMarketListing(body, userId) {
     });
 }
 
+function sanitizeStallAppearance(value) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const safe = {};
+    for (const key of ['bodyColor', 'hairColor', 'pantsColor', 'gender']) {
+        if (source[key] !== undefined) safe[key] = String(source[key]).slice(0, 32);
+    }
+    return safe;
+}
+
+async function openVendingStall(body, userId) {
+    const characterId = String(body?.p_character_id || '');
+    const shopName = String(body?.p_shop_name || 'ร้านค้า').trim().slice(0, 24) || 'ร้านค้า';
+    const requested = body?.p_requested_slot;
+    const requestedSlot = requested === null || requested === undefined || requested === '' ? null : Number(requested);
+    if (!characterId || (requestedSlot !== null && (!Number.isInteger(requestedSlot) || requestedSlot < 0 || requestedSlot >= 8))) {
+        return { ok: false, reason: 'invalid_slot' };
+    }
+
+    return tx(async (client) => {
+        await client.query("SELECT pg_advisory_xact_lock(hashtextextended('vending:slots', 0))");
+        const { rows: chars } = await client.query(
+            'SELECT id, name FROM characters WHERE id = $1 AND user_id = $2 FOR UPDATE',
+            [characterId, userId],
+        );
+        const character = chars[0];
+        if (!character) return { ok: false, reason: 'not_owner' };
+        const { rows: mineRows } = await client.query(
+            'SELECT id, slot FROM vending_stalls WHERE user_id = $1 FOR UPDATE', [userId],
+        );
+        const mine = mineRows[0];
+        const { rows: occupied } = await client.query(
+            'SELECT slot, user_id FROM vending_stalls WHERE slot BETWEEN 0 AND 7',
+        );
+        let slot = -1;
+        if (requestedSlot !== null) {
+            if (occupied.some(row => Number(row.slot) === requestedSlot && row.user_id !== userId)) {
+                return { ok: false, reason: 'taken' };
+            }
+            slot = requestedSlot;
+        } else if (mine) {
+            slot = Number(mine.slot);
+        } else {
+            const used = new Set(occupied.map(row => Number(row.slot)));
+            for (let i = 0; i < 8; i++) { if (!used.has(i)) { slot = i; break; } }
+            if (slot < 0) return { ok: false, reason: 'full' };
+        }
+        const { rows } = await client.query(
+            `INSERT INTO vending_stalls
+                (user_id, character_id, owner_name, shop_name, slot, appearance)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (user_id) DO UPDATE SET
+                character_id = EXCLUDED.character_id, owner_name = EXCLUDED.owner_name,
+                shop_name = EXCLUDED.shop_name, slot = EXCLUDED.slot,
+                appearance = EXCLUDED.appearance, updated_at = now()
+             RETURNING *`,
+            [userId, characterId, character.name, shopName, slot, sanitizeStallAppearance(body?.p_appearance)],
+        );
+        return { ok: true, slot, moved: !!mine && Number(mine.slot) !== slot, stall: rows[0] };
+    });
+}
+
+async function closeVendingStall(userId) {
+    return tx(async (client) => {
+        await client.query('DELETE FROM vending_stalls WHERE user_id = $1', [userId]);
+        return { ok: true };
+    });
+}
+
 async function cancelMarketListing(body, userId) {
     const listingId = String(body?.p_listing_id || '');
     if (!listingId) return { ok: false, reason: 'bad_listing' };
@@ -106,6 +176,14 @@ export async function callRpc(fn, body, userId) {
     if (fn === 'cancel_market_listing') {
         if (!userId) throw httpErr(401, 'auth required');
         return cancelMarketListing(body, userId);
+    }
+    if (fn === 'open_vending_stall') {
+        if (!userId) throw httpErr(401, 'auth required');
+        return openVendingStall(body, userId);
+    }
+    if (fn === 'close_vending_stall') {
+        if (!userId) throw httpErr(401, 'auth required');
+        return closeVendingStall(userId);
     }
     const argNames = RPCS[fn];
     if (!argNames) throw httpErr(404, `unknown rpc: ${fn}`);
