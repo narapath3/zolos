@@ -83,3 +83,15 @@ test('card mail retries are idempotent and cannot escrow the same request twice'
   assert.match(mailMigration, /pg_advisory_xact_lock/);
   assert.match(mailMigration, /idempotent_replay/);
 });
+
+test('generic character inserts cannot mint non-default progression', () => {
+  assert.match(data, /CHARACTER_CREATE_DEFAULTS/);
+  assert.match(data, /invalid character creation fields/);
+  assert.match(data, /action === 'insert'/);
+});
+
+test('self-host card mail locks the inventory row before escrow', () => {
+  const rpcFunctions = read('../server/api/rpc_functions.sql');
+  assert.match(rpcFunctions, /FROM inventory[\s\S]*ORDER BY quantity DESC LIMIT 1 FOR UPDATE/);
+  assert.match(rpcFunctions, /request_id/);
+});

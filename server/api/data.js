@@ -64,12 +64,28 @@ const SERVER_AUTHORITATIVE_CHARACTER_FIELDS = new Set([
     'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 'atk', 'def',
     'gold', 'zol', 'total_kills', 'play_time', 'updated_at',
 ]);
+const CHARACTER_CREATE_DEFAULTS = Object.freeze({
+    level: 1, exp: 0, hp: 100, max_hp: 100, sp: 50, max_sp: 50,
+    atk: 10, def: 5, gold: 0, zol: 0, total_kills: 0, play_time: 0,
+});
 
 function assertClientWriteAllowed(table, action, values) {
-    if (table !== 'characters' || !['update', 'upsert'].includes(action)) return;
-    const blocked = Object.keys(values || {}).filter(key => SERVER_AUTHORITATIVE_CHARACTER_FIELDS.has(key));
-    if (blocked.length) {
-        throw httpErr(403, `server-authoritative character fields: ${blocked.join(', ')}`);
+    if (table !== 'characters') return;
+    const input = values || {};
+    if (['update', 'upsert'].includes(action)) {
+        const blocked = Object.keys(input).filter(key => SERVER_AUTHORITATIVE_CHARACTER_FIELDS.has(key));
+        if (blocked.length) {
+            throw httpErr(403, `server-authoritative character fields: ${blocked.join(', ')}`);
+        }
+        return;
+    }
+    if (action === 'insert') {
+        const forged = Object.entries(CHARACTER_CREATE_DEFAULTS).filter(([key, expected]) => (
+            Object.hasOwn(input, key) && Number(input[key]) !== expected
+        )).map(([key]) => key);
+        if (forged.length) {
+            throw httpErr(403, `invalid character creation fields: ${forged.join(', ')}`);
+        }
     }
 }
 

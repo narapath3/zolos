@@ -81,7 +81,9 @@ BEGIN
   SELECT * INTO v_recipient FROM characters WHERE id = p_recipient_char_id;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'reason', 'no_recipient'); END IF;
   IF v_recipient.user_id = p_user_id THEN RETURN jsonb_build_object('ok', false, 'reason', 'self'); END IF;
-  SELECT * INTO v_inv FROM inventory WHERE character_id = v_sender.id AND item_name = p_item_name ORDER BY quantity DESC LIMIT 1;
+  SELECT * INTO v_inv FROM inventory
+    WHERE character_id = v_sender.id AND item_name = p_item_name
+    ORDER BY quantity DESC LIMIT 1 FOR UPDATE;
   IF NOT FOUND OR v_inv.quantity < v_qty THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_enough'); END IF;
   IF (v_inv.stats->>'equipped') = 'true' AND (v_inv.quantity - v_qty) < 1 THEN RETURN jsonb_build_object('ok', false, 'reason', 'socketed_reserve'); END IF;
   UPDATE inventory SET quantity = quantity - v_qty WHERE id = v_inv.id;
