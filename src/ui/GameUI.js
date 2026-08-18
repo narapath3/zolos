@@ -5031,6 +5031,21 @@ export class GameUI {
       const bindEmail = document.getElementById('link-account-email');
       const bindPass = document.getElementById('link-account-password');
       const bindStatus = document.getElementById('link-account-status');
+      const guestLinkSection = document.getElementById('settings-guest-link-section');
+      const openAccountLinkBtn = document.getElementById('btn-open-account-link');
+
+      const openAccountLinkSection = () => {
+        tabProfilePane.style.display = 'none';
+        tabSettingsPane.style.display = 'block';
+        tabProfileBtn.classList.remove('active-tab');
+        tabSettingsBtn.classList.add('active-tab');
+        this._syncAudioSettingsUI();
+        this._syncGameplaySettingsUI();
+        guestLinkSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => bindEmail?.focus(), 120);
+      };
+
+      openAccountLinkBtn?.addEventListener('click', openAccountLinkSection);
 
       const combatDetailsToggle = document.getElementById('profile-combat-details-toggle');
       const combatBreakdown = document.getElementById('profile-combat-breakdown');
@@ -5071,17 +5086,18 @@ export class GameUI {
           }
 
           try {
-            if (this.bindAccountCallback) {
-              await this.bindAccountCallback(email, password);
-              if (bindStatus) {
+            if (!this.bindAccountCallback) {
+              throw new Error('ระบบผูกบัญชียังไม่พร้อม กรุณาโหลดเกมใหม่แล้วลองอีกครั้ง');
+            }
+            await this.bindAccountCallback(email, password);
+            if (bindStatus) {
                 bindStatus.textContent = '✅ ผูกบัญชีสำเร็จ! กรุณาจำอีเมลและรหัสผ่านไว้';
                 bindStatus.style.color = '#40e080';
-              }
-              // Hide section after success after a delay
-              setTimeout(() => {
-                this.setGuestMode(false);
-              }, 3000);
             }
+            // Hide section after success after a delay
+            setTimeout(() => {
+              this.setGuestMode(false);
+            }, 3000);
           } catch (err) {
             if (bindStatus) {
               bindStatus.textContent = `❌ ผิดพลาด: ${err.message}`;
@@ -5510,6 +5526,8 @@ export class GameUI {
     if (guestSection) {
       guestSection.style.display = isGuest ? 'block' : 'none';
     }
+    const profileGuestCta = document.getElementById('profile-guest-link-cta');
+    if (profileGuestCta) profileGuestCta.hidden = !isGuest;
     const heroGuest = document.getElementById('profile-hero-guest');
     if (heroGuest) heroGuest.hidden = !isGuest;
   }
@@ -8124,7 +8142,7 @@ export class GameUI {
         this.character.stats.gold += listing.price;
         const reason = (boughtResult && boughtResult.reason) || 'unknown';
         const msg = {
-          guest_account_required: '❌ ต้องผูกบัญชี (อีเมล) ก่อนจึงจะซื้อของจากแผงผู้เล่นได้',
+          guest_account_required: '❌ ต้องผูกบัญชีก่อนจึงจะซื้อของจากแผงผู้เล่นได้ — เปิด ⚙️ Settings & Profile > Settings > ผูกบัญชี Guest',
           own_listing: '❌ ซื้อของที่ตัวเองตั้งขายไม่ได้',
           not_enough_gold: '❌ เงิน Zeny ไม่เพียงพอ',
           no_character: '❌ ไม่พบตัวละคร ลองใหม่อีกครั้ง',

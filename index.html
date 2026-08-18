@@ -1059,6 +1059,14 @@
               <div id="profile-combat-breakdown" class="profile-combat-breakdown" hidden></div>
             </section>
 
+            <section id="profile-guest-link-cta" class="profile-guest-link-cta" hidden>
+              <div class="profile-guest-link-copy">
+                <strong>🔗 ปกป้องตัวละครของคุณ</strong>
+                <span>ผูกอีเมลและรหัสผ่านเพื่อเปิดแผงขายของ และเล่นต่อได้จากเครื่องอื่น</span>
+              </div>
+              <button id="btn-open-account-link" type="button" class="btn-primary">ผูกบัญชี</button>
+            </section>
+
             <div class="form-group">
               <label for="profile-edit-name">👤 Character Name / ชื่อตัวละคร</label>
               <input type="text" id="profile-edit-name" placeholder="ชื่อตัวละคร" maxlength="16" autocomplete="off" />
@@ -1116,6 +1124,22 @@
 
           <!-- Tab 2: Settings -->
           <div id="tab-content-settings" class="tab-pane" style="display: none;">
+
+            <!-- Guest Account Linking Section -->
+            <div id="settings-guest-link-section" class="settings-section guest-link-settings-section" style="display: none;">
+              <div class="settings-section-title">🔗 ผูกบัญชี Guest</div>
+              <p class="settings-hint" style="margin-top: 0; margin-bottom: 14px;">
+                ผูกอีเมลและรหัสผ่านเพื่อป้องกันตัวละครหาย เปิดแผงขายของ และเข้าสู่ระบบจากเครื่องอื่นได้
+              </p>
+              <input type="email" id="link-account-email" class="settings-input" placeholder="อีเมล (Email)" autocomplete="email" />
+              <input type="password" id="link-account-password" class="settings-input"
+                placeholder="รหัสผ่านอย่างน้อย 6 ตัวอักษร" autocomplete="new-password" />
+              <button id="btn-link-account" class="btn-primary settings-btn" type="button"
+                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">
+                ✅ ยืนยันการผูกบัญชี
+              </button>
+              <div id="link-account-status" class="settings-bind-status" role="status" aria-live="polite"></div>
+            </div>
 
             <!-- Audio -->
             <div class="settings-section">
@@ -1262,20 +1286,6 @@
                 แล้วกดปุ่มเดิมอีกครั้งเพื่อบันทึก</p>
             </div>
 
-            <!-- Guest Account Linking Section -->
-            <div id="settings-guest-link-section" class="settings-section" style="display: none;">
-              <div class="settings-section-title">🔗 Bind Account / ผูกบัญชีถาวร</div>
-              <p class="settings-hint" style="margin-top: 0; margin-bottom: 14px;">
-                ผูกบัญชี Guest ด้วย Email และ Password เพื่อป้องกันตัวละครหายและเข้าสู่ระบบจากเครื่องอื่นได้
-              </p>
-              <input type="email" id="link-account-email" class="settings-input" placeholder="อีเมล (Email)" />
-              <input type="password" id="link-account-password" class="settings-input"
-                placeholder="รหัสผ่าน (Password)" />
-              <button id="btn-link-account" class="btn-primary settings-btn"
-                style="margin-top: 12px; background: #40e080 !important; border-color: #30c070 !important; color: #06210f;">⚔️
-                Bind Account / ยืนยันการผูกบัญชี</button>
-              <div id="link-account-status" class="settings-bind-status"></div>
-            </div>
           </div>
 
           <div class="popup-actions">

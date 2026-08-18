@@ -4695,22 +4695,28 @@ a,
 /* iPad landscape: keep the AUTO/FISH rail beside, not above or inside,
    the skill/attack action zone. The horizontal separation is intentional:
    percentage-positioned skill buttons cannot collide with this rail. */
-@media (min-width: 769px) and (max-width: 1180px) and (orientation: landscape) {
+@media (min-width: 769px) and (max-width: 1180px) and (orientation: landscape),
+       (min-width: 1181px) and (max-width: 1366px) and (orientation: landscape) and (pointer: coarse) {
   :root {
     --zolos-bottom-nav-clearance: calc(72px + var(--safe-bottom));
     --zolos-action-zone-size: clamp(170px, 25vw, 196px);
+    --zolos-auto-rail-size: clamp(56px, 5.5vw, 68px);
     --zolos-action-bottom: calc(var(--zolos-bottom-nav-clearance) + 4px);
   }
 
+  /* The auto rail owns the outermost right edge. The skill/attack cluster
+     sits immediately to its left with a fixed gap, so neither can drift
+     toward the middle of the playfield. */
   #mobile-actions {
     width: var(--zolos-action-zone-size);
     height: var(--zolos-action-zone-size);
-    right: calc(16px + var(--safe-right));
+    right: calc(16px + var(--safe-right) + var(--zolos-auto-rail-size) + 12px);
     bottom: var(--zolos-action-bottom) !important;
   }
 
   #auto-farm-container {
-    right: calc(16px + var(--safe-right) + var(--zolos-action-zone-size) + 12px) !important;
+    width: var(--zolos-auto-rail-size);
+    right: calc(16px + var(--safe-right)) !important;
     bottom: var(--zolos-action-bottom) !important;
     top: auto !important;
     flex-direction: column !important;
@@ -7496,6 +7502,37 @@ a,
 .profile-editor-content .eq-slot.empty:hover { opacity: 1; border-color: rgba(255, 215, 99, .72); background: rgba(255, 211, 88, .12); }
 .profile-editor-content .eq-slot-lb { color: #b3d4df; }
 .profile-editor-content .eq-slot.filled .eq-slot-lb { color: #ffe29a; }
+
+.profile-guest-link-cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 13px 14px;
+  border: 1px solid rgba(64, 224, 128, .34);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(64, 224, 128, .14), rgba(8, 24, 48, .48));
+  box-shadow: inset 0 1px rgba(255, 255, 255, .06), 0 8px 20px rgba(0, 0, 0, .16);
+}
+
+.profile-guest-link-cta[hidden] { display: none; }
+.profile-guest-link-copy { display: grid; gap: 4px; min-width: 0; }
+.profile-guest-link-copy strong { color: #bfffd1; font-size: 12px; }
+.profile-guest-link-copy span { color: #a8c9bb; font-size: 10px; line-height: 1.45; }
+.profile-guest-link-cta button { flex: 0 0 auto; white-space: nowrap; }
+
+.guest-link-settings-section {
+  border-color: rgba(64, 224, 128, .42) !important;
+  background: linear-gradient(145deg, rgba(64, 224, 128, .13), rgba(8, 20, 47, .34)) !important;
+}
+.guest-link-settings-section .settings-section-title { color: #aaffc2; }
+.guest-link-settings-section .settings-hint { color: #b6d9c4; }
+
+@media (max-width: 720px) {
+  .profile-guest-link-cta { grid-template-columns: 1fr; }
+  .profile-guest-link-cta button { width: 100%; }
+}
 
 .profile-editor-content .settings-section {
   border-color: rgba(105, 208, 238, .20);

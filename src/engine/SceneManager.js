@@ -4937,7 +4937,10 @@ export class SceneManager {
                 map: new THREE.CanvasTexture(canvas), transparent: true
             }));
             sign.position.y = 3.3;
-            sign.scale.set(3.2, 1.0, 1);
+            const isTouchViewport = /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
+                || window.matchMedia?.('(pointer: coarse)')?.matches;
+            const signScale = isTouchViewport ? 2.55 : 3.2;
+            sign.scale.set(signScale, isTouchViewport ? 0.82 : 1.0, 1);
             group.add(sign);
 
             // Sit on the ground rather than at y = 0: the field still rolls by

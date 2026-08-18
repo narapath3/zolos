@@ -39,13 +39,29 @@ test('in-world stall signs use high-DPI Thai-safe fitted canvas text', () => {
   assert.doesNotMatch(scene, /ctx\.font = 'bold 44px Arial'/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 30px Arial'/);
   assert.match(scene, /ctx\.rect\(x - maxWidth \/ 2 - 2, baseline - size \* 1\.35/);
+  assert.match(scene, /const isTouchViewport = \/Android\|iPad\|iPhone\|iPod\/i\.test\(navigator\.userAgent\)/);
+  assert.match(scene, /const signScale = isTouchViewport \? 2\.55 : 3\.2/);
 });
 
 test('iPad landscape separates the auto rail from the skill and attack zone', () => {
   assert.match(css, /@media \(min-width: 769px\) and \(max-width: 1180px\) and \(orientation: landscape\)/);
-  assert.match(css, /#auto-farm-container\s*\{[\s\S]*right: calc\(16px \+ var\(--safe-right\) \+ var\(--zolos-action-zone-size\) \+ 12px\)/);
-  assert.match(css, /#mobile-actions\s*\{[\s\S]*right: calc\(16px \+ var\(--safe-right\)\)/);
+  assert.match(css, /\(min-width: 1181px\) and \(max-width: 1366px\) and \(orientation: landscape\) and \(pointer: coarse\)/);
+  assert.match(css, /#auto-farm-container\s*\{[\s\S]*right: calc\(16px \+ var\(--safe-right\)\)/);
+  assert.match(css, /--zolos-auto-rail-size: clamp\(56px, 5\.5vw, 68px\)/);
+  assert.match(css, /#mobile-actions\s*\{[\s\S]*right: calc\(16px \+ var\(--safe-right\) \+ var\(--zolos-auto-rail-size\) \+ 12px\)/);
   assert.match(css, /\.btn-auto,[\s\S]*\.btn-fishing\s*\{[\s\S]*width: clamp\(44px, 5vw, 52px\)/);
   assert.match(css, /#auto-farm-container > \.btn-auto,[\s\S]*#auto-farm-container > \.btn-fishing[\s\S]*position: relative;[\s\S]*flex: 0 0 auto/);
   assert.match(css, /#auto-farm-container\s*\{[\s\S]*isolation: isolate;[\s\S]*z-index: 1600 !important/);
+});
+
+test('guest account linking is discoverable from Profile and Settings', () => {
+  const index = read('../index.html');
+  assert.match(index, /id="profile-guest-link-cta"/);
+  assert.match(index, /id="btn-open-account-link"/);
+  assert.match(index, /id="settings-guest-link-section"/);
+  assert.match(index, /autocomplete="email"/);
+  assert.match(gameUI, /openAccountLinkBtn\?\.addEventListener\('click', openAccountLinkSection\)/);
+  assert.match(gameUI, /profileGuestCta\.hidden = !isGuest/);
+  assert.match(gameUI, /ระบบผูกบัญชียังไม่พร้อม/);
+  assert.match(gameUI, /Settings & Profile > Settings > ผูกบัญชี Guest/);
 });
