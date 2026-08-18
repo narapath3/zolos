@@ -73,3 +73,13 @@ test('remote marketplace client paths use atomic RPCs and avoid double inventory
   assert.match(gameUI, /const serverAuthoritative = boughtResult\.serverAuthoritative === true/);
   assert.match(gameUI, /if \(!serverAuthoritative && this\.characterId\)/);
 });
+
+const mailMigration = read('../migrations/20260818_card_mail_idempotency.sql');
+
+test('card mail retries are idempotent and cannot escrow the same request twice', () => {
+  assert.match(gameSync, /p_request_id: idempotencyKey/);
+  assert.match(rpc, /send_card_mail: \['p_recipient_char_id',[\s\S]*'p_request_id'\]/);
+  assert.match(mailMigration, /CREATE UNIQUE INDEX IF NOT EXISTS card_mailbox_sender_request_uidx/);
+  assert.match(mailMigration, /pg_advisory_xact_lock/);
+  assert.match(mailMigration, /idempotent_replay/);
+});

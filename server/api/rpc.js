@@ -8,7 +8,7 @@ import { cleanupExpiredVendingStalls } from './marketExpiry.js';
 // name -> ordered arg names the CLIENT supplies (p_user_id is prepended from JWT)
 const RPCS = {
     buy_market_item: ['p_listing_id'],
-    send_card_mail: ['p_recipient_char_id', 'p_item_name', 'p_item_type', 'p_quantity', 'p_price', 'p_stats'],
+    send_card_mail: ['p_recipient_char_id', 'p_item_name', 'p_item_type', 'p_quantity', 'p_price', 'p_stats', 'p_request_id'],
     claim_card_mail: ['p_mail_id'],
     return_card_mail: ['p_mail_id'],
     admin_update_character: ['target_char_id', 'updates'],

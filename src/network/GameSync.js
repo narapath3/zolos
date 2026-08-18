@@ -481,9 +481,12 @@ export async function searchCharactersByName(query) {
 // ===== Card Mailbox (offline P2P card delivery via escrow) =====
 
 // Escrow a card into the recipient's mailbox. Returns the RPC result jsonb
-// ({ ok, reason?, mail_id?, recipient_name? }).
-export async function sendCardMail(recipientCharId, itemName, itemType, quantity, price, stats = {}) {
+// ({ ok, reason?, mail_id?, recipient_name? }). A request id makes a retry of
+// the same network operation resolve to the original escrow instead of sending
+// another copy.
+export async function sendCardMail(recipientCharId, itemName, itemType, quantity, price, stats = {}, requestId = null) {
     if (isOfflineMode || !supabase) return { ok: false, reason: 'offline' };
+    const idempotencyKey = requestId || `mail_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
     try {
         const { data, error } = await supabase.rpc('send_card_mail', {
             p_recipient_char_id: recipientCharId,
@@ -492,6 +495,7 @@ export async function sendCardMail(recipientCharId, itemName, itemType, quantity
             p_quantity: quantity,
             p_price: price || 0,
             p_stats: stats || {},
+            p_request_id: idempotencyKey,
         });
         if (error) { console.error('[Mail] send error:', error.message); return { ok: false, reason: 'error' }; }
         return data || { ok: false, reason: 'error' };

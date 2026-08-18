@@ -61,13 +61,20 @@ BEGIN
     'seller_name', v_listing.seller_name, 'stats', COALESCE(v_listing.stats, '{}'::jsonb));
 END $function$;
 
-CREATE OR REPLACE FUNCTION public.send_card_mail(p_user_id uuid, p_recipient_char_id text, p_item_name text, p_item_type text, p_quantity integer, p_price integer, p_stats jsonb)
+CREATE OR REPLACE FUNCTION public.send_card_mail(p_user_id uuid, p_recipient_char_id text, p_item_name text, p_item_type text, p_quantity integer, p_price integer, p_stats jsonb, p_request_id text)
 RETURNS jsonb LANGUAGE plpgsql AS $function$
 DECLARE
-  v_sender characters%ROWTYPE; v_recipient characters%ROWTYPE; v_inv inventory%ROWTYPE;
+  v_sender characters%ROWTYPE; v_recipient characters%ROWTYPE; v_inv inventory%ROWTYPE; v_existing card_mailbox%ROWTYPE;
   v_qty integer := floor(p_quantity)::int; v_price integer := GREATEST(0, floor(p_price)::int); v_mail_id uuid;
 BEGIN
   IF p_user_id IS NULL THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_authed'); END IF;
+  IF p_request_id IS NULL OR p_request_id !~ '^[A-Za-z0-9:_-]{1,160}$' THEN RETURN jsonb_build_object('ok', false, 'reason', 'invalid_request'); END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_user_id::text || ':' || p_request_id, 0));
+  SELECT * INTO v_existing FROM card_mailbox WHERE sender_user_id = p_user_id AND request_id = p_request_id;
+  IF FOUND THEN
+    RETURN jsonb_build_object('ok', true, 'mail_id', v_existing.id,
+      'recipient_char_id', v_existing.recipient_char_id, 'idempotent_replay', true);
+  END IF;
   IF v_qty < 1 THEN RETURN jsonb_build_object('ok', false, 'reason', 'bad_quantity'); END IF;
   SELECT * INTO v_sender FROM characters WHERE user_id = p_user_id ORDER BY created_at LIMIT 1;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'reason', 'no_character'); END IF;
@@ -79,8 +86,8 @@ BEGIN
   IF (v_inv.stats->>'equipped') = 'true' AND (v_inv.quantity - v_qty) < 1 THEN RETURN jsonb_build_object('ok', false, 'reason', 'socketed_reserve'); END IF;
   UPDATE inventory SET quantity = quantity - v_qty WHERE id = v_inv.id;
   DELETE FROM inventory WHERE id = v_inv.id AND quantity <= 0;
-  INSERT INTO card_mailbox (sender_char_id, sender_user_id, sender_name, recipient_char_id, recipient_user_id, item_name, item_type, quantity, price, stats)
-  VALUES (v_sender.id, p_user_id, v_sender.name, v_recipient.id, v_recipient.user_id, p_item_name, COALESCE(p_item_type, 'card'), v_qty, v_price, COALESCE(p_stats, '{}'::jsonb))
+  INSERT INTO card_mailbox (sender_char_id, sender_user_id, sender_name, recipient_char_id, recipient_user_id, item_name, item_type, quantity, price, stats, request_id)
+  VALUES (v_sender.id, p_user_id, v_sender.name, v_recipient.id, v_recipient.user_id, p_item_name, COALESCE(p_item_type, 'card'), v_qty, v_price, COALESCE(p_stats, '{}'::jsonb), p_request_id)
   RETURNING id INTO v_mail_id;
   RETURN jsonb_build_object('ok', true, 'mail_id', v_mail_id, 'recipient_name', v_recipient.name, 'recipient_char_id', v_recipient.id);
 END $function$;
