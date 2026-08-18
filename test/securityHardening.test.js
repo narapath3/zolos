@@ -8,6 +8,8 @@ const data = read('../server/api/data.js');
 const server = read('../server/server.js');
 const gameUI = read('../src/ui/GameUI.js');
 const profileModal = read('../src/ui/PlayerProfileModal.js');
+const authUI = read('../src/ui/AuthUI.js');
+const indexHtml = read('../index.html');
 const main = read('../src/main.js');
 const offlineAuth = read('../src/network/SupabaseClient.js');
 
@@ -172,4 +174,11 @@ test('connected sessions fail closed for client-only reward paths', () => {
   assert.match(gameUI, /_spinRoulette\(\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
   assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)/);
   assert.match(main, /case 'fishCaught':[\s\S]*gameUI && gameUI\._onlineSessionWithoutAuthority\?\.\(\)/);
+});
+
+test('guest splash distinguishes a new guest from resuming the active session', () => {
+  assert.match(indexHtml, /<span>Guest ใหม่<\/span>/);
+  assert.match(authUI, /START GAME above/);
+  assert.match(authUI, /_splashGuestLabelEl\.textContent = 'Guest ใหม่'/);
+  assert.match(authUI, /เริ่ม Guest ใหม่ — START GAME ใช้สำหรับกลับเข้า session เดิม/);
 });

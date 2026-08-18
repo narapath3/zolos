@@ -95,6 +95,7 @@ export class AuthUI {
         this._splashAltEl = document.getElementById('auth-splash-alt');
         this._splashSwitchBtn = document.getElementById('btn-splash-switch');
         this._splashGuestBtn = document.getElementById('btn-splash-guest');
+        this._splashGuestLabelEl = this._splashGuestBtn?.querySelector('span');
         this._splashStartBtn = document.getElementById('auth-splash-start-btn');
 
         if (this._startBtn) {
@@ -129,7 +130,9 @@ export class AuthUI {
                 this._handleSignOut();
             });
         }
-        // "เล่นเป็น Guest" straight from the splash.
+        // "Guest ใหม่" starts a fresh anonymous identity; START GAME above
+        // resumes the welcome-back session. Keeping those semantics explicit
+        // prevents accidental loss of the player's expected guest identity.
         if (this._splashGuestBtn) {
             this._splashGuestBtn.addEventListener('click', () => this._handleGuest());
         }
@@ -372,11 +375,17 @@ export class AuthUI {
         }
         if (this._welcomeEl) this._welcomeEl.style.display = 'flex';
         if (this._splashAltEl) this._splashAltEl.style.display = 'flex';
+        if (this._splashGuestLabelEl) this._splashGuestLabelEl.textContent = 'Guest ใหม่';
+        this._splashGuestBtn?.setAttribute('aria-label', 'เริ่ม Guest ใหม่ — START GAME ใช้สำหรับกลับเข้า session เดิม');
+        this._splashGuestBtn?.setAttribute('title', 'เริ่ม Guest ใหม่ (START GAME เพื่อกลับเข้าเกมเดิม)');
     }
 
     _hideWelcomeChip() {
         if (this._welcomeEl) this._welcomeEl.style.display = 'none';
         if (this._splashAltEl) this._splashAltEl.style.display = 'none';
+        if (this._splashGuestLabelEl) this._splashGuestLabelEl.textContent = 'Guest ใหม่';
+        this._splashGuestBtn?.setAttribute('aria-label', 'เริ่ม Guest ใหม่');
+        this._splashGuestBtn?.setAttribute('title', 'เริ่ม Guest ใหม่');
     }
 
     _showSessionMode(username) {
