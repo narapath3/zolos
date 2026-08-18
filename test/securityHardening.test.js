@@ -35,3 +35,17 @@ test('offline fallback never creates new plaintext password records', () => {
   assert.match(offlineAuth, /password_hash: await hashOfflinePassword\(password\)/);
   assert.match(offlineAuth, /delete user\.password/);
 });
+
+const combat = read('../src/engine/CombatSystem.js');
+
+test('connected sessions block local monster progression without server authority', () => {
+  assert.match(combat, /isSocketConnected\(\) && window\.__serverMonsters !== true/);
+  assert.match(combat, /if \(this\._onlineSessionWithoutAuthority\(\)\) return;/);
+  assert.match(combat, /const allowLocalReward = reward && !this\._onlineSessionWithoutAuthority\(\)/);
+});
+
+test('generic character writes reject client-owned progression and freshness fields', () => {
+  assert.match(data, /SERVER_AUTHORITATIVE_CHARACTER_FIELDS/);
+  assert.match(data, /server-authoritative character fields/);
+  assert.match(data, /assertClientWriteAllowed\(table, action, spec\.values \|\| \{\}\)/);
+});

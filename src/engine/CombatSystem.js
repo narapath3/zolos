@@ -1,6 +1,7 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
 import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS, getPetCombat } from './GameData.js';
+import { isSocketConnected } from '../network/SocketClient.js';
 
 export function buildAutoSearchWaypoints({ halfExtent = 46, step = 11, isBlocked = () => false } = {}) {
     const points = [];
@@ -411,6 +412,7 @@ export class CombatSystem {
     // and rewards stay consistent. Emits a `petAttack` event for the visuals.
     _petStrike(monster, combat) {
         if (!monster || !monster.alive) return;
+        if (this._onlineSessionWithoutAuthority()) return;
         const isCritical = Math.random() < combat.crit;
         let dmg = combat.atk + Math.floor(Math.random() * combat.variance);
         if (isCritical) dmg = Math.floor(dmg * 1.8);
@@ -469,6 +471,11 @@ export class CombatSystem {
 
     _resolveDamage(monster, weaponClass = null) {
         if (!monster || !monster.alive) return;
+        // Never let a connected multiplayer session fall back to client-owned
+        // progression while the server has not declared its authoritative mode.
+        // This sacrifices PvE temporarily during a bad deployment rather than
+        // allowing the browser to mint EXP, gold, and loot.
+        if (this._onlineSessionWithoutAuthority()) return;
 
         // Player attacks monster. Card sockets can raise crit chance and add a
         // flat damage multiplier on top of the base 10%.
@@ -571,8 +578,9 @@ export class CombatSystem {
     // and we never touched it, so bystanders don't farm kills for free.
     _onMonsterKilled(monster, reward = true) {
         const data = monster.data;
+        const allowLocalReward = reward && !this._onlineSessionWithoutAuthority();
 
-        if (reward) {
+        if (allowLocalReward) {
             // EXP
             const leveledUp = this.character.addExp(data.exp);
             this.onEvent({
@@ -650,6 +658,14 @@ export class CombatSystem {
     handleRemoteKill(monster) {
         if (!monster) return;
         this._onMonsterKilled(monster, monster._localContributed === true);
+    }
+
+    _onlineSessionWithoutAuthority() {
+        try {
+            return isSocketConnected() && window.__serverMonsters !== true;
+        } catch {
+            return false;
+        }
     }
 
     _updateFishing(dt) {

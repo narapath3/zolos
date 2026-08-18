@@ -60,6 +60,18 @@ const POLICIES = {
 };
 
 const SAFE_OPS = new Set(['eq', 'neq', 'in', 'gt', 'gte', 'lt', 'lte']);
+const SERVER_AUTHORITATIVE_CHARACTER_FIELDS = new Set([
+    'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp', 'atk', 'def',
+    'gold', 'zol', 'total_kills', 'play_time', 'updated_at',
+]);
+
+function assertClientWriteAllowed(table, action, values) {
+    if (table !== 'characters' || !['update', 'upsert'].includes(action)) return;
+    const blocked = Object.keys(values || {}).filter(key => SERVER_AUTHORITATIVE_CHARACTER_FIELDS.has(key));
+    if (blocked.length) {
+        throw httpErr(403, `server-authoritative character fields: ${blocked.join(', ')}`);
+    }
+}
 
 // cache real columns per table so we only ever reference existing columns
 const colCache = new Map();
@@ -164,6 +176,7 @@ export async function runQuery(spec, userId) {
         const values = Array.isArray(spec.values) ? spec.values : [spec.values || {}];
         const results = [];
         for (const v of values) {
+            assertClientWriteAllowed(table, action, v);
             const row = sanitizeWrite(policy, v, cols);
             // stamp/verify ownership
             await enforceInsertOwnership(policy, row, userId);
@@ -200,6 +213,7 @@ export async function runQuery(spec, userId) {
     }
 
     if (action === 'update') {
+        assertClientWriteAllowed(table, action, spec.values || {});
         const row = sanitizeWrite(policy, spec.values || {}, cols);
         const keys = Object.keys(row);
         if (!keys.length) throw httpErr(400, 'no writable fields');
