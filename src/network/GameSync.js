@@ -1086,8 +1086,9 @@ export async function migrateGuestToAccount(email, password, guest) {
     if (isOfflineMode || !supabase) throw new Error('ไม่สามารถผูกบัญชีในโหมดออฟไลน์');
     if (!guest) throw new Error('ไม่พบข้อมูลตัวละคร');
 
-    const username = guest.name || 'Adventurer';
-    const gender = guest.gender || 'male';
+    const username = String(guest.name || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
+    const requestedGender = String(guest.gender || 'male').toLowerCase();
+    const gender = ['male', 'female'].includes(requestedGender) ? requestedGender : 'male';
 
     // 1. Create the real account (auto-signs-in when email confirmation is off)
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
@@ -1115,18 +1116,15 @@ export async function migrateGuestToAccount(email, password, guest) {
     // 3. Profile
     try { await supabase.from('profiles').upsert({ id: newUserId, username, gender }); } catch (e) { /* non-fatal */ }
 
-    // 4. Character row — carry over the guest's stats (strip non-DB fields)
-    const s = { ...(guest.stats || {}) };
-    delete s.id; delete s.sound_enabled; delete s.graphics_quality; delete s.fps_enabled;
+    // 4. Character row — never trust local guest progression. The guest state
+    // is browser-controlled and can be edited before binding; the new account
+    // starts from server defaults instead of importing level/gold/exp/equipment.
     const charInsert = {
-        // `id` is a NOT NULL text PK with no DB default — set it client-side
-        // exactly like createCharacter() does for registrations.
         id: 'char_' + Math.random().toString(36).substring(2, 10),
         user_id: newUserId,
         name: username,
         gender,
-        last_map: (guest.stats && guest.stats.last_map) || 'prontera_field',
-        ...s,
+        last_map: 'prontera_field',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
@@ -1144,13 +1142,13 @@ export async function migrateGuestToAccount(email, password, guest) {
         return false;
     };
 
-    // 5. Inventory — each item retried; anything that still fails is reported
-    // back to the caller instead of vanishing quietly.
+    // 5. Inventory — local guest rows are untrusted. Give only the canonical
+    // starter weapon; all forged level/gold/item stacks are intentionally reset.
     const failedItems = [];
+    const starterOk = await withRetry(() => saveInventoryItem(newCharId, 'Sword', 'weapon', 1, { equipped: true }));
+    if (!starterOk) failedItems.push('Sword');
     for (const it of (guest.inventory || [])) {
-        if (!it || !it.item_name || !it.quantity) continue;
-        const ok = await withRetry(() => saveInventoryItem(newCharId, it.item_name, it.item_type || 'material', it.quantity, it.stats || {}));
-        if (!ok) failedItems.push(it.item_name);
+        if (it?.item_name && it.item_name !== 'Sword' && Number(it.quantity) > 0) failedItems.push(String(it.item_name));
     }
 
     // 6. System collections (friends / daily quests / fishing almanac / login streak)
