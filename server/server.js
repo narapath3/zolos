@@ -37,7 +37,6 @@ import {
     resolveTrustedMap,
     sanitizeSaveUpdates,
     serializeOnlinePlayer,
-    sanitizeInventoryBackup,
     sanitizeRemoteAppearance,
     validateMovement,
     shouldRateLimitEvent,
@@ -1734,11 +1733,8 @@ async function saveCharacterToSupabase(saveData) {
                     .from('characters')
                     .update(filtered)
                     .eq('id', characterId);
-                if (error) {
-                    throw error;
-                } else {
-                    console.log(`[Server] 💾 Saved character: ${characterId}`);
-                }
+                if (error) throw error;
+                else console.log(`[Server] 💾 Saved character: ${characterId}`);
             }
         }
 
@@ -1802,23 +1798,13 @@ async function saveCharacterToSupabase(saveData) {
             }
         }
 
-        // 4. Save full inventory (Safety backup)
-        if (inventory && Array.isArray(inventory)) {
-            try {
-                const sanitized = sanitizeInventoryBackup(inventory);
-                // Batch update inventory items that have stats
-                const itemsWithStats = sanitized.filter(i => i.stats && Object.keys(i.stats).length > 0);
-                for (const item of itemsWithStats) {
-                    const { error } = await supabase
-                        .from('inventory')
-                        .update({ stats: item.stats })
-                        .eq('character_id', characterId)
-                        .eq('item_name', item.item_name);
-                    if (error) throw error;
-                }
-            } catch (e) {
-                throw new Error(`Save inventory backup failed: ${e.message}`);
-            }
+        // 4. Do not apply a client inventory snapshot here. Even a sanitized
+        // snapshot still lets a connected browser overwrite server-owned item
+        // stats (refine/cards/equipment) through the service-role save path.
+        // Inventory mutations now come from authoritative monster/economy RPCs;
+        // system snapshots are persisted through their explicit fields above.
+        if (inventory && Array.isArray(inventory) && inventory.length > 0) {
+            console.warn(`[Server] 🚫 Ignored client inventory backup for ${characterId}; inventory is server-authoritative`);
         }
         return true;
     } catch (err) {

@@ -113,3 +113,11 @@ test('system inventory snapshots carry an explicit item identity on stats update
   assert.match(gameSync, /update\(\{ stats: questData \}\)[\s\S]*eq\('item_name', 'daily_quests'\)/);
   assert.match(gameSync, /stats: \{ list: friendsList \}[\s\S]*eq\('item_name', 'friends_list'\)/);
 });
+
+const serverSource = read('../server/server.js');
+
+test('save_state never persists a client inventory snapshot through service role', () => {
+  assert.match(serverSource, /Ignored client inventory backup/);
+  assert.match(serverSource, /inventory is server-authoritative/);
+  assert.doesNotMatch(serverSource, /const sanitized = sanitizeInventoryBackup\(inventory\)/);
+});
