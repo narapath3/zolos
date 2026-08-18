@@ -54,8 +54,9 @@ const POLICIES = {
     market_history: { read: 'public', write: false },
     character_cards: {
         read: 'own_via_character',
-        write: 'own_via_character',
-        writable: ['character_id', 'card_id', 'owned', 'stars', 'pity'],
+        // Collection counts, stars, and pity are server-owned. Mutations go
+        // through card fusion/refine/economy RPCs, never generic /db writes.
+        write: false,
     },
 };
 

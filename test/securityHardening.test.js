@@ -95,3 +95,8 @@ test('self-host card mail locks the inventory row before escrow', () => {
   assert.match(rpcFunctions, /FROM inventory[\s\S]*ORDER BY quantity DESC LIMIT 1 FOR UPDATE/);
   assert.match(rpcFunctions, /request_id/);
 });
+
+test('character card collection is read-only through the generic data API', () => {
+  assert.match(data, /character_cards:[\s\S]*?write: false/);
+  assert.match(data, /Collection counts, stars, and pity are server-owned/);
+});
