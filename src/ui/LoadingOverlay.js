@@ -70,12 +70,12 @@ export class LoadingOverlay {
                     <div class="loading-crest-wrap">
                         <div class="crest-glow-ring"></div>
                         <div class="crest-particle-aura"></div>
-                        <img src="/assets/zolos_icon.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="ZOLOS Emblem" class="loading-crest-img" />
+                        <img src="/src/assets/zolos_soft_mascot_emblem.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="ZOLOS Emblem" class="loading-crest-img" />
                     </div>
 
                     <!-- Title & Tagline -->
-                    <h1 class="loading-title">ZOLOS</h1>
-                    <div class="loading-subtitle">REALM OF ADVENTURERS</div>
+                    <img src="/src/assets/zolos_wordmark_soft.png" onerror="this.onerror=null;this.src='/favicon.svg';" alt="ZOLOS.ONLINE" class="loading-wordmark" />
+                    <div class="loading-subtitle">~ PROMISED REALM OF MIDGARD ~</div>
 
                     <!-- Main Progress Container -->
                     <div class="loading-bar-wrapper">
