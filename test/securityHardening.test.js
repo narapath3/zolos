@@ -18,7 +18,7 @@ test('production self-host auth refuses a missing or weak JWT secret', () => {
 test('public profile reads use an allowlist and cannot request is_admin', () => {
   assert.match(data, /publicColumns: \['id', 'username', 'gender', 'created_at'\]/);
   assert.match(data, /public column not available/);
-  assert.match(data, /const publicColumns = policy\.read === 'public'/);
+  assert.match(data, /const publicColumns = \['public', 'authenticated'\]\.includes\(policy\.read\)/);
 });
 
 test('local Postgres defaults to server-authoritative monster rewards', () => {
@@ -120,4 +120,10 @@ test('save_state never persists a client inventory snapshot through service role
   assert.match(serverSource, /Ignored client inventory backup/);
   assert.match(serverSource, /inventory is server-authoritative/);
   assert.doesNotMatch(serverSource, /const sanitized = sanitizeInventoryBackup\(inventory\)/);
+});
+
+test('character data requires authentication and uses a field allowlist', () => {
+  assert.match(data, /characters:[\s\S]*?read: 'authenticated'/);
+  assert.match(data, /characters:[\s\S]*?publicColumns:/);
+  assert.match(data, /policy\.read === 'authenticated'/);
 });

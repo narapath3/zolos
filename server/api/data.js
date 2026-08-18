@@ -10,7 +10,15 @@ import { httpErr } from './auth.js';
 //   'own_via_character' — row.character_id must belong to a character owned by the user
 const POLICIES = {
     characters: {
-        read: 'public',
+        // Character rows are visible to logged-in players for leaderboard/profile
+        // features, but anonymous callers must not enumerate IDs or gameplay state.
+        read: 'authenticated',
+        publicColumns: [
+            'id', 'user_id', 'name', 'level', 'exp', 'hp', 'max_hp', 'sp', 'max_sp',
+            'atk', 'def', 'gold', 'zol', 'total_kills', 'play_time', 'weapon', 'hat',
+            'glasses', 'shield', 'armor', 'gender', 'last_map', 'job', 'body_color',
+            'hair_color', 'pants_color', 'appearance', 'mmr', 'pvp_wins', 'pvp_losses',
+        ],
         write: 'own', ownerCol: 'user_id',
         // characters.id is a client-style text id (char_xxx), no DB default
         genId: () => 'char_' + Math.random().toString(36).slice(2, 10),
@@ -177,13 +185,15 @@ export async function runQuery(spec, userId) {
     }
 
     if (action === 'select') {
-        if (policy.read !== 'public') {
+        if (policy.read === 'authenticated') {
+            if (!userId) throw httpErr(401, 'auth required');
+        } else if (policy.read !== 'public') {
             const own = ownershipClause(policy, userId, params, false);
             if (!userId || !own) throw httpErr(401, 'auth required');
             whereParts.push(own);
         }
         let sel = '*';
-        const publicColumns = policy.read === 'public' && Array.isArray(policy.publicColumns)
+        const publicColumns = ['public', 'authenticated'].includes(policy.read) && Array.isArray(policy.publicColumns)
             ? new Set(policy.publicColumns)
             : null;
         if (Array.isArray(spec.columns)) {
