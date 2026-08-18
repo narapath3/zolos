@@ -20,7 +20,7 @@
 |---|---|---|
 | Browser runtime | เปิด local app ที่ `127.0.0.1:3001`, เปิด auth, Guest, loading, job, daily reward และ game HUD | ทำงานถึงหน้าเกมจริง; พบ resource state mismatch และ navigation anomaly |
 | Static source audit | Auth, generic `/api/db`, Socket.IO handlers, save pipeline, combat, admin API, profile rendering | พบและแก้จุดเสี่ยงที่ยืนยันได้หลายรายการ |
-| Regression tests | `npm test` | ผ่าน 438/438 |
+| Regression tests | `npm test` | ผ่าน 456/456 |
 | Production build | `npm run build` | ผ่าน; เหลือเฉพาะคำเตือน chunk size และ ineffective dynamic import |
 | Dependency audit | `npm audit --omit=dev` | 0 vulnerabilities หลังอัปเดต Socket.IO parser |
 | Production safety | ไม่ทำ mutation หรือ exploit บน VPS/บริการจริง | ไม่มีการเปลี่ยนแปลง production ระหว่าง audit |
@@ -115,7 +115,7 @@ Guest login เข้าสู่เกมจริง สร้างตัว�
 
 การตรวจรอบนี้เพิ่ม regression tests สำหรับ security hardening และได้ผลดังนี้:
 
-- `npm test`: **438/438 ผ่าน**
+- `npm test`: **456/456 ผ่าน**
 - `npm run build`: **ผ่าน**
 - `npm audit --omit=dev`: **0 vulnerabilities**
 - `node --check`: ไฟล์ที่แก้ใน frontend และ server ผ่าน syntax check
