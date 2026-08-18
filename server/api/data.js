@@ -91,7 +91,12 @@ function assertClientWriteAllowed(table, action, values, filters = []) {
             const isSystemSnapshotWrite = input.item_type === 'system' && SYSTEM_INVENTORY_ITEMS.has(input.item_name);
             const isStarterSword = input.item_name === 'Sword' && input.item_type === 'weapon'
                 && Number(input.quantity) === 1;
-            if (!isSystemSnapshotWrite && !isStarterSword) {
+            const starterStats = input.stats && typeof input.stats === 'object' && !Array.isArray(input.stats)
+                ? input.stats : {};
+            const starterStatsSafe = isStarterSword
+                && Object.keys(starterStats).every(key => key === 'equipped')
+                && (starterStats.equipped === undefined || typeof starterStats.equipped === 'boolean');
+            if (!isSystemSnapshotWrite && !starterStatsSafe) {
                 throw httpErr(403, 'inventory grants must come from server-authoritative rewards');
             }
         } else if (action === 'update') {

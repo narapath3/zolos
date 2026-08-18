@@ -148,3 +148,8 @@ test('market purchases lock the buyer balance before settlement', () => {
   assert.match(marketBuyMigration, /CREATE OR REPLACE FUNCTION public\.buy_market_item\(p_listing_id uuid\)/);
   assert.match(marketBuyMigration, /FROM public\.characters[\s\S]*LIMIT 1 FOR UPDATE/);
 });
+
+test('starter Sword inventory exception cannot carry forged combat stats', () => {
+  assert.match(data, /starterStatsSafe/);
+  assert.match(data, /Object\.keys\(starterStats\)\.every\(key => key === 'equipped'\)/);
+});
