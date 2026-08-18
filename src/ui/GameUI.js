@@ -5280,6 +5280,36 @@ export class GameUI {
           uidDisplay.textContent = `UID: #${uid}`;
         }
         this._renderProfileJob();
+
+        // Character Hero Header — keep the summary in sync with the existing
+        // profile fields and live character state.
+        const heroName = document.getElementById('profile-hero-name');
+        const heroLevel = document.getElementById('profile-hero-level');
+        const heroJob = document.getElementById('profile-hero-job');
+        const heroEmoji = document.getElementById('profile-hero-job-emoji');
+        const heroStatus = document.getElementById('profile-hero-status');
+        const heroGuest = document.getElementById('profile-hero-guest');
+        const heroUid = document.getElementById('profile-hero-uid');
+        const heroPower = document.getElementById('profile-hero-power');
+        const heroStats = this.character.stats || {};
+        const heroJobInfo = JOBS[heroStats.job] || null;
+        const heroLevelValue = Number(heroStats.level) || 1;
+        const heroNameValue = heroStats.name || 'Adventurer';
+        if (heroName) heroName.textContent = heroNameValue;
+        if (heroLevel) heroLevel.textContent = `Lv.${heroLevelValue}`;
+        if (heroJob) heroJob.textContent = heroJobInfo ? `${heroJobInfo.name} · ${heroJobInfo.nameEn}` : 'Novice';
+        if (heroEmoji) heroEmoji.textContent = heroJobInfo?.emoji || '🌱';
+        if (heroStatus) {
+          heroStatus.className = 'profile-hero-status is-online';
+          heroStatus.textContent = '● ONLINE';
+        }
+        if (heroGuest) {
+          heroGuest.hidden = !this.isGuest;
+          heroGuest.textContent = 'GUEST ACCOUNT';
+        }
+        if (heroUid && uidDisplay) heroUid.textContent = uidDisplay.textContent;
+        if (heroPower) heroPower.textContent = `ATK ${Number(heroStats.atk) || 0} · DEF ${Number(heroStats.def) || 0}`;
+
         if (nameInput) nameInput.value = this.character.stats?.name || '';
         if (shirtInput) shirtInput.value = hexToStr(this.character.bodyColor || 0x4060c0);
         if (pantsInput) pantsInput.value = hexToStr(this.character.pantsColor || 0x3a3a5a);
@@ -5418,6 +5448,8 @@ export class GameUI {
     if (guestSection) {
       guestSection.style.display = isGuest ? 'block' : 'none';
     }
+    const heroGuest = document.getElementById('profile-hero-guest');
+    if (heroGuest) heroGuest.hidden = !isGuest;
   }
 
   /**
