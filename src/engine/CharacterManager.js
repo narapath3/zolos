@@ -264,6 +264,7 @@ export class CharacterManager {
         this.activeBuffs = { atk: null, def: null };
 
         // Custom property getters for base stats + equipment bonuses
+        this._statsRevision = 0;
         this.stats._baseAtk = 10;
         this.stats._baseMaxSp = 50;
         this.stats._baseMaxHp = 100;
@@ -324,6 +325,18 @@ export class CharacterManager {
         this.characterId = null;
 
         this._createModel();
+    }
+
+    // Notify UI consumers that a derived combat stat input changed. The event is
+    // intentionally browser-only so CharacterManager remains safe in Node tests.
+    _notifyStatsChanged(reason = 'unknown') {
+        this._statsRevision += 1;
+        if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+        const EventCtor = typeof CustomEvent === 'function' ? CustomEvent : null;
+        if (!EventCtor) return;
+        window.dispatchEvent(new EventCtor('zolos:stats-changed', {
+            detail: { character: this, reason, revision: this._statsRevision },
+        }));
     }
 
     getWeaponAtkBonus(weaponName) {
@@ -433,7 +446,9 @@ export class CharacterManager {
     equipCard(slotId, idOrName) {
         if (!(slotId in this.equippedCards)) return false;
         if (!idOrName) {
+            if (this.equippedCards[slotId] === null) return true;
             this.equippedCards[slotId] = null;
+            this._notifyStatsChanged('card-unequip');
             return true;
         }
         const card = getCard(idOrName);
@@ -442,11 +457,14 @@ export class CharacterManager {
             if (slot !== slotId && cardId === card.id) return false;
         }
         this.equippedCards[slotId] = card.id;
+        this._notifyStatsChanged('card-equip');
         return true;
     }
     unequipCard(slotId) {
         if (!(slotId in this.equippedCards)) return false;
+        if (this.equippedCards[slotId] === null) return true;
         this.equippedCards[slotId] = null;
+        this._notifyStatsChanged('card-unequip');
         return true;
     }
 
@@ -513,9 +531,11 @@ export class CharacterManager {
     }
 
     equipWeapon(itemName) {
+        const changed = this.equippedWeapon !== itemName;
         this.equippedWeapon = itemName;
         this.updateWeaponVisuals(itemName);
         this._updateDivineAura();
+        if (changed) this._notifyStatsChanged('weapon-equip');
     }
 
     updateWeaponVisuals(itemName) {
@@ -2636,6 +2656,7 @@ export class CharacterManager {
 
         if (leveledUp) {
             this.updateNameTag();
+            this._notifyStatsChanged('level-up');
             // Milestone: push the level-up to the server immediately so it can't
             // be lost to an abrupt disconnect before the next auto-save tick.
             if (typeof window !== 'undefined') window.zolosSaveNow?.();
@@ -3158,6 +3179,7 @@ export class CharacterManager {
             name: skill.name,
             emoji: skill.emoji,
         };
+        this._notifyStatsChanged('buff-applied');
     }
 
     // Count buffs down; called from update(dt).
@@ -3167,7 +3189,10 @@ export class CharacterManager {
             const b = this.activeBuffs[stat];
             if (!b) continue;
             b.remaining -= dt;
-            if (b.remaining <= 0) this.activeBuffs[stat] = null;
+            if (b.remaining <= 0) {
+                this.activeBuffs[stat] = null;
+                this._notifyStatsChanged('buff-expired');
+            }
         }
     }
 
@@ -3530,6 +3555,7 @@ export class CharacterManager {
             }
         }
         if (app.title !== undefined) this.setTitle(app.title);
+        this._notifyStatsChanged('appearance-sync');
     }
 
     destroy() {

@@ -739,6 +739,8 @@ export class GameUI {
 
     // Live pet level + XP badge.
     this.updatePetHud();
+    // Level-ups and server-side stat changes already flow through updateHUD.
+    this._refreshProfileCombatStats();
   }
 
   updateStats(stats) {
@@ -2309,6 +2311,23 @@ export class GameUI {
       chip('INT', attr.int, '#748ffc', 'พลังเวท');
   }
 
+  // Refresh the live ATK/DEF summary without rebuilding or reopening the modal.
+  // The breakdown is intentionally refreshed only when it is visible, keeping
+  // the collapsed Profile lightweight while preserving its latest state.
+  _refreshProfileCombatStats() {
+    const modal = document.getElementById('profile-editor-modal');
+    if (!modal || modal.style.display === 'none' || !this.character?.stats) return;
+
+    const stats = this.character.stats;
+    const heroPower = document.getElementById('profile-hero-power');
+    if (heroPower) {
+      heroPower.textContent = `ATK ${Number(stats.atk) || 0} · DEF ${Number(stats.def) || 0}`;
+    }
+
+    const breakdown = document.getElementById('profile-combat-breakdown');
+    if (breakdown && !breakdown.hidden) this._renderCombatStatBreakdown();
+  }
+
   // Push the refine level (+N) of each equipped item onto the character so its
   // stat getters scale by refine. Called on load and after every equip/refine.
   _syncEquipRefine() {
@@ -2325,6 +2344,7 @@ export class GameUI {
         if (slot && r[slot] !== undefined) r[slot] = rf;
       }
     }
+    this._refreshProfileCombatStats();
   }
 
   // "+N " prefix for a refined item name (or '' if not refined / not found).
@@ -2636,6 +2656,7 @@ export class GameUI {
     this._renderInventory();
     this.updateHUD(this.character.stats);
     this.updateStats(this.character.stats);
+    this._refreshProfileCombatStats();
     // Persist equippedCards + cardState to Supabase so they survive page reload.
     if (this.characterId && this.character?.saveStatsToDatabase) {
       try { await this.character.saveStatsToDatabase(); }
@@ -4965,6 +4986,14 @@ export class GameUI {
 
     if (!modal) return;
 
+    // CharacterManager emits this event whenever a derived combat-stat input
+    // changes outside the Profile render cycle (for example level-up or buffs).
+    this._listenGlobal(window, 'zolos:stats-changed', (event) => {
+      const changedCharacter = event?.detail?.character;
+      if (changedCharacter && changedCharacter !== this.character) return;
+      this._refreshProfileCombatStats();
+    });
+
     // Helper: convert int hex to #rrggbb string
     const hexToStr = (h) => '#' + ('000000' + h.toString(16)).slice(-6);
     // Helper: convert #rrggbb string to int
@@ -7188,8 +7217,8 @@ export class GameUI {
       this._syncEquipRefine();
       this.updateHUD(this.character.stats);
       this.updateStats(this.character.stats);
+      this._refreshProfileCombatStats();
     }
-
     // Feedback + spectacle.
     if (success) {
       this.addCombatLog(`✨✅ ตีบวก ${item.emoji || ''} ${item.item_name} สำเร็จ! เป็น +${newLevel}`, 'levelup');
@@ -11334,6 +11363,7 @@ export class GameUI {
       }
 
       this.updateStats(this.character.stats);
+      this._refreshProfileCombatStats();
 
       // Persist card socket state + inventory stats to Supabase
       if (this.characterId && this.character?.saveStatsToDatabase) {
@@ -11386,6 +11416,7 @@ export class GameUI {
       }
 
       this.updateStats(this.character.stats);
+      this._refreshProfileCombatStats();
 
       // Persist card socket state + inventory stats to Supabase
       if (this.characterId && this.character?.saveStatsToDatabase) {
