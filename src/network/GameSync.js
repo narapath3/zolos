@@ -422,6 +422,29 @@ export async function fetchPublicCharacter(userId) {
     }
 }
 
+// Public profile lookup for leaderboard rows. This intentionally addresses the
+// character by its public character id instead of exposing or accepting the
+// owning auth user UUID in the leaderboard response.
+export async function fetchPublicCharacterById(characterId) {
+    if (!supabase || isOfflineMode || !characterId || characterId.startsWith('guest_') || characterId.startsWith('local_')) return null;
+    try {
+        const fields = 'name, level, exp, hp, max_hp, sp, max_sp, atk, def, gold, zol, total_kills, play_time, weapon, hat, glasses, shield, armor, gender, last_map, job, body_color, hair_color, pants_color, appearance';
+        const { data, error } = await supabase
+            .from('characters')
+            .select(fields)
+            .eq('id', characterId)
+            .maybeSingle();
+        if (error) {
+            console.error('[Zolos] fetchPublicCharacterById error:', error.message);
+            return null;
+        }
+        return data;
+    } catch (e) {
+        console.error('[Zolos] fetchPublicCharacterById error:', e);
+        return null;
+    }
+}
+
 // Resolve a player-facing UID (the 8-char code shown as "UID: #XXXXXXXX",
 // derived from characters.id → 'char_' + suffix) back to that character's
 // routing identity. Used by the card P2P trade so a sender can target a
@@ -1711,10 +1734,10 @@ export async function fetchLeaderboard(category = 'level') {
         return q.order('level', { ascending: false }).order('total_kills', { ascending: false });
     };
 
-    // `id` (the char_xxx character id) is needed by the in-game admin panel so
-    // its edit/give/delete RPCs target the right character — admin_*_character
-    // look up WHERE id = target_char_id, not by user_id.
-    const cols = 'id, name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses, user_id';
+    // Expose only the public character id. The auth user UUID is an internal
+    // routing key and must never be included in the public leaderboard DTO.
+    // AdminUI also targets admin RPCs with characters.id, not user_id.
+    const cols = 'id, name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses';
     let query = applyOrder(supabase.from('characters').select(`${cols}, profiles(username)`));
 
     let { data, error } = await query.limit(50);

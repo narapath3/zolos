@@ -7,6 +7,8 @@ const auth = read('../server/api/auth.js');
 const data = read('../server/api/data.js');
 const server = read('../server/server.js');
 const gameUI = read('../src/ui/GameUI.js');
+const profileModal = read('../src/ui/PlayerProfileModal.js');
+const main = read('../src/main.js');
 const offlineAuth = read('../src/network/SupabaseClient.js');
 
 test('production self-host auth refuses a missing or weak JWT secret', () => {
@@ -152,4 +154,22 @@ test('market purchases lock the buyer balance before settlement', () => {
 test('starter Sword inventory exception cannot carry forged combat stats', () => {
   assert.match(data, /starterStatsSafe/);
   assert.match(data, /Object\.keys\(starterStats\)\.every\(key => key === 'equipped'\)/);
+});
+
+test('public leaderboard redacts auth user ids and profile lookup uses character ids', () => {
+  assert.match(gameSync, /const cols = 'id, name, level, total_kills, gold, zol, play_time, mmr, pvp_wins, pvp_losses';/);
+  assert.doesNotMatch(gameSync, /const cols = '[^']*user_id/);
+  assert.match(gameSync, /export async function fetchPublicCharacterById\(characterId\)/);
+  assert.match(gameSync, /\.eq\('id', characterId\)/);
+  assert.match(gameUI, /data-character-id="\$\{characterId\}"/);
+  assert.doesNotMatch(gameUI, /data-user-id="\$\{uid\}"/);
+  assert.match(profileModal, /Boolean\(player\.characterId\) && window\.gameUI\?\.characterId === player\.characterId/);
+});
+
+test('connected sessions fail closed for client-only reward paths', () => {
+  assert.match(gameUI, /isSocketConnected\(\) && window\.__serverRewards !== true/);
+  assert.match(gameUI, /_claimQuestReward\(idx\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
+  assert.match(gameUI, /_spinRoulette\(\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
+  assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)/);
+  assert.match(main, /case 'fishCaught':[\s\S]*gameUI && gameUI\._onlineSessionWithoutAuthority\?\.\(\)/);
 });

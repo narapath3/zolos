@@ -627,11 +627,12 @@ export class PlayerProfileModal {
     const isInGlobalRoster = window.gameUI && Array.isArray(window.gameUI.onlinePlayers)
       && window.gameUI.onlinePlayers.some(p => p.userId === uid);
     const isOffline = isInGlobalRoster ? false
-      : (player.isOffline || (uid.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(uid))));
+      : (player.isOffline || !uid || (uid.startsWith('guest_') && (!window.remotePlayersMap || !window.remotePlayersMap.has(uid))));
 
     // Friend status check
     const isFriend = window.gameUI && window.gameUI.friends && window.gameUI.friends.includes(player.username);
-    const isSelf = window.userId === player.userId;
+    const isSelf = (Boolean(player.userId) && window.userId === player.userId)
+      || (Boolean(player.characterId) && window.gameUI?.characterId === player.characterId);
 
     // Build the full HTML — preserve the canvas DOM element reference
     // so that the WebGL renderer survives between show() calls.
@@ -743,8 +744,9 @@ export class PlayerProfileModal {
     // If the modal was already showing a DIFFERENT player (switched mid-fly),
     // we must rebuild the full DOM. But if it's the same player, skip the
     // innerHTML assignment to preserve the WebGL canvas.
-    const isSamePlayer = this._lastShownPlayerId === player.userId;
-    this._lastShownPlayerId = player.userId;
+    const playerKey = player.userId || player.characterId || '';
+    const isSamePlayer = this._lastShownPlayerId === playerKey;
+    this._lastShownPlayerId = playerKey;
 
     if (!isSamePlayer) {
       card.innerHTML = cardHTML;
@@ -760,7 +762,7 @@ export class PlayerProfileModal {
     if (bottomClose) bottomClose.onclick = () => this.hide();
 
     // Action button handlers
-    if (!isSelf) {
+    if (!isSelf && uid) {
       const btnFriend = card.querySelector('#prof-btn-friend');
       const btnWarp = card.querySelector('#prof-btn-warp');
       const btnDuel = card.querySelector('#prof-btn-duel');
@@ -883,13 +885,12 @@ export class PlayerProfileModal {
     const badge = this.modal.querySelector('.status-badge');
     if (!badge) return;
 
-    const userId = this.currentPlayer.userId;
-    // Local player is always online
-    const isLocal = window.userId === userId;
-    // Remote player is online if in the same map
-    const isRemoteOnline = window.remotePlayersMap && window.remotePlayersMap.has(userId);
-    // Also check the global online roster (cross-map friends)
-    const isInGlobalRoster = window.gameUI && Array.isArray(window.gameUI.onlinePlayers)
+    const userId = this.currentPlayer.userId || '';
+    // A leaderboard profile has only a public character id and is intentionally
+    // not treated as an authenticated live roster entry.
+    const isLocal = Boolean(userId) && window.userId === userId;
+    const isRemoteOnline = Boolean(userId) && window.remotePlayersMap && window.remotePlayersMap.has(userId);
+    const isInGlobalRoster = Boolean(userId) && window.gameUI && Array.isArray(window.gameUI.onlinePlayers)
       && window.gameUI.onlinePlayers.some(p => p.userId === userId);
     const isOnline = isLocal || isRemoteOnline || isInGlobalRoster;
 

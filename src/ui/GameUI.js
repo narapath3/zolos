@@ -1,6 +1,6 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat } from '../engine/GameData.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
 import { observeItemPortraits } from './ItemPortraitRenderer.js';
@@ -30,6 +30,7 @@ import {
 import { migrateLegacyCards } from '../cards/CardMigration.js';
 import { getCard } from '../cards/CardCatalog.js';
 import { BugReportUI } from './BugReportUI.js';
+import { isSocketConnected } from '../network/SocketClient.js';
 
 // Maps each skill id to a line-art glyph in the #ic-* SVG sprite (index.html),
 // so the skill bar shows clean professional icons instead of emoji.
@@ -363,6 +364,19 @@ export class GameUI {
     return !this._destroyed
       && generation === this._lifecycleGeneration
       && this.characterId === characterId;
+  }
+
+  // Client-only reward paths are fail-closed for connected sessions. The
+  // monster handshake currently advertises only monster authority; it must not
+  // be treated as proof that fishing/quests/roulette are server-authoritative.
+  // A future signed reward-capability handshake may set __serverRewards=true
+  // after those RPCs are deployed and verified.
+  _onlineSessionWithoutAuthority() {
+    try {
+      return isSocketConnected() && window.__serverRewards !== true;
+    } catch {
+      return false;
+    }
   }
 
   _setupPanels() {
@@ -1262,6 +1276,7 @@ export class GameUI {
   // bonus the first time it's seen and auto-refreshes the almanac if open.
   recordFishCatch(item) {
     if (!item || (item.type && item.type !== 'fish')) return;
+    if (this._onlineSessionWithoutAuthority()) return;
     const name = item.name || item.item_name;
     if (!name || !FISH_SPECIES[name]) return;
     if (!this.almanac) this.almanac = { caught: [], claimed: [], counts: {} };
@@ -3517,12 +3532,14 @@ export class GameUI {
       lbBody.addEventListener('click', (e) => {
         const row = e.target.closest('.lb-row');
         if (!row) return;
-        const userId = row.getAttribute('data-user-id');
-        if (!userId) return; // mock/guest entries with no real account
+        const characterId = row.getAttribute('data-character-id');
+        if (!characterId) return; // mock entries without a public character id
         this._showPlayerPopup({
           username: row.getAttribute('data-username'),
           level: Number(row.getAttribute('data-level')) || 1,
-          userId,
+          characterId,
+          userId: null,
+          isOffline: true,
         });
       });
     }
@@ -3547,7 +3564,7 @@ export class GameUI {
           ? entry.name
           : (entry.profiles?.username && !isPlaceholderName(entry.profiles.username)
             ? entry.profiles.username
-            : getDeterministicGuestName(entry.user_id || entry.name || `entry_${i}`));
+            : getDeterministicGuestName(entry.id || entry.name || `entry_${i}`));
         let valueText = '';
         if (cat === 'level') valueText = `Lv.${entry.level} | 💀${entry.total_kills ?? 0}`;
         else if (cat === 'gold') valueText = `💰 ${(entry.gold ?? 0).toLocaleString()} Zeny`;
@@ -3560,11 +3577,11 @@ export class GameUI {
           valueText = `🎖️ ${(entry.mmr ?? 1000).toLocaleString()} MMR &nbsp;·&nbsp; ${w}W/${l}L (${wr}%)`;
         }
         const zolText = `🪙 ${(entry.zol ?? 0).toLocaleString()} Zol`;
-        const uid = entry.user_id || '';
-        const isSelf = (uid && uid === window.userId) || (username === this.character?.stats?.name);
+        const characterId = entry.id || '';
+        const isSelf = (characterId && characterId === this.characterId) || (username === this.character?.stats?.name);
         const selfClass = isSelf ? ' lb-row-self' : '';
         return `
-          <div class="lb-row${uid ? ' lb-clickable' : ''}${selfClass}" data-user-id="${uid}" data-username="${username}" data-level="${entry.level ?? 1}">
+          <div class="lb-row${characterId ? ' lb-clickable' : ''}${selfClass}" data-character-id="${characterId}" data-username="${username}" data-level="${entry.level ?? 1}">
             <span class="lb-rank">${rankIcon}</span>
             <span class="lb-name">
               <span class="lb-username">${username}</span>
@@ -3956,10 +3973,12 @@ export class GameUI {
   }
 
   async _fetchAndShowPlayerProfile(player) {
-    // Safety: guard against missing/undefined userId which would crash
-    // show() with a TypeError on .startsWith()
-    if (!player || !player.userId) {
-      console.error('[Profile] No userId for player:', player);
+    // Leaderboard rows carry a public characterId; live roster rows carry the
+    // routing userId. Accept either, but never require the public UI to expose
+    // the auth user UUID.
+    const lookupId = player?.characterId || player?.userId;
+    if (!player || !lookupId) {
+      console.error('[Profile] No public player identifier:', player);
       return;
     }
 
@@ -3977,9 +3996,10 @@ export class GameUI {
     // 3. Fetch DB stats in background — update the modal once data arrives.
     let dbData = null;
     try {
-      const { fetchPublicCharacter } = await import('../network/GameSync.js');
-      console.error(`[Profile] Fetching DB stats for ${player.username} (userId=${player.userId})...`);
-      dbData = await fetchPublicCharacter(player.userId);
+      console.error(`[Profile] Fetching DB stats for ${player.username} (${player.characterId ? 'characterId' : 'userId'}=${lookupId})...`);
+      dbData = player.characterId
+        ? await fetchPublicCharacterById(player.characterId)
+        : await (await import('../network/GameSync.js')).fetchPublicCharacter(player.userId);
       if (!dbData) {
         // Fallback: try querying by username in case the userId doesn't
         // match the characters.user_id column (e.g. server sent a socket
@@ -7627,6 +7647,11 @@ export class GameUI {
       return;
     }
 
+    if (this._onlineSessionWithoutAuthority()) {
+      this.addCombatLog('🚫 เซิร์ฟเวอร์ยังไม่พร้อมยืนยันรางวัล การขายจึงถูกระงับเพื่อป้องกันไอเทม/เงินซ้ำ', 'warning');
+      return;
+    }
+
     invItem.quantity -= qty;
     if (invItem.quantity <= 0) {
       this.inventory = this.inventory.filter(i => i.quantity > 0);
@@ -10785,6 +10810,10 @@ export class GameUI {
   _claimQuestReward(idx) {
     const state = this.dailyQuestsState;
     if (!state || !state.quests || !state.quests[idx]) return;
+    if (this._onlineSessionWithoutAuthority()) {
+      this.addCombatLog('🚫 เซิร์ฟเวอร์ยังไม่รองรับการยืนยันรางวัลเควส จึงระงับการรับรางวัลชั่วคราว', 'warning');
+      return;
+    }
 
     const q = state.quests[idx];
     if (q.isClaimed || q.current < q.target) return;
@@ -10818,6 +10847,10 @@ export class GameUI {
   _spinRoulette() {
     const state = this.dailyQuestsState;
     if (!state || state.rouletteSpent) return;
+    if (this._onlineSessionWithoutAuthority()) {
+      this.addCombatLog('🚫 เซิร์ฟเวอร์ยังไม่รองรับการยืนยันรางวัลวงล้อ จึงระงับการสุ่มชั่วคราว', 'warning');
+      return;
+    }
 
     const spinBtn = document.getElementById('btn-spin-roulette');
     const display = document.getElementById('roulette-rewards-display');
@@ -10904,7 +10937,7 @@ export class GameUI {
 
   incrementQuestProgress(type, targetName = '') {
     const state = this.dailyQuestsState;
-    if (!state || !state.quests) return;
+    if (!state || !state.quests || this._onlineSessionWithoutAuthority()) return;
 
     let updated = false;
     state.quests.forEach(q => {
