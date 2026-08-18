@@ -43,7 +43,8 @@ BEGIN
   SELECT * INTO v_listing FROM marketplace WHERE id = p_listing_id FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'reason', 'gone'); END IF;
   IF v_listing.seller_id = p_user_id THEN RETURN jsonb_build_object('ok', false, 'reason', 'own_listing'); END IF;
-  SELECT * INTO v_buyer FROM characters WHERE user_id = p_user_id ORDER BY created_at LIMIT 1;
+  SELECT * INTO v_buyer FROM characters
+    WHERE user_id = p_user_id ORDER BY created_at LIMIT 1 FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'reason', 'no_character'); END IF;
   IF v_buyer.gold < v_listing.price THEN RETURN jsonb_build_object('ok', false, 'reason', 'not_enough_gold'); END IF;
   UPDATE characters SET gold = gold - v_listing.price, updated_at = now() WHERE id = v_buyer.id;

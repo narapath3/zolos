@@ -138,3 +138,13 @@ test('vending stalls use authoritative RPCs instead of generic row writes', () =
   assert.match(vendingMigration, /user_id = auth\.uid\(\)/);
   assert.match(vendingMigration, /REVOKE INSERT, UPDATE, DELETE ON public\.vending_stalls/);
 });
+
+const marketBuyMigration = read('../migrations/20260818_market_buy_lock.sql');
+
+test('market purchases lock the buyer balance before settlement', () => {
+  const rpcFunctions = read('../server/api/rpc_functions.sql');
+  assert.match(rpcFunctions, /v_buyer characters%ROWTYPE/);
+  assert.match(rpcFunctions, /FROM characters[\s\S]*ORDER BY created_at LIMIT 1 FOR UPDATE/);
+  assert.match(marketBuyMigration, /CREATE OR REPLACE FUNCTION public\.buy_market_item\(p_listing_id uuid\)/);
+  assert.match(marketBuyMigration, /FROM public\.characters[\s\S]*LIMIT 1 FOR UPDATE/);
+});
