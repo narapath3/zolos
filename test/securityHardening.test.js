@@ -108,3 +108,8 @@ test('generic inventory writes cannot grant items or forge quantity/stats', () =
   assert.match(data, /SYSTEM_INVENTORY_ITEMS/);
   assert.match(data, /isStarterSword/);
 });
+
+test('system inventory snapshots carry an explicit item identity on stats updates', () => {
+  assert.match(gameSync, /update\(\{ stats: questData \}\)[\s\S]*eq\('item_name', 'daily_quests'\)/);
+  assert.match(gameSync, /stats: \{ list: friendsList \}[\s\S]*eq\('item_name', 'friends_list'\)/);
+});

@@ -890,7 +890,9 @@ export async function saveDailyQuests(characterId, questData) {
             await supabase
                 .from('inventory')
                 .update({ stats: questData })
-                .eq('id', existing.id);
+                .eq('id', existing.id)
+                .eq('item_name', 'daily_quests')
+                .eq('item_type', 'system');
         } else {
             await supabase
                 .from('inventory')
@@ -945,7 +947,8 @@ export async function saveFishingAlmanac(characterId, almanacData) {
             .maybeSingle();
 
         if (existing) {
-            await supabase.from('inventory').update({ stats: almanacData }).eq('id', existing.id);
+            await supabase.from('inventory').update({ stats: almanacData })
+                .eq('id', existing.id).eq('item_name', 'fishing_almanac').eq('item_type', 'system');
         } else {
             await supabase.from('inventory').insert({
                 character_id: characterId,
@@ -993,7 +996,8 @@ export async function saveAdventureJournal(characterId, journalData) {
             .eq('character_id', characterId).eq('item_name', 'adventure_journal')
             .eq('item_type', 'system').maybeSingle();
         if (existing) {
-            await supabase.from('inventory').update({ stats: journalData }).eq('id', existing.id);
+            await supabase.from('inventory').update({ stats: journalData })
+                .eq('id', existing.id).eq('item_name', 'adventure_journal').eq('item_type', 'system');
         } else {
             await supabase.from('inventory').insert({ character_id: characterId, item_name: 'adventure_journal', item_type: 'system', quantity: 1, stats: journalData });
         }
@@ -1036,7 +1040,8 @@ export async function saveLoginStreak(characterId, streakData) {
             .maybeSingle();
 
         if (existing) {
-            await supabase.from('inventory').update({ stats: streakData }).eq('id', existing.id);
+            await supabase.from('inventory').update({ stats: streakData })
+                .eq('id', existing.id).eq('item_name', 'login_streak').eq('item_type', 'system');
         } else {
             await supabase.from('inventory').insert({
                 character_id: characterId,
@@ -1180,7 +1185,9 @@ export async function saveFriendsList(characterId, friendsList) {
             await supabase
                 .from('inventory')
                 .update({ stats: { list: friendsList } })
-                .eq('id', existing.id);
+                .eq('id', existing.id)
+                .eq('item_name', 'friends_list')
+                .eq('item_type', 'system');
         } else {
             await supabase
                 .from('inventory')
