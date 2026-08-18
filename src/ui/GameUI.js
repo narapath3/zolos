@@ -7985,8 +7985,11 @@ export class GameUI {
           }
         }
 
-        // Sync inventory DB decrement
-        await saveInventoryItem(this.characterId, item.item_name, item.item_type, -qty, item.stats || {});
+        // Remote listings already escrowed the item in the server transaction.
+        // Only the offline/local marketplace needs a second persistence update.
+        if (listing._serverAuthoritative !== true) {
+          await saveInventoryItem(this.characterId, item.item_name, item.item_type, -qty, item.stats || {});
+        }
 
         this.addCombatLog(`⚖️ ตั้งขาย ${item.emoji} ${item.item_name} x${qty} ราคา ${price} Zeny แล้ว`, 'system');
         if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
@@ -8026,11 +8029,13 @@ export class GameUI {
       const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
 
       if (boughtResult && boughtResult.success) {
+        const serverAuthoritative = boughtResult.serverAuthoritative === true;
         // Adopt the server's authoritative gold when provided (RPC path)
         if (boughtResult.buyerGold !== undefined) {
           this.character.stats.gold = boughtResult.buyerGold;
         }
-        // Add item to local inventory
+        // Add item to local inventory. The remote RPC already committed the
+        // inventory row; this is only the immediate UI projection.
         const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
         if (listing.item_type === 'pet') {
           // Receive the pet as its own named instance (keeps the seller's name).
@@ -8043,7 +8048,7 @@ export class GameUI {
           const s = listing.stats || {};
           row.stats.instances.push({ uid: this._newPetUid(), name: s.petName || null, level: s.petLevel || 1, xp: s.petXp || 0 });
           row.quantity = row.stats.instances.length;
-          if (this.characterId) {
+          if (!serverAuthoritative && this.characterId) {
             const { setInventoryItemQuantity } = await import('../network/GameSync.js');
             await setInventoryItemQuantity(this.characterId, listing.item_name, 'pet', row.quantity, row.stats);
           }
@@ -8104,7 +8109,9 @@ export class GameUI {
     if (confirm(`คุณต้องการยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} หรือไม่?`)) {
       const canceled = await cancelMarketListing(listing.id, this.characterId);
       if (canceled) {
-        // Add back to local inventory
+        const serverAuthoritative = canceled.serverAuthoritative === true;
+        // Add back to local inventory. Remote cancel already restored the
+        // inventory row atomically; this is only the immediate UI projection.
         const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
         if (listing.item_type === 'pet') {
           // Return the pet as its own named instance (keep name/level, never merge).
@@ -8117,7 +8124,7 @@ export class GameUI {
           const s = listing.stats || {};
           row.stats.instances.push({ uid: this._newPetUid(), name: s.petName || null, level: s.petLevel || 1, xp: s.petXp || 0 });
           row.quantity = row.stats.instances.length;
-          if (this.characterId) {
+          if (!serverAuthoritative && this.characterId) {
             const { setInventoryItemQuantity } = await import('../network/GameSync.js');
             await setInventoryItemQuantity(this.characterId, listing.item_name, 'pet', row.quantity, row.stats);
           }

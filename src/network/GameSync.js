@@ -2346,34 +2346,24 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
         }
 
         // For Supabase, let DB generate UUID id; use auth.uid() as seller_id
-        const supabaseData = {
-            item_id: itemId,
-            item_name: itemName,
-            item_type: itemType,
-            quantity,
-            price,
-            seller_id: user.id,   // auth.uid() UUID
-            seller_name: sellerName,
-            stats,
-        };
+        // Authenticated listings must be escrowed atomically: the server checks
+        // character ownership and inventory quantity, removes the offered item,
+        // then creates the listing in one transaction. The browser never gets to
+        // mint a listing by merely posting a marketplace row.
+        const { data, error } = await supabase.rpc('create_market_listing', {
+            p_character_id: sellerCharId,
+            p_item_name: itemName,
+            p_quantity: quantity,
+            p_price: price,
+        });
 
-        const { data, error } = await supabase
-            .from('marketplace')
-            .insert(supabaseData)
-            .select()
-            .single();
-
-        if (error) {
-            console.error('[Zolos] ❌ Supabase marketplace insert FAILED:', error.code, error.message);
-            // Mark as failed so UI knows not to deduct inventory
+        if (error || !data?.ok || !data.listing) {
+            console.error('[Zolos] ❌ Atomic marketplace listing FAILED:', error?.message || data?.reason);
             listingData._failed = true;
-            const listings = initLocalMarketplace();
-            listings.unshift(listingData);
-            localDb.set('marketplace_listings', listings);
             return listingData;
         }
-        console.log('[Zolos] ✅ Marketplace listing created on Supabase:', data.id);
-        return data;
+        console.log('[Zolos] ✅ Atomic marketplace listing created:', data.listing.id);
+        return { ...data.listing, _serverAuthoritative: true };
     } catch (err) {
         console.error('[Zolos] ❌ Catch error on listing:', err.message);
         listingData._failed = true;
@@ -2385,6 +2375,20 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
 }
 
 export async function cancelMarketListing(listingId, characterId) {
+    const isRemoteListing = !isOfflineMode && supabase
+        && !characterId.startsWith('guest_') && !characterId.startsWith('local_')
+        && !String(listingId).startsWith('mock_') && !String(listingId).startsWith('listing_');
+    if (isRemoteListing) {
+        const { data, error } = await supabase.rpc('cancel_market_listing', {
+            p_listing_id: listingId,
+        });
+        if (error || !data?.ok) {
+            console.warn('[Zolos] Atomic marketplace cancel failed:', error?.message || data?.reason);
+            return false;
+        }
+        return { ok: true, serverAuthoritative: true };
+    }
+
     let listing = null;
     let isLocalListing = false;
 
@@ -2585,7 +2589,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
                     message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${data.item_name}] x${data.quantity} จาก [${data.seller_name}] ในราคา ${data.price} Zeny!`
                 });
             }
-            return { success: true, buyerGold: data.buyer_gold };
+            return { success: true, serverAuthoritative: true, buyerGold: data.buyer_gold };
         } catch (err) {
             return { success: false, reason: 'error', detail: err.message };
         }

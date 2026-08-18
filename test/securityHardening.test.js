@@ -49,3 +49,27 @@ test('generic character writes reject client-owned progression and freshness fie
   assert.match(data, /server-authoritative character fields/);
   assert.match(data, /assertClientWriteAllowed\(table, action, spec\.values \|\| \{\}\)/);
 });
+
+const rpc = read('../server/api/rpc.js');
+const gameSync = read('../src/network/GameSync.js');
+const marketMigration = read('../migrations/20260818_market_escrow.sql');
+
+test('market escrow RPC locks ownership and inventory before creating a listing', () => {
+  assert.match(rpc, /async function createMarketListing/);
+  assert.match(rpc, /FROM inventory WHERE character_id = \$1 AND item_name = \$2 FOR UPDATE/);
+  assert.match(rpc, /DELETE FROM inventory WHERE id = \$1/);
+  assert.match(rpc, /INSERT INTO marketplace/);
+  assert.match(rpc, /async function cancelMarketListing/);
+  assert.match(rpc, /seller_id = \$2 FOR UPDATE/);
+  assert.match(marketMigration, /CREATE OR REPLACE FUNCTION public\.create_market_listing/);
+  assert.match(marketMigration, /CREATE OR REPLACE FUNCTION public\.cancel_market_listing/);
+});
+
+test('remote marketplace client paths use atomic RPCs and avoid double inventory mutations', () => {
+  assert.match(gameSync, /supabase\.rpc\('create_market_listing'/);
+  assert.match(gameSync, /supabase\.rpc\('cancel_market_listing'/);
+  assert.match(gameSync, /serverAuthoritative: true/);
+  assert.match(gameUI, /listing\._serverAuthoritative !== true/);
+  assert.match(gameUI, /const serverAuthoritative = boughtResult\.serverAuthoritative === true/);
+  assert.match(gameUI, /if \(!serverAuthoritative && this\.characterId\)/);
+});
