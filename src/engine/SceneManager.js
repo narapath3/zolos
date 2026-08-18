@@ -65,6 +65,51 @@ function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSiz
     ctx.restore();
 }
 
+function createFramedShopLabel(width, height, {
+    fill = 'rgba(20, 12, 6, 0.8)',
+    stroke = '#ffd24a',
+    title = 'ร้านค้า',
+    titleColor = '#ffd97a',
+    titleMaxSize = 56,
+    titleMinSize = 24,
+    boxX = 36,
+    boxY = 12,
+    boxWidth = width - 72,
+    boxHeight = height - 24,
+    radius = 24,
+    iconColor = titleColor,
+} = {}) {
+    const { canvas, ctx } = createHiDPICanvas(width, height);
+    if (!ctx) return { canvas, ctx };
+    ctx.fillStyle = fill;
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(4, Math.round(height / 34));
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+    ctx.stroke();
+    ctx.shadowColor = iconColor;
+    ctx.shadowBlur = Math.min(18, height / 10);
+    ctx.fillStyle = iconColor;
+    ctx.beginPath();
+    ctx.arc(boxX + 28, boxY + boxHeight / 2, Math.max(6, height / 14), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    drawFittedCanvasText(
+        ctx,
+        title,
+        width / 2,
+        boxY + boxHeight / 2 + titleMaxSize * 0.3,
+        boxWidth - 56,
+        titleMaxSize,
+        titleMinSize,
+        titleColor,
+        700,
+        18,
+    );
+    return { canvas, ctx };
+}
+
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
 export const PET_BOUTIQUE_POSITION = Object.freeze({ x: -10, z: -7 });
@@ -4486,29 +4531,20 @@ export class SceneManager {
         group.add(premiumMerchant);
 
         // ---- Floating shop name tag ----
-        const canvas = document.createElement('canvas');
-        canvas.width = 1024; // Double resolution for better clarity and overflow protection
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        // Background
-        ctx.fillStyle = 'rgba(40, 20, 10, 0.7)';
-        ctx.roundRect(128, 16, 768, 96, 24);
-        ctx.fill();
-        // Border
-        ctx.strokeStyle = '#c8a050';
-        ctx.lineWidth = 6;
-        ctx.roundRect(128, 16, 768, 96, 24);
-        ctx.stroke();
-        // Text
-        ctx.font = 'bold 48px "Helvetica Neue", Helvetica, Arial, sans-serif';
-        ctx.textAlign = 'left'; // Use left alignment and manual offset for more control in Safari
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffd040';
-        // Manually center by measuring or using a safe offset
-        // '🏪 ร้านค้า' is approx 240px wide at 48px font. 
-        // Canvas is 1024, center is 512. 512 - 120 = 392.
-        ctx.fillText('🏪 ร้านค้า', 410, 64);
-
+        const { canvas } = createFramedShopLabel(1024, 128, {
+            fill: 'rgba(40, 20, 10, 0.7)',
+            stroke: '#c8a050',
+            title: 'ร้านค้า',
+            titleColor: '#ffd040',
+            titleMaxSize: 48,
+            titleMinSize: 24,
+            boxX: 128,
+            boxY: 16,
+            boxWidth: 768,
+            boxHeight: 96,
+            radius: 24,
+            iconColor: '#ffd040',
+        });
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameTag = new THREE.Sprite(spriteMat);
@@ -4995,14 +5031,20 @@ export class SceneManager {
         awning.position.set(0, 2.45, 0.1); awning.rotation.x = -0.12;
         group.add(awning);
 
-        const { canvas, ctx } = createHiDPICanvas(768, 144);
-        if (ctx) {
-            ctx.fillStyle = 'rgba(20, 16, 10, 0.65)';
-            ctx.roundRect(96, 12, 576, 120, 24); ctx.fill();
-            ctx.strokeStyle = '#9a8a6a'; ctx.lineWidth = 6;
-            ctx.roundRect(96, 12, 576, 120, 24); ctx.stroke();
-            drawFittedCanvasText(ctx, '🏪 แผงว่าง — เปิดร้านได้!', 384, 90, 520, 54, 24, '#cfc4a8', 700);
-        }
+        const { canvas } = createFramedShopLabel(768, 144, {
+            fill: 'rgba(20, 16, 10, 0.65)',
+            stroke: '#9a8a6a',
+            title: 'แผงว่าง — เปิดร้านได้!',
+            titleColor: '#cfc4a8',
+            titleMaxSize: 54,
+            titleMinSize: 24,
+            boxX: 96,
+            boxY: 12,
+            boxWidth: 576,
+            boxHeight: 120,
+            radius: 24,
+            iconColor: '#cfc4a8',
+        });
         const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
         sign.position.y = 3.1;
         sign.scale.set(2.8, 0.55, 1);
@@ -5180,25 +5222,20 @@ export class SceneManager {
         premiumAppraiser.position.set(0, .18, .48); group.add(premiumAppraiser);
 
         // ---- Floating shop name tag ----
-        const canvas = document.createElement('canvas');
-        canvas.width = 1024; // Higher width to prevent clipping
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(10, 40, 20, 0.7)';
-        ctx.roundRect(64, 16, 896, 96, 24);
-        ctx.fill();
-        ctx.strokeStyle = '#ebd040';
-        ctx.lineWidth = 6;
-        ctx.roundRect(64, 16, 896, 96, 24);
-        ctx.stroke();
-        ctx.font = 'bold 42px "Helvetica Neue", Helvetica, Arial, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffdd44';
-        // '💰 รับซื้อไอเทม (Sell Shop)' is approx 450px wide.
-        // 512 - 225 = 287. Using 280 for safety.
-        ctx.fillText('💰 รับซื้อไอเทม (Sell Shop)', 280, 64);
-
+        const { canvas } = createFramedShopLabel(1024, 128, {
+            fill: 'rgba(10, 40, 20, 0.7)',
+            stroke: '#ebd040',
+            title: 'รับซื้อไอเทม (Sell Shop)',
+            titleColor: '#ffdd44',
+            titleMaxSize: 42,
+            titleMinSize: 22,
+            boxX: 64,
+            boxY: 16,
+            boxWidth: 896,
+            boxHeight: 96,
+            radius: 24,
+            iconColor: '#ffdd44',
+        });
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameTag = new THREE.Sprite(spriteMat);
