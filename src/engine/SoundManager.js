@@ -9,6 +9,9 @@ export class SoundManager {
         // the rest of the SFX (hits, pickups, level-ups) keep playing.
         this.skillSoundsEnabled = true;
         this.masterVolume = 0.3;
+        this.environmentVolume = 0.55;
+        this._environmentNodes = { water: null, waterfall: null };
+        this._environmentNextSplashAt = 0;
         this._initOnInteraction();
     }
 
@@ -34,6 +37,121 @@ export class SoundManager {
             this.ctx.resume();
         }
         return this.ctx;
+    }
+
+    startEnvironmentAudio() {
+        if (!this.enabled) return;
+        const ctx = this._ensureCtx();
+        this._ensureEnvironmentNodes(ctx);
+    }
+
+    setEnvironmentAudio({ waterDistance = Infinity, waterfallDistance = Infinity } = {}) {
+        if (!this.ctx) return;
+        const ctx = this.ctx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        this._ensureEnvironmentNodes(ctx);
+        const waterGain = this._distanceGain(waterDistance, 18);
+        const waterfallGain = this._distanceGain(waterfallDistance, 24);
+        const enabledGain = this.enabled ? 1 : 0;
+        const base = this.masterVolume * this.environmentVolume * enabledGain;
+        const now = ctx.currentTime;
+        const setTarget = (node, value) => {
+            if (!node?.gain?.gain) return;
+            node.gain.gain.setTargetAtTime(Math.max(0, value), now, 0.18);
+        };
+        setTarget(this._environmentNodes.water, base * waterGain * 0.72);
+        setTarget(this._environmentNodes.waterfall, base * waterfallGain);
+
+        // A sparse impact variation prevents the waterfall from sounding like
+        // one perfectly static loop while keeping mobile CPU/audio work small.
+        if (waterfallGain > 0.08 && now >= this._environmentNextSplashAt && enabledGain) {
+            this.playWaterSplash({ volume: waterfallGain * 0.28 });
+            this._environmentNextSplashAt = now + 2.8 + Math.random() * 2.6;
+        }
+    }
+
+    stopEnvironmentAudio() {
+        const ctx = this.ctx;
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        Object.values(this._environmentNodes).forEach((node) => {
+            if (!node?.gain?.gain) return;
+            node.gain.gain.cancelScheduledValues(now);
+            node.gain.gain.setTargetAtTime(0, now, 0.12);
+            try { node.source.stop(now + 0.5); } catch { /* already stopped */ }
+        });
+        this._environmentNodes = { water: null, waterfall: null };
+    }
+
+    _distanceGain(distance, maxDistance) {
+        if (!Number.isFinite(distance) || distance >= maxDistance) return 0;
+        return Math.max(0, 1 - distance / maxDistance) ** 1.35;
+    }
+
+    _ensureEnvironmentNodes(ctx) {
+        if (!ctx) return;
+        if (!this._environmentNodes.water) {
+            this._environmentNodes.water = this._createEnvironmentLoop(ctx, {
+                lowpass: 1350,
+                highpass: 70,
+                volume: 0,
+                seed: 0.18,
+            });
+        }
+        if (!this._environmentNodes.waterfall) {
+            this._environmentNodes.waterfall = this._createEnvironmentLoop(ctx, {
+                lowpass: 2800,
+                highpass: 120,
+                volume: 0,
+                seed: 0.73,
+            });
+        }
+    }
+
+    _createEnvironmentLoop(ctx, { lowpass, highpass, volume = 0, seed = 0 } = {}) {
+        const duration = 2.4;
+        const length = Math.max(1, Math.floor(ctx.sampleRate * duration));
+        const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let smooth = seed * 2 - 1;
+        for (let i = 0; i < length; i++) {
+            // Smoothed noise has a natural water-bed texture and avoids a
+            // harsh white-noise hiss on phone speakers.
+            smooth = smooth * 0.985 + (Math.random() * 2 - 1) * 0.015;
+            data[i] = smooth * 2.3 + (Math.random() * 2 - 1) * 0.16;
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = highpass;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = lowpass;
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        source.connect(hp).connect(lp).connect(gain).connect(ctx.destination);
+        source.start();
+        return { source, gain, hp, lp };
+    }
+
+    playWaterSplash({ volume = 1 } = {}) {
+        if (!this.enabled) return;
+        const ctx = this._ensureCtx();
+        const t = ctx.currentTime;
+        const m = this.masterVolume * Math.max(0, Math.min(1, volume));
+        this._playNoiseBurst(ctx, t, 0.18, m * 0.48, 260, 1800);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(240, t);
+        osc.frequency.exponentialRampToValueAtTime(72, t + 0.24);
+        gain.gain.setValueAtTime(m * 0.22, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.28);
     }
 
     // ============ Attack Hit Sound ============

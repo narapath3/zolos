@@ -1580,6 +1580,33 @@ export class SceneManager {
         this.envObjects.push(pathEastWest);
     }
 
+    setSoundManager(soundManager) {
+        this.soundManager = soundManager || null;
+    }
+
+    _updateWaterAudio(dt) {
+        if (!this.soundManager || !this.camera) return;
+        this._waterAudioTimer = (this._waterAudioTimer || 0) + dt;
+        // Environment audio does not need frame-perfect updates. 12.5 Hz is
+        // smooth enough for mobile and avoids needless Web Audio scheduling.
+        if (this._waterAudioTimer < 0.08) return;
+        this._waterAudioTimer = 0;
+        if (this.currentMap === 'skyrail_bazaar') {
+            this.soundManager.setEnvironmentAudio?.({});
+            return;
+        }
+
+        const { x, z } = this.camera.position;
+        const riverZ = Math.sin(x * 0.08) * 10 - 2;
+        const riverSideDistance = Math.max(0, Math.abs(z - riverZ) - 1.5);
+        const riverEndDistance = Math.max(0, Math.abs(x) - 56);
+        const waterDistance = Math.hypot(riverSideDistance, riverEndDistance);
+        const waterfallDistance = this.currentMap === 'prontera'
+            ? Math.hypot(x + 33, z + 8)
+            : Infinity;
+        this.soundManager.setEnvironmentAudio?.({ waterDistance, waterfallDistance });
+    }
+
     // ============ Water ============
     _createWater(config) {
         if (this.currentMap === 'skyrail_bazaar') {
@@ -5820,6 +5847,7 @@ export class SceneManager {
     updateAnimations(dt) {
         this.time += dt;
         this._updateShopLabelVisibility(dt);
+        this._updateWaterAudio(dt);
         if (this.grassWindUniform) this.grassWindUniform.value = this.time;
         if (this.skyMat?.uniforms?.skyTime) this.skyMat.uniforms.skyTime.value = this.time;
         for (const pet of this.petShowcaseModels || []) {

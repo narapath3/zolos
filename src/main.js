@@ -291,6 +291,7 @@ async function initGame(charData) {
     particles.camera = sceneManager.camera; // used to billboard sword-slash arcs
     window.particles = particles; // exposed for the forge's craft-success burst
     soundManager = new SoundManager();
+    sceneManager.setSoundManager?.(soundManager);
     monsters = new MonsterManager(sceneManager.scene, sceneManager);
     // Local monster deaths resolve here, after ordinary loot is awarded and
     // before respawn. The manager guard advances pity once per monster life.
@@ -925,6 +926,9 @@ async function initGame(charData) {
             const v = parseInt(sfxVolumeStr, 10);
             if (!isNaN(v)) soundManager.masterVolume = Math.max(0, Math.min(1, v / 100));
         }
+        // Start ambience only after the game-start gesture has created the
+        // AudioContext; this is required by mobile Safari autoplay policy.
+        soundManager.startEnvironmentAudio?.();
     }
 
     // Apply persisted game settings
