@@ -56,3 +56,30 @@ test('water reflection-heavy effects remain scoped to adaptive tiers', () => {
   assert.match(source, /depthWrite: false/);
   assert.match(source, /toneMapped: false/);
 });
+
+test('adaptive water adds shoreline foam and Fresnel reflection without forcing high-tier probes on low devices', () => {
+  assert.match(source, /uFoamStrength/);
+  assert.match(source, /uReflectionStrength/);
+  assert.match(source, /float shoreBand =/);
+  assert.match(source, /float foamMask = clamp\(shoreBand/);
+  assert.match(source, /float fresnel = pow/);
+  assert.match(source, /vec3 skyReflection = mix/);
+  assert.match(source, /const enablePlanarReflection = this\.graphicsQuality === 'high'/);
+  assert.match(source, /uPlanarReflectionStrength: \{ value: enablePlanarReflection \? 1\.0 : 0\.0 \}/);
+});
+
+test('high-tier planar reflection is resolution-capped and disposed on map changes', () => {
+  assert.match(source, /new Reflector\(new THREE\.PlaneGeometry\(riverLength, 40\)/);
+  assert.match(source, /Math\.max\(256, Math\.min\(512/);
+  assert.match(source, /multisample: 0/);
+  assert.match(source, /if \(object\.isReflector && typeof object\.dispose === 'function'\)/);
+  assert.match(source, /this\.waterReflection = null/);
+});
+
+test('river shoreline foam uses bounded geometry and animated bubbles', () => {
+  assert.match(source, /_createRiverFoam\(config, riverLength\)/);
+  assert.match(source, /const segments = quality === 'high' \? 72 : 48/);
+  assert.match(source, /new THREE\.TubeGeometry\(curve, segments, radius, 5, false\)/);
+  assert.match(source, /float bubbles = sin\(vUv\.x \* 38\.0/);
+  assert.match(source, /this\.waterFoamMeshes\.forEach/);
+});

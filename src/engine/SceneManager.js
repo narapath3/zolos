@@ -6,6 +6,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { ITEMS } from './GameData.js';
 import { MAP_TRACKS } from './MapMusicConfig.js';
 import { youtubeBGM } from './YouTubeBGM.js';
@@ -427,6 +428,8 @@ export class SceneManager {
         // Animation time
         this.time = 0;
         this.waterMesh = null;
+        this.waterReflection = null;
+        this.waterFoamMeshes = [];
         this.cloudSprites = [];
         this.portalMeshes = [];
         this.oreNodes = [];
@@ -504,6 +507,9 @@ export class SceneManager {
         for (const object of objects) {
             if (!object) continue;
             this.scene.remove(object);
+            if (object.isReflector && typeof object.dispose === 'function') {
+                object.dispose();
+            }
             object.traverse?.(child => {
                 if (child.geometry && !geometries.has(child.geometry)) {
                     geometries.add(child.geometry);
@@ -538,6 +544,8 @@ export class SceneManager {
         this.portalMeshes = [];
         this.oreNodes = [];
         this.waterMesh = null;
+        this.waterReflection = null;
+        this.waterFoamMeshes = [];
         this.cloudSprites = [];
         this.waterfalls = [];
         this.floatingIslands = [];
@@ -1624,26 +1632,69 @@ export class SceneManager {
         this.waterFlowTex = waterTex;
         this.waterShaderUniforms = null;
 
+        const enablePlanarReflection = this.graphicsQuality === 'high';
+        let reflectionProbe = null;
+        if (enablePlanarReflection) {
+            const viewportMin = Math.min(window.innerWidth || 720, window.innerHeight || 720);
+            const reflectionSize = Math.max(256, Math.min(512, Math.floor(viewportMin * 0.5)));
+            const reflectionShader = {
+                ...Reflector.ReflectorShader,
+                uniforms: {
+                    ...Reflector.ReflectorShader.uniforms,
+                    reflectionAlpha: { value: 0.0 },
+                },
+                fragmentShader: Reflector.ReflectorShader.fragmentShader
+                    .replace('uniform vec3 color;\n', 'uniform vec3 color;\nuniform float reflectionAlpha;\n')
+                    .replace(
+                        'gl_FragColor = vec4( blendOverlay( base.rgb, color ), 1.0 );',
+                        'gl_FragColor = vec4( blendOverlay( base.rgb, color ), reflectionAlpha );'
+                    ),
+            };
+            reflectionProbe = new Reflector(new THREE.PlaneGeometry(riverLength, 40), {
+                shader: reflectionShader,
+                textureWidth: reflectionSize,
+                textureHeight: reflectionSize,
+                color: 0x9fd8ec,
+                clipBias: 0.002,
+                multisample: 0,
+            });
+            reflectionProbe.rotation.x = -Math.PI / 2;
+            reflectionProbe.position.set(0, -0.245, -2);
+            reflectionProbe.material.transparent = true;
+            reflectionProbe.material.depthWrite = false;
+            this.waterReflection = reflectionProbe;
+            this.scene.add(reflectionProbe);
+            this.envObjects.push(reflectionProbe);
+        }
+
         const useAdaptiveWater = this.graphicsQuality === 'medium' || this.graphicsQuality === 'high';
         let waterMat;
         if (useAdaptiveWater) {
             const uniforms = {
                 uMap: { value: waterTex },
+                uReflectionMap: { value: reflectionProbe?.getRenderTarget?.().texture || waterTex },
+                uReflectionMatrix: { value: reflectionProbe?.material?.uniforms?.textureMatrix?.value || new THREE.Matrix4() },
                 uTime: { value: 0 },
                 uColor: { value: new THREE.Color(config.waterColor) },
                 uDeepColor: { value: new THREE.Color(config.waterColor).multiplyScalar(0.42) },
-                uFoamColor: { value: new THREE.Color(0xa9eaff) },
+                uFoamColor: { value: new THREE.Color(0xc8f4ff) },
+                uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.9 : 0.62 },
+                uReflectionStrength: { value: this.graphicsQuality === 'high' ? 1.0 : 0.72 },
+                uPlanarReflectionStrength: { value: enablePlanarReflection ? 1.0 : 0.0 },
             };
             this.waterShaderUniforms = uniforms;
             waterMat = new THREE.ShaderMaterial({
                 uniforms,
                 vertexShader: `
                     uniform float uTime;
+                    uniform mat4 uReflectionMatrix;
                     varying vec2 vUv;
+                    varying vec4 vReflectionUv;
                     varying vec3 vWorldPosition;
                     varying vec3 vNormal;
                     void main() {
                         vUv = uv;
+                        vReflectionUv = uReflectionMatrix * vec4(position, 1.0);
                         vec3 p = position;
                         float waveA = sin(position.x * 0.19 + uTime * 0.72) * 0.035;
                         float waveB = cos(position.y * 0.27 - uTime * 0.48) * 0.022;
@@ -1656,11 +1707,16 @@ export class SceneManager {
                 `,
                 fragmentShader: `
                     uniform sampler2D uMap;
+                    uniform sampler2D uReflectionMap;
                     uniform float uTime;
                     uniform vec3 uColor;
                     uniform vec3 uDeepColor;
                     uniform vec3 uFoamColor;
+                    uniform float uFoamStrength;
+                    uniform float uReflectionStrength;
+                    uniform float uPlanarReflectionStrength;
                     varying vec2 vUv;
+                    varying vec4 vReflectionUv;
                     varying vec3 vWorldPosition;
                     varying vec3 vNormal;
                     void main() {
@@ -1671,9 +1727,20 @@ export class SceneManager {
                         float detail = dot(mix(texA, texB, 0.5), vec3(0.30, 0.45, 0.25));
                         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
                         float fresnel = pow(1.0 - max(dot(normalize(vNormal), viewDir), 0.0), 3.0);
+                        // The river plane edges are the shoreline bands. Detail
+                        // breaks the foam so it reads as moving bubbles rather
+                        // than a static white border.
+                        float shoreBand = (1.0 - smoothstep(0.025, 0.16, vUv.y)) + smoothstep(0.84, 0.975, vUv.y);
+                        float foamNoise = smoothstep(0.42, 0.82, detail);
+                        float foamMask = clamp(shoreBand * (0.34 + foamNoise * 0.66) * uFoamStrength, 0.0, 1.0);
+                        float reflection = fresnel * (0.34 + uReflectionStrength * 0.42);
+                        vec3 skyReflection = mix(vec3(0.30, 0.55, 0.72), vec3(0.82, 0.96, 1.0), detail);
+                        vec3 planarReflection = texture2DProj(uReflectionMap, vReflectionUv).rgb;
+                        vec3 reflectionColor = mix(skyReflection, planarReflection, uPlanarReflectionStrength);
                         vec3 color = mix(uDeepColor, uColor, 0.55 + detail * 0.35);
-                        color = mix(color, uFoamColor, fresnel * 0.32 + detail * 0.06);
-                        float alpha = 0.70 + fresnel * 0.16;
+                        color = mix(color, reflectionColor, reflection);
+                        color = mix(color, uFoamColor, foamMask + fresnel * 0.08);
+                        float alpha = 0.70 + fresnel * 0.16 + foamMask * 0.08;
                         gl_FragColor = vec4(color, alpha);
                     }
                 `,
@@ -1703,6 +1770,7 @@ export class SceneManager {
         this.scene.add(water);
         this.envObjects.push(water);
         this.waterMesh = water;
+        if (useAdaptiveWater) this._createRiverFoam(config, riverLength);
 
         // Custom riverbank rocks
         const bankRocks = [
@@ -1735,6 +1803,69 @@ export class SceneManager {
 
         // Bridge over the winding river at x = 0, z = -2
         this._createBridge(0, -2);
+    }
+
+    _createRiverFoam(config, riverLength) {
+        const quality = this.graphicsQuality;
+        if (quality !== 'medium' && quality !== 'high') return;
+        const segments = quality === 'high' ? 72 : 48;
+        const radius = quality === 'high' ? 0.075 : 0.055;
+        const riverHalfWidth = 5.25;
+        const makeFoamSide = (side) => {
+            const points = [];
+            for (let i = 0; i <= 18; i++) {
+                const x = -riverLength * 0.5 + (riverLength * i) / 18;
+                const centerZ = Math.sin(x * 0.08) * 10 - 2;
+                const ripple = Math.sin(x * 0.31 + side * 1.7) * 0.12;
+                points.push(new THREE.Vector3(x, -0.205, centerZ + side * riverHalfWidth + ripple));
+            }
+            const curve = new THREE.CatmullRomCurve3(points);
+            const geometry = new THREE.TubeGeometry(curve, segments, radius, 5, false);
+            const uniforms = {
+                uTime: { value: 0 },
+                uColor: { value: new THREE.Color(0xcff7ff) },
+                uOpacity: { value: quality === 'high' ? 0.55 : 0.38 },
+                uPhase: { value: side * 1.4 },
+            };
+            const material = new THREE.ShaderMaterial({
+                uniforms,
+                vertexShader: `
+                    uniform float uTime;
+                    uniform float uPhase;
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        vec3 p = position;
+                        p.y += sin(uv.x * 34.0 - uTime * 1.7 + uPhase) * 0.018;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float uTime;
+                    uniform float uPhase;
+                    uniform vec3 uColor;
+                    uniform float uOpacity;
+                    varying vec2 vUv;
+                    void main() {
+                        float bubbles = sin(vUv.x * 38.0 - uTime * 2.3 + uPhase) * 0.5 + 0.5;
+                        bubbles *= sin(vUv.x * 17.0 + uTime * 1.4) * 0.5 + 0.5;
+                        float rim = 1.0 - abs(vUv.y - 0.5) * 1.85;
+                        float alpha = uOpacity * clamp(rim, 0.0, 1.0) * (0.35 + bubbles * 0.65);
+                        gl_FragColor = vec4(uColor, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                toneMapped: false,
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            this.scene.add(mesh);
+            this.envObjects.push(mesh);
+            this.waterFoamMeshes.push({ mesh, uniforms });
+        };
+        makeFoamSide(-1);
+        makeFoamSide(1);
     }
 
     // ============ PVP Arena ============
@@ -5906,6 +6037,11 @@ export class SceneManager {
         } else if (this.waterFlowTex) {
             this.waterFlowTex.offset.x += dt * 0.025;
             this.waterFlowTex.offset.y += dt * 0.008;
+        }
+        if (this.waterFoamMeshes?.length) {
+            this.waterFoamMeshes.forEach(({ uniforms }) => {
+                if (uniforms?.uTime) uniforms.uTime.value = this.time;
+            });
         }
 
         // Sakura petals drifting down from cherry trees
