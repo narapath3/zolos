@@ -87,7 +87,8 @@ export class Monster {
         this.wanderTimer = 0;
         this.hitFlash = 0;
         this.isMoving = false; // Flag to track movement for water splashing
-        this.isWaterMonster = !!this.data.waterOnly;
+        this.isAmbient = this.data.ambientOnly === true;
+        this.isWaterMonster = !this.isAmbient && !!this.data.waterOnly;
         this.estimatedLevel = Math.max(1, Math.round((Math.sqrt(this.data.hp / 30) + this.data.atk / 5) / 2));
 
         this._createModel(position);
@@ -871,8 +872,9 @@ export class Monster {
             pupilR.add(shineL.clone());
         }
 
-        this._addRemasterAura(size, color);
+        if (!this.isAmbient) this._addRemasterAura(size, color);
 
+        if (!this.isAmbient) {
         // HP bar above monster
         const hpBarBg = new THREE.Mesh(
             new THREE.PlaneGeometry(0.8, 0.08),
@@ -916,6 +918,7 @@ export class Monster {
         this._nameContext = ctx;
         this._nameTexture = texture;
         this._dangerTier = null;
+        }
 
         // Shadow
         const shadowGeo = new THREE.CircleGeometry(size * 0.5, 12);
@@ -970,6 +973,7 @@ export class Monster {
     }
 
     takeDamage(amount, isCritical = false, options = {}) {
+        if (this.isAmbient) return { killed: false, damage: 0 };
         const actualDmg = resolveMonsterDamage(amount, this.data.def, options);
         this.hp = Math.max(0, this.hp - actualDmg);
         // Getting hit provokes it — chase the attacker for a while.
@@ -1021,6 +1025,7 @@ export class Monster {
         this._serverControlled = true;
     }
     setServerHp(hp, maxHp) {
+        if (this.isAmbient) return;
         this.maxHp = maxHp || this.maxHp;
         this.hp = Math.max(0, hp);
         if (this.hpBarFill) this.hpBarFill.scale.x = Math.max(0.01, this.hp / this.maxHp);
@@ -1033,6 +1038,7 @@ export class Monster {
     }
 
     triggerAttackPresentation() {
+        if (this.isAmbient) return null;
         this._attackAnim = this._attackAnimDuration;
         return getMonsterAttackStyle(this);
     }
@@ -1129,6 +1135,7 @@ export class Monster {
     }
 
     update(dt, camera, sceneManager, player, onAttackPlayer) {
+        if (this.isAmbient) return;
         this._updateDangerLabel(player?.stats?.level);
         if (!this.alive) return;
         if (this._serverControlled) return this._updateServerRendered(dt, camera);
@@ -1432,6 +1439,12 @@ export class MonsterManager {
         if (!this._srvById) this._srvById = new Map();
         const snapshotIds = new Set(payload.mons.map(s => s && s.id).filter(Boolean));
         for (const s of payload.mons) {
+            if (s?.t === 'clam') {
+                const ambientMonster = this._srvById.get(s.id);
+                if (ambientMonster) this._removeServerMonster(ambientMonster);
+                snapshotIds.delete(s.id);
+                continue;
+            }
             let m = this._srvById.get(s.id);
             let spawnedNew = false;
             // A respawn usually rerolls the monster type, so the id comes back as
@@ -1504,7 +1517,7 @@ export class MonsterManager {
     // FX + resolve card drops. Respawn is server-driven (it reappears in state).
     killServerMonster(id) {
         const m = this._srvById && this._srvById.get(id);
-        if (!m || !m.alive) return null;
+        if (!m || m.isAmbient || !m.alive) return null;
         m.alive = false;
         m._attackAnim = 0;
         m._awaitingServerRespawn = true;
@@ -1703,7 +1716,7 @@ export class MonsterManager {
 
     queueRespawn(monster) {
         if ((this.sceneManager?.currentMap || this.mapId) === 'skyrail_bazaar') return;
-        if (!monster || monster._respawnQueued) return;
+        if (!monster || monster.isAmbient || monster._respawnQueued) return;
         monster._respawnQueued = true;
         if (!monster._cardDeathResolved) {
             monster._cardDeathResolved = true;
@@ -1737,7 +1750,7 @@ export class MonsterManager {
         const pools = landOnly ? [this.monsters] : [this.monsters, this.waterMonsters];
         for (const pool of pools) {
             for (const m of pool) {
-                if (!m.alive) continue;
+                if (!m.alive || m.isAmbient) continue;
                 const d = m.distanceTo(position);
                 if (d < nearestDist) {
                     nearestDist = d;
@@ -1751,6 +1764,6 @@ export class MonsterManager {
 
     // Get all alive monsters (land + water)
     getAlive() {
-        return [...this.monsters, ...this.waterMonsters].filter(m => m.alive);
+        return [...this.monsters, ...this.waterMonsters].filter(m => m.alive && !m.isAmbient);
     }
 }

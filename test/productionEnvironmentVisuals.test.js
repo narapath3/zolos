@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+const gameDataSource = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
+const monsterSource = fs.readFileSync(new URL('../src/engine/MonsterManager.js', import.meta.url), 'utf8');
+const serverMonsterSource = fs.readFileSync(new URL('../server/game/monsterEngine.js', import.meta.url), 'utf8');
 
 test('fantasy sky includes a physical sun halo, horizon haze and banding control', () => {
   assert.match(source, /sunDirection/);
@@ -82,4 +85,24 @@ test('river shoreline foam uses bounded geometry and animated bubbles', () => {
   assert.match(source, /new THREE\.TubeGeometry\(curve, segments, radius, 5, false\)/);
   assert.match(source, /float bubbles = sin\(vUv\.x \* 38\.0/);
   assert.match(source, /this\.waterFoamMeshes\.forEach/);
+});
+
+test('Clam is an ambient aquatic actor rather than a combat monster', () => {
+  assert.match(gameDataSource, /clam:\s*\{[\s\S]*?ambientOnly: true/);
+  assert.doesNotMatch(gameDataSource, /table\.push\(\{ type: 'clam'/);
+  assert.doesNotMatch(gameDataSource, /clam: \{ family: 'aquatic' \}/);
+  assert.match(monsterSource, /this\.isAmbient = this\.data\.ambientOnly === true/);
+  assert.match(monsterSource, /if \(!this\.isAmbient\) \{/);
+  assert.match(monsterSource, /if \(this\.isAmbient\) return \{ killed: false, damage: 0 \}/);
+  assert.match(monsterSource, /if \(s\?\.t === 'clam'\)/);
+  assert.match(monsterSource, /if \(!m\.alive \|\| m\.isAmbient\) continue/);
+  assert.match(source, /_createAmbientClamActors\(riverLength\)/);
+  assert.match(source, /actor\.name = 'ambient-clam-actor'/);
+});
+
+test('server filters legacy Clam rows from authoritative water spawn, respawn and snapshots', () => {
+  assert.match(serverMonsterSource, /const AMBIENT_WATER_TYPES = new Set\(\['clam'\]\)/);
+  assert.match(serverMonsterSource, /s\.is_water && !AMBIENT_WATER_TYPES\.has\(s\.monster_type\)/);
+  assert.match(serverMonsterSource, /!!s\.is_water === m\.isWater && !AMBIENT_WATER_TYPES\.has\(s\.monster_type\)/);
+  assert.match(serverMonsterSource, /!m\.alive \|\| AMBIENT_WATER_TYPES\.has\(m\.type\)/);
 });

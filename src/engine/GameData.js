@@ -932,6 +932,9 @@ export const WATER_MONSTERS = {
         ]
     },
     clam: {
+        // Ambient-only aquatic actor: retained for legacy model/card data but
+        // excluded from every combat spawn table and reward path.
+        ambientOnly: true,
         name: 'Clam',
         emoji: '🐚',
         color: 0xd0b890,
@@ -1733,7 +1736,7 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
 export function getWaterSpawnTable(playerLevel) {
     const table = [];
     table.push({ type: 'shrimp', weight: 30 });
-    table.push({ type: 'clam', weight: 20 });
+    // Clam is an ambient aquatic actor, never a combat spawn.
     if (playerLevel >= 2) table.push({ type: 'fish', weight: 25 });
     if (playerLevel >= 4) table.push({ type: 'crab', weight: 20 });
     if (playerLevel >= 7) table.push({ type: 'marina', weight: 12 });
@@ -1778,7 +1781,7 @@ const MONSTER_COMBAT_META = Object.freeze({
     gargoyle: { family: 'construct' }, iron_golem: { family: 'construct' }, storm_dragon: { family: 'dragon', isBoss: true, isElite: true },
     dragon_egg: { family: 'dragon' }, sea_dragon: { family: 'dragon' }, leib_olmai: { family: 'beast' },
     dark_illusion: { family: 'undead' }, abyss_knight: { family: 'undead', isBoss: true, isElite: true },
-    shrimp: { family: 'aquatic' }, clam: { family: 'aquatic' }, fish: { family: 'aquatic' },
+    shrimp: { family: 'aquatic' }, fish: { family: 'aquatic' },
     crab: { family: 'aquatic' }, marina: { family: 'aquatic' },
 });
 

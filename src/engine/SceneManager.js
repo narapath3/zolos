@@ -430,6 +430,7 @@ export class SceneManager {
         this.waterMesh = null;
         this.waterReflection = null;
         this.waterFoamMeshes = [];
+        this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.portalMeshes = [];
         this.oreNodes = [];
@@ -546,6 +547,7 @@ export class SceneManager {
         this.waterMesh = null;
         this.waterReflection = null;
         this.waterFoamMeshes = [];
+        this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.waterfalls = [];
         this.floatingIslands = [];
@@ -1771,6 +1773,7 @@ export class SceneManager {
         this.envObjects.push(water);
         this.waterMesh = water;
         if (useAdaptiveWater) this._createRiverFoam(config, riverLength);
+        this._createAmbientClamActors(riverLength);
 
         // Custom riverbank rocks
         const bankRocks = [
@@ -1803,6 +1806,55 @@ export class SceneManager {
 
         // Bridge over the winding river at x = 0, z = -2
         this._createBridge(0, -2);
+    }
+
+    _createAmbientClamActors(riverLength) {
+        const quality = this.graphicsQuality;
+        const count = quality === 'high' ? 5 : quality === 'medium' ? 3 : 2;
+        for (let i = 0; i < count; i++) {
+            const actor = new THREE.Group();
+            actor.name = 'ambient-clam-actor';
+            const shellMat = new THREE.MeshStandardMaterial({
+                color: 0xd7b98b,
+                roughness: 0.54,
+                metalness: 0.02,
+                emissive: 0x2a1d12,
+                emissiveIntensity: 0.12,
+            });
+            const innerMat = new THREE.MeshStandardMaterial({
+                color: 0xf3d9cf,
+                roughness: 0.42,
+                metalness: 0.0,
+                emissive: 0x24141b,
+                emissiveIntensity: 0.1,
+            });
+            const shell = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 6), shellMat);
+            shell.scale.set(1.25, 0.34, 0.88);
+            shell.rotation.z = -0.16;
+            shell.position.y = 0.04;
+            actor.add(shell);
+            const inner = new THREE.Mesh(new THREE.SphereGeometry(0.2, 9, 6), innerMat);
+            inner.scale.set(1.15, 0.2, 0.72);
+            inner.position.set(0, 0.105, 0.02);
+            actor.add(inner);
+            const pearl = new THREE.Mesh(
+                new THREE.SphereGeometry(0.055, 8, 6),
+                new THREE.MeshStandardMaterial({ color: 0xfff4e8, roughness: 0.18, metalness: 0.05 })
+            );
+            pearl.position.set(0.02, 0.16, 0.02);
+            actor.add(pearl);
+            const phase = i * 1.83 + 0.4;
+            actor.userData.ambientType = 'clam';
+            actor.userData.phase = phase;
+            actor.userData.baseX = -36 + i * 18.5;
+            actor.userData.baseZ = Math.sin(actor.userData.baseX * 0.08) * 10 - 2 + (i % 2 ? 2.5 : -2.6);
+            actor.userData.speed = 0.18 + (i % 3) * 0.035;
+            actor.position.set(actor.userData.baseX, -0.12, actor.userData.baseZ);
+            actor.rotation.y = phase;
+            this.scene.add(actor);
+            this.envObjects.push(actor);
+            this.ambientAquaticActors.push(actor);
+        }
     }
 
     _createRiverFoam(config, riverLength) {
@@ -6041,6 +6093,17 @@ export class SceneManager {
         if (this.waterFoamMeshes?.length) {
             this.waterFoamMeshes.forEach(({ uniforms }) => {
                 if (uniforms?.uTime) uniforms.uTime.value = this.time;
+            });
+        }
+        if (this.ambientAquaticActors?.length) {
+            this.ambientAquaticActors.forEach((actor) => {
+                const { baseX, baseZ, phase, speed } = actor.userData;
+                const t = this.time * speed + phase;
+                actor.position.x = baseX + Math.sin(t * 0.48) * 2.2;
+                actor.position.z = baseZ + Math.cos(t * 0.62) * 1.25;
+                actor.position.y = -0.13 + Math.sin(t * 1.8) * 0.035;
+                actor.rotation.y = phase + Math.sin(t * 0.48) * 0.28;
+                actor.rotation.z = Math.sin(t * 1.1) * 0.08;
             });
         }
 
