@@ -89,41 +89,90 @@ function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSiz
 }
 
 function createShopSignCanvas(shopName, {
-    fill = 'rgba(18, 12, 28, 0.94)',
-    accent = '#ffd24a',
-    titleFill = 'rgba(255, 228, 154, 0.22)',
+    fill = 'rgba(18, 12, 28, 0.96)',
+    accent = '#f6d27a',
+    titleFill = 'rgba(255, 236, 176, 0.12)',
 } = {}) {
-    const width = 896;
-    const height = 260;
+    // A thin market-board silhouette reads as a real sign attached to the
+    // awning, instead of a tall floating UI card. Keep the canvas aspect ratio
+    // stable so Safari and Android scale the same bitmap geometry.
+    const width = 1024;
+    const height = 180;
     const { canvas, ctx } = createHiDPICanvas(width, height);
     if (!ctx) return canvas;
 
-    const panel = { x: 48, y: 16, width: 800, height: 228 };
+    const panel = { x: 20, y: 18, width: 984, height: 144 };
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.48)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 8;
     ctx.fillStyle = fill;
-    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 34);
-    ctx.fill();
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 7;
-    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 34);
-    ctx.stroke();
-
-    // One title row only. The title capsule is centered in the full sign,
-    // with no owner row or side icon that can make the label appear doubled.
-    const titleBox = { x: 100, y: 86, width: 696, height: 88 };
-    ctx.fillStyle = titleFill;
-    ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 22);
-    ctx.fill();
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 4;
-    ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 22);
-    ctx.stroke();
-
-    ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.arc(width / 2, 30, 6, 0, Math.PI * 2);
+    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 28);
     ctx.fill();
-    drawFittedCanvasText(ctx, shopName || 'ร้านค้า', width / 2, 145, 600, 48, 22, '#fff8e7', 700, 18, 1);
+    ctx.restore();
+
+    // Double hairline border: premium but quiet, with identical left/right
+    // geometry so the optical center is the mathematical center.
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 28);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(panel.x + 11, panel.y + 11, panel.width - 22, panel.height - 22, 19);
+    ctx.stroke();
+
+    const titleBox = { x: 94, y: 43, width: 836, height: 94 };
+    ctx.fillStyle = titleFill;
+    ctx.beginPath();
+    ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 20);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 20);
+    ctx.stroke();
+
+    // Symmetric brass rivets are decorative only; they never consume title
+    // width and therefore cannot push Thai text toward the right on iOS.
+    ctx.fillStyle = accent;
+    [panel.x + 30, panel.x + panel.width - 30].forEach((x) => {
+        ctx.beginPath();
+        ctx.arc(x, height / 2, 7, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    drawFittedCanvasText(ctx, shopName || 'ร้านค้า', width / 2, 104, 760, 50, 22, '#fff9e8', 700, 26, 1);
     return canvas;
+}
+
+function createShopSignSprite(shopName, options = {}) {
+    const canvas = createShopSignCanvas(shopName, options);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.generateMipmaps = false;
+
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+    }));
+    sprite.renderOrder = 1001;
+    sprite.userData.isShopLabel = true;
+    const touch = /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
+        || window.matchMedia?.('(pointer: coarse)')?.matches;
+    const worldWidth = touch ? 3.55 : 4.05;
+    sprite.scale.set(worldWidth, worldWidth * (canvas.height / canvas.width), 1);
+    return sprite;
 }
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
@@ -4547,17 +4596,14 @@ export class SceneManager {
         group.add(premiumMerchant);
 
         // ---- Floating shop name tag ----
-        const canvas = createShopSignCanvas('ร้านค้า', {
-            fill: 'rgba(40, 20, 10, 0.92)',
+        const nameTag = createShopSignSprite('ร้านค้า', {
+            fill: 'rgba(40, 20, 10, 0.94)',
             accent: '#ffd040',
-            titleFill: 'rgba(40, 20, 10, 0.45)',
+            titleFill: 'rgba(255,255,255,0.1)',
         });
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        const nameTag = new THREE.Sprite(spriteMat);
-        nameTag.position.y = 4.4;
-        nameTag.scale.set(5.0, 1.45, 1);
+        nameTag.position.y = 4.35;
         group.add(nameTag);
+        group.userData.shopLabel = nameTag;
 
         // ---- Position the entire shop on dry land ----
         group.position.set(-8, 0, 5);
@@ -4967,30 +5013,16 @@ export class SceneManager {
                 group.add(itemSprite);
             }
 
-            // Rebuilt shop sign: one symmetric canvas with a single centered title.
-            const signCanvas = createShopSignCanvas(stall.shop_name, {
-                fill: `rgba(${(awningColor >> 16) & 255}, ${(awningColor >> 8) & 255}, ${awningColor & 255}, 0.92)`,
+            // One compact billboard sign attached to the awning. Product
+            // details remain in the stall modal; the world label is identity only.
+            const sign = createShopSignSprite(stall.shop_name, {
+                fill: `rgba(${(awningColor >> 16) & 255}, ${(awningColor >> 8) & 255}, ${awningColor & 255}, 0.94)`,
                 accent: '#fff1a8',
-                titleFill: 'rgba(20, 12, 28, 0.42)',
+                titleFill: 'rgba(20, 12, 28, 0.36)',
             });
-            const signTexture = new THREE.CanvasTexture(signCanvas);
-            signTexture.colorSpace = THREE.SRGBColorSpace;
-            signTexture.minFilter = THREE.LinearFilter;
-            signTexture.magFilter = THREE.LinearFilter;
-            signTexture.generateMipmaps = false;
-            const sign = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: signTexture,
-                transparent: true,
-                depthTest: false,
-                depthWrite: false,
-            }));
-            sign.renderOrder = 1001;
             sign.position.y = 3.35;
-            const isTouchViewport = /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
-                || window.matchMedia?.('(pointer: coarse)')?.matches;
-            const signScale = isTouchViewport ? 2.55 : 3.2;
-            sign.scale.set(signScale, isTouchViewport ? 0.92 : 1.1, 1);
             group.add(sign);
+            group.userData.shopLabel = sign;
 
             // Sit on the ground rather than at y = 0: the field still rolls by
             // ±0.15, which is enough to sink the thin base slab out of sight.
@@ -5034,15 +5066,14 @@ export class SceneManager {
         awning.position.set(0, 2.45, 0.1); awning.rotation.x = -0.12;
         group.add(awning);
 
-        const canvas = createShopSignCanvas('แผงว่าง — เปิดร้านได้!', {
-            fill: 'rgba(20, 16, 10, 0.82)',
+        const sign = createShopSignSprite('เปิดร้าน', {
+            fill: 'rgba(28, 24, 18, 0.9)',
             accent: '#cfc4a8',
-            titleFill: 'rgba(20, 16, 10, 0.42)',
+            titleFill: 'rgba(255,255,255,0.08)',
         });
-        const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
-        sign.position.y = 3.1;
-        sign.scale.set(2.8, 0.82, 1);
+        sign.position.y = 3.28;
         group.add(sign);
+        group.userData.shopLabel = sign;
 
         group.position.set(x, this.getTerrainHeight(x, z), z);
         return group;
@@ -5216,17 +5247,14 @@ export class SceneManager {
         premiumAppraiser.position.set(0, .18, .48); group.add(premiumAppraiser);
 
         // ---- Floating shop name tag ----
-        const canvas = createShopSignCanvas('รับซื้อไอเทม (Sell Shop)', {
-            fill: 'rgba(10, 40, 20, 0.92)',
+        const nameTag = createShopSignSprite('รับซื้อไอเทม', {
+            fill: 'rgba(10, 40, 20, 0.94)',
             accent: '#ffdd44',
-            titleFill: 'rgba(10, 40, 20, 0.45)',
+            titleFill: 'rgba(255,255,255,0.1)',
         });
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        const nameTag = new THREE.Sprite(spriteMat);
-        nameTag.position.y = 4.4;
-        nameTag.scale.set(5.7, 1.65, 1);
+        nameTag.position.y = 4.35;
         group.add(nameTag);
+        group.userData.shopLabel = nameTag;
 
         // Position on dry land - slightly higher elevation and shifted
         group.position.set(9.5, 0.45, -4.5);
@@ -5592,9 +5620,43 @@ export class SceneManager {
         };
     }
 
-    // ============ Animate per-frame ============
+    _updateShopLabelVisibility(dt) {
+        if (!this.camera) return;
+        this._shopLabelTimer = (this._shopLabelTimer || 0) + dt;
+        // Throttle material writes so a crowded market remains inexpensive on
+        // lower-end Android devices as well as iPhone/iPad.
+        if (this._shopLabelTimer < 0.08) return;
+        this._shopLabelTimer = 0;
+
+        const groups = [
+            ...(this.stallMeshes || []),
+            this.npcMesh,
+            this.npcSellMesh,
+        ];
+        const camera = this.camera.position;
+        const world = new THREE.Vector3();
+        groups.forEach((group) => {
+            const label = group?.userData?.shopLabel;
+            if (!label?.material) return;
+            label.getWorldPosition(world);
+            const distance = world.distanceTo(camera);
+            // Nearby signs remain crisp; distant signs recede instead of
+            // becoming a wall of overlapping text in the market street.
+            const targetOpacity = distance <= 11
+                ? 1
+                : distance >= 32
+                    ? 0.18
+                    : 1 - ((distance - 11) / 21) * 0.82;
+            const material = label.material;
+            material.opacity += (targetOpacity - material.opacity) * 0.22;
+            label.visible = material.opacity > 0.08;
+        });
+    }
+
+    // ============ Animate per-frame ==========
     updateAnimations(dt) {
         this.time += dt;
+        this._updateShopLabelVisibility(dt);
         if (this.grassWindUniform) this.grassWindUniform.value = this.time;
         if (this.skyMat?.uniforms?.skyTime) this.skyMat.uniforms.skyTime.value = this.time;
         for (const pet of this.petShowcaseModels || []) {
