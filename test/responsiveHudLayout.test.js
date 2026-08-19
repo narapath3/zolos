@@ -37,10 +37,12 @@ test('in-world stall signs use high-DPI Thai-safe fitted canvas text', () => {
   assert.match(scene, /function createFramedShopLabel\(width, height/);
   assert.match(scene, /createFramedShopLabel\(1024, 128/);
   assert.match(scene, /createFramedShopLabel\(768, 144/);
-  assert.match(scene, /drawFittedCanvasText\(ctx, stall\.shop_name/);
-  assert.match(scene, /stall\.shop_name \|\| 'ร้านค้า'.*560, 62, 26.*24, 2\)/);
+  assert.match(scene, /function createShopTextSprite\(value, maxSize, minSize/);
+  assert.match(scene, /createShopTextSprite\(stall\.shop_name \|\| 'ร้านค้า'/);
+  assert.match(scene, /titleSprite\.position\.set\(0, 3\.42, 0\)/);
+  assert.match(scene, /ownerSprite\.position\.set\(0, 3\.06, 0\)/);
   assert.match(scene, /boxWidth - 112/);
-  assert.match(scene, /drawFittedCanvasText\(ctx, `ร้านของ \$\{stall\.owner_name/);
+  assert.match(scene, /createShopTextSprite\(`ร้านของ \$\{stall\.owner_name/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 44px Arial'/);
   assert.doesNotMatch(scene, /ctx\.font = 'bold 30px Arial'/);
   assert.match(scene, /const safeWidth = Math\.max\(1, maxWidth - \(padding \* 2\)\)/);
@@ -49,6 +51,7 @@ test('in-world stall signs use high-DPI Thai-safe fitted canvas text', () => {
   assert.doesNotMatch(scene, /ctx\.fillText\('🏪 ร้านค้า'/);
   assert.doesNotMatch(scene, /ctx\.fillText\('💰 รับซื้อไอเทม/);
   assert.doesNotMatch(scene, /drawFittedCanvasText\(ctx, '🏪 แผงว่าง/);
+  assert.doesNotMatch(scene, /drawFittedCanvasText\(ctx, stall\.shop_name/);
   assert.match(scene, /const isTouchViewport = \/Android\|iPad\|iPhone\|iPod\/i\.test\(navigator\.userAgent\)/);
   assert.match(scene, /const signScale = isTouchViewport \? 2\.55 : 3\.2/);
   assert.match(scene, /function drawFittedCanvasText\([^)]*maxLines = 1/);

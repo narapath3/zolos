@@ -134,6 +134,19 @@ function createFramedShopLabel(width, height, {
     return { canvas, ctx };
 }
 
+function createShopTextSprite(value, maxSize, minSize, maxWidth = 520, maxLines = 1) {
+    const { canvas, ctx } = createHiDPICanvas(640, 96);
+    drawFittedCanvasText(ctx, value, 320, 62, maxWidth, maxSize, minSize, '#fff7e8', 700, 22, maxLines);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(canvas),
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+    }));
+    sprite.renderOrder = 1001;
+    return sprite;
+}
+
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
 export const PET_BOUTIQUE_POSITION = Object.freeze({ x: -10, z: -7 });
@@ -4999,9 +5012,9 @@ export class SceneManager {
                 ctx.beginPath();
                 ctx.arc(82, 96, 9, 0, Math.PI * 2);
                 ctx.fill();
-                drawFittedCanvasText(ctx, stall.shop_name || 'ร้านค้า', 384, 102, 560, 62, 26, '#ffd97a', 700, 24, 2);
+                // Text is rendered as independent centered sprites below. Keeping
+                // it out of this frame texture avoids iOS texture/padding drift.
                 ctx.shadowBlur = 0;
-                drawFittedCanvasText(ctx, `ร้านของ ${stall.owner_name || '???'}`, 384, 207, 560, 42, 20, '#cfe0f0', 700, 24, 2);
             }
             const sign = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: new THREE.CanvasTexture(canvas), transparent: true
@@ -5012,6 +5025,15 @@ export class SceneManager {
             const signScale = isTouchViewport ? 2.55 : 3.2;
             sign.scale.set(signScale, isTouchViewport ? 0.82 : 1.0, 1);
             group.add(sign);
+
+            const titleSprite = createShopTextSprite(stall.shop_name || 'ร้านค้า', 54, 18, 520, 1);
+            titleSprite.position.set(0, 3.42, 0);
+            titleSprite.scale.set(signScale * 0.84, (isTouchViewport ? 0.82 : 1.0) * 0.27, 1);
+            group.add(titleSprite);
+            const ownerSprite = createShopTextSprite(`ร้านของ ${stall.owner_name || '???'}`, 34, 16, 520, 1);
+            ownerSprite.position.set(0, 3.06, 0);
+            ownerSprite.scale.set(signScale * 0.84, (isTouchViewport ? 0.82 : 1.0) * 0.22, 1);
+            group.add(ownerSprite);
 
             // Sit on the ground rather than at y = 0: the field still rolls by
             // ±0.15, which is enough to sink the thin base slab out of sight.
