@@ -117,6 +117,8 @@ test('river guard rails block land-to-water movement but keep the bridge crossin
   assert.match(sceneSource, /if \(bridgeDeckOpen\(fromPosition\) \|\| bridgeDeckOpen\(toPosition\)\) return resolved/);
   assert.match(sceneSource, /const toDistance = Math\.abs\(toDelta\)/);
   assert.match(sceneSource, /Math\.sign\(toDelta \|\| fromDelta\) === side/);
+  assert.match(sceneSource, /if \(fromDistance < guardLine\)/);
+  assert.match(sceneSource, /const exitSide = toDelta >= 0 \? 1 : -1/);
   assert.match(mainSource, /setMovementCollisionResolver/);
   assert.match(characterSource, /movementCollisionResolver/);
   assert.match(characterSource, /const resolvedPosition = this\.movementCollisionResolver/);

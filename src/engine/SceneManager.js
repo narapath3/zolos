@@ -6394,9 +6394,16 @@ export class SceneManager {
         const toDistance = Math.abs(toDelta);
         const guardLine = 5.55;
 
-        // Preserve recovery from a legacy save that placed a player in water;
-        // normal land-to-water movement is handled by the swept boundary below.
-        if (fromDistance < guardLine) return resolved;
+        // Players already inside the river may continue moving in the water,
+        // but cannot exit through a guard rail. They must use the bridge deck,
+        // which remains the intentional recovery route for legacy positions.
+        if (fromDistance < guardLine) {
+            if (toDistance < guardLine) return resolved;
+            const exitSide = toDelta >= 0 ? 1 : -1;
+            resolved.z = riverCenter(toPosition.x) + exitSide * guardLine;
+            resolved.y = toPosition.y;
+            return resolved;
+        }
 
         // Block both entering the river and jumping across it in a single
         // movement step. This closes gaps between rail posts and click-to-move
