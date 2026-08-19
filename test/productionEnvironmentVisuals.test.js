@@ -30,3 +30,29 @@ test('lighting preserves warm key light with cool sky fill and soft shadow bias'
   assert.match(source, /shadow\.normalBias = 0\.025/);
   assert.match(source, /outputColorSpace = THREE\.SRGBColorSpace/);
 });
+
+test('river water upgrades to an adaptive Fresnel shader on medium/high tiers and keeps a low-cost fallback', () => {
+  assert.match(source, /const useAdaptiveWater = this\.graphicsQuality === 'medium' \|\| this\.graphicsQuality === 'high'/);
+  assert.match(source, /uTime: \{ value: 0 \}/);
+  assert.match(source, /uniform sampler2D uMap/);
+  assert.match(source, /float fresnel = pow/);
+  assert.match(source, /waterShaderUniforms\.uTime\.value = this\.time/);
+  assert.match(source, /Ultra-low\/low keeps a single inexpensive lit material/);
+});
+
+test('waterfall uses quality-scaled flow ribbons, foam, mist, and impact spray', () => {
+  assert.match(source, /const useAdaptiveFall = this\.graphicsQuality === 'medium' \|\| this\.graphicsQuality === 'high'/);
+  assert.match(source, /const makeFlowMaterial = \(color, opacity, phase = 0\)/);
+  assert.match(source, /flowUv\.y -= uTime \* 0\.58/);
+  assert.match(source, /const mistN = this\.graphicsQuality === 'high'/);
+  assert.match(source, /const sprayN = this\.graphicsQuality === 'high'/);
+  assert.match(source, /waterfallStateFinal\.spray/);
+  assert.match(source, /wf\.foam\.scale\.set/);
+  assert.match(source, /wf\.pool\.scale\.setScalar/);
+});
+
+test('water reflection-heavy effects remain scoped to adaptive tiers', () => {
+  assert.match(source, /this\.graphicsQuality === 'medium' \|\| this\.graphicsQuality === 'high'/g);
+  assert.match(source, /depthWrite: false/);
+  assert.match(source, /toneMapped: false/);
+});

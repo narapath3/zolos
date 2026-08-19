@@ -1590,20 +1590,85 @@ export class SceneManager {
         const riverLength = this.currentMap === 'prontera' ? 116 : 80;
         const waterGeo = new THREE.PlaneGeometry(riverLength, 40, this.currentMap === 'prontera' ? 110 : 80, 30);
         const waterTex = this._createWaterTexture();
-        // Flowing water: scroll the caustic texture along the river each frame
+        waterTex.colorSpace = THREE.SRGBColorSpace;
         waterTex.wrapS = THREE.RepeatWrapping;
         waterTex.wrapT = THREE.RepeatWrapping;
+        waterTex.anisotropy = Math.min(this.graphicsQuality === 'high' ? 4 : 2, this.renderer.capabilities.getMaxAnisotropy());
         this.waterFlowTex = waterTex;
-        const waterMat = new THREE.MeshPhongMaterial({
-            color: config.waterColor,
-            map: waterTex,
-            transparent: true,
-            opacity: 0.68,
-            shininess: 140,
-            specular: 0xc0e8ff,
-            side: THREE.DoubleSide,
-            envMapIntensity: 0.4,
-        });
+        this.waterShaderUniforms = null;
+
+        const useAdaptiveWater = this.graphicsQuality === 'medium' || this.graphicsQuality === 'high';
+        let waterMat;
+        if (useAdaptiveWater) {
+            const uniforms = {
+                uMap: { value: waterTex },
+                uTime: { value: 0 },
+                uColor: { value: new THREE.Color(config.waterColor) },
+                uDeepColor: { value: new THREE.Color(config.waterColor).multiplyScalar(0.42) },
+                uFoamColor: { value: new THREE.Color(0xa9eaff) },
+            };
+            this.waterShaderUniforms = uniforms;
+            waterMat = new THREE.ShaderMaterial({
+                uniforms,
+                vertexShader: `
+                    uniform float uTime;
+                    varying vec2 vUv;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vNormal;
+                    void main() {
+                        vUv = uv;
+                        vec3 p = position;
+                        float waveA = sin(position.x * 0.19 + uTime * 0.72) * 0.035;
+                        float waveB = cos(position.y * 0.27 - uTime * 0.48) * 0.022;
+                        p.z += waveA + waveB;
+                        vec4 worldPosition = modelMatrix * vec4(p, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        vNormal = normalize(mat3(modelMatrix) * normal);
+                        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform sampler2D uMap;
+                    uniform float uTime;
+                    uniform vec3 uColor;
+                    uniform vec3 uDeepColor;
+                    uniform vec3 uFoamColor;
+                    varying vec2 vUv;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vNormal;
+                    void main() {
+                        vec2 flowUvA = vUv * vec2(3.2, 1.5) + vec2(uTime * 0.018, uTime * 0.006);
+                        vec2 flowUvB = vUv * vec2(6.0, 2.2) - vec2(uTime * 0.011, uTime * 0.012);
+                        vec3 texA = texture2D(uMap, flowUvA).rgb;
+                        vec3 texB = texture2D(uMap, flowUvB).rgb;
+                        float detail = dot(mix(texA, texB, 0.5), vec3(0.30, 0.45, 0.25));
+                        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                        float fresnel = pow(1.0 - max(dot(normalize(vNormal), viewDir), 0.0), 3.0);
+                        vec3 color = mix(uDeepColor, uColor, 0.55 + detail * 0.35);
+                        color = mix(color, uFoamColor, fresnel * 0.32 + detail * 0.06);
+                        float alpha = 0.70 + fresnel * 0.16;
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                toneMapped: true,
+            });
+        } else {
+            // Ultra-low/low keeps a single inexpensive lit material and the
+            // existing scrolling texture path for older mobile GPUs.
+            waterMat = new THREE.MeshPhongMaterial({
+                color: config.waterColor,
+                map: waterTex,
+                transparent: true,
+                opacity: 0.68,
+                shininess: 140,
+                specular: 0xc0e8ff,
+                side: THREE.DoubleSide,
+                envMapIntensity: 0.4,
+            });
+        }
         const water = new THREE.Mesh(waterGeo, waterMat);
         water.rotation.x = -Math.PI / 2;
         water.position.set(0, -0.26, -2);
@@ -2842,45 +2907,100 @@ export class SceneManager {
             }
         });
 
-        // --- Falling water sheet (scrolling texture, scrolls downward) ---
+        // --- Falling water: layered flow ribbons for cinematic tiers, with a
+        // cheap scrolling texture fallback for ultra-low/low devices. ---
         const fallTex = this._createWaterTexture();
+        fallTex.colorSpace = THREE.SRGBColorSpace;
+        fallTex.wrapS = THREE.RepeatWrapping;
+        fallTex.wrapT = THREE.RepeatWrapping;
         fallTex.repeat.set(1.5, 4);
-        const fallMat = new THREE.MeshBasicMaterial({
-            map: fallTex,
-            color: 0xbfe6ff,
-            transparent: true,
-            opacity: 0.82,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-            fog: true,
-        });
-        const sheet = new THREE.Mesh(new THREE.PlaneGeometry(sheetW, cliffH), fallMat);
+        const useAdaptiveFall = this.graphicsQuality === 'medium' || this.graphicsQuality === 'high';
+        const flowMaterials = [];
+        const makeFlowMaterial = (color, opacity, phase = 0) => {
+            if (!useAdaptiveFall) {
+                const mat = new THREE.MeshBasicMaterial({
+                    map: fallTex, color, transparent: true, opacity,
+                    side: THREE.DoubleSide, depthWrite: false,
+                });
+                flowMaterials.push(mat);
+                return mat;
+            }
+            const uniforms = {
+                uMap: { value: fallTex },
+                uTime: { value: 0 },
+                uColor: { value: new THREE.Color(color) },
+                uOpacity: { value: opacity },
+                uPhase: { value: phase },
+            };
+            const mat = new THREE.ShaderMaterial({
+                uniforms,
+                vertexShader: `
+                    uniform float uTime;
+                    uniform float uPhase;
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        vec3 p = position;
+                        float sway = sin(uv.y * 15.0 + uTime * 1.35 + uPhase) * 0.075;
+                        p.x += sway * (0.25 + uv.y * 0.75);
+                        p.z += cos(uv.y * 11.0 + uTime * 0.85 + uPhase) * 0.035;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform sampler2D uMap;
+                    uniform float uTime;
+                    uniform float uOpacity;
+                    uniform float uPhase;
+                    uniform vec3 uColor;
+                    varying vec2 vUv;
+                    void main() {
+                        vec2 flowUv = vUv * vec2(1.5, 4.0);
+                        flowUv.y -= uTime * 0.58 + uPhase;
+                        vec3 tex = texture2D(uMap, flowUv).rgb;
+                        float detail = dot(tex, vec3(0.32, 0.48, 0.20));
+                        float edge = smoothstep(0.01, 0.14, vUv.x) * smoothstep(0.99, 0.86, vUv.x);
+                        float crest = smoothstep(0.30, 0.92, detail) * 0.55;
+                        vec3 color = mix(uColor * 0.62, vec3(0.93, 0.99, 1.0), crest);
+                        float alpha = uOpacity * edge * (0.52 + detail * 0.74);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                side: THREE.DoubleSide,
+                toneMapped: false,
+            });
+            flowMaterials.push(mat);
+            return mat;
+        };
+
+        const sheet = new THREE.Mesh(
+            new THREE.PlaneGeometry(sheetW, cliffH, useAdaptiveFall ? 8 : 1, useAdaptiveFall ? 28 : 1),
+            makeFlowMaterial(0xbfe6ff, 0.82, 0.0)
+        );
         sheet.position.set(0, cliffH / 2, -0.9);
         group.add(sheet);
-        // A second, brighter inner sheet for depth
-        const sheet2 = sheet.clone();
-        sheet2.material = fallMat.clone();
-        sheet2.material.color = new THREE.Color(0xffffff);
-        sheet2.material.opacity = 0.4;
+        // A brighter, narrower inner ribbon adds depth without another fluid sim.
+        const sheet2 = new THREE.Mesh(
+            new THREE.PlaneGeometry(sheetW, cliffH, useAdaptiveFall ? 6 : 1, useAdaptiveFall ? 24 : 1),
+            makeFlowMaterial(0xf3fbff, 0.38, 1.9)
+        );
         sheet2.scale.set(0.6, 1, 1);
-        sheet2.position.z = -0.85;
+        sheet2.position.set(0, cliffH / 2, -0.85);
         group.add(sheet2);
-        this.waterfalls.push({ tex: fallTex, tex2: sheet2.material.map });
 
         // Two narrow side cascades break up the single flat water curtain.
         [-1, 1].forEach((side, i) => {
             const ribbon = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.72, cliffH * 0.72),
-                new THREE.MeshBasicMaterial({
-                    map: fallTex, color: i ? 0xb8ebff : 0xe4f7ff,
-                    transparent: true, opacity: 0.48, side: THREE.DoubleSide,
-                    depthWrite: false, fog: true,
-                })
+                new THREE.PlaneGeometry(0.72, cliffH * 0.72, useAdaptiveFall ? 4 : 1, useAdaptiveFall ? 18 : 1),
+                makeFlowMaterial(i ? 0xb8ebff : 0xe4f7ff, 0.48, 3.4 + i)
             );
             ribbon.position.set(side * 2.65, cliffH * 0.42, -0.15);
             ribbon.rotation.z = side * 0.045;
             group.add(ribbon);
         });
+        this.waterfalls.push({ tex: fallTex, flowMaterials });
 
         // --- Foam crest at the lip ---
         const crest = new THREE.Mesh(
@@ -2893,20 +3013,25 @@ export class SceneManager {
 
         // --- Plunge pool (glowing disc + foam ring) ---
         const pool = new THREE.Mesh(
-            new THREE.CircleGeometry(3.6, 24),
-            new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.6 })
+            new THREE.CircleGeometry(3.6, this.graphicsQuality === 'ultra-low' ? 12 : 24),
+            new THREE.MeshBasicMaterial({ color: 0x8fd8ff, transparent: true, opacity: 0.6, depthWrite: false })
         );
         pool.rotation.x = -Math.PI / 2;
         pool.position.set(0, 0.02, 0.4);
         group.add(pool);
         const foam = new THREE.Mesh(
-            new THREE.RingGeometry(0.4, 1.6, 20),
-            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, side: THREE.DoubleSide })
+            new THREE.RingGeometry(0.4, 1.6, this.graphicsQuality === 'ultra-low' ? 12 : 20),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })
         );
         foam.rotation.x = -Math.PI / 2;
         foam.position.set(0, 0.05, 0.1);
         group.add(foam);
-        const poolLight = new THREE.PointLight(0x9fe0ff, 0.8, 14);
+        const waterfallState = this.waterfalls[this.waterfalls.length - 1];
+        if (waterfallState) {
+            waterfallState.pool = pool;
+            waterfallState.foam = foam;
+        }
+        const poolLight = new THREE.PointLight(0x9fe0ff, this.graphicsQuality === 'high' ? 0.8 : 0.45, 14);
         poolLight.position.set(0, 1.2, 0.2);
         group.add(poolLight);
 
@@ -2927,7 +3052,13 @@ export class SceneManager {
         group.add(rainbow);
 
         // --- Rising mist (points that float up and reset) ---
-        const mistN = this.graphicsQuality === 'low' ? 40 : 90;
+        const mistN = this.graphicsQuality === 'high'
+            ? 120
+            : this.graphicsQuality === 'medium'
+                ? 78
+                : this.graphicsQuality === 'low'
+                    ? 40
+                    : 18;
         const mPos = new Float32Array(mistN * 3);
         const mData = [];
         for (let i = 0; i < mistN; i++) {
@@ -2944,7 +3075,39 @@ export class SceneManager {
             depthWrite: false, sizeAttenuation: true,
         }));
         group.add(mist);
-        this.waterfalls[this.waterfalls.length - 1].mist = { geo: mistGeo, data: mData };
+        const waterfallStateFinal = this.waterfalls[this.waterfalls.length - 1];
+        if (waterfallStateFinal) waterfallStateFinal.mist = { geo: mistGeo, data: mData };
+
+        // Short-lived impact spray: very small on low tiers, richer on high.
+        const sprayN = this.graphicsQuality === 'high'
+            ? 44
+            : this.graphicsQuality === 'medium'
+                ? 28
+                : this.graphicsQuality === 'low'
+                    ? 12
+                    : 0;
+        if (sprayN > 0) {
+            const sPos = new Float32Array(sprayN * 3);
+            const sData = [];
+            for (let i = 0; i < sprayN; i++) {
+                const sx = (Math.random() - 0.5) * sheetW * 0.75;
+                const sz = 0.1 + Math.random() * 1.05;
+                sPos.set([sx, 0.12 + Math.random() * 0.35, sz], i * 3);
+                sData.push({ x: sx, z: sz, speed: 0.8 + Math.random() * 1.3, top: 0.7 + Math.random() * 1.6, phase: Math.random() * Math.PI * 2 });
+            }
+            const sprayGeo = new THREE.BufferGeometry();
+            sprayGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+            const spray = new THREE.Points(sprayGeo, new THREE.PointsMaterial({
+                color: 0xf4fcff,
+                size: this.graphicsQuality === 'high' ? 0.14 : 0.1,
+                transparent: true,
+                opacity: 0.55,
+                depthWrite: false,
+                sizeAttenuation: true,
+            }));
+            group.add(spray);
+            if (waterfallStateFinal) waterfallStateFinal.spray = { geo: sprayGeo, data: sData };
+        }
 
         this.scene.add(group);
         this.envObjects.push(group);
@@ -5708,8 +5871,11 @@ export class SceneManager {
             if (dome && dome.material) dome.material.opacity = 0.10 + Math.sin(this._arenaCagePulse * 3) * 0.06;
         }
 
-        // Flowing water: scroll the caustic texture along the river
-        if (this.waterFlowTex) {
+        // Flowing water: shader tiers animate their own UVs; the fallback
+        // material keeps the inexpensive texture-offset path.
+        if (this.waterShaderUniforms?.uTime) {
+            this.waterShaderUniforms.uTime.value = this.time;
+        } else if (this.waterFlowTex) {
             this.waterFlowTex.offset.x += dt * 0.025;
             this.waterFlowTex.offset.y += dt * 0.008;
         }
@@ -5906,11 +6072,25 @@ export class SceneManager {
             });
         }
 
-        // Waterfall: scroll the falling sheets downward and float the mist up
+        // Waterfall: animate flow shader layers, impact foam and mist. The
+        // fallback path still scrolls the shared texture on older GPUs.
         if (this.waterfalls && this.waterfalls.length) {
             for (const wf of this.waterfalls) {
-                if (wf.tex) wf.tex.offset.y -= dt * 0.9;
-                if (wf.tex2) wf.tex2.offset.y -= dt * 1.3;
+                if (wf.flowMaterials?.length) {
+                    wf.flowMaterials.forEach((mat) => {
+                        if (mat.uniforms?.uTime) mat.uniforms.uTime.value = this.time;
+                    });
+                } else if (wf.tex) {
+                    wf.tex.offset.y -= dt * 0.9;
+                }
+                if (wf.foam) {
+                    const pulse = 1 + Math.sin(this.time * 2.4) * 0.08;
+                    wf.foam.scale.set(pulse, pulse, 1);
+                    if (wf.foam.material) wf.foam.material.opacity = 0.56 + Math.sin(this.time * 2.1) * 0.12;
+                }
+                if (wf.pool) {
+                    wf.pool.scale.setScalar(1 + Math.sin(this.time * 1.8) * 0.035);
+                }
                 if (wf.mist) {
                     const pos = wf.mist.geo.attributes.position;
                     const data = wf.mist.data;
@@ -5919,6 +6099,21 @@ export class SceneManager {
                         let y = pos.getY(i) + d.speed * dt;
                         if (y > d.top) y = 0;
                         pos.setXYZ(i, d.x + Math.sin(this.time * 0.8 + i) * 0.2, y, d.baseZ);
+                    }
+                    pos.needsUpdate = true;
+                }
+                if (wf.spray) {
+                    const pos = wf.spray.geo.attributes.position;
+                    const data = wf.spray.data;
+                    for (let i = 0; i < data.length; i++) {
+                        const d = data[i];
+                        let y = pos.getY(i) + d.speed * dt;
+                        if (y > d.top) {
+                            y = 0.12;
+                            d.x = (Math.random() - 0.5) * 3.0;
+                            d.z = 0.1 + Math.random() * 1.05;
+                        }
+                        pos.setXYZ(i, d.x + Math.sin(this.time * 2.4 + d.phase) * 0.08, y, d.z);
                     }
                     pos.needsUpdate = true;
                 }
