@@ -88,63 +88,46 @@ function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSiz
     ctx.restore();
 }
 
-function createFramedShopLabel(width, height, {
-    fill = 'rgba(20, 12, 6, 0.8)',
-    stroke = '#ffd24a',
-    title = 'ร้านค้า',
-    titleColor = '#ffd97a',
-    titleMaxSize = 56,
-    titleMinSize = 24,
-    boxX = 36,
-    boxY = 12,
-    boxWidth = width - 72,
-    boxHeight = height - 24,
-    radius = 24,
-    iconColor = titleColor,
+function createShopSignCanvas(shopName, ownerName, {
+    fill = 'rgba(18, 12, 28, 0.94)',
+    accent = '#ffd24a',
+    titleFill = 'rgba(255, 228, 154, 0.22)',
 } = {}) {
+    const width = 896;
+    const height = 260;
     const { canvas, ctx } = createHiDPICanvas(width, height);
-    if (!ctx) return { canvas, ctx };
-    ctx.fillStyle = fill;
-    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
-    ctx.fill();
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = Math.max(4, Math.round(height / 34));
-    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
-    ctx.stroke();
-    ctx.shadowColor = iconColor;
-    ctx.shadowBlur = Math.min(18, height / 10);
-    ctx.fillStyle = iconColor;
-    ctx.beginPath();
-    ctx.arc(boxX + 28, boxY + boxHeight / 2, Math.max(6, height / 14), 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    drawFittedCanvasText(
-        ctx,
-        title,
-        width / 2,
-        boxY + boxHeight / 2 + titleMaxSize * 0.3,
-        boxWidth - 112,
-        titleMaxSize,
-        titleMinSize,
-        titleColor,
-        700,
-        18,
-        2,
-    );
-    return { canvas, ctx };
-}
+    if (!ctx) return canvas;
 
-function createShopTextSprite(value, maxSize, minSize, maxWidth = 520, maxLines = 1) {
-    const { canvas, ctx } = createHiDPICanvas(640, 96);
-    drawFittedCanvasText(ctx, value, 320, 62, maxWidth, maxSize, minSize, '#fff7e8', 700, 22, maxLines);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: new THREE.CanvasTexture(canvas),
-        transparent: true,
-        depthTest: false,
-        depthWrite: false,
-    }));
-    sprite.renderOrder = 1001;
-    return sprite;
+    const panel = { x: 48, y: 16, width: 800, height: 228 };
+    ctx.fillStyle = fill;
+    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 34);
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 7;
+    ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 34);
+    ctx.stroke();
+
+    const hasOwner = Boolean(String(ownerName || '').trim());
+    // A centered title capsule with no side icon. This keeps the visual center
+    // identical to the Canvas center on iOS Safari and on Android.
+    const titleBox = { x: 100, y: hasOwner ? 48 : 86, width: 696, height: 88 };
+    ctx.fillStyle = titleFill;
+    ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 22);
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 4;
+    ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 22);
+    ctx.stroke();
+
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(width / 2, 30, 6, 0, Math.PI * 2);
+    ctx.fill();
+    drawFittedCanvasText(ctx, shopName || 'ร้านค้า', width / 2, hasOwner ? 107 : 145, 600, 48, 22, '#fff8e7', 700, 18, 1);
+    if (hasOwner) {
+        drawFittedCanvasText(ctx, `ร้านของ ${ownerName}`, width / 2, 198, 640, 34, 18, '#d9e8ff', 700, 18, 1);
+    }
+    return canvas;
 }
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
@@ -4568,25 +4551,16 @@ export class SceneManager {
         group.add(premiumMerchant);
 
         // ---- Floating shop name tag ----
-        const { canvas } = createFramedShopLabel(1024, 128, {
-            fill: 'rgba(40, 20, 10, 0.7)',
-            stroke: '#c8a050',
-            title: 'ร้านค้า',
-            titleColor: '#ffd040',
-            titleMaxSize: 48,
-            titleMinSize: 24,
-            boxX: 128,
-            boxY: 16,
-            boxWidth: 768,
-            boxHeight: 96,
-            radius: 24,
-            iconColor: '#ffd040',
+        const canvas = createShopSignCanvas('ร้านค้า', null, {
+            fill: 'rgba(40, 20, 10, 0.92)',
+            accent: '#ffd040',
+            titleFill: 'rgba(40, 20, 10, 0.45)',
         });
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameTag = new THREE.Sprite(spriteMat);
         nameTag.position.y = 4.4;
-        nameTag.scale.set(5.0, 0.625, 1); // Adjusted scale for wider canvas
+        nameTag.scale.set(5.0, 1.45, 1);
         group.add(nameTag);
 
         // ---- Position the entire shop on dry land ----
@@ -4997,43 +4971,31 @@ export class SceneManager {
                 group.add(itemSprite);
             }
 
-            // Glowing shop sign
-            const { canvas, ctx } = createHiDPICanvas(768, 240);
-            if (ctx) {
-                ctx.fillStyle = 'rgba(20, 12, 6, 0.8)';
-                ctx.roundRect(36, 15, 696, 132, 26); ctx.fill();
-                ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 7;
-                ctx.roundRect(36, 15, 696, 132, 26); ctx.stroke();
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#ffb020'; ctx.shadowBlur = 18;
-                // Draw the decorative marker separately so an iOS emoji glyph
-                // can never consume width reserved for the player shop name.
-                ctx.fillStyle = '#ffd97a';
-                ctx.beginPath();
-                ctx.arc(82, 96, 9, 0, Math.PI * 2);
-                ctx.fill();
-                // Text is rendered as independent centered sprites below. Keeping
-                // it out of this frame texture avoids iOS texture/padding drift.
-                ctx.shadowBlur = 0;
-            }
+            // Rebuilt shop sign: one symmetric canvas, no side icon, and both
+            // title/owner rows centered from the same visual midpoint.
+            const signCanvas = createShopSignCanvas(stall.shop_name, stall.owner_name, {
+                fill: `rgba(${(awningColor >> 16) & 255}, ${(awningColor >> 8) & 255}, ${awningColor & 255}, 0.92)`,
+                accent: '#fff1a8',
+                titleFill: 'rgba(20, 12, 28, 0.42)',
+            });
+            const signTexture = new THREE.CanvasTexture(signCanvas);
+            signTexture.colorSpace = THREE.SRGBColorSpace;
+            signTexture.minFilter = THREE.LinearFilter;
+            signTexture.magFilter = THREE.LinearFilter;
+            signTexture.generateMipmaps = false;
             const sign = new THREE.Sprite(new THREE.SpriteMaterial({
-                map: new THREE.CanvasTexture(canvas), transparent: true
+                map: signTexture,
+                transparent: true,
+                depthTest: false,
+                depthWrite: false,
             }));
-            sign.position.y = 3.3;
+            sign.renderOrder = 1001;
+            sign.position.y = 3.35;
             const isTouchViewport = /Android|iPad|iPhone|iPod/i.test(navigator.userAgent)
                 || window.matchMedia?.('(pointer: coarse)')?.matches;
             const signScale = isTouchViewport ? 2.55 : 3.2;
-            sign.scale.set(signScale, isTouchViewport ? 0.82 : 1.0, 1);
+            sign.scale.set(signScale, isTouchViewport ? 0.92 : 1.1, 1);
             group.add(sign);
-
-            const titleSprite = createShopTextSprite(stall.shop_name || 'ร้านค้า', 54, 18, 520, 1);
-            titleSprite.position.set(0, 3.42, 0);
-            titleSprite.scale.set(signScale * 0.84, (isTouchViewport ? 0.82 : 1.0) * 0.27, 1);
-            group.add(titleSprite);
-            const ownerSprite = createShopTextSprite(`ร้านของ ${stall.owner_name || '???'}`, 34, 16, 520, 1);
-            ownerSprite.position.set(0, 3.06, 0);
-            ownerSprite.scale.set(signScale * 0.84, (isTouchViewport ? 0.82 : 1.0) * 0.22, 1);
-            group.add(ownerSprite);
 
             // Sit on the ground rather than at y = 0: the field still rolls by
             // ±0.15, which is enough to sink the thin base slab out of sight.
@@ -5077,23 +5039,14 @@ export class SceneManager {
         awning.position.set(0, 2.45, 0.1); awning.rotation.x = -0.12;
         group.add(awning);
 
-        const { canvas } = createFramedShopLabel(768, 144, {
-            fill: 'rgba(20, 16, 10, 0.65)',
-            stroke: '#9a8a6a',
-            title: 'แผงว่าง — เปิดร้านได้!',
-            titleColor: '#cfc4a8',
-            titleMaxSize: 54,
-            titleMinSize: 24,
-            boxX: 96,
-            boxY: 12,
-            boxWidth: 576,
-            boxHeight: 120,
-            radius: 24,
-            iconColor: '#cfc4a8',
+        const canvas = createShopSignCanvas('แผงว่าง — เปิดร้านได้!', null, {
+            fill: 'rgba(20, 16, 10, 0.82)',
+            accent: '#cfc4a8',
+            titleFill: 'rgba(20, 16, 10, 0.42)',
         });
         const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true }));
         sign.position.y = 3.1;
-        sign.scale.set(2.8, 0.55, 1);
+        sign.scale.set(2.8, 0.82, 1);
         group.add(sign);
 
         group.position.set(x, this.getTerrainHeight(x, z), z);
@@ -5268,25 +5221,16 @@ export class SceneManager {
         premiumAppraiser.position.set(0, .18, .48); group.add(premiumAppraiser);
 
         // ---- Floating shop name tag ----
-        const { canvas } = createFramedShopLabel(1024, 128, {
-            fill: 'rgba(10, 40, 20, 0.7)',
-            stroke: '#ebd040',
-            title: 'รับซื้อไอเทม (Sell Shop)',
-            titleColor: '#ffdd44',
-            titleMaxSize: 42,
-            titleMinSize: 22,
-            boxX: 64,
-            boxY: 16,
-            boxWidth: 896,
-            boxHeight: 96,
-            radius: 24,
-            iconColor: '#ffdd44',
+        const canvas = createShopSignCanvas('รับซื้อไอเทม (Sell Shop)', null, {
+            fill: 'rgba(10, 40, 20, 0.92)',
+            accent: '#ffdd44',
+            titleFill: 'rgba(10, 40, 20, 0.45)',
         });
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const nameTag = new THREE.Sprite(spriteMat);
         nameTag.position.y = 4.4;
-        nameTag.scale.set(6.0, 0.75, 1); // Wider sprite scale to match wider canvas
+        nameTag.scale.set(5.7, 1.65, 1);
         group.add(nameTag);
 
         // Position on dry land - slightly higher elevation and shifted
