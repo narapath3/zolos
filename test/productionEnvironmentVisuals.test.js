@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('../src/engine/SceneManager.js', import.meta.url), 'utf8');
+const sceneSource = source;
+const mainSource = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const characterSource = fs.readFileSync(new URL('../src/engine/CharacterManager.js', import.meta.url), 'utf8');
 const gameDataSource = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
 const monsterSource = fs.readFileSync(new URL('../src/engine/MonsterManager.js', import.meta.url), 'utf8');
 const serverMonsterSource = fs.readFileSync(new URL('../server/game/monsterEngine.js', import.meta.url), 'utf8');
@@ -105,6 +108,16 @@ test('river surface stays aligned with the actual bank width instead of a flat o
   assert.match(source, /const riverWidth = 11\.4/);
   assert.match(source, /new THREE\.PlaneGeometry\(riverLength, riverWidth/);
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
+});
+
+test('river guard rails block land-to-water movement but keep the bridge crossing open', () => {
+  assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition\)/);
+  assert.match(sceneSource, /const guardLine = 5\.55/);
+  assert.match(sceneSource, /if \(fromDistance < guardLine \|\| Math\.abs\(toDelta\) >= guardLine\) return resolved/);
+  assert.match(sceneSource, /const bridgeOpen = \(p\) => Math\.abs\(p\.x\) < 2\.8/);
+  assert.match(mainSource, /setMovementCollisionResolver/);
+  assert.match(characterSource, /movementCollisionResolver/);
+  assert.match(characterSource, /const resolvedPosition = this\.movementCollisionResolver/);
 });
 
 test('river adds segmented wooden guard rails with an open bridge approach', () => {

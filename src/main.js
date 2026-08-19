@@ -280,6 +280,9 @@ async function initGame(charData) {
     });
 
     character = new CharacterManager(sceneManager.scene);
+    character.setMovementCollisionResolver?.((fromPosition, toPosition) =>
+        sceneManager.resolveMovementCollision?.(fromPosition, toPosition) || toPosition
+    );
 
     // Load character data
     character.loadStats(charData);

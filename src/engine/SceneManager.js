@@ -6269,6 +6269,31 @@ export class SceneManager {
         this.camera.lookAt(midX, 1.0, midZ);
     }
 
+    resolveMovementCollision(fromPosition, toPosition) {
+        const resolved = toPosition.clone();
+        if (this.currentMap !== 'prontera' || !fromPosition || !toPosition) return resolved;
+
+        // Keep the bridge approach/crossing open; guard rails stop only the
+        // riverbank sides, never the playable bridge deck.
+        const bridgeOpen = (p) => Math.abs(p.x) < 2.8 && p.z >= -10.5 && p.z <= 6.5;
+        if (bridgeOpen(toPosition)) return resolved;
+
+        const riverCenter = (x) => Math.sin(x * 0.08) * 10 - 2;
+        const fromDelta = fromPosition.z - riverCenter(fromPosition.x);
+        const toDelta = toPosition.z - riverCenter(toPosition.x);
+        const fromDistance = Math.abs(fromDelta);
+        const guardLine = 5.55;
+
+        // Do not eject a player who is already inside the water; this allows
+        // recovery/escape from old saved positions and keeps fishing stable.
+        if (fromDistance < guardLine || Math.abs(toDelta) >= guardLine) return resolved;
+
+        const side = fromDelta < 0 ? -1 : 1;
+        resolved.z = riverCenter(toPosition.x) + side * guardLine;
+        resolved.y = toPosition.y;
+        return resolved;
+    }
+
     // Check if a position is in the winding river (and not on the bridge)
     isInWater(position) {
         if (!this.waterMesh) return false;

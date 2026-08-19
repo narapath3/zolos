@@ -158,6 +158,7 @@ export class CharacterManager {
     constructor(scene) {
         this.scene = scene;
         this.mesh = null;
+        this.movementCollisionResolver = null;
         this.weaponMesh = null;
         this.nameSprite = null;
         this.bodyColor = 0x4060c0; // Default blue, overridden by setBodyColor()
@@ -2560,6 +2561,10 @@ export class CharacterManager {
         }, 5000);
     }
 
+    setMovementCollisionResolver(resolver) {
+        this.movementCollisionResolver = typeof resolver === 'function' ? resolver : null;
+    }
+
     // Move to a target position
     moveToward(targetPoint, dt) {
         if (!this.mesh) return;
@@ -2574,11 +2579,21 @@ export class CharacterManager {
         const distance = dir.length();
         if (distance > 0.1) {
             dir.normalize();
-            this.mesh.position.add(dir.multiplyScalar(Math.min(distance, this.moveSpeed * dt)));
+            const step = Math.min(distance, this.moveSpeed * dt);
+            const nextPosition = this.mesh.position.clone().add(dir.multiplyScalar(step));
+            const resolvedPosition = this.movementCollisionResolver
+                ? this.movementCollisionResolver(this.mesh.position, nextPosition, this)
+                : nextPosition;
+            const actualMove = resolvedPosition.clone().sub(this.mesh.position);
+            this.mesh.position.copy(resolvedPosition);
             clampToWorld(this.mesh.position);
+            if (actualMove.lengthSq() < 0.000001) {
+                this.state = 'idle';
+                return false;
+            }
 
-            // Rotate to face movement direction
-            const targetRotation = Math.atan2(dir.x, dir.z);
+            // Rotate to face actual movement direction
+            const targetRotation = Math.atan2(actualMove.x, actualMove.z);
             let turn = targetRotation - this.mesh.rotation.y;
             while (turn > Math.PI) turn -= Math.PI * 2;
             while (turn < -Math.PI) turn += Math.PI * 2;
@@ -2599,10 +2614,19 @@ export class CharacterManager {
 
         if (dirX !== 0 || dirZ !== 0) {
             const moveVec = new THREE.Vector3(dirX, 0, dirZ).normalize();
-            this.mesh.position.add(moveVec.multiplyScalar(this.moveSpeed * dt));
+            const nextPosition = this.mesh.position.clone().add(moveVec.multiplyScalar(this.moveSpeed * dt));
+            const resolvedPosition = this.movementCollisionResolver
+                ? this.movementCollisionResolver(this.mesh.position, nextPosition, this)
+                : nextPosition;
+            const actualMove = resolvedPosition.clone().sub(this.mesh.position);
+            this.mesh.position.copy(resolvedPosition);
             clampToWorld(this.mesh.position);
+            if (actualMove.lengthSq() < 0.000001) {
+                this.state = 'idle';
+                return false;
+            }
 
-            const targetRotation = Math.atan2(dirX, dirZ);
+            const targetRotation = Math.atan2(actualMove.x, actualMove.z);
             let turn = targetRotation - this.mesh.rotation.y;
             while (turn > Math.PI) turn -= Math.PI * 2;
             while (turn < -Math.PI) turn += Math.PI * 2;
