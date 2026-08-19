@@ -20,7 +20,7 @@ const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystem
 const PRONTERA_RIVER_HALF_WIDTH = 5.7; // water plane half-width (11.4 total)
 const PRONTERA_RIVER_BANK_EDGE = 7.25; // dry-land edge where the fence sits
 const PRONTERA_RIVER_GUARD_LINE = 6.78; // player stop line before the fence
-const PRONTERA_BRIDGE_HALF_WIDTH = 2.15; // touch-safe approach corridor
+const PRONTERA_BRIDGE_HALF_WIDTH = 1.8; // actual 3.6-unit bridge deck half-width
 const PRONTERA_BRIDGE_MIN_Z = -10.35;
 const PRONTERA_BRIDGE_MAX_Z = 6.35;
 
@@ -2579,7 +2579,7 @@ export class SceneManager {
             for (let i = 0; i < points.length - 1; i++) {
                 const a = points[i];
                 const b = points[i + 1];
-                if (a.x < -bridgeRailGap && b.x > bridgeRailGap) continue;
+                if (a.x <= -bridgeRailGap && b.x >= bridgeRailGap) continue;
                 const dx = b.x - a.x;
                 const dz = b.z - a.z;
                 const length = Math.hypot(dx, dz);
@@ -6492,9 +6492,8 @@ export class SceneManager {
         const resolved = toPosition.clone();
         if (this.currentMap !== 'prontera' || !fromPosition || !toPosition) return resolved;
 
-        // Only the actual bridge approach corridor is open. Its tolerance is
-        // slightly wider than the 3.6-unit deck so touch/joystick movement can
-        // enter smoothly, but it remains narrower than the new fence endpoints.
+        // Only the actual 3.6-unit bridge deck is open. Keeping this exact
+        // width prevents a side-entry corridor from bypassing the handrails.
         const bridgeDeckOpen = (p) => Math.abs(p.x) < PRONTERA_BRIDGE_HALF_WIDTH
             && p.z >= PRONTERA_BRIDGE_MIN_Z && p.z <= PRONTERA_BRIDGE_MAX_Z;
         const fromOnBridge = bridgeDeckOpen(fromPosition);

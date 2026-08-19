@@ -120,6 +120,7 @@ test('river surface stays aligned with the actual bank width instead of a flat o
 test('river guard rails block land-to-water movement but keep the bridge crossing open', () => {
   assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition\)/);
   assert.match(sceneSource, /const guardLine = PRONTERA_RIVER_GUARD_LINE/);
+  assert.match(sceneSource, /const PRONTERA_BRIDGE_HALF_WIDTH = 1\.8/);
   assert.match(sceneSource, /const bridgeDeckOpen = \(p\) => Math\.abs\(p\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(sceneSource, /const fromOnBridge = bridgeDeckOpen\(fromPosition\)/);
   assert.match(sceneSource, /const toOnBridge = bridgeDeckOpen\(toPosition\)/);
@@ -147,7 +148,7 @@ test('river adds segmented wooden guard rails while collision seals the approach
   assert.match(source, /const railGeo = new THREE\.CylinderGeometry/);
   assert.match(source, /const ropeGeo = new THREE\.CylinderGeometry/);
   assert.match(source, /if \(Math\.abs\(x\) < bridgeRailGap\) continue/);
-  assert.match(source, /if \(a\.x < -bridgeRailGap && b\.x > bridgeRailGap\) continue/);
+  assert.match(source, /if \(a\.x <= -bridgeRailGap && b\.x >= bridgeRailGap\) continue/);
   assert.match(source, /this\.waterGuardRails\.push/);
 });
 
