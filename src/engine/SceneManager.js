@@ -6380,22 +6380,29 @@ export class SceneManager {
         const resolved = toPosition.clone();
         if (this.currentMap !== 'prontera' || !fromPosition || !toPosition) return resolved;
 
-        // Keep the bridge approach/crossing open; guard rails stop only the
-        // riverbank sides, never the playable bridge deck.
-        const bridgeOpen = (p) => Math.abs(p.x) < 2.8 && p.z >= -10.5 && p.z <= 6.5;
-        if (bridgeOpen(toPosition)) return resolved;
+        // Only the actual bridge deck is open. The old 2.8-unit approach gap
+        // let players cut around the end of a rail and enter the river beside
+        // the bridge. Keep a small tolerance for touch/joystick movement while
+        // matching the 3.6-unit deck width (x = +/-1.8).
+        const bridgeDeckOpen = (p) => Math.abs(p.x) < 1.9 && p.z >= -10.5 && p.z <= 6.5;
+        if (bridgeDeckOpen(fromPosition) || bridgeDeckOpen(toPosition)) return resolved;
 
         const riverCenter = (x) => Math.sin(x * 0.08) * 10 - 2;
         const fromDelta = fromPosition.z - riverCenter(fromPosition.x);
         const toDelta = toPosition.z - riverCenter(toPosition.x);
         const fromDistance = Math.abs(fromDelta);
+        const toDistance = Math.abs(toDelta);
         const guardLine = 5.55;
 
-        // Do not eject a player who is already inside the water; this allows
-        // recovery/escape from old saved positions and keeps fishing stable.
-        if (fromDistance < guardLine || Math.abs(toDelta) >= guardLine) return resolved;
+        // Preserve recovery from a legacy save that placed a player in water;
+        // normal land-to-water movement is handled by the swept boundary below.
+        if (fromDistance < guardLine) return resolved;
 
+        // Block both entering the river and jumping across it in a single
+        // movement step. This closes gaps between rail posts and click-to-move
+        // overshoot paths while retaining the bridge deck as the only crossing.
         const side = fromDelta < 0 ? -1 : 1;
+        if (toDistance >= guardLine && Math.sign(toDelta || fromDelta) === side) return resolved;
         resolved.z = riverCenter(toPosition.x) + side * guardLine;
         resolved.y = toPosition.y;
         return resolved;

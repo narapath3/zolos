@@ -113,14 +113,16 @@ test('river surface stays aligned with the actual bank width instead of a flat o
 test('river guard rails block land-to-water movement but keep the bridge crossing open', () => {
   assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition\)/);
   assert.match(sceneSource, /const guardLine = 5\.55/);
-  assert.match(sceneSource, /if \(fromDistance < guardLine \|\| Math\.abs\(toDelta\) >= guardLine\) return resolved/);
-  assert.match(sceneSource, /const bridgeOpen = \(p\) => Math\.abs\(p\.x\) < 2\.8/);
+  assert.match(sceneSource, /const bridgeDeckOpen = \(p\) => Math\.abs\(p\.x\) < 1\.9/);
+  assert.match(sceneSource, /if \(bridgeDeckOpen\(fromPosition\) \|\| bridgeDeckOpen\(toPosition\)\) return resolved/);
+  assert.match(sceneSource, /const toDistance = Math\.abs\(toDelta\)/);
+  assert.match(sceneSource, /Math\.sign\(toDelta \|\| fromDelta\) === side/);
   assert.match(mainSource, /setMovementCollisionResolver/);
   assert.match(characterSource, /movementCollisionResolver/);
   assert.match(characterSource, /const resolvedPosition = this\.movementCollisionResolver/);
 });
 
-test('river adds segmented wooden guard rails with an open bridge approach', () => {
+test('river adds segmented wooden guard rails while collision seals the approach gaps', () => {
   assert.match(source, /_createRiverGuardRails\(riverLength\)/);
   assert.match(source, /const spacing = quality === 'high' \? 3\.0 : quality === 'medium' \? 3\.35 : 3\.8/);
   assert.match(source, /river-guard-rail-segment/);
