@@ -1679,9 +1679,9 @@ export class SceneManager {
                 uReflectionMap: { value: reflectionProbe?.getRenderTarget?.().texture || waterTex },
                 uReflectionMatrix: { value: reflectionProbe?.material?.uniforms?.textureMatrix?.value || new THREE.Matrix4() },
                 uTime: { value: 0 },
-                uColor: { value: new THREE.Color(config.waterColor) },
-                uDeepColor: { value: new THREE.Color(0x0b4f73) },
-                uShallowColor: { value: new THREE.Color(0x35b7c6) },
+                uColor: { value: new THREE.Color(config.waterColor).multiplyScalar(0.62) },
+                uDeepColor: { value: new THREE.Color(0x06405c) },
+                uShallowColor: { value: new THREE.Color(0x2a9eb4) },
                 uHighlightColor: { value: new THREE.Color(0xb8f3ee) },
                 uFoamColor: { value: new THREE.Color(0xe6ffff) },
                 uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.54 : 0.38 },
@@ -1757,12 +1757,12 @@ export class SceneManager {
                         float centerDepth = smoothstep(0.10, 0.92, 1.0 - abs(vUv.y - 0.5) * 2.0);
                         centerDepth = clamp(centerDepth * (0.88 + detail * 0.12), 0.0, 1.0);
                         vec3 color = mix(uShallowColor, uDeepColor, centerDepth * uDepthAmount);
-                        color = mix(color, uColor, 0.16 + waveMask * 0.18);
+                        color = mix(color, uColor, 0.10 + waveMask * 0.12);
                         color = mix(color, reflectionColor, reflection);
                         float glint = smoothstep(0.68, 0.94, detail) * (0.12 + fresnel * 0.34) * uWaveStrength;
                         color += uHighlightColor * glint;
                         color = mix(color, uFoamColor, foamMask * 0.72 + fresnel * 0.025);
-                        float alpha = 0.76 + fresnel * 0.09 + foamMask * 0.035;
+                        float alpha = 0.82 + fresnel * 0.07 + foamMask * 0.025;
                         gl_FragColor = vec4(color, alpha);
                     }
                 `,
@@ -6774,8 +6774,8 @@ export class SceneManager {
         canvas.height = size;
         const ctx = canvas.getContext('2d');
 
-        // Deep water base
-        ctx.fillStyle = '#2a6090';
+        // Deep blue-green base keeps texture detail from becoming a flat cyan slab.
+        ctx.fillStyle = '#0d526d';
         ctx.fillRect(0, 0, size, size);
 
         // Layered caustic ripple patterns
@@ -6789,8 +6789,8 @@ export class SceneManager {
                 const rot = Math.random() * Math.PI;
                 const alpha = 0.03 + Math.random() * 0.06;
                 ctx.fillStyle = layer < 2
-                    ? `rgba(120, 200, 255, ${alpha})`
-                    : `rgba(255, 255, 255, ${alpha * 0.7})`;
+                    ? `rgba(94, 206, 218, ${alpha})`
+                    : `rgba(220, 255, 248, ${alpha * 0.55})`;
                 ctx.save();
                 ctx.translate(x, y);
                 ctx.rotate(rot);
@@ -6806,7 +6806,7 @@ export class SceneManager {
             const x = Math.random() * size;
             const y = Math.random() * size;
             const len = 10 + Math.random() * 30;
-            ctx.strokeStyle = `rgba(200, 240, 255, ${0.04 + Math.random() * 0.06})`;
+            ctx.strokeStyle = `rgba(180, 246, 238, ${0.035 + Math.random() * 0.05})`;
             ctx.lineWidth = 1 + Math.random() * 2;
             ctx.beginPath();
             ctx.moveTo(x, y);
