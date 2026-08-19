@@ -1692,7 +1692,7 @@ export class SceneManager {
                 uReflectionStrength: { value: this.graphicsQuality === 'high' ? 0.68 : 0.48 },
                 uWaveStrength: { value: this.graphicsQuality === 'high' ? 0.72 : 0.52 },
                 uDepthAmount: { value: 0.84 },
-                uWaterOpacity: { value: this.graphicsQuality === 'high' ? 0.78 : 0.74 },
+                uWaterOpacity: { value: this.graphicsQuality === 'high' ? 0.90 : 0.86 },
                 uPlanarReflectionStrength: { value: enablePlanarReflection ? 1.0 : 0.0 },
             };
             this.waterShaderUniforms = uniforms;
@@ -1747,9 +1747,9 @@ export class SceneManager {
                         vec3 texB = texture2D(uMap, flowUvB).rgb;
                         float detail = dot(mix(texA, texB, 0.5), vec3(0.30, 0.45, 0.25));
                         float waveMask = smoothstep(0.22, 0.8, detail);
-                        float windWaveA = sin(vUv.x * 19.0 - uTime * 1.6 + vUv.y * 3.0);
-                        float windWaveB = sin(vUv.x * 43.0 - uTime * 2.35 - vUv.y * 5.0);
-                        float windWave = smoothstep(0.22, 0.84, windWaveA * 0.62 + windWaveB * 0.38 + 0.5);
+                        float windWaveSlow = sin(vUv.x * 8.0 - uTime * 0.58 + vUv.y * 2.0) * 0.5 + 0.5;
+                        float windWaveDetail = sin(vUv.x * 27.0 - uTime * 1.45 - vUv.y * 4.0) * 0.5 + 0.5;
+                        float windWave = smoothstep(0.30, 0.82, windWaveSlow * 0.70 + windWaveDetail * 0.30);
                         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
                         float facing = max(dot(normalize(vNormal), viewDir), 0.0);
                         float fresnel = pow(1.0 - facing, 3.2);
@@ -1758,8 +1758,8 @@ export class SceneManager {
                         // than a static white border.
                         float shoreBand = (1.0 - smoothstep(0.025, 0.16, vUv.y)) + smoothstep(0.84, 0.975, vUv.y);
                         float foamNoise = smoothstep(0.42, 0.82, detail);
-                        float crestFoam = smoothstep(0.76, 0.96, windWave) * (0.18 + fresnel * 0.42);
-                        float foamMask = clamp(shoreBand * (0.30 + foamNoise * 0.56) * uFoamStrength + crestFoam * uFoamStrength, 0.0, 1.0);
+                        float crestFoam = smoothstep(0.78, 0.96, windWave) * (0.24 + fresnel * 0.48);
+                        float foamMask = clamp(shoreBand * (0.38 + foamNoise * 0.62) * uFoamStrength + crestFoam * uFoamStrength, 0.0, 1.0);
                         float reflection = clamp(fresnel * (0.20 + uReflectionStrength * 0.30) + windWave * 0.035, 0.0, 0.68);
                         vec3 skyReflection = mix(vec3(0.11, 0.36, 0.53), vec3(0.60, 0.88, 0.91), waveMask);
                         vec3 planarReflection = texture2DProj(uReflectionMap, vReflectionUv).rgb;
@@ -1772,8 +1772,9 @@ export class SceneManager {
                         float glint = smoothstep(0.68, 0.94, detail) * (0.08 + fresnel * 0.24) * uWaveStrength;
                         float waveRibbon = smoothstep(0.64, 0.94, sin(vUv.x * 31.0 + uTime * 0.9 + detail * 3.0) * 0.5 + 0.5);
                         color += uHighlightColor * (glint + waveRibbon * (0.016 + fresnel * 0.06) + windWave * 0.022);
-                        float shoreTint = shoreBand * (0.035 + foamNoise * 0.045);
+                        float shoreTint = shoreBand * (0.05 + foamNoise * 0.06);
                         color = mix(color, uShallowColor, shoreTint);
+                        color = mix(color, uHighlightColor, windWave * (0.012 + fresnel * 0.035));
                         color = mix(color, uFoamColor, foamMask * 0.58 + fresnel * 0.018);
                         float alpha = clamp(uWaterOpacity + fresnel * 0.04 + foamMask * 0.02, 0.0, 0.90);
                         gl_FragColor = vec4(color, alpha);
@@ -1791,7 +1792,7 @@ export class SceneManager {
                 color: new THREE.Color(config.waterColor).multiplyScalar(0.62),
                 map: waterTex,
                 transparent: true,
-                opacity: 0.78,
+                opacity: 0.86,
                 shininess: 105,
                 specular: 0x8fd9de,
                 side: THREE.DoubleSide,
@@ -2001,7 +2002,7 @@ export class SceneManager {
         const quality = this.graphicsQuality;
         if (quality !== 'medium' && quality !== 'high') return;
         const segments = quality === 'high' ? 72 : 48;
-        const radius = quality === 'high' ? 0.045 : 0.032;
+        const radius = quality === 'high' ? 0.052 : 0.038;
         const riverHalfWidth = 5.25;
         const makeFoamSide = (side) => {
             const points = [];
@@ -2016,7 +2017,7 @@ export class SceneManager {
             const uniforms = {
                 uTime: { value: 0 },
                 uColor: { value: new THREE.Color(0xd8f6f4) },
-                uOpacity: { value: quality === 'high' ? 0.34 : 0.24 },
+                uOpacity: { value: quality === 'high' ? 0.42 : 0.31 },
                 uPhase: { value: side * 1.4 },
             };
             const material = new THREE.ShaderMaterial({

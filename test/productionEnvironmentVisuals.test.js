@@ -41,9 +41,11 @@ test('river water upgrades to an adaptive Fresnel shader on medium/high tiers an
   assert.match(source, /float fresnel = pow/);
   assert.match(source, /float centerDepth = smoothstep/);
   assert.match(source, /mix\(uShallowColor, uDeepColor, centerDepth \* uDepthAmount\)/);
-  assert.match(source, /uWaterOpacity: \{ value: this\.graphicsQuality === 'high' \? 0\.78 : 0\.74 \}/);
+  assert.match(source, /uWaterOpacity: \{ value: this\.graphicsQuality === 'high' \? 0\.90 : 0\.86 \}/);
   assert.match(source, /float alpha = clamp\(uWaterOpacity/);
-  assert.match(source, /opacity: 0\.78/);
+  assert.match(source, /opacity: 0\.86/);
+  assert.match(source, /float windWaveSlow = sin/);
+  assert.match(source, /float windWaveDetail = sin/);
   assert.match(source, /float windWave = smoothstep/);
   assert.match(source, /float crestFoam = smoothstep/);
   assert.match(source, /float waveRibbon =/);
@@ -108,6 +110,7 @@ test('water surface adds mobile-safe air bubbles and wind-driven ripple rings', 
 test('river shoreline foam uses bounded geometry and animated bubbles', () => {
   assert.match(source, /_createRiverFoam\(config, riverLength\)/);
   assert.match(source, /const segments = quality === 'high' \? 72 : 48/);
+  assert.match(source, /const radius = quality === 'high' \? 0\.052 : 0\.038/);
   assert.match(source, /new THREE\.TubeGeometry\(curve, segments, radius, 5, false\)/);
   assert.match(source, /float bubbles = sin\(vUv\.x \* 38\.0/);
   assert.match(source, /this\.waterFoamMeshes\.forEach/);
