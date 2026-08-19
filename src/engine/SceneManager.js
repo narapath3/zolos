@@ -18,8 +18,8 @@ const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystem
 // guard rails and movement collision. Keeping these values together prevents
 // the visual bank and the physical barrier from drifting apart.
 const PRONTERA_RIVER_HALF_WIDTH = 5.7; // water plane half-width (11.4 total)
-const PRONTERA_RIVER_BANK_EDGE = 7.25; // dry-land edge where the fence sits
-const PRONTERA_RIVER_GUARD_LINE = 6.78; // player stop line before the fence
+const PRONTERA_RIVER_BANK_EDGE = 6.05; // dry-land edge where the fence sits
+const PRONTERA_RIVER_GUARD_LINE = 5.84; // player stop line before the fence
 const PRONTERA_BRIDGE_HALF_WIDTH = 1.8; // actual 3.6-unit bridge deck half-width
 const PRONTERA_BRIDGE_MIN_Z = -10.35;
 const PRONTERA_BRIDGE_MAX_Z = 6.35;
@@ -2554,8 +2554,8 @@ export class SceneManager {
             for (let i = 0; i < sampleXs.length; i++) {
                 const x = sampleXs[i];
                 const riverZ = Math.sin(x * 0.08) * 10 - 2;
-                // Place the fence on the raised dry shoulder, outside the water
-                // plane and shoreline foam. It must never be planted in the cut.
+                // Place the fence on the narrow dry shoulder immediately
+                // outside the water plane; it must not spread into the field.
                 const z = riverZ + side * PRONTERA_RIVER_BANK_EDGE;
                 const terrainY = this.getTerrainHeight(x, z);
                 const group = new THREE.Group();
@@ -2643,7 +2643,7 @@ export class SceneManager {
                 const z = centerZ + side * (PRONTERA_RIVER_HALF_WIDTH + 0.10);
                 const terrainY = this.getTerrainHeight(x, z);
                 // Keep the trim partly over the water and partly embedded in the
-                // wet shoulder, so there is no floating lip or brown seam.
+                // narrow wet shoulder, so there is no floating lip or brown seam.
                 const y = Math.min(terrainY + 0.025, -0.105);
                 points.push(new THREE.Vector3(x, y, z));
             }

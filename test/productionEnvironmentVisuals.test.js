@@ -141,6 +141,8 @@ test('river adds segmented wooden guard rails while collision seals the approach
   assert.match(source, /const spacing = quality === 'high' \? 2\.8 : quality === 'medium' \? 3\.15 : 3\.55/);
   assert.match(source, /const postHeight = quality === 'ultra-low' \? 1\.72 : 1\.92/);
   assert.match(source, /const bridgeRailGap = PRONTERA_BRIDGE_HALF_WIDTH \+ 0\.20/);
+  assert.match(source, /const PRONTERA_RIVER_BANK_EDGE = 6\.05/);
+  assert.match(source, /const PRONTERA_RIVER_GUARD_LINE = 5\.84/);
   assert.match(source, /const z = riverZ \+ side \* PRONTERA_RIVER_BANK_EDGE/);
   assert.match(source, /river-guard-rail-segment/);
   assert.match(source, /river-guard-rail-span/);
@@ -179,6 +181,7 @@ test('river shoreline edge follows the water plane and adds sparse wet stones', 
   assert.match(source, /_createRiverBankEdge\(riverLength\)/);
   assert.match(source, /river-shoreline-edge/);
   assert.match(source, /const z = centerZ \+ side \* \(PRONTERA_RIVER_HALF_WIDTH \+ 0\.10\)/);
+  assert.match(source, /narrow wet shoulder/);
   assert.match(source, /new THREE\.TubeGeometry\(curve, segments, edgeRadius, 6, false\)/);
   assert.match(source, /const stoneCount = quality === 'high' \? 12 : quality === 'medium' \? 8 : 4/);
 });
