@@ -1623,9 +1623,11 @@ export class SceneManager {
             this.waterMesh = null;
             return;
         }
-        // Large river water plane centered around z = -2, length 80, width 32
+        // Keep the water surface aligned with the actual river bed and banks.
+        // The old 40-unit slab made the river read as a flat blue rectangle.
         const riverLength = this.currentMap === 'prontera' ? 116 : 80;
-        const waterGeo = new THREE.PlaneGeometry(riverLength, 40, this.currentMap === 'prontera' ? 110 : 80, 30);
+        const riverWidth = 11.4;
+        const waterGeo = new THREE.PlaneGeometry(riverLength, riverWidth, this.currentMap === 'prontera' ? 110 : 80, 22);
         const waterTex = this._createWaterTexture();
         waterTex.colorSpace = THREE.SRGBColorSpace;
         waterTex.wrapS = THREE.RepeatWrapping;
@@ -1652,7 +1654,7 @@ export class SceneManager {
                         'gl_FragColor = vec4( blendOverlay( base.rgb, color ), reflectionAlpha );'
                     ),
             };
-            reflectionProbe = new Reflector(new THREE.PlaneGeometry(riverLength, 40), {
+            reflectionProbe = new Reflector(new THREE.PlaneGeometry(riverLength, riverWidth), {
                 shader: reflectionShader,
                 textureWidth: reflectionSize,
                 textureHeight: reflectionSize,
@@ -1678,10 +1680,14 @@ export class SceneManager {
                 uReflectionMatrix: { value: reflectionProbe?.material?.uniforms?.textureMatrix?.value || new THREE.Matrix4() },
                 uTime: { value: 0 },
                 uColor: { value: new THREE.Color(config.waterColor) },
-                uDeepColor: { value: new THREE.Color(config.waterColor).multiplyScalar(0.42) },
-                uFoamColor: { value: new THREE.Color(0xc8f4ff) },
-                uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.9 : 0.62 },
-                uReflectionStrength: { value: this.graphicsQuality === 'high' ? 1.0 : 0.72 },
+                uDeepColor: { value: new THREE.Color(0x0b4f73) },
+                uShallowColor: { value: new THREE.Color(0x35b7c6) },
+                uHighlightColor: { value: new THREE.Color(0xb8f3ee) },
+                uFoamColor: { value: new THREE.Color(0xe6ffff) },
+                uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.54 : 0.38 },
+                uReflectionStrength: { value: this.graphicsQuality === 'high' ? 0.68 : 0.48 },
+                uWaveStrength: { value: this.graphicsQuality === 'high' ? 0.72 : 0.52 },
+                uDepthAmount: { value: 0.86 },
                 uPlanarReflectionStrength: { value: enablePlanarReflection ? 1.0 : 0.0 },
             };
             this.waterShaderUniforms = uniforms;
@@ -1696,11 +1702,14 @@ export class SceneManager {
                     varying vec3 vNormal;
                     void main() {
                         vUv = uv;
-                        vReflectionUv = uReflectionMatrix * vec4(position, 1.0);
+                        vec4 reflectionPosition = uReflectionMatrix * vec4(position, 1.0);
                         vec3 p = position;
-                        float waveA = sin(position.x * 0.19 + uTime * 0.72) * 0.035;
-                        float waveB = cos(position.y * 0.27 - uTime * 0.48) * 0.022;
-                        p.z += waveA + waveB;
+                        float waveA = sin(position.x * 0.21 + uTime * 0.62) * 0.035;
+                        float waveB = sin(position.x * 0.49 - uTime * 0.37 + position.y * 0.14) * 0.018;
+                        float waveC = cos(position.y * 0.31 + uTime * 0.51) * 0.012;
+                        p.z += (waveA + waveB + waveC) * 0.72;
+                        reflectionPosition.z += (waveA + waveB + waveC) * 0.72;
+                        vReflectionUv = reflectionPosition;
                         vec4 worldPosition = modelMatrix * vec4(p, 1.0);
                         vWorldPosition = worldPosition.xyz;
                         vNormal = normalize(mat3(modelMatrix) * normal);
@@ -1713,36 +1722,47 @@ export class SceneManager {
                     uniform float uTime;
                     uniform vec3 uColor;
                     uniform vec3 uDeepColor;
+                    uniform vec3 uShallowColor;
+                    uniform vec3 uHighlightColor;
                     uniform vec3 uFoamColor;
                     uniform float uFoamStrength;
                     uniform float uReflectionStrength;
+                    uniform float uWaveStrength;
+                    uniform float uDepthAmount;
                     uniform float uPlanarReflectionStrength;
                     varying vec2 vUv;
                     varying vec4 vReflectionUv;
                     varying vec3 vWorldPosition;
                     varying vec3 vNormal;
                     void main() {
-                        vec2 flowUvA = vUv * vec2(3.2, 1.5) + vec2(uTime * 0.018, uTime * 0.006);
-                        vec2 flowUvB = vUv * vec2(6.0, 2.2) - vec2(uTime * 0.011, uTime * 0.012);
+                        vec2 flowUvA = vUv * vec2(3.0, 1.25) + vec2(uTime * 0.014, uTime * 0.004);
+                        vec2 flowUvB = vUv * vec2(7.0, 2.4) - vec2(uTime * 0.009, uTime * 0.013);
                         vec3 texA = texture2D(uMap, flowUvA).rgb;
                         vec3 texB = texture2D(uMap, flowUvB).rgb;
                         float detail = dot(mix(texA, texB, 0.5), vec3(0.30, 0.45, 0.25));
+                        float waveMask = smoothstep(0.22, 0.8, detail);
                         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-                        float fresnel = pow(1.0 - max(dot(normalize(vNormal), viewDir), 0.0), 3.0);
+                        float facing = max(dot(normalize(vNormal), viewDir), 0.0);
+                        float fresnel = pow(1.0 - facing, 3.2);
                         // The river plane edges are the shoreline bands. Detail
                         // breaks the foam so it reads as moving bubbles rather
                         // than a static white border.
                         float shoreBand = (1.0 - smoothstep(0.025, 0.16, vUv.y)) + smoothstep(0.84, 0.975, vUv.y);
                         float foamNoise = smoothstep(0.42, 0.82, detail);
                         float foamMask = clamp(shoreBand * (0.34 + foamNoise * 0.66) * uFoamStrength, 0.0, 1.0);
-                        float reflection = fresnel * (0.34 + uReflectionStrength * 0.42);
-                        vec3 skyReflection = mix(vec3(0.30, 0.55, 0.72), vec3(0.82, 0.96, 1.0), detail);
+                        float reflection = clamp(fresnel * (0.22 + uReflectionStrength * 0.34), 0.0, 0.72);
+                        vec3 skyReflection = mix(vec3(0.11, 0.36, 0.53), vec3(0.60, 0.88, 0.91), waveMask);
                         vec3 planarReflection = texture2DProj(uReflectionMap, vReflectionUv).rgb;
                         vec3 reflectionColor = mix(skyReflection, planarReflection, uPlanarReflectionStrength);
-                        vec3 color = mix(uDeepColor, uColor, 0.55 + detail * 0.35);
+                        float centerDepth = smoothstep(0.10, 0.92, 1.0 - abs(vUv.y - 0.5) * 2.0);
+                        centerDepth = clamp(centerDepth * (0.88 + detail * 0.12), 0.0, 1.0);
+                        vec3 color = mix(uShallowColor, uDeepColor, centerDepth * uDepthAmount);
+                        color = mix(color, uColor, 0.16 + waveMask * 0.18);
                         color = mix(color, reflectionColor, reflection);
-                        color = mix(color, uFoamColor, foamMask + fresnel * 0.08);
-                        float alpha = 0.70 + fresnel * 0.16 + foamMask * 0.08;
+                        float glint = smoothstep(0.68, 0.94, detail) * (0.12 + fresnel * 0.34) * uWaveStrength;
+                        color += uHighlightColor * glint;
+                        color = mix(color, uFoamColor, foamMask * 0.72 + fresnel * 0.025);
+                        float alpha = 0.76 + fresnel * 0.09 + foamMask * 0.035;
                         gl_FragColor = vec4(color, alpha);
                     }
                 `,
@@ -1892,7 +1912,7 @@ export class SceneManager {
         const quality = this.graphicsQuality;
         if (quality !== 'medium' && quality !== 'high') return;
         const segments = quality === 'high' ? 72 : 48;
-        const radius = quality === 'high' ? 0.075 : 0.055;
+        const radius = quality === 'high' ? 0.045 : 0.032;
         const riverHalfWidth = 5.25;
         const makeFoamSide = (side) => {
             const points = [];
@@ -1906,8 +1926,8 @@ export class SceneManager {
             const geometry = new THREE.TubeGeometry(curve, segments, radius, 5, false);
             const uniforms = {
                 uTime: { value: 0 },
-                uColor: { value: new THREE.Color(0xcff7ff) },
-                uOpacity: { value: quality === 'high' ? 0.55 : 0.38 },
+                uColor: { value: new THREE.Color(0xd8f6f4) },
+                uOpacity: { value: quality === 'high' ? 0.34 : 0.24 },
                 uPhase: { value: side * 1.4 },
             };
             const material = new THREE.ShaderMaterial({
@@ -1933,7 +1953,8 @@ export class SceneManager {
                         float bubbles = sin(vUv.x * 38.0 - uTime * 2.3 + uPhase) * 0.5 + 0.5;
                         bubbles *= sin(vUv.x * 17.0 + uTime * 1.4) * 0.5 + 0.5;
                         float rim = 1.0 - abs(vUv.y - 0.5) * 1.85;
-                        float alpha = uOpacity * clamp(rim, 0.0, 1.0) * (0.35 + bubbles * 0.65);
+                        float brokenEdge = smoothstep(0.22, 0.82, bubbles);
+                        float alpha = uOpacity * clamp(rim, 0.0, 1.0) * (0.18 + brokenEdge * 0.82);
                         gl_FragColor = vec4(uColor, alpha);
                     }
                 `,

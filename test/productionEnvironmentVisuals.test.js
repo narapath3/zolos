@@ -39,6 +39,8 @@ test('river water upgrades to an adaptive Fresnel shader on medium/high tiers an
   assert.match(source, /uTime: \{ value: 0 \}/);
   assert.match(source, /uniform sampler2D uMap/);
   assert.match(source, /float fresnel = pow/);
+  assert.match(source, /float centerDepth = smoothstep/);
+  assert.match(source, /mix\(uShallowColor, uDeepColor, centerDepth \* uDepthAmount\)/);
   assert.match(source, /waterShaderUniforms\.uTime\.value = this\.time/);
   assert.match(source, /Ultra-low\/low keeps a single inexpensive lit material/);
 });
@@ -72,11 +74,18 @@ test('adaptive water adds shoreline foam and Fresnel reflection without forcing 
 });
 
 test('high-tier planar reflection is resolution-capped and disposed on map changes', () => {
-  assert.match(source, /new Reflector\(new THREE\.PlaneGeometry\(riverLength, 40\)/);
+  assert.match(source, /const riverWidth = 11\.4/);
+  assert.match(source, /new Reflector\(new THREE\.PlaneGeometry\(riverLength, riverWidth\)/);
   assert.match(source, /Math\.max\(256, Math\.min\(512/);
   assert.match(source, /multisample: 0/);
   assert.match(source, /if \(object\.isReflector && typeof object\.dispose === 'function'\)/);
   assert.match(source, /this\.waterReflection = null/);
+});
+
+test('river surface stays aligned with the actual bank width instead of a flat oversized slab', () => {
+  assert.match(source, /const riverWidth = 11\.4/);
+  assert.match(source, /new THREE\.PlaneGeometry\(riverLength, riverWidth/);
+  assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
 });
 
 test('river shoreline foam uses bounded geometry and animated bubbles', () => {
