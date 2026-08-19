@@ -433,6 +433,7 @@ export class SceneManager {
         this.waterRippleMeshes = [];
         this.waterBubbleField = null;
         this.waterAquaticProps = [];
+        this.waterGuardRails = [];
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.portalMeshes = [];
@@ -553,6 +554,7 @@ export class SceneManager {
         this.waterRippleMeshes = [];
         this.waterBubbleField = null;
         this.waterAquaticProps = [];
+        this.waterGuardRails = [];
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.waterfalls = [];
@@ -1819,6 +1821,7 @@ export class SceneManager {
         }
         this._createWaterBubbleField(riverLength);
         this._createAquaticProps(riverLength);
+        this._createRiverGuardRails(riverLength);
         this._createAmbientAquaticActors(riverLength);
 
         // Custom riverbank rocks
@@ -2460,6 +2463,87 @@ export class SceneManager {
             this.scene.add(group);
             this.envObjects.push(group);
             this.fishes.push(group);
+        }
+    }
+
+    _createRiverGuardRails(riverLength) {
+        const quality = this.graphicsQuality;
+        const span = Math.min(riverLength * 0.86, 98);
+        const spacing = quality === 'high' ? 3.0 : quality === 'medium' ? 3.35 : 3.8;
+        const postCount = Math.floor(span / spacing);
+        const woodDark = new THREE.MeshStandardMaterial({ color: 0x4b2b18, roughness: 0.88, metalness: 0.0 });
+        const woodMid = new THREE.MeshStandardMaterial({ color: 0x7b4b27, roughness: 0.82, metalness: 0.0 });
+        const woodLight = new THREE.MeshStandardMaterial({ color: 0xb57a3d, roughness: 0.76, metalness: 0.0 });
+        const ropeMat = new THREE.MeshStandardMaterial({ color: 0xceb477, roughness: 0.95, metalness: 0.0 });
+        const postGeo = new THREE.CylinderGeometry(0.105, 0.14, 1.35, 6);
+        const capGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.10, 6);
+        const railGeo = new THREE.CylinderGeometry(0.075, 0.075, spacing * 1.08, 6);
+        const lowerRailGeo = new THREE.CylinderGeometry(0.045, 0.045, spacing * 1.04, 6);
+        const ropeGeo = new THREE.CylinderGeometry(0.022, 0.022, spacing * 1.02, 5);
+        const sideOffsets = [-1, 1];
+        const segmentGap = (x) => Math.abs(x) < 2.8; // leave the bridge approach open
+        for (const side of sideOffsets) {
+            const points = [];
+            for (let i = 0; i <= postCount; i++) {
+                const x = -span * 0.5 + (span * i) / Math.max(1, postCount);
+                if (segmentGap(x)) continue;
+                const riverZ = Math.sin(x * 0.08) * 10 - 2;
+                const z = riverZ + side * 6.15;
+                const terrainY = this.getTerrainHeight(x, z);
+                const group = new THREE.Group();
+                group.name = 'river-guard-rail-segment';
+                const post = new THREE.Mesh(postGeo, woodMid);
+                post.position.y = 0.67;
+                post.rotation.z = ((i % 3) - 1) * 0.035;
+                post.castShadow = true;
+                group.add(post);
+                const cap = new THREE.Mesh(capGeo, i % 2 ? woodLight : woodDark);
+                cap.position.y = 1.38;
+                cap.rotation.x = Math.PI / 2;
+                group.add(cap);
+                group.position.set(x, terrainY + 0.04, z);
+                this.scene.add(group);
+                this.envObjects.push(group);
+                this.waterGuardRails.push(group);
+                points.push({ x, z, terrainY });
+            }
+            for (let i = 0; i < points.length - 1; i++) {
+                const a = points[i];
+                const b = points[i + 1];
+                if (Math.abs(b.x - a.x) > spacing * 1.65) continue;
+                const dx = b.x - a.x;
+                const dz = b.z - a.z;
+                const length = Math.hypot(dx, dz);
+                const angle = Math.atan2(dz, dx);
+                const midX = (a.x + b.x) * 0.5;
+                const midZ = (a.z + b.z) * 0.5;
+                const midY = (a.terrainY + b.terrainY) * 0.5 + 0.04;
+                const segment = new THREE.Group();
+                segment.name = 'river-guard-rail-span';
+                const rail = new THREE.Mesh(railGeo, woodLight);
+                rail.rotation.z = Math.PI / 2;
+                rail.rotation.y = -angle;
+                rail.scale.y = length / (spacing * 1.08);
+                rail.position.y = 1.07;
+                rail.castShadow = true;
+                segment.add(rail);
+                const lower = new THREE.Mesh(lowerRailGeo, woodDark);
+                lower.rotation.z = Math.PI / 2;
+                lower.rotation.y = -angle;
+                lower.scale.y = length / (spacing * 1.04);
+                lower.position.y = 0.55;
+                segment.add(lower);
+                const rope = new THREE.Mesh(ropeGeo, ropeMat);
+                rope.rotation.z = Math.PI / 2;
+                rope.rotation.y = -angle;
+                rope.scale.y = length / (spacing * 1.02);
+                rope.position.y = 0.82;
+                segment.add(rope);
+                segment.position.set(midX, midY, midZ);
+                this.scene.add(segment);
+                this.envObjects.push(segment);
+                this.waterGuardRails.push(segment);
+            }
         }
     }
 

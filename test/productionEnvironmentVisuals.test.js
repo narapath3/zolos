@@ -107,6 +107,18 @@ test('river surface stays aligned with the actual bank width instead of a flat o
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
 });
 
+test('river adds segmented wooden guard rails with an open bridge approach', () => {
+  assert.match(source, /_createRiverGuardRails\(riverLength\)/);
+  assert.match(source, /const spacing = quality === 'high' \? 3\.0 : quality === 'medium' \? 3\.35 : 3\.8/);
+  assert.match(source, /river-guard-rail-segment/);
+  assert.match(source, /river-guard-rail-span/);
+  assert.match(source, /const postGeo = new THREE\.CylinderGeometry/);
+  assert.match(source, /const railGeo = new THREE\.CylinderGeometry/);
+  assert.match(source, /const ropeGeo = new THREE\.CylinderGeometry/);
+  assert.match(source, /Math\.abs\(x\) < 2\.8/);
+  assert.match(source, /this\.waterGuardRails\.push/);
+});
+
 test('river adds tier-scaled aquatic props without covering the readable water silhouette', () => {
   assert.match(source, /_createAquaticProps\(riverLength\)/);
   assert.match(source, /const propCount = quality === 'high' \? 24 : quality === 'medium' \? 16 : 9/);
