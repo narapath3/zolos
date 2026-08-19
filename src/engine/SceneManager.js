@@ -14,6 +14,16 @@ import { buildPet } from './PetModels.js';
 
 const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, Arial, sans-serif';
 
+// Prontera river geometry is shared by terrain coloring, water, shoreline,
+// guard rails and movement collision. Keeping these values together prevents
+// the visual bank and the physical barrier from drifting apart.
+const PRONTERA_RIVER_HALF_WIDTH = 5.7; // water plane half-width (11.4 total)
+const PRONTERA_RIVER_BANK_EDGE = 7.25; // dry-land edge where the fence sits
+const PRONTERA_RIVER_GUARD_LINE = 6.78; // player stop line before the fence
+const PRONTERA_BRIDGE_HALF_WIDTH = 2.15; // touch-safe approach corridor
+const PRONTERA_BRIDGE_MIN_Z = -10.35;
+const PRONTERA_BRIDGE_MAX_Z = 6.35;
+
 /**
  * Canvas text is rendered separately from DOM text. iPad Safari can choose a
  * different fallback font and text metric than Android, so never rely on a
@@ -849,12 +859,15 @@ export class SceneManager {
 
         const riverCenter = Math.sin(x * 0.08) * 10 - 2;
         const distToRiver = Math.abs(z - riverCenter);
-        if (distToRiver < 7.0) {
-            const t = distToRiver / 7.0;
+        if (distToRiver < PRONTERA_RIVER_HALF_WIDTH) {
+            const t = distToRiver / PRONTERA_RIVER_HALF_WIDTH;
             height = -1.3 * (1.0 - t * t);
-        } else if (distToRiver < 10.0) {
-            const t = (distToRiver - 7.0) / 3.0;
-            height += 0.35 * Math.sin(t * Math.PI);
+        } else if (distToRiver < PRONTERA_RIVER_BANK_EDGE) {
+            // A short, raised wet shoulder transitions from the water plane to
+            // dry land. Rails are placed outside this band, never in the cut.
+            const t = (distToRiver - PRONTERA_RIVER_HALF_WIDTH)
+                / (PRONTERA_RIVER_BANK_EDGE - PRONTERA_RIVER_HALF_WIDTH);
+            height += 0.18 * Math.sin(t * Math.PI);
         }
 
         // 26-unit foothill radius, 14-unit summit radius. This creates a long
@@ -874,7 +887,8 @@ export class SceneManager {
     getWalkableHeight(x, z) {
         // The bridge is an elevated walkable surface; do not reuse the carved
         // riverbed height or characters will visually sink through its deck.
-        if (this.currentMap === 'prontera' && Math.abs(x) < 1.8 && z >= -10 && z <= 6) {
+        if (this.currentMap === 'prontera' && Math.abs(x) < PRONTERA_BRIDGE_HALF_WIDTH
+            && z >= PRONTERA_BRIDGE_MIN_Z && z <= PRONTERA_BRIDGE_MAX_Z) {
             return 0.60;
         }
         return this.getTerrainHeight(x, z);
@@ -1517,12 +1531,20 @@ export class SceneManager {
                 const deepBed = new THREE.Color(0x0b4860);
                 const bedLight = new THREE.Color(0x1b7890);
                 color = deepBed.lerp(bedLight, t);
-            } else if (distToRiver < 5.5) {
-                // Blue wet shoreline, never brown terrain inside the river bank.
-                const t = (distToRiver - 3.2) / 2.2;
+            } else if (distToRiver < PRONTERA_RIVER_HALF_WIDTH) {
+                // Blue wet shoreline follows the actual water plane edge.
+                const t = (distToRiver - 3.2) / (PRONTERA_RIVER_HALF_WIDTH - 3.2);
                 const shoreWater = new THREE.Color(0x39aabd);
                 const grassColor = baseColor.clone().lerp(altColor, 0.4);
                 color = shoreWater.lerp(grassColor, t * 0.25);
+            } else if (distToRiver < PRONTERA_RIVER_BANK_EDGE) {
+                // A muted teal/grass transition makes the soil edge readable
+                // beneath the rail instead of looking like submerged brown dirt.
+                const t = (distToRiver - PRONTERA_RIVER_HALF_WIDTH)
+                    / (PRONTERA_RIVER_BANK_EDGE - PRONTERA_RIVER_HALF_WIDTH);
+                const shoreWater = new THREE.Color(0x4e9e99);
+                const grassColor = baseColor.clone().lerp(altColor, 0.28);
+                color = shoreWater.lerp(grassColor, t * 0.70);
             } else if (x < -6 && z < -6) {
                 // Mossy cave highland. Keep it readable in every weather state;
                 // cave props provide the darkness instead of a pitch-black floor.
@@ -1772,6 +1794,8 @@ export class SceneManager {
                         float windWaveSlow = sin(vUv.x * 8.0 - uTime * 0.58 + vUv.y * 2.0) * 0.5 + 0.5;
                         float windWaveDetail = sin(vUv.x * 27.0 - uTime * 1.45 - vUv.y * 4.0) * 0.5 + 0.5;
                         float windWave = smoothstep(0.30, 0.82, windWaveSlow * 0.70 + windWaveDetail * 0.30);
+                        float currentRibbon = smoothstep(0.58, 0.94, sin(vUv.x * 18.0 - uTime * 0.64 + vUv.y * 5.0) * 0.5 + 0.5);
+                        float microWave = sin(vUv.x * 92.0 - uTime * 1.9 + vUv.y * 18.0) * 0.5 + 0.5;
                         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
                         float facing = max(dot(normalize(vNormal), viewDir), 0.0);
                         float fresnel = pow(1.0 - facing, 3.2);
@@ -1781,8 +1805,9 @@ export class SceneManager {
                         float shoreBand = (1.0 - smoothstep(0.025, 0.16, vUv.y)) + smoothstep(0.84, 0.975, vUv.y);
                         float foamNoise = smoothstep(0.42, 0.82, detail);
                         float crestFoam = smoothstep(0.78, 0.96, windWave) * (0.24 + fresnel * 0.48);
-                        float foamMask = clamp(shoreBand * (0.38 + foamNoise * 0.62) * uFoamStrength + crestFoam * uFoamStrength, 0.0, 1.0);
-                        float reflection = clamp(fresnel * (0.20 + uReflectionStrength * 0.30) + windWave * 0.035, 0.0, 0.68);
+                        float foamLace = smoothstep(0.70, 0.96, sin(vUv.x * 46.0 - uTime * 1.2 + detail * 6.0) * 0.5 + 0.5);
+                        float foamMask = clamp(shoreBand * (0.24 + foamNoise * 0.56 + foamLace * 0.22) * uFoamStrength + crestFoam * uFoamStrength, 0.0, 1.0);
+                        float reflection = clamp(fresnel * (0.22 + uReflectionStrength * 0.34) + windWave * 0.045, 0.0, 0.72);
                         vec3 skyReflection = mix(vec3(0.11, 0.36, 0.53), vec3(0.60, 0.88, 0.91), waveMask);
                         vec3 planarReflection = texture2DProj(uReflectionMap, vReflectionUv).rgb;
                         vec3 reflectionColor = mix(skyReflection, planarReflection, uPlanarReflectionStrength);
@@ -1793,9 +1818,14 @@ export class SceneManager {
                         color = mix(color, reflectionColor, reflection);
                         float glint = smoothstep(0.68, 0.94, detail) * (0.08 + fresnel * 0.24) * uWaveStrength;
                         float waveRibbon = smoothstep(0.64, 0.94, sin(vUv.x * 31.0 + uTime * 0.9 + detail * 3.0) * 0.5 + 0.5);
-                        color += uHighlightColor * (glint + waveRibbon * (0.016 + fresnel * 0.06) + windWave * 0.022);
-                        float shoreTint = shoreBand * (0.05 + foamNoise * 0.06);
+                        vec3 sunDir = normalize(vec3(-0.28, 0.82, 0.44));
+                        vec3 reflectedSun = reflect(-sunDir, normalize(vNormal));
+                        float sunGlint = pow(max(dot(reflectedSun, viewDir), 0.0), 22.0) * (0.18 + fresnel * 0.34);
+                        color += uHighlightColor * (glint + waveRibbon * (0.018 + fresnel * 0.07) + windWave * 0.026);
+                        color += uHighlightColor * (currentRibbon * 0.028 + microWave * fresnel * 0.028 + sunGlint * uWaveStrength);
+                        float shoreTint = shoreBand * (0.07 + foamNoise * 0.07);
                         color = mix(color, uShallowColor, shoreTint);
+                        color = mix(color, uHighlightColor, currentRibbon * (0.018 + fresnel * 0.03));
                         color = mix(color, uHighlightColor, windWave * (0.012 + fresnel * 0.035));
                         color = mix(color, uFoamColor, foamMask * 0.58 + fresnel * 0.018);
                         float alpha = clamp(uWaterOpacity + fresnel * 0.04 + foamMask * 0.02, 0.0, 0.90);
@@ -1836,6 +1866,7 @@ export class SceneManager {
         }
         this._createWaterBubbleField(riverLength);
         this._createAquaticProps(riverLength);
+        this._createRiverBankEdge(riverLength);
         this._createRiverGuardRails(riverLength);
         this._createRiverNightAmbience(riverLength);
         this._createAmbientAquaticActors(riverLength);
@@ -2043,7 +2074,7 @@ export class SceneManager {
         const count = quality === 'high' ? 16 : 10;
         const group = new THREE.Group();
         group.name = 'water-wind-ripples';
-        const riverHalfWidth = 5.05;
+        const riverHalfWidth = PRONTERA_RIVER_HALF_WIDTH - 0.42;
         const span = Math.min(riverLength * 0.86, 96);
         for (let i = 0; i < count; i++) {
             const material = new THREE.MeshBasicMaterial({
@@ -2115,17 +2146,18 @@ export class SceneManager {
         if (quality !== 'medium' && quality !== 'high') return;
         const segments = quality === 'high' ? 72 : 48;
         const radius = quality === 'high' ? 0.052 : 0.038;
-        const riverHalfWidth = 5.25;
+        const riverHalfWidth = PRONTERA_RIVER_HALF_WIDTH - 0.18;
         const makeFoamSide = (side) => {
             const points = [];
             for (let i = 0; i <= 18; i++) {
                 const x = -riverLength * 0.5 + (riverLength * i) / 18;
                 const centerZ = Math.sin(x * 0.08) * 10 - 2;
                 const ripple = Math.sin(x * 0.31 + side * 1.7) * 0.12;
-                points.push(new THREE.Vector3(x, -0.205, centerZ + side * riverHalfWidth + ripple));
+                points.push(new THREE.Vector3(x, -0.145, centerZ + side * riverHalfWidth + ripple));
             }
             const curve = new THREE.CatmullRomCurve3(points);
-            const geometry = new THREE.TubeGeometry(curve, segments, radius, 5, false);
+                            const geometry = new THREE.TubeGeometry(curve, segments, radius, 5, false);
+
             const uniforms = {
                 uTime: { value: 0 },
                 uColor: { value: new THREE.Color(0xd8f6f4) },
@@ -2484,40 +2516,61 @@ export class SceneManager {
 
     _createRiverGuardRails(riverLength) {
         const quality = this.graphicsQuality;
-        const span = Math.min(riverLength * 0.86, 98);
-        const spacing = quality === 'high' ? 3.0 : quality === 'medium' ? 3.35 : 3.8;
-        const postCount = Math.floor(span / spacing);
-        const woodDark = new THREE.MeshStandardMaterial({ color: 0x4b2b18, roughness: 0.88, metalness: 0.0 });
-        const woodMid = new THREE.MeshStandardMaterial({ color: 0x7b4b27, roughness: 0.82, metalness: 0.0 });
-        const woodLight = new THREE.MeshStandardMaterial({ color: 0xb57a3d, roughness: 0.76, metalness: 0.0 });
-        const ropeMat = new THREE.MeshStandardMaterial({ color: 0xceb477, roughness: 0.95, metalness: 0.0 });
-        const postGeo = new THREE.CylinderGeometry(0.105, 0.14, 1.35, 6);
-        const capGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.10, 6);
-        const railGeo = new THREE.CylinderGeometry(0.075, 0.075, spacing * 1.08, 6);
-        const lowerRailGeo = new THREE.CylinderGeometry(0.045, 0.045, spacing * 1.04, 6);
-        const ropeGeo = new THREE.CylinderGeometry(0.022, 0.022, spacing * 1.02, 5);
+        // Extend almost to the visible water ends so the physical boundary does
+        // not look like an invisible wall after the last wooden post.
+        const span = Math.min(riverLength * 0.98, 114);
+        const spacing = quality === 'high' ? 2.8 : quality === 'medium' ? 3.15 : 3.55;
+        const postHeight = quality === 'ultra-low' ? 1.72 : 1.92;
+        const topRailY = 1.58;
+        const lowerRailY = 0.62;
+        const ropeY = 1.08;
+        const bridgeRailGap = PRONTERA_BRIDGE_HALF_WIDTH + 0.20;
+        const woodDark = new THREE.MeshStandardMaterial({ color: 0x3c2415, roughness: 0.90, metalness: 0.0 });
+        const woodMid = new THREE.MeshStandardMaterial({ color: 0x76502d, roughness: 0.84, metalness: 0.0 });
+        const woodLight = new THREE.MeshStandardMaterial({ color: 0xb88146, roughness: 0.78, metalness: 0.0 });
+        const ropeMat = new THREE.MeshStandardMaterial({ color: 0xd8c083, roughness: 0.96, metalness: 0.0 });
+        const postGeo = new THREE.CylinderGeometry(0.14, 0.19, postHeight, 8);
+        const capGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.12, 8);
+        const railGeo = new THREE.CylinderGeometry(0.09, 0.09, spacing * 1.12, 8);
+        const lowerRailGeo = new THREE.CylinderGeometry(0.055, 0.055, spacing * 1.08, 7);
+        const ropeGeo = new THREE.CylinderGeometry(0.026, 0.026, spacing * 1.06, 6);
         const sideOffsets = [-1, 1];
-        const segmentGap = (x) => Math.abs(x) < 2.8; // leave the bridge approach open
+        const sampleXs = [];
+        const sampleCount = Math.ceil(span / spacing);
+        for (let i = 0; i <= sampleCount; i++) {
+            const x = -span * 0.5 + (span * i) / Math.max(1, sampleCount);
+            if (Math.abs(x) < bridgeRailGap) continue;
+            sampleXs.push(x);
+        }
+        // Force a clean, symmetric end-post pair at the bridge approach. This
+        // removes the old variable-sized holes caused by skipping a grid sample.
+        for (const x of [-bridgeRailGap, bridgeRailGap]) {
+            if (!sampleXs.some((sampleX) => Math.abs(sampleX - x) < 0.01)) sampleXs.push(x);
+        }
+        sampleXs.sort((a, b) => a - b);
+
         for (const side of sideOffsets) {
             const points = [];
-            for (let i = 0; i <= postCount; i++) {
-                const x = -span * 0.5 + (span * i) / Math.max(1, postCount);
-                if (segmentGap(x)) continue;
+            for (let i = 0; i < sampleXs.length; i++) {
+                const x = sampleXs[i];
                 const riverZ = Math.sin(x * 0.08) * 10 - 2;
-                const z = riverZ + side * 6.15;
+                // Place the fence on the raised dry shoulder, outside the water
+                // plane and shoreline foam. It must never be planted in the cut.
+                const z = riverZ + side * PRONTERA_RIVER_BANK_EDGE;
                 const terrainY = this.getTerrainHeight(x, z);
                 const group = new THREE.Group();
                 group.name = 'river-guard-rail-segment';
                 const post = new THREE.Mesh(postGeo, woodMid);
-                post.position.y = 0.67;
+                post.position.y = postHeight * 0.5;
                 post.rotation.z = ((i % 3) - 1) * 0.035;
                 post.castShadow = true;
                 group.add(post);
                 const cap = new THREE.Mesh(capGeo, i % 2 ? woodLight : woodDark);
-                cap.position.y = 1.38;
+                cap.position.y = postHeight + 0.05;
                 cap.rotation.x = Math.PI / 2;
+                cap.castShadow = true;
                 group.add(cap);
-                group.position.set(x, terrainY + 0.04, z);
+                group.position.set(x, terrainY + 0.06, z);
                 this.scene.add(group);
                 this.envObjects.push(group);
                 this.waterGuardRails.push(group);
@@ -2526,39 +2579,98 @@ export class SceneManager {
             for (let i = 0; i < points.length - 1; i++) {
                 const a = points[i];
                 const b = points[i + 1];
-                if (Math.abs(b.x - a.x) > spacing * 1.65) continue;
+                if (a.x < -bridgeRailGap && b.x > bridgeRailGap) continue;
                 const dx = b.x - a.x;
                 const dz = b.z - a.z;
                 const length = Math.hypot(dx, dz);
                 const angle = Math.atan2(dz, dx);
                 const midX = (a.x + b.x) * 0.5;
                 const midZ = (a.z + b.z) * 0.5;
-                const midY = (a.terrainY + b.terrainY) * 0.5 + 0.04;
+                const midY = (a.terrainY + b.terrainY) * 0.5 + 0.06;
                 const segment = new THREE.Group();
                 segment.name = 'river-guard-rail-span';
                 const rail = new THREE.Mesh(railGeo, woodLight);
                 rail.rotation.z = Math.PI / 2;
                 rail.rotation.y = -angle;
-                rail.scale.y = length / (spacing * 1.08);
-                rail.position.y = 1.07;
+                rail.scale.y = length / (spacing * 1.12);
+                rail.position.y = topRailY;
                 rail.castShadow = true;
                 segment.add(rail);
                 const lower = new THREE.Mesh(lowerRailGeo, woodDark);
                 lower.rotation.z = Math.PI / 2;
                 lower.rotation.y = -angle;
-                lower.scale.y = length / (spacing * 1.04);
-                lower.position.y = 0.55;
+                lower.scale.y = length / (spacing * 1.08);
+                lower.position.y = lowerRailY;
                 segment.add(lower);
                 const rope = new THREE.Mesh(ropeGeo, ropeMat);
                 rope.rotation.z = Math.PI / 2;
                 rope.rotation.y = -angle;
-                rope.scale.y = length / (spacing * 1.02);
-                rope.position.y = 0.82;
+                rope.scale.y = length / (spacing * 1.06);
+                rope.position.y = ropeY;
                 segment.add(rope);
                 segment.position.set(midX, midY, midZ);
                 this.scene.add(segment);
                 this.envObjects.push(segment);
                 this.waterGuardRails.push(segment);
+            }
+        }
+    }
+
+    _createRiverBankEdge(riverLength) {
+        if (this.currentMap !== 'prontera') return;
+        const quality = this.graphicsQuality;
+        const segments = quality === 'high' ? 64 : quality === 'medium' ? 44 : 28;
+        const samples = quality === 'high' ? 20 : quality === 'medium' ? 15 : 10;
+        const span = Math.min(riverLength * 0.96, 112);
+        const edgeRadius = quality === 'high' ? 0.105 : 0.085;
+        const edgeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x4f9b8e,
+            roughness: 0.86,
+            metalness: 0.0,
+            emissive: 0x0b2525,
+            emissiveIntensity: 0.16,
+        });
+        const wetMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2d6872,
+            roughness: 0.94,
+            metalness: 0.0,
+        });
+        for (const side of [-1, 1]) {
+            const points = [];
+            for (let i = 0; i <= samples; i++) {
+                const x = -span * 0.5 + (span * i) / Math.max(1, samples);
+                const centerZ = Math.sin(x * 0.08) * 10 - 2;
+                const z = centerZ + side * (PRONTERA_RIVER_HALF_WIDTH + 0.10);
+                const terrainY = this.getTerrainHeight(x, z);
+                // Keep the trim partly over the water and partly embedded in the
+                // wet shoulder, so there is no floating lip or brown seam.
+                const y = Math.min(terrainY + 0.025, -0.105);
+                points.push(new THREE.Vector3(x, y, z));
+            }
+            const curve = new THREE.CatmullRomCurve3(points);
+            const geometry = new THREE.TubeGeometry(curve, segments, edgeRadius, 6, false);
+            const mesh = new THREE.Mesh(geometry, edgeMaterial);
+            mesh.name = 'river-shoreline-edge';
+            mesh.castShadow = quality === 'high';
+            mesh.receiveShadow = true;
+            this.scene.add(mesh);
+            this.envObjects.push(mesh);
+
+            // Small, sparse dark wet stones break the perfect procedural line.
+            const stoneCount = quality === 'high' ? 12 : quality === 'medium' ? 8 : 4;
+            for (let i = 0; i < stoneCount; i++) {
+                const x = -span * 0.46 + (span * i) / Math.max(1, stoneCount - 1);
+                const centerZ = Math.sin(x * 0.08) * 10 - 2;
+                const z = centerZ + side * (PRONTERA_RIVER_HALF_WIDTH + 0.18 + (i % 2) * 0.14);
+                const stone = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.12 + (i % 3) * 0.035, 0),
+                    wetMaterial
+                );
+                stone.position.set(x, Math.min(this.getTerrainHeight(x, z) + 0.06, 0.02), z);
+                stone.scale.y = 0.52;
+                stone.rotation.set(0.18 + i * 0.2, i * 0.7, 0.12);
+                this.scene.add(stone);
+                this.envObjects.push(stone);
             }
         }
     }
@@ -6380,19 +6492,39 @@ export class SceneManager {
         const resolved = toPosition.clone();
         if (this.currentMap !== 'prontera' || !fromPosition || !toPosition) return resolved;
 
-        // Only the actual bridge deck is open. The old 2.8-unit approach gap
-        // let players cut around the end of a rail and enter the river beside
-        // the bridge. Keep a small tolerance for touch/joystick movement while
-        // matching the 3.6-unit deck width (x = +/-1.8).
-        const bridgeDeckOpen = (p) => Math.abs(p.x) < 1.9 && p.z >= -10.5 && p.z <= 6.5;
-        if (bridgeDeckOpen(fromPosition) || bridgeDeckOpen(toPosition)) return resolved;
+        // Only the actual bridge approach corridor is open. Its tolerance is
+        // slightly wider than the 3.6-unit deck so touch/joystick movement can
+        // enter smoothly, but it remains narrower than the new fence endpoints.
+        const bridgeDeckOpen = (p) => Math.abs(p.x) < PRONTERA_BRIDGE_HALF_WIDTH
+            && p.z >= PRONTERA_BRIDGE_MIN_Z && p.z <= PRONTERA_BRIDGE_MAX_Z;
+        const fromOnBridge = bridgeDeckOpen(fromPosition);
+        const toOnBridge = bridgeDeckOpen(toPosition);
+        if (fromOnBridge && toOnBridge) return resolved;
+        if (fromOnBridge && !toOnBridge) {
+            // Leaving through the bridge ends is valid; leaving through either
+            // side must stop at the handrail instead of cutting into the river.
+            const leavingEnd = toPosition.z < PRONTERA_BRIDGE_MIN_Z
+                || toPosition.z > PRONTERA_BRIDGE_MAX_Z;
+            if (leavingEnd && Math.abs(toPosition.x) < PRONTERA_BRIDGE_HALF_WIDTH) return resolved;
+            resolved.x = THREE.MathUtils.clamp(toPosition.x, -PRONTERA_BRIDGE_HALF_WIDTH, PRONTERA_BRIDGE_HALF_WIDTH);
+            resolved.y = toPosition.y;
+            return resolved;
+        }
+        if (toOnBridge) {
+            const enteringFromEnd = Math.abs(fromPosition.x) < PRONTERA_BRIDGE_HALF_WIDTH
+                && (fromPosition.z < PRONTERA_BRIDGE_MIN_Z || fromPosition.z > PRONTERA_BRIDGE_MAX_Z);
+            if (enteringFromEnd) return resolved;
+            resolved.x = Math.sign(fromPosition.x || toPosition.x) * PRONTERA_BRIDGE_HALF_WIDTH;
+            resolved.y = toPosition.y;
+            return resolved;
+        }
 
         const riverCenter = (x) => Math.sin(x * 0.08) * 10 - 2;
         const fromDelta = fromPosition.z - riverCenter(fromPosition.x);
         const toDelta = toPosition.z - riverCenter(toPosition.x);
         const fromDistance = Math.abs(fromDelta);
         const toDistance = Math.abs(toDelta);
-        const guardLine = 5.55;
+        const guardLine = PRONTERA_RIVER_GUARD_LINE;
 
         // Players already inside the river may continue moving in the water,
         // but cannot exit through a guard rail. They must use the bridge deck,
@@ -6417,13 +6549,13 @@ export class SceneManager {
 
     getFootstepSurface(position) {
         if (!position) return 'grass';
-        if (this.currentMap === 'prontera' && Math.abs(position.x) < 2.2
-            && position.z >= -10 && position.z <= 6) {
+        if (this.currentMap === 'prontera' && Math.abs(position.x) < PRONTERA_BRIDGE_HALF_WIDTH
+            && position.z >= PRONTERA_BRIDGE_MIN_Z && position.z <= PRONTERA_BRIDGE_MAX_Z) {
             return 'bridge';
         }
         if (this.isInWater(position)) return 'water';
         const riverCenter = Math.sin(position.x * 0.08) * 10 - 2;
-        if (Math.abs(position.z - riverCenter) < 7.6) return 'wet';
+        if (Math.abs(position.z - riverCenter) < PRONTERA_RIVER_BANK_EDGE + 0.35) return 'wet';
         return 'grass';
     }
 
@@ -6431,10 +6563,10 @@ export class SceneManager {
     isInWater(position) {
         if (!this.waterMesh) return false;
 
-        // Check if on the bridge (approximate bounds)
-        // Bridge is centered at xOffset = 0, zOffset = -2
-        // Bridge planks have width 3.6 (x between -1.8 and 1.8), and span z from -10 to +6
-        if (Math.abs(position.x) < 1.8 && position.z >= -10 && position.z <= 6) {
+        // The bridge deck is 3.6 units wide; the corridor includes a small
+        // touch-safe tolerance so visual and movement checks agree on mobile.
+        if (Math.abs(position.x) < PRONTERA_BRIDGE_HALF_WIDTH
+            && position.z >= PRONTERA_BRIDGE_MIN_Z && position.z <= PRONTERA_BRIDGE_MAX_Z) {
             return false;
         }
 
@@ -6442,8 +6574,8 @@ export class SceneManager {
         const riverZ = Math.sin(position.x * 0.08) * 10 - 2;
         const distToRiver = Math.abs(position.z - riverZ);
 
-        // Riverbed cut boundary for wider river
-        return distToRiver < 5.5;
+        // Water surface boundary follows the 11.4-unit river plane.
+        return distToRiver < PRONTERA_RIVER_HALF_WIDTH;
     }
 
     getEnvironmentAt(position) {

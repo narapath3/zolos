@@ -54,6 +54,10 @@ test('river water upgrades to an adaptive Fresnel shader on medium/high tiers an
   assert.match(source, /float windWaveDetail = sin/);
   assert.match(source, /float windWave = smoothstep/);
   assert.match(source, /float crestFoam = smoothstep/);
+  assert.match(source, /float currentRibbon =/);
+  assert.match(source, /float microWave =/);
+  assert.match(source, /float sunGlint =/);
+  assert.match(source, /float foamLace =/);
   assert.match(source, /float waveRibbon =/);
   assert.match(source, /waterShaderUniforms\.uTime\.value = this\.time/);
   assert.match(source, /Ultra-low\/low keeps a single inexpensive lit material/);
@@ -89,6 +93,7 @@ test('adaptive water adds shoreline foam and Fresnel reflection without forcing 
 
 test('high-tier planar reflection is resolution-capped and disposed on map changes', () => {
   assert.match(source, /const riverWidth = 11\.4/);
+  assert.match(source, /const PRONTERA_RIVER_HALF_WIDTH = 5\.7/);
   assert.match(source, /new Reflector\(new THREE\.PlaneGeometry\(riverLength, riverWidth\)/);
   assert.match(source, /Math\.max\(256, Math\.min\(512/);
   assert.match(source, /multisample: 0/);
@@ -100,25 +105,31 @@ test('river palette stays blue and does not use brown terrain colors', () => {
   assert.match(source, /const deepBed = new THREE\.Color\(0x0b4860\)/);
   assert.match(source, /const bedLight = new THREE\.Color\(0x1b7890\)/);
   assert.match(source, /const shoreWater = new THREE\.Color\(0x39aabd\)/);
-  assert.match(source, /Blue wet shoreline, never brown terrain inside the river bank/);
+  assert.match(source, /Blue wet shoreline follows the actual water plane edge/);
+  assert.match(source, /A muted teal\/grass transition makes the soil edge readable/);
   assert.doesNotMatch(source, /const mudColor = new THREE\.Color\(0x3a2e24\)/);
 });
 
 test('river surface stays aligned with the actual bank width instead of a flat oversized slab', () => {
   assert.match(source, /const riverWidth = 11\.4/);
+  assert.match(source, /const PRONTERA_RIVER_HALF_WIDTH = 5\.7/);
   assert.match(source, /new THREE\.PlaneGeometry\(riverLength, riverWidth/);
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
 });
 
 test('river guard rails block land-to-water movement but keep the bridge crossing open', () => {
   assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition\)/);
-  assert.match(sceneSource, /const guardLine = 5\.55/);
-  assert.match(sceneSource, /const bridgeDeckOpen = \(p\) => Math\.abs\(p\.x\) < 1\.9/);
-  assert.match(sceneSource, /if \(bridgeDeckOpen\(fromPosition\) \|\| bridgeDeckOpen\(toPosition\)\) return resolved/);
+  assert.match(sceneSource, /const guardLine = PRONTERA_RIVER_GUARD_LINE/);
+  assert.match(sceneSource, /const bridgeDeckOpen = \(p\) => Math\.abs\(p\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
+  assert.match(sceneSource, /const fromOnBridge = bridgeDeckOpen\(fromPosition\)/);
+  assert.match(sceneSource, /const toOnBridge = bridgeDeckOpen\(toPosition\)/);
+  assert.match(sceneSource, /if \(fromOnBridge && toOnBridge\) return resolved/);
   assert.match(sceneSource, /const toDistance = Math\.abs\(toDelta\)/);
   assert.match(sceneSource, /Math\.sign\(toDelta \|\| fromDelta\) === side/);
   assert.match(sceneSource, /if \(fromDistance < guardLine\)/);
   assert.match(sceneSource, /const exitSide = toDelta >= 0 \? 1 : -1/);
+  assert.match(sceneSource, /const enteringFromEnd = Math\.abs\(fromPosition\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
+  assert.match(sceneSource, /resolved\.x = Math\.sign\(fromPosition\.x \|\| toPosition\.x\) \* PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(mainSource, /setMovementCollisionResolver/);
   assert.match(characterSource, /movementCollisionResolver/);
   assert.match(characterSource, /const resolvedPosition = this\.movementCollisionResolver/);
@@ -126,13 +137,17 @@ test('river guard rails block land-to-water movement but keep the bridge crossin
 
 test('river adds segmented wooden guard rails while collision seals the approach gaps', () => {
   assert.match(source, /_createRiverGuardRails\(riverLength\)/);
-  assert.match(source, /const spacing = quality === 'high' \? 3\.0 : quality === 'medium' \? 3\.35 : 3\.8/);
+  assert.match(source, /const spacing = quality === 'high' \? 2\.8 : quality === 'medium' \? 3\.15 : 3\.55/);
+  assert.match(source, /const postHeight = quality === 'ultra-low' \? 1\.72 : 1\.92/);
+  assert.match(source, /const bridgeRailGap = PRONTERA_BRIDGE_HALF_WIDTH \+ 0\.20/);
+  assert.match(source, /const z = riverZ \+ side \* PRONTERA_RIVER_BANK_EDGE/);
   assert.match(source, /river-guard-rail-segment/);
   assert.match(source, /river-guard-rail-span/);
   assert.match(source, /const postGeo = new THREE\.CylinderGeometry/);
   assert.match(source, /const railGeo = new THREE\.CylinderGeometry/);
   assert.match(source, /const ropeGeo = new THREE\.CylinderGeometry/);
-  assert.match(source, /Math\.abs\(x\) < 2\.8/);
+  assert.match(source, /if \(Math\.abs\(x\) < bridgeRailGap\) continue/);
+  assert.match(source, /if \(a\.x < -bridgeRailGap && b\.x > bridgeRailGap\) continue/);
   assert.match(source, /this\.waterGuardRails\.push/);
 });
 
@@ -157,6 +172,14 @@ test('water surface adds mobile-safe air bubbles and wind-driven ripple rings', 
   assert.match(source, /group\.name = 'water-wind-ripples'/);
   assert.match(source, /this\.waterBubbleField\.data\.forEach/);
   assert.match(source, /this\.waterRippleMeshes\.forEach/);
+});
+
+test('river shoreline edge follows the water plane and adds sparse wet stones', () => {
+  assert.match(source, /_createRiverBankEdge\(riverLength\)/);
+  assert.match(source, /river-shoreline-edge/);
+  assert.match(source, /const z = centerZ \+ side \* \(PRONTERA_RIVER_HALF_WIDTH \+ 0\.10\)/);
+  assert.match(source, /new THREE\.TubeGeometry\(curve, segments, edgeRadius, 6, false\)/);
+  assert.match(source, /const stoneCount = quality === 'high' \? 12 : quality === 'medium' \? 8 : 4/);
 });
 
 test('river shoreline foam uses bounded geometry and animated bubbles', () => {

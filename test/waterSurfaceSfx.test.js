@@ -22,8 +22,8 @@ test('main movement stride routes footsteps through the detected surface', () =>
 
 test('SceneManager detects bridge and wet riverbank surfaces', () => {
   assert.match(scene, /getFootstepSurface\(position\)/);
-  assert.match(scene, /Math\.abs\(position\.x\) < 2\.2/);
-  assert.match(scene, /position\.z >= -10 && position\.z <= 6/);
+  assert.match(scene, /Math\.abs\(position\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
+  assert.match(scene, /position\.z >= PRONTERA_BRIDGE_MIN_Z && position\.z <= PRONTERA_BRIDGE_MAX_Z/);
   assert.match(scene, /if \(this\.isInWater\(position\)\) return 'water'/);
   assert.match(scene, /return 'wet'/);
 });
