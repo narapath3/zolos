@@ -1,6 +1,6 @@
 // Monster Manager — Monster spawning, AI, and management
 import * as THREE from 'three';
-import { MONSTERS, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster, getWaterSpawnTable } from './GameData.js';
+import { MONSTERS, AMBIENT_WATER_TYPES, pickRandomMonster, getSpawnTable, getAllMonsters, pickRandomWaterMonster, getWaterSpawnTable } from './GameData.js';
 import { upgradeMonsterAnatomy, animateMonsterRig, addSpeciesArtDetails, addEliteSculptDetails } from './MonsterAnatomy.js';
 
 // Reference level used for the SHARED world spawn tables. Fixed (not the local
@@ -22,6 +22,7 @@ const MAX_WATER_MONSTERS = 4;
 const SPAWN_RANGE = 12;
 const PRONTERA_SPAWN_RANGE = 50;
 const RESPAWN_TIME = 3;
+const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 
 let sharedMonsterSkinTexture = null;
 function getMonsterSkinTexture() {
@@ -1439,7 +1440,7 @@ export class MonsterManager {
         if (!this._srvById) this._srvById = new Map();
         const snapshotIds = new Set(payload.mons.map(s => s && s.id).filter(Boolean));
         for (const s of payload.mons) {
-            if (s?.t === 'clam') {
+            if (AMBIENT_WATER_SET.has(s?.t)) {
                 const ambientMonster = this._srvById.get(s.id);
                 if (ambientMonster) this._removeServerMonster(ambientMonster);
                 snapshotIds.delete(s.id);
@@ -1648,6 +1649,7 @@ export class MonsterManager {
         const useRng = rng || Math.random;
         // Level-independent water table + seeded type pick → same for everyone.
         const table = getWaterSpawnTable(SHARED_SPAWN_LEVEL);
+        if (!table.length) return;
         for (let i = 0; i < MAX_WATER_MONSTERS; i++) {
             const type = this._pickWeightedSeeded(table, useRng);
             const pos = this._getRandomPositionForMonster(type, useRng);
@@ -1671,6 +1673,8 @@ export class MonsterManager {
     }
 
     _spawnOneWater(playerLevel) {
+        const table = getWaterSpawnTable(playerLevel);
+        if (!table.length) return null;
         const type = pickRandomWaterMonster(playerLevel);
         const pos = this._getRandomPositionForMonster(type, Math.random);
 

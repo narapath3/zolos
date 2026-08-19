@@ -1773,7 +1773,7 @@ export class SceneManager {
         this.envObjects.push(water);
         this.waterMesh = water;
         if (useAdaptiveWater) this._createRiverFoam(config, riverLength);
-        this._createAmbientClamActors(riverLength);
+        this._createAmbientAquaticActors(riverLength);
 
         // Custom riverbank rocks
         const bankRocks = [
@@ -1808,48 +1808,79 @@ export class SceneManager {
         this._createBridge(0, -2);
     }
 
-    _createAmbientClamActors(riverLength) {
+    _createAmbientAquaticActors(riverLength) {
         const quality = this.graphicsQuality;
-        const count = quality === 'high' ? 5 : quality === 'medium' ? 3 : 2;
-        for (let i = 0; i < count; i++) {
-            const actor = new THREE.Group();
-            actor.name = 'ambient-clam-actor';
-            const shellMat = new THREE.MeshStandardMaterial({
-                color: 0xd7b98b,
-                roughness: 0.54,
-                metalness: 0.02,
-                emissive: 0x2a1d12,
-                emissiveIntensity: 0.12,
-            });
-            const innerMat = new THREE.MeshStandardMaterial({
-                color: 0xf3d9cf,
-                roughness: 0.42,
-                metalness: 0.0,
-                emissive: 0x24141b,
-                emissiveIntensity: 0.1,
-            });
-            const shell = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 6), shellMat);
-            shell.scale.set(1.25, 0.34, 0.88);
-            shell.rotation.z = -0.16;
-            shell.position.y = 0.04;
-            actor.add(shell);
-            const inner = new THREE.Mesh(new THREE.SphereGeometry(0.2, 9, 6), innerMat);
-            inner.scale.set(1.15, 0.2, 0.72);
-            inner.position.set(0, 0.105, 0.02);
-            actor.add(inner);
-            const pearl = new THREE.Mesh(
-                new THREE.SphereGeometry(0.055, 8, 6),
-                new THREE.MeshStandardMaterial({ color: 0xfff4e8, roughness: 0.18, metalness: 0.05 })
+        const count = quality === 'high' ? 12 : quality === 'medium' ? 8 : 6;
+        const types = ['shrimp', 'fish', 'crab', 'marina', 'clam'];
+        const makeMat = (color, roughness = 0.56, emissive = 0x101820) => new THREE.MeshStandardMaterial({
+            color, roughness, metalness: 0.02, emissive, emissiveIntensity: 0.12,
+        });
+        const addFin = (actor, color, x, y, z, scale = 1) => {
+            const fin = new THREE.Mesh(new THREE.ConeGeometry(0.14 * scale, 0.34 * scale, 4), makeMat(color, 0.5));
+            fin.position.set(x, y, z);
+            fin.rotation.x = Math.PI / 2;
+            fin.rotation.z = Math.PI / 4;
+            actor.add(fin);
+        };
+        const addRipple = (actor, scale = 1) => {
+            const ripple = new THREE.Mesh(
+                new THREE.RingGeometry(0.18 * scale, 0.25 * scale, 16),
+                new THREE.MeshBasicMaterial({ color: 0xb9f4ff, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
             );
-            pearl.position.set(0.02, 0.16, 0.02);
-            actor.add(pearl);
-            const phase = i * 1.83 + 0.4;
-            actor.userData.ambientType = 'clam';
+            ripple.rotation.x = -Math.PI / 2;
+            ripple.position.y = -0.07;
+            actor.add(ripple);
+            actor.userData.ripple = ripple;
+        };
+        const span = Math.min(riverLength * 0.78, 88);
+        for (let i = 0; i < count; i++) {
+            const type = types[i % types.length];
+            const actor = new THREE.Group();
+            const phase = i * 1.37 + 0.4;
+            const bodyColor = type === 'shrimp' ? 0xff7180 : type === 'fish' ? 0x59a8ff : type === 'crab' ? 0xf04c4c : type === 'marina' ? 0xb9eaff : 0xd7b98b;
+            const body = new THREE.Mesh(new THREE.SphereGeometry(type === 'marina' ? 0.33 : 0.24, 10, 8), makeMat(bodyColor));
+            body.scale.set(type === 'fish' ? 1.45 : type === 'marina' ? 0.92 : 1.18, type === 'clam' ? 0.42 : 0.72, type === 'fish' ? 0.72 : 0.92);
+            body.position.y = type === 'clam' ? 0.02 : 0.12;
+            actor.add(body);
+            actor.userData.body = body;
+            actor.userData.bodyScaleY = body.scale.y;
+            if (type === 'fish' || type === 'shrimp') {
+                addFin(actor, type === 'shrimp' ? 0xffadb2 : 0x8bd0ff, 0, 0.1, -0.3, 0.9);
+                addFin(actor, type === 'fish' ? 0x8bd0ff : 0xffadb2, 0, 0.2, 0.23, 0.55);
+            } else if (type === 'crab') {
+                const clawMat = makeMat(0xff7770, 0.48, 0x321010);
+                for (const side of [-1, 1]) {
+                    const claw = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), clawMat);
+                    claw.scale.set(0.72, 0.55, 1.18);
+                    claw.position.set(side * 0.34, 0.11, 0.15);
+                    actor.add(claw);
+                }
+            } else if (type === 'marina') {
+                const tentacleMat = makeMat(0x8fd5ef, 0.46, 0x102b3d);
+                for (let leg = 0; leg < 4; leg++) {
+                    const tentacle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.045, 0.35, 6), tentacleMat);
+                    const angle = (leg / 4) * Math.PI * 2;
+                    tentacle.position.set(Math.cos(angle) * 0.16, -0.17, Math.sin(angle) * 0.16);
+                    tentacle.rotation.z = Math.cos(angle) * 0.28;
+                    tentacle.rotation.x = Math.sin(angle) * 0.28;
+                    actor.add(tentacle);
+                }
+            } else if (type === 'clam') {
+                const inner = new THREE.Mesh(new THREE.SphereGeometry(0.19, 9, 6), makeMat(0xf3d9cf, 0.42, 0x24141b));
+                inner.scale.set(1.15, 0.2, 0.72);
+                inner.position.set(0, 0.1, 0.02);
+                actor.add(inner);
+                const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), makeMat(0xfff4e8, 0.18));
+                pearl.position.set(0.02, 0.16, 0.02);
+                actor.add(pearl);
+            }
+            addRipple(actor, type === 'marina' ? 1.25 : 0.8);
+            actor.userData.ambientType = type;
             actor.userData.phase = phase;
-            actor.userData.baseX = -36 + i * 18.5;
-            actor.userData.baseZ = Math.sin(actor.userData.baseX * 0.08) * 10 - 2 + (i % 2 ? 2.5 : -2.6);
+            actor.userData.baseX = -span * 0.5 + (span * i) / Math.max(1, count - 1);
+            actor.userData.baseZ = Math.sin(actor.userData.baseX * 0.08) * 10 - 2 + ((i % 3) - 1) * 2.2;
             actor.userData.speed = 0.18 + (i % 3) * 0.035;
-            actor.position.set(actor.userData.baseX, -0.12, actor.userData.baseZ);
+            actor.position.set(actor.userData.baseX, -0.13, actor.userData.baseZ);
             actor.rotation.y = phase;
             this.scene.add(actor);
             this.envObjects.push(actor);
@@ -6097,13 +6128,15 @@ export class SceneManager {
         }
         if (this.ambientAquaticActors?.length) {
             this.ambientAquaticActors.forEach((actor) => {
-                const { baseX, baseZ, phase, speed } = actor.userData;
+                const { baseX, baseZ, phase, speed, body, ripple } = actor.userData;
                 const t = this.time * speed + phase;
                 actor.position.x = baseX + Math.sin(t * 0.48) * 2.2;
                 actor.position.z = baseZ + Math.cos(t * 0.62) * 1.25;
                 actor.position.y = -0.13 + Math.sin(t * 1.8) * 0.035;
                 actor.rotation.y = phase + Math.sin(t * 0.48) * 0.28;
                 actor.rotation.z = Math.sin(t * 1.1) * 0.08;
+                if (body) body.scale.y = (actor.userData.bodyScaleY || 1) * (1 + Math.sin(t * 2.4) * 0.035);
+                if (ripple) ripple.scale.setScalar(0.92 + Math.sin(t * 1.7) * 0.08);
             });
         }
 

@@ -16,6 +16,7 @@ import { clampMonsterDamage } from '../securityPolicy.js';
 import { getCardsBySource } from '../cards/CardCatalog.js';
 import { resolveCardDrops } from '../cards/CardDrops.js';
 import { getCardOverrides } from '../api/cardEconomy.js';
+import { AMBIENT_WATER_TYPES } from '../../src/engine/GameData.js';
 
 const TICK_MS = 100;               // 10 Hz simulation + broadcast
 const SPAWN_RANGE = 12;            // matches client MonsterManager
@@ -23,7 +24,7 @@ const PRONTERA_SPAWN_RANGE = 50;   // expanded field + explorable mountain
 const RESPAWN_MS = 4000;
 const AGGRO_MS = 8000;             // how long a hit keeps a monster hunting
 const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
-const AMBIENT_WATER_TYPES = new Set(['clam']);
+const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 const ATTACK_REACH = 1.8;
 const ATTACK_CD_MS = 1300;
 // Longest current player cast range is 10 world units. Keep a small network
@@ -148,7 +149,7 @@ export function spawnMap(mapId) {
     const spawns = cfg.spawnsByMap.get(mapId) || [];
     const mc = cfg.mapCfg.get(mapId) || { land_count: 0, water_count: 0 };
     const land = spawns.filter(s => !s.is_water);
-    const water = spawns.filter(s => s.is_water && !AMBIENT_WATER_TYPES.has(s.monster_type));
+    const water = spawns.filter(s => s.is_water && !AMBIENT_WATER_SET.has(s.monster_type));
     const monsters = new Map();
     for (let i = 0; i < (mc.land_count || 0) && land.length; i++) {
         const pick = weightedPick(land);
@@ -260,7 +261,7 @@ function stepMonster(m, mapId, now, dtSec) {
 function broadcastMap(mapId, world) {
     const mons = [];
     for (const m of world.monsters.values()) {
-        if (!m.alive || AMBIENT_WATER_TYPES.has(m.type)) continue;
+        if (!m.alive || AMBIENT_WATER_SET.has(m.type)) continue;
         mons.push({
             id: m.id, t: m.type,
             x: Math.round(m.x * 100) / 100, z: Math.round(m.z * 100) / 100,
@@ -289,7 +290,7 @@ function tick() {
 function respawnMonster(m, mapId) {
     // Reroll type from the map's table so admin edits take effect on respawn.
     const spawns = (cfg.spawnsByMap.get(mapId) || []).filter(s =>
-        !!s.is_water === m.isWater && !AMBIENT_WATER_TYPES.has(s.monster_type));
+        !!s.is_water === m.isWater && !AMBIENT_WATER_SET.has(s.monster_type));
     if (spawns.length) m.type = weightedPick(spawns).monster_type;
     const def = cfg.defs.get(m.type);
     const pos = m.isWater ? pickWaterPos() : pickLandPos(mapId, def?.environment || 'ground');

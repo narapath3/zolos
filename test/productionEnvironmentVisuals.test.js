@@ -87,22 +87,30 @@ test('river shoreline foam uses bounded geometry and animated bubbles', () => {
   assert.match(source, /this\.waterFoamMeshes\.forEach/);
 });
 
-test('Clam is an ambient aquatic actor rather than a combat monster', () => {
-  assert.match(gameDataSource, /clam:\s*\{[\s\S]*?ambientOnly: true/);
-  assert.doesNotMatch(gameDataSource, /table\.push\(\{ type: 'clam'/);
-  assert.doesNotMatch(gameDataSource, /clam: \{ family: 'aquatic' \}/);
+test('all aquatic species are ambient actors rather than combat monsters', () => {
+  assert.match(gameDataSource, /export const AMBIENT_WATER_TYPES = Object\.freeze\(\['shrimp', 'clam', 'fish', 'crab', 'marina'\]\)/);
+  for (const type of ['shrimp', 'clam', 'fish', 'crab', 'marina']) {
+    assert.match(gameDataSource, new RegExp(`${type}:\\s*\\{[\\s\\S]*?ambientOnly: true`));
+  }
+  assert.match(gameDataSource, /All water species are ambient actors; there are no water combat spawns/);
+  assert.doesNotMatch(gameDataSource, /table\.push\(\{ type: '(?:shrimp|clam|fish|crab|marina)'/);
+  assert.match(gameDataSource, /Aquatic scenery is intentionally absent from combat metadata/);
   assert.match(monsterSource, /this\.isAmbient = this\.data\.ambientOnly === true/);
   assert.match(monsterSource, /if \(!this\.isAmbient\) \{/);
   assert.match(monsterSource, /if \(this\.isAmbient\) return \{ killed: false, damage: 0 \}/);
-  assert.match(monsterSource, /if \(s\?\.t === 'clam'\)/);
+  assert.match(monsterSource, /const AMBIENT_WATER_SET = new Set\(AMBIENT_WATER_TYPES\)/);
+  assert.match(monsterSource, /if \(AMBIENT_WATER_SET\.has\(s\?\.t\)\)/);
   assert.match(monsterSource, /if \(!m\.alive \|\| m\.isAmbient\) continue/);
-  assert.match(source, /_createAmbientClamActors\(riverLength\)/);
-  assert.match(source, /actor\.name = 'ambient-clam-actor'/);
+  assert.match(source, /_createAmbientAquaticActors\(riverLength\)/);
+  assert.match(source, /const types = \['shrimp', 'fish', 'crab', 'marina', 'clam'\]/);
+  assert.match(source, /actor\.userData\.ambientType = type/);
 });
 
-test('server filters legacy Clam rows from authoritative water spawn, respawn and snapshots', () => {
-  assert.match(serverMonsterSource, /const AMBIENT_WATER_TYPES = new Set\(\['clam'\]\)/);
-  assert.match(serverMonsterSource, /s\.is_water && !AMBIENT_WATER_TYPES\.has\(s\.monster_type\)/);
-  assert.match(serverMonsterSource, /!!s\.is_water === m\.isWater && !AMBIENT_WATER_TYPES\.has\(s\.monster_type\)/);
-  assert.match(serverMonsterSource, /!m\.alive \|\| AMBIENT_WATER_TYPES\.has\(m\.type\)/);
+test('server filters legacy aquatic rows from authoritative water spawn, respawn and snapshots', () => {
+  assert.match(serverMonsterSource, /import \{ AMBIENT_WATER_TYPES \} from '\.\.\/\.\.\/src\/engine\/GameData\.js'/);
+  assert.match(serverMonsterSource, /const AMBIENT_WATER_SET = new Set\(AMBIENT_WATER_TYPES\)/);
+  assert.match(serverMonsterSource, /AMBIENT_WATER_TYPES/);
+  assert.match(serverMonsterSource, /s\.is_water && !AMBIENT_WATER_SET\.has\(s\.monster_type\)/);
+  assert.match(serverMonsterSource, /!!s\.is_water === m\.isWater && !AMBIENT_WATER_SET\.has\(s\.monster_type\)/);
+  assert.match(serverMonsterSource, /!m\.alive \|\| AMBIENT_WATER_SET\.has\(m\.type\)/);
 });

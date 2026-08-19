@@ -911,9 +911,13 @@ export const ABYSS_MONSTERS = {
     }
 };
 
-// ============ WATER MONSTERS ============
+// ============ AMBIENT AQUATIC ACTORS ============
+// These species live in the water as scenery only. They never participate in
+// combat, targeting, HP, EXP, gold, or monster loot flows.
+export const AMBIENT_WATER_TYPES = Object.freeze(['shrimp', 'clam', 'fish', 'crab', 'marina']);
 export const WATER_MONSTERS = {
     shrimp: {
+        ambientOnly: true,
         name: 'Shrimp',
         emoji: '🦐',
         color: 0xff6060,
@@ -953,6 +957,7 @@ export const WATER_MONSTERS = {
         ]
     },
     fish: {
+        ambientOnly: true,
         name: 'Fish',
         emoji: '🐟',
         color: 0x4080ff,
@@ -971,6 +976,7 @@ export const WATER_MONSTERS = {
         ]
     },
     crab: {
+        ambientOnly: true,
         name: 'Crab',
         emoji: '🦀',
         color: 0xe04040,
@@ -991,6 +997,7 @@ export const WATER_MONSTERS = {
         ]
     },
     marina: {
+        ambientOnly: true,
         name: 'Marina',
         emoji: '🦑',
         color: 0xadd8e6, // Pale Ice Blue
@@ -1735,11 +1742,7 @@ export function getSpawnTable(playerLevel, mapId = 'prontera') {
 // ============ WATER SPAWN TABLE ============
 export function getWaterSpawnTable(playerLevel) {
     const table = [];
-    table.push({ type: 'shrimp', weight: 30 });
-    // Clam is an ambient aquatic actor, never a combat spawn.
-    if (playerLevel >= 2) table.push({ type: 'fish', weight: 25 });
-    if (playerLevel >= 4) table.push({ type: 'crab', weight: 20 });
-    if (playerLevel >= 7) table.push({ type: 'marina', weight: 12 });
+    // All water species are ambient actors; there are no water combat spawns.
     return table;
 }
 
@@ -1781,8 +1784,7 @@ const MONSTER_COMBAT_META = Object.freeze({
     gargoyle: { family: 'construct' }, iron_golem: { family: 'construct' }, storm_dragon: { family: 'dragon', isBoss: true, isElite: true },
     dragon_egg: { family: 'dragon' }, sea_dragon: { family: 'dragon' }, leib_olmai: { family: 'beast' },
     dark_illusion: { family: 'undead' }, abyss_knight: { family: 'undead', isBoss: true, isElite: true },
-    shrimp: { family: 'aquatic' }, fish: { family: 'aquatic' },
-    crab: { family: 'aquatic' }, marina: { family: 'aquatic' },
+    // Aquatic scenery is intentionally absent from combat metadata.
 });
 
 export function getMonsterCombatMeta(type, data = {}) {
