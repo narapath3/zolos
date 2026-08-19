@@ -1687,7 +1687,8 @@ export class SceneManager {
                 uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.54 : 0.38 },
                 uReflectionStrength: { value: this.graphicsQuality === 'high' ? 0.68 : 0.48 },
                 uWaveStrength: { value: this.graphicsQuality === 'high' ? 0.72 : 0.52 },
-                uDepthAmount: { value: 0.86 },
+                uDepthAmount: { value: 0.92 },
+                uWaterOpacity: { value: this.graphicsQuality === 'high' ? 0.94 : 0.91 },
                 uPlanarReflectionStrength: { value: enablePlanarReflection ? 1.0 : 0.0 },
             };
             this.waterShaderUniforms = uniforms;
@@ -1729,6 +1730,7 @@ export class SceneManager {
                     uniform float uReflectionStrength;
                     uniform float uWaveStrength;
                     uniform float uDepthAmount;
+                    uniform float uWaterOpacity;
                     uniform float uPlanarReflectionStrength;
                     varying vec2 vUv;
                     varying vec4 vReflectionUv;
@@ -1759,10 +1761,13 @@ export class SceneManager {
                         vec3 color = mix(uShallowColor, uDeepColor, centerDepth * uDepthAmount);
                         color = mix(color, uColor, 0.10 + waveMask * 0.12);
                         color = mix(color, reflectionColor, reflection);
-                        float glint = smoothstep(0.68, 0.94, detail) * (0.12 + fresnel * 0.34) * uWaveStrength;
-                        color += uHighlightColor * glint;
-                        color = mix(color, uFoamColor, foamMask * 0.72 + fresnel * 0.025);
-                        float alpha = 0.82 + fresnel * 0.07 + foamMask * 0.025;
+                        float glint = smoothstep(0.68, 0.94, detail) * (0.10 + fresnel * 0.28) * uWaveStrength;
+                        float waveRibbon = smoothstep(0.64, 0.94, sin(vUv.x * 31.0 + uTime * 0.9 + detail * 3.0) * 0.5 + 0.5);
+                        color += uHighlightColor * (glint + waveRibbon * (0.018 + fresnel * 0.075));
+                        float shoreTint = shoreBand * (0.035 + foamNoise * 0.045);
+                        color = mix(color, uShallowColor, shoreTint);
+                        color = mix(color, uFoamColor, foamMask * 0.58 + fresnel * 0.018);
+                        float alpha = clamp(uWaterOpacity + fresnel * 0.035 + foamMask * 0.018, 0.0, 0.98);
                         gl_FragColor = vec4(color, alpha);
                     }
                 `,
@@ -1775,12 +1780,12 @@ export class SceneManager {
             // Ultra-low/low keeps a single inexpensive lit material and the
             // existing scrolling texture path for older mobile GPUs.
             waterMat = new THREE.MeshPhongMaterial({
-                color: config.waterColor,
+                color: new THREE.Color(config.waterColor).multiplyScalar(0.62),
                 map: waterTex,
                 transparent: true,
-                opacity: 0.68,
-                shininess: 140,
-                specular: 0xc0e8ff,
+                opacity: 0.90,
+                shininess: 105,
+                specular: 0x8fd9de,
                 side: THREE.DoubleSide,
                 envMapIntensity: 0.4,
             });

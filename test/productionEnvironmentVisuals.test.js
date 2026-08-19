@@ -41,6 +41,10 @@ test('river water upgrades to an adaptive Fresnel shader on medium/high tiers an
   assert.match(source, /float fresnel = pow/);
   assert.match(source, /float centerDepth = smoothstep/);
   assert.match(source, /mix\(uShallowColor, uDeepColor, centerDepth \* uDepthAmount\)/);
+  assert.match(source, /uWaterOpacity: \{ value: this\.graphicsQuality === 'high' \? 0\.94 : 0\.91 \}/);
+  assert.match(source, /float alpha = clamp\(uWaterOpacity/);
+  assert.match(source, /opacity: 0\.90/);
+  assert.match(source, /float waveRibbon =/);
   assert.match(source, /waterShaderUniforms\.uTime\.value = this\.time/);
   assert.match(source, /Ultra-low\/low keeps a single inexpensive lit material/);
 });
