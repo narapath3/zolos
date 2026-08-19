@@ -123,6 +123,14 @@ test('river surface stays aligned with the actual bank width instead of a flat o
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
 });
 
+test('generic ground fence is removed while river guard rails remain shoreline-only', () => {
+  assert.doesNotMatch(source, /this\._createFence\(\)/);
+  assert.doesNotMatch(source, /_createFence\(\) \{/);
+  assert.doesNotMatch(source, /post\.position\.set\(-20, 0\.4, i \* 2\)/);
+  assert.match(source, /const PRONTERA_RIVER_RAIL_OFFSET = 5\.82/);
+  assert.match(source, /const z = riverZ \+ side \* PRONTERA_RIVER_RAIL_OFFSET/);
+});
+
 test('river guard rails block land-to-water movement but keep the bridge crossing open', () => {
   assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition\)/);
   assert.match(sceneSource, /const guardLine = PRONTERA_RIVER_GUARD_LINE/);
@@ -148,8 +156,9 @@ test('river adds segmented wooden guard rails while collision seals the approach
   assert.match(source, /const postHeight = quality === 'ultra-low' \? 1\.72 : 1\.92/);
   assert.match(source, /const bridgeRailGap = PRONTERA_BRIDGE_HALF_WIDTH \+ 0\.20/);
   assert.match(source, /const PRONTERA_RIVER_BANK_EDGE = 6\.05/);
-  assert.match(source, /const PRONTERA_RIVER_GUARD_LINE = 5\.84/);
-  assert.match(source, /const z = riverZ \+ side \* PRONTERA_RIVER_BANK_EDGE/);
+  assert.match(source, /const PRONTERA_RIVER_RAIL_OFFSET = 5\.82/);
+  assert.match(source, /const PRONTERA_RIVER_GUARD_LINE = 5\.70/);
+  assert.match(source, /const z = riverZ \+ side \* PRONTERA_RIVER_RAIL_OFFSET/);
   assert.match(source, /river-guard-rail-segment/);
   assert.match(source, /river-guard-rail-span/);
   assert.match(source, /const postGeo = new THREE\.CylinderGeometry/);
@@ -188,6 +197,7 @@ test('river shoreline edge follows the water plane and adds sparse wet stones', 
   assert.match(source, /river-shoreline-edge/);
   assert.match(source, /const z = centerZ \+ side \* \(PRONTERA_RIVER_HALF_WIDTH \+ 0\.10\)/);
   assert.match(source, /narrow wet shoulder/);
+  assert.match(source, /const PRONTERA_RIVER_RAIL_OFFSET = 5\.82/);
   assert.match(source, /new THREE\.TubeGeometry\(curve, segments, edgeRadius, 6, false\)/);
   assert.match(source, /const stoneCount = quality === 'high' \? 12 : quality === 'medium' \? 8 : 4/);
 });

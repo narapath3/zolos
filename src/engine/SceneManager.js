@@ -18,8 +18,9 @@ const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystem
 // guard rails and movement collision. Keeping these values together prevents
 // the visual bank and the physical barrier from drifting apart.
 const PRONTERA_RIVER_HALF_WIDTH = 5.7; // water plane half-width (11.4 total)
-const PRONTERA_RIVER_BANK_EDGE = 6.05; // dry-land edge where the fence sits
-const PRONTERA_RIVER_GUARD_LINE = 5.84; // player stop line before the fence
+const PRONTERA_RIVER_BANK_EDGE = 6.05; // outer dry-land shoulder boundary
+const PRONTERA_RIVER_RAIL_OFFSET = 5.82; // rail center, just outside water
+const PRONTERA_RIVER_GUARD_LINE = 5.70; // player stop line at water edge
 const PRONTERA_BRIDGE_HALF_WIDTH = 1.8; // actual 3.6-unit bridge deck half-width
 const PRONTERA_BRIDGE_MIN_Z = -10.35;
 const PRONTERA_BRIDGE_MAX_Z = 6.35;
@@ -2579,9 +2580,9 @@ export class SceneManager {
             for (let i = 0; i < sampleXs.length; i++) {
                 const x = sampleXs[i];
                 const riverZ = Math.sin(x * 0.08) * 10 - 2;
-                // Place the fence on the narrow dry shoulder immediately
-                // outside the water plane; it must not spread into the field.
-                const z = riverZ + side * PRONTERA_RIVER_BANK_EDGE;
+                // Place the fence directly beside the water plane. It must
+                // never use the wider dry-land shoulder as its visual position.
+                const z = riverZ + side * PRONTERA_RIVER_RAIL_OFFSET;
                 const terrainY = this.getTerrainHeight(x, z);
                 const group = new THREE.Group();
                 group.name = 'river-guard-rail-segment';
@@ -3291,9 +3292,6 @@ export class SceneManager {
 
         // --- Stepping stone paths ---
         this._createSteppingStones();
-
-        // --- Fence segments along one edge ---
-        this._createFence();
 
         // --- Signpost near spawn ---
         this._createSignpost(2.5, 2.5);
@@ -4490,31 +4488,6 @@ export class SceneManager {
             this.scene.add(stone);
             this.envObjects.push(stone);
         });
-    }
-
-    _createFence() {
-        const fenceMat = new THREE.MeshLambertMaterial({ color: 0x8a6a4a });
-        for (let i = -5; i <= 5; i++) {
-            // Post
-            const postGeo = new THREE.BoxGeometry(0.15, 0.8, 0.15);
-            const post = new THREE.Mesh(postGeo, fenceMat);
-            post.position.set(-20, 0.4, i * 2);
-            post.castShadow = true;
-            this.scene.add(post);
-            this.envObjects.push(post);
-        }
-        // Horizontal bars
-        for (let i = -5; i < 5; i++) {
-            const barGeo = new THREE.BoxGeometry(0.08, 0.08, 1.9);
-            const bar = new THREE.Mesh(barGeo, fenceMat);
-            bar.position.set(-20, 0.55, i * 2 + 1);
-            this.scene.add(bar);
-            this.envObjects.push(bar);
-            const bar2 = new THREE.Mesh(barGeo.clone(), fenceMat);
-            bar2.position.set(-20, 0.25, i * 2 + 1);
-            this.scene.add(bar2);
-            this.envObjects.push(bar2);
-        }
     }
 
     _createSignpost(x, z) {
