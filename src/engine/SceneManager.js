@@ -1664,6 +1664,23 @@ export class SceneManager {
     }
 
     // ============ Water ============
+    _warpPronteraRiverSurfaceGeometry(geometry) {
+        if (this.currentMap !== 'prontera' || !geometry?.attributes?.position) return geometry;
+        const positions = geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++) {
+            const x = positions.getX(i);
+            const across = positions.getY(i);
+            // PlaneGeometry is rotated -90 degrees around X below, so local Y
+            // becomes the negative world-Z direction. Offset local Y by the
+            // river bend to make water, shoreline, rails and terrain share one
+            // physical centerline instead of leaving rails on dry ground.
+            positions.setY(i, across - Math.sin(x * 0.08) * 10);
+        }
+        positions.needsUpdate = true;
+        geometry.computeVertexNormals();
+        return geometry;
+    }
+
     _createWater(config) {
         if (this.currentMap === 'skyrail_bazaar') {
             this.waterMesh = null;
@@ -1674,6 +1691,7 @@ export class SceneManager {
         const riverLength = this.currentMap === 'prontera' ? 116 : 80;
         const riverWidth = 11.4;
         const waterGeo = new THREE.PlaneGeometry(riverLength, riverWidth, this.currentMap === 'prontera' ? 110 : 80, 22);
+        this._warpPronteraRiverSurfaceGeometry(waterGeo);
         const waterTex = this._createWaterTexture();
         waterTex.colorSpace = THREE.SRGBColorSpace;
         waterTex.wrapS = THREE.RepeatWrapping;
@@ -1700,7 +1718,14 @@ export class SceneManager {
                         'gl_FragColor = vec4( blendOverlay( base.rgb, color ), reflectionAlpha );'
                     ),
             };
-            reflectionProbe = new Reflector(new THREE.PlaneGeometry(riverLength, riverWidth), {
+            const reflectionGeo = new THREE.PlaneGeometry(
+                riverLength,
+                riverWidth,
+                this.currentMap === 'prontera' ? 110 : 80,
+                22
+            );
+            this._warpPronteraRiverSurfaceGeometry(reflectionGeo);
+            reflectionProbe = new Reflector(reflectionGeo, {
                 shader: reflectionShader,
                 textureWidth: reflectionSize,
                 textureHeight: reflectionSize,

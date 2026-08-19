@@ -93,8 +93,12 @@ test('adaptive water adds shoreline foam and Fresnel reflection without forcing 
 
 test('high-tier planar reflection is resolution-capped and disposed on map changes', () => {
   assert.match(source, /const riverWidth = 11\.4/);
+  assert.match(source, /_warpPronteraRiverSurfaceGeometry\(geometry\)/);
+  assert.match(source, /positions\.setY\(i, across - Math\.sin\(x \* 0\.08\) \* 10\)/);
   assert.match(source, /const PRONTERA_RIVER_HALF_WIDTH = 5\.7/);
-  assert.match(source, /new Reflector\(new THREE\.PlaneGeometry\(riverLength, riverWidth\)/);
+  assert.match(source, /const reflectionGeo = new THREE\.PlaneGeometry/);
+  assert.match(source, /this\._warpPronteraRiverSurfaceGeometry\(reflectionGeo\)/);
+  assert.match(source, /reflectionProbe = new Reflector\(reflectionGeo/);
   assert.match(source, /Math\.max\(256, Math\.min\(512/);
   assert.match(source, /multisample: 0/);
   assert.match(source, /if \(object\.isReflector && typeof object\.dispose === 'function'\)/);
@@ -112,6 +116,8 @@ test('river palette stays blue and does not use brown terrain colors', () => {
 
 test('river surface stays aligned with the actual bank width instead of a flat oversized slab', () => {
   assert.match(source, /const riverWidth = 11\.4/);
+  assert.match(source, /_warpPronteraRiverSurfaceGeometry\(geometry\)/);
+  assert.match(source, /positions\.setY\(i, across - Math\.sin\(x \* 0\.08\) \* 10\)/);
   assert.match(source, /const PRONTERA_RIVER_HALF_WIDTH = 5\.7/);
   assert.match(source, /new THREE\.PlaneGeometry\(riverLength, riverWidth/);
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
