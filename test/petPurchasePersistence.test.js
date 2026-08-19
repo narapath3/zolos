@@ -14,6 +14,22 @@ test('Pet Sanctuary waits for authoritative purchase before changing UI state', 
   assert.doesNotMatch(block, /_performShopAction|setInventoryItemQuantity|saveStatsToDatabase/);
 });
 
+test('Pet Sanctuary exposes mobile-friendly discovery controls and ownership states', () => {
+  assert.match(gameUi, /data-pet-filter="all"/);
+  assert.match(gameUi, /data-pet-filter="owned"/);
+  assert.match(gameUi, /data-pet-filter="available"/);
+  assert.match(gameUi, /data-pet-filter="rare"/);
+  assert.match(gameUi, /data-pet-filter="legendary"/);
+  assert.match(gameUi, /class="pet-boutique__sort"/);
+  assert.match(gameUi, /value="price-asc"/);
+  assert.match(gameUi, /value="price-desc"/);
+  assert.match(gameUi, /value="rarity"/);
+  assert.match(gameUi, /data-owned=/);
+  assert.match(gameUi, /state\.equipped\?' is-equipped':state\.ownedCount\?' is-owned':''/);
+  assert.match(gameUi, /const applyPetView=\(\)=>/);
+  assert.match(gameUi, /ยังไม่มีสัตว์เลี้ยงในคอลเลกชัน/);
+});
+
 test('server owns pet catalog, price, identity and database transaction', () => {
   const handler = server.match(/socket\.on\('pet_purchase'[\s\S]*?\n    \}\);/)?.[0] || '';
   assert.match(handler, /PET_CATALOG\[itemName\]/);
