@@ -1491,18 +1491,19 @@ export class SceneManager {
             let color = baseColor.clone();
             const distFromCenter = Math.sqrt(x * x + z * z);
 
-            if (distToRiver < 5.5) {
-                // Muddy dark riverbed
+            if (distToRiver < 3.2) {
+                // Blue-green riverbed fallback: if a low-tier device exposes
+                // the bed through the water, it must still read as water.
                 const t = distToRiver / 3.2;
-                const mudColor = new THREE.Color(0x3a2e24);
-                const sandColor = new THREE.Color(0x8a7258);
-                color = mudColor.lerp(sandColor, t);
-            } else if (distToRiver < 5.2) {
-                // Sandy wet shore blending into grass
-                const t = (distToRiver - 3.2) / 2.0;
-                const sandColor = new THREE.Color(0x8a7258);
+                const deepBed = new THREE.Color(0x0b4860);
+                const bedLight = new THREE.Color(0x1b7890);
+                color = deepBed.lerp(bedLight, t);
+            } else if (distToRiver < 5.5) {
+                // Blue wet shoreline, never brown terrain inside the river bank.
+                const t = (distToRiver - 3.2) / 2.2;
+                const shoreWater = new THREE.Color(0x39aabd);
                 const grassColor = baseColor.clone().lerp(altColor, 0.4);
-                color = sandColor.lerp(grassColor, t);
+                color = shoreWater.lerp(grassColor, t * 0.25);
             } else if (x < -6 && z < -6) {
                 // Mossy cave highland. Keep it readable in every weather state;
                 // cave props provide the darkness instead of a pitch-black floor.
@@ -1683,10 +1684,12 @@ export class SceneManager {
                 uReflectionMap: { value: reflectionProbe?.getRenderTarget?.().texture || waterTex },
                 uReflectionMatrix: { value: reflectionProbe?.material?.uniforms?.textureMatrix?.value || new THREE.Matrix4() },
                 uTime: { value: 0 },
-                uColor: { value: new THREE.Color(config.waterColor).multiplyScalar(0.62) },
-                uDeepColor: { value: new THREE.Color(0x06405c) },
-                uShallowColor: { value: new THREE.Color(0x2a9eb4) },
-                uHighlightColor: { value: new THREE.Color(0xb8f3ee) },
+                uColor: { value: (this.currentMap === 'prontera'
+                    ? new THREE.Color(0x1f91bd)
+                    : new THREE.Color(config.waterColor)).multiplyScalar(0.86) },
+                uDeepColor: { value: new THREE.Color(0x075779) },
+                uShallowColor: { value: new THREE.Color(0x39bfd4) },
+                uHighlightColor: { value: new THREE.Color(0xbaf9ff) },
                 uFoamColor: { value: new THREE.Color(0xe6ffff) },
                 uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.54 : 0.38 },
                 uReflectionStrength: { value: this.graphicsQuality === 'high' ? 0.68 : 0.48 },
@@ -1789,7 +1792,9 @@ export class SceneManager {
             // Ultra-low/low keeps a single inexpensive lit material and the
             // existing scrolling texture path for older mobile GPUs.
             waterMat = new THREE.MeshPhongMaterial({
-                color: new THREE.Color(config.waterColor).multiplyScalar(0.62),
+                color: (this.currentMap === 'prontera'
+                    ? new THREE.Color(0x1f91bd)
+                    : new THREE.Color(config.waterColor)).multiplyScalar(0.86),
                 map: waterTex,
                 transparent: true,
                 opacity: 0.86,

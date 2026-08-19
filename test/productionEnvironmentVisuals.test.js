@@ -39,6 +39,9 @@ test('river water upgrades to an adaptive Fresnel shader on medium/high tiers an
   assert.match(source, /uTime: \{ value: 0 \}/);
   assert.match(source, /uniform sampler2D uMap/);
   assert.match(source, /float fresnel = pow/);
+  assert.match(source, /uDeepColor: \{ value: new THREE\.Color\(0x075779\) \}/);
+  assert.match(source, /uShallowColor: \{ value: new THREE\.Color\(0x39bfd4\) \}/);
+  assert.match(source, /this\.currentMap === 'prontera'\s*\n\s*\? new THREE\.Color\(0x1f91bd\)/);
   assert.match(source, /float centerDepth = smoothstep/);
   assert.match(source, /mix\(uShallowColor, uDeepColor, centerDepth \* uDepthAmount\)/);
   assert.match(source, /uWaterOpacity: \{ value: this\.graphicsQuality === 'high' \? 0\.90 : 0\.86 \}/);
@@ -88,6 +91,14 @@ test('high-tier planar reflection is resolution-capped and disposed on map chang
   assert.match(source, /multisample: 0/);
   assert.match(source, /if \(object\.isReflector && typeof object\.dispose === 'function'\)/);
   assert.match(source, /this\.waterReflection = null/);
+});
+
+test('river palette stays blue and does not use brown terrain colors', () => {
+  assert.match(source, /const deepBed = new THREE\.Color\(0x0b4860\)/);
+  assert.match(source, /const bedLight = new THREE\.Color\(0x1b7890\)/);
+  assert.match(source, /const shoreWater = new THREE\.Color\(0x39aabd\)/);
+  assert.match(source, /Blue wet shoreline, never brown terrain inside the river bank/);
+  assert.doesNotMatch(source, /const mudColor = new THREE\.Color\(0x3a2e24\)/);
 });
 
 test('river surface stays aligned with the actual bank width instead of a flat oversized slab', () => {
