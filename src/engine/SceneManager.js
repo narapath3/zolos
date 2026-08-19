@@ -20,7 +20,11 @@ const CANVAS_UI_FONT = '"Kanit", "Noto Sans Thai", -apple-system, BlinkMacSystem
 const PRONTERA_RIVER_HALF_WIDTH = 5.7; // water plane half-width (11.4 total)
 const PRONTERA_RIVER_BANK_EDGE = 6.05; // outer dry-land shoulder boundary
 const PRONTERA_RIVER_RAIL_OFFSET = 5.82; // rail center, just outside water
-const PRONTERA_RIVER_GUARD_LINE = 5.70; // player stop line at water edge
+const PRONTERA_RIVER_PLAYER_RADIUS = 0.52; // chibi body collision radius
+const PRONTERA_RIVER_GUARD_LINE = PRONTERA_RIVER_RAIL_OFFSET
+    + PRONTERA_RIVER_PLAYER_RADIUS + 0.06; // outer push-out line
+const PRONTERA_RIVER_INNER_LINE = PRONTERA_RIVER_RAIL_OFFSET
+    - PRONTERA_RIVER_PLAYER_RADIUS - 0.06; // inner water-side stop line
 const PRONTERA_BRIDGE_HALF_WIDTH = 1.8; // actual 3.6-unit bridge deck half-width
 const PRONTERA_BRIDGE_MIN_Z = -10.35;
 const PRONTERA_BRIDGE_MAX_Z = 6.35;
@@ -6486,7 +6490,7 @@ export class SceneManager {
         this.camera.lookAt(midX, 1.0, midZ);
     }
 
-    resolveMovementCollision(fromPosition, toPosition) {
+    resolveMovementCollision(fromPosition, toPosition, character = null) {
         const resolved = toPosition.clone();
         if (this.currentMap !== 'prontera' || !fromPosition || !toPosition) return resolved;
 
@@ -6522,26 +6526,62 @@ export class SceneManager {
         const fromDistance = Math.abs(fromDelta);
         const toDistance = Math.abs(toDelta);
         const guardLine = PRONTERA_RIVER_GUARD_LINE;
+        const innerLine = PRONTERA_RIVER_INNER_LINE;
+        const playerRadius = Math.max(
+            0.46,
+            Math.min(0.62, Number(character?.collisionRadius) || PRONTERA_RIVER_PLAYER_RADIUS)
+        );
+        const outerLine = Math.max(guardLine,
+            PRONTERA_RIVER_RAIL_OFFSET + playerRadius + 0.06);
+        const waterLine = Math.min(innerLine,
+            PRONTERA_RIVER_RAIL_OFFSET - playerRadius - 0.06);
 
-        // Players already inside the river may continue moving in the water,
-        // but cannot exit through a guard rail. They must use the bridge deck,
-        // which remains the intentional recovery route for legacy positions.
-        if (fromDistance < guardLine) {
-            if (toDistance < guardLine) return resolved;
-            const exitSide = toDelta >= 0 ? 1 : -1;
-            resolved.z = riverCenter(toPosition.x) + exitSide * guardLine;
+        // Sweep the complete movement segment. A destination-only check lets a
+        // fast click-to-move step jump from one side of the winding river to the
+        // other without ever landing inside the barrier band.
+        const segmentCrosses = (threshold) => {
+            const length = Math.hypot(toPosition.x - fromPosition.x, toPosition.z - fromPosition.z);
+            const steps = Math.min(24, Math.max(2, Math.ceil(length / 0.35)));
+            let previousDistance = Math.abs(fromPosition.z - riverCenter(fromPosition.x));
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const x = fromPosition.x + (toPosition.x - fromPosition.x) * t;
+                const z = fromPosition.z + (toPosition.z - fromPosition.z) * t;
+                const currentDistance = Math.abs(z - riverCenter(x));
+                // Only report an outside → inside transition. Movement that is
+                // already inside the river remains free until it tries to exit.
+                if (previousDistance >= threshold && currentDistance < threshold) return true;
+                previousDistance = currentDistance;
+            }
+            return false;
+        };
+        const crossesWaterBand = segmentCrosses(waterLine);
+        const fromSide = Math.sign(fromDelta) || 1;
+        const toSide = Math.sign(toDelta) || fromSide;
+        const pushTo = (side, distance) => {
+            resolved.z = riverCenter(toPosition.x) + side * distance;
             resolved.y = toPosition.y;
             return resolved;
+        };
+
+        // A character already in the water cannot exit through the rail. The
+        // inner line keeps the body radius on the water side, so the next input
+        // visibly bumps/pushes back instead of letting the mesh overlap the rail.
+        if (fromDistance < waterLine) {
+            if (toDistance < waterLine && !crossesWaterBand) return resolved;
+            return pushTo(toSide, waterLine);
         }
 
-        // Block both entering the river and jumping across it in a single
-        // movement step. This closes gaps between rail posts and click-to-move
-        // overshoot paths while retaining the bridge deck as the only crossing.
-        const side = fromDelta < 0 ? -1 : 1;
-        if (toDistance >= guardLine && Math.sign(toDelta || fromDelta) === side) return resolved;
-        resolved.z = riverCenter(toPosition.x) + side * guardLine;
-        resolved.y = toPosition.y;
-        return resolved;
+        // Recover legacy positions that are already overlapping the rail by
+        // pushing them to the land-side clearance line before accepting input.
+        if (fromDistance < outerLine) return pushTo(fromSide, outerLine);
+
+        // A direct, diagonal, or overshoot step into/crossing the river is
+        // resolved on the original side. X movement is preserved, allowing the
+        // player to slide along the rail instead of becoming stuck.
+        const crossedToOtherSide = toSide !== fromSide;
+        if (toDistance >= outerLine && !crossedToOtherSide && !crossesWaterBand) return resolved;
+        return pushTo(fromSide, outerLine);
     }
 
     getFootstepSurface(position) {

@@ -132,17 +132,27 @@ test('generic ground fence is removed while river guard rails remain shoreline-o
 });
 
 test('river guard rails block land-to-water movement but keep the bridge crossing open', () => {
-  assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition\)/);
+  assert.match(sceneSource, /resolveMovementCollision\(fromPosition, toPosition, character = null\)/);
   assert.match(sceneSource, /const guardLine = PRONTERA_RIVER_GUARD_LINE/);
+  assert.match(sceneSource, /const PRONTERA_RIVER_PLAYER_RADIUS = 0\.52/);
+  assert.match(sceneSource, /const innerLine = PRONTERA_RIVER_INNER_LINE/);
+  assert.match(sceneSource, /const segmentCrosses = \(threshold\) =>/);
+  assert.match(sceneSource, /const steps = Math\.min\(24, Math\.max\(2, Math\.ceil\(length \/ 0\.35\)\)\)/);
+  assert.match(sceneSource, /if \(previousDistance >= threshold && currentDistance < threshold\) return true/);
+  assert.match(sceneSource, /const pushTo = \(side, distance\) =>/);
+  assert.match(sceneSource, /const crossedToOtherSide = toSide !== fromSide/);
+  assert.match(sceneSource, /resolved\.z = riverCenter\(toPosition\.x\) \+ side \* distance/);
   assert.match(sceneSource, /const PRONTERA_BRIDGE_HALF_WIDTH = 1\.8/);
   assert.match(sceneSource, /const bridgeDeckOpen = \(p\) => Math\.abs\(p\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(sceneSource, /const fromOnBridge = bridgeDeckOpen\(fromPosition\)/);
   assert.match(sceneSource, /const toOnBridge = bridgeDeckOpen\(toPosition\)/);
   assert.match(sceneSource, /if \(fromOnBridge && toOnBridge\) return resolved/);
   assert.match(sceneSource, /const toDistance = Math\.abs\(toDelta\)/);
-  assert.match(sceneSource, /Math\.sign\(toDelta \|\| fromDelta\) === side/);
-  assert.match(sceneSource, /if \(fromDistance < guardLine\)/);
-  assert.match(sceneSource, /const exitSide = toDelta >= 0 \? 1 : -1/);
+  assert.match(sceneSource, /const fromSide = Math\.sign\(fromDelta\) \|\| 1/);
+  assert.match(sceneSource, /const toSide = Math\.sign\(toDelta\) \|\| fromSide/);
+  assert.match(sceneSource, /if \(fromDistance < waterLine\)/);
+  assert.match(sceneSource, /if \(fromDistance < outerLine\) return pushTo\(fromSide, outerLine\)/);
+  assert.match(sceneSource, /return pushTo\(toSide, waterLine\)/);
   assert.match(sceneSource, /const enteringFromEnd = Math\.abs\(fromPosition\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(sceneSource, /resolved\.x = Math\.sign\(fromPosition\.x \|\| toPosition\.x\) \* PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(mainSource, /setMovementCollisionResolver/);
@@ -157,7 +167,8 @@ test('river adds segmented wooden guard rails while collision seals the approach
   assert.match(source, /const bridgeRailGap = PRONTERA_BRIDGE_HALF_WIDTH \+ 0\.20/);
   assert.match(source, /const PRONTERA_RIVER_BANK_EDGE = 6\.05/);
   assert.match(source, /const PRONTERA_RIVER_RAIL_OFFSET = 5\.82/);
-  assert.match(source, /const PRONTERA_RIVER_GUARD_LINE = 5\.70/);
+  assert.match(source, /const PRONTERA_RIVER_GUARD_LINE = PRONTERA_RIVER_RAIL_OFFSET/);
+  assert.match(source, /\+ PRONTERA_RIVER_PLAYER_RADIUS \+ 0\.06/);
   assert.match(source, /const z = riverZ \+ side \* PRONTERA_RIVER_RAIL_OFFSET/);
   assert.match(source, /river-guard-rail-segment/);
   assert.match(source, /river-guard-rail-span/);
