@@ -193,7 +193,17 @@ function createShopSignSprite(shopName, options = {}) {
 
 // PVP arena location on the main field (server duel spawns are center ± 3 on x)
 const PVP_ARENA_POS = { x: -14, z: 14 };
-export const PET_BOUTIQUE_POSITION = Object.freeze({ x: -10, z: -7 });
+// Pet Sanctuary sits on a clear southern meadow, away from the winding river,
+// bridge handrails, PVP arena and portal approaches. Keep this as the single
+// source of truth for placement and decorative-prop exclusion.
+export const PET_BOUTIQUE_POSITION = Object.freeze({ x: 6, z: -15 });
+const PET_BOUTIQUE_CLEAR_RADIUS = 5.1;
+const isNearPetBoutique = (x, z, extra = 0) => {
+    const dx = x - PET_BOUTIQUE_POSITION.x;
+    const dz = z - PET_BOUTIQUE_POSITION.z;
+    const radius = PET_BOUTIQUE_CLEAR_RADIUS + extra;
+    return dx * dx + dz * dz < radius * radius;
+};
 
 // ============ Map Configs ============
 const MAP_CONFIGS = {
@@ -3221,7 +3231,7 @@ export class SceneManager {
         ];
 
         treePositions.forEach(([x, z], idx) => {
-            if (this._isOnLand(x, z)) {
+            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8)) {
                 const typeIdx = idx % config.treeTypes.length;
                 const type = config.treeTypes[typeIdx];
                 this._createTree(x, z, type);
@@ -3236,12 +3246,13 @@ export class SceneManager {
             [14, -3], [-2, -11], [7, 12], [-13, 14], [3, 14],
         ];
         rockPosMain.forEach(([x, z]) => {
-            if (this._isOnLand(x, z)) this._createRock(x, z);
+            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8)) this._createRock(x, z);
         });
 
         const density = config.decorDensity;
 
-        // --- Flowers (reduced for performance) ---
+                    // --- Flowers (reduced for performance) ---
+
         for (let i = 0; i < Math.floor(55 * density); i++) {
             const x = (Math.random() - 0.5) * 42;
             const z = (Math.random() - 0.5) * 42;
@@ -3249,6 +3260,7 @@ export class SceneManager {
             if (!this._isOnLand(x, z)) continue;
             if (x < -6 && z < -6) continue; // Skip Cave
             if (x > 6 && z > 6) continue; // Skip Mountain
+            if (isNearPetBoutique(x, z)) continue;
             this._createFlower(x, z);
         }
 
@@ -3256,7 +3268,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(100 * density); i++) {
             const x = (Math.random() - 0.5) * 48;
             const z = (Math.random() - 0.5) * 48;
-            if (!this._isOnLand(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
             this._createGrassTuft(x, z);
         }
 
@@ -3265,7 +3277,7 @@ export class SceneManager {
             const x = (Math.random() - 0.5) * 34;
             const z = (Math.random() - 0.5) * 34;
             if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
-            if (!this._isOnLand(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
             this._createMushroom(x, z);
         }
 
@@ -3273,7 +3285,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(50 * density); i++) {
             const x = (Math.random() - 0.5) * 46;
             const z = (Math.random() - 0.5) * 46;
-            if (!this._isOnLand(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
             this._createPebble(x, z);
         }
 
@@ -3282,7 +3294,7 @@ export class SceneManager {
             const x = (Math.random() - 0.5) * 40;
             const z = (Math.random() - 0.5) * 40;
             if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
-            if (!this._isOnLand(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
             this._createCloverPatch(x, z);
         }
 
@@ -3290,7 +3302,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(15 * density); i++) {
             const x = (Math.random() - 0.5) * 38;
             const z = (Math.random() - 0.5) * 38;
-            if (!this._isOnLand(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
             this._createFallenLeaves(x, z);
         }
 
@@ -5665,7 +5677,11 @@ export class SceneManager {
         const glow=new THREE.PointLight(0xff8fc9,1.15,10); glow.position.set(0,2.4,0); group.add(glow);
         const keeper = this._buildPremiumShopkeeper('keeper');
         keeper.position.set(0, .28, .35); keeper.scale.multiplyScalar(1.12); group.add(keeper);
-        group.position.set(PET_BOUTIQUE_POSITION.x, 0, PET_BOUTIQUE_POSITION.z);
+        group.position.set(
+            PET_BOUTIQUE_POSITION.x,
+            this.getTerrainHeight(PET_BOUTIQUE_POSITION.x, PET_BOUTIQUE_POSITION.z),
+            PET_BOUTIQUE_POSITION.z
+        );
         this.scene.add(group); this.envObjects.push(group); this.npcPetMesh=group;
     }
 

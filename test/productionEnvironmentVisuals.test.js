@@ -123,6 +123,20 @@ test('river surface stays aligned with the actual bank width instead of a flat o
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
 });
 
+test('pet sanctuary is placed on a clear dry-land meadow', () => {
+  assert.match(source, /export const PET_BOUTIQUE_POSITION = Object\.freeze\(\{ x: 6, z: -15 \}\)/);
+  assert.match(source, /const PET_BOUTIQUE_CLEAR_RADIUS = 5\.1/);
+  assert.match(source, /const isNearPetBoutique = \(x, z, extra = 0\) =>/);
+  assert.match(source, /group\.userData\.npcType = 'pet_boutique'/);
+  assert.match(source, /group\.userData\.collisionRadius = 3\.4/);
+  assert.match(source, /this\.getTerrainHeight\(PET_BOUTIQUE_POSITION\.x, PET_BOUTIQUE_POSITION\.z\)/);
+  assert.match(source, /if \(this\._isOnLand\(x, z\) && !isNearPetBoutique\(x, z, 0\.8\)\)/);
+  assert.match(source, /if \(!this\._isOnLand\(x, z\) \|\| isNearPetBoutique\(x, z\)\) continue/);
+
+  const riverZ = Math.sin(6 * 0.08) * 10 - 2;
+  assert.ok(Math.abs(-15 - riverZ) > 7, 'boutique must be outside the river keep-out band');
+});
+
 test('generic ground fence is removed while river guard rails remain shoreline-only', () => {
   assert.doesNotMatch(source, /this\._createFence\(\)/);
   assert.doesNotMatch(source, /_createFence\(\) \{/);
