@@ -88,7 +88,7 @@ function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSiz
     ctx.restore();
 }
 
-function createShopSignCanvas(shopName, ownerName, {
+function createShopSignCanvas(shopName, {
     fill = 'rgba(18, 12, 28, 0.94)',
     accent = '#ffd24a',
     titleFill = 'rgba(255, 228, 154, 0.22)',
@@ -107,10 +107,9 @@ function createShopSignCanvas(shopName, ownerName, {
     ctx.roundRect(panel.x, panel.y, panel.width, panel.height, 34);
     ctx.stroke();
 
-    const hasOwner = Boolean(String(ownerName || '').trim());
-    // A centered title capsule with no side icon. This keeps the visual center
-    // identical to the Canvas center on iOS Safari and on Android.
-    const titleBox = { x: 100, y: hasOwner ? 48 : 86, width: 696, height: 88 };
+    // One title row only. The title capsule is centered in the full sign,
+    // with no owner row or side icon that can make the label appear doubled.
+    const titleBox = { x: 100, y: 86, width: 696, height: 88 };
     ctx.fillStyle = titleFill;
     ctx.roundRect(titleBox.x, titleBox.y, titleBox.width, titleBox.height, 22);
     ctx.fill();
@@ -123,10 +122,7 @@ function createShopSignCanvas(shopName, ownerName, {
     ctx.beginPath();
     ctx.arc(width / 2, 30, 6, 0, Math.PI * 2);
     ctx.fill();
-    drawFittedCanvasText(ctx, shopName || 'ร้านค้า', width / 2, hasOwner ? 107 : 145, 600, 48, 22, '#fff8e7', 700, 18, 1);
-    if (hasOwner) {
-        drawFittedCanvasText(ctx, `ร้านของ ${ownerName}`, width / 2, 198, 640, 34, 18, '#d9e8ff', 700, 18, 1);
-    }
+    drawFittedCanvasText(ctx, shopName || 'ร้านค้า', width / 2, 145, 600, 48, 22, '#fff8e7', 700, 18, 1);
     return canvas;
 }
 
@@ -4551,7 +4547,7 @@ export class SceneManager {
         group.add(premiumMerchant);
 
         // ---- Floating shop name tag ----
-        const canvas = createShopSignCanvas('ร้านค้า', null, {
+        const canvas = createShopSignCanvas('ร้านค้า', {
             fill: 'rgba(40, 20, 10, 0.92)',
             accent: '#ffd040',
             titleFill: 'rgba(40, 20, 10, 0.45)',
@@ -4971,9 +4967,8 @@ export class SceneManager {
                 group.add(itemSprite);
             }
 
-            // Rebuilt shop sign: one symmetric canvas, no side icon, and both
-            // title/owner rows centered from the same visual midpoint.
-            const signCanvas = createShopSignCanvas(stall.shop_name, stall.owner_name, {
+            // Rebuilt shop sign: one symmetric canvas with a single centered title.
+            const signCanvas = createShopSignCanvas(stall.shop_name, {
                 fill: `rgba(${(awningColor >> 16) & 255}, ${(awningColor >> 8) & 255}, ${awningColor & 255}, 0.92)`,
                 accent: '#fff1a8',
                 titleFill: 'rgba(20, 12, 28, 0.42)',
@@ -5039,7 +5034,7 @@ export class SceneManager {
         awning.position.set(0, 2.45, 0.1); awning.rotation.x = -0.12;
         group.add(awning);
 
-        const canvas = createShopSignCanvas('แผงว่าง — เปิดร้านได้!', null, {
+        const canvas = createShopSignCanvas('แผงว่าง — เปิดร้านได้!', {
             fill: 'rgba(20, 16, 10, 0.82)',
             accent: '#cfc4a8',
             titleFill: 'rgba(20, 16, 10, 0.42)',
@@ -5221,7 +5216,7 @@ export class SceneManager {
         premiumAppraiser.position.set(0, .18, .48); group.add(premiumAppraiser);
 
         // ---- Floating shop name tag ----
-        const canvas = createShopSignCanvas('รับซื้อไอเทม (Sell Shop)', null, {
+        const canvas = createShopSignCanvas('รับซื้อไอเทม (Sell Shop)', {
             fill: 'rgba(10, 40, 20, 0.92)',
             accent: '#ffdd44',
             titleFill: 'rgba(10, 40, 20, 0.45)',
