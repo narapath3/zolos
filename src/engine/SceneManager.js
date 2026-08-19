@@ -30,38 +30,61 @@ function createHiDPICanvas(width, height) {
     return { canvas, ctx };
 }
 
-function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSize, color, weight = 700, padding = 18) {
+function drawFittedCanvasText(ctx, value, x, baseline, maxWidth, maxSize, minSize, color, weight = 700, padding = 18, maxLines = 1) {
     if (!ctx) return;
     const original = String(value || '').trim() || 'ร้านค้า';
     const family = CANVAS_UI_FONT;
+    // Reserve a deliberately conservative viewport. Safari's Thai fallback
+    // can report a width that is smaller than the final rasterized glyphs.
     const safeWidth = Math.max(1, maxWidth - (padding * 2));
-    let text = original;
     let size = maxSize;
+    let lines = [original];
 
     const setFont = () => { ctx.font = `${weight} ${size}px ${family}`; };
+    const wrap = () => {
+        const chars = Array.from(original);
+        const nextLines = [];
+        let line = '';
+        chars.forEach((char) => {
+            const candidate = `${line}${char}`;
+            if (line && ctx.measureText(candidate).width > safeWidth) {
+                nextLines.push(line);
+                line = char;
+            } else {
+                line = candidate;
+            }
+        });
+        if (line) nextLines.push(line);
+        return nextLines.length ? nextLines : ['ร้านค้า'];
+    };
+
     setFont();
-    while (size > minSize && ctx.measureText(text).width > safeWidth) {
+    lines = wrap();
+    while (size > minSize && (lines.length > maxLines || lines.some((line) => ctx.measureText(line).width > safeWidth))) {
         size -= 1;
         setFont();
+        lines = wrap();
     }
-    if (ctx.measureText(text).width > safeWidth) {
-        const chars = Array.from(text);
-        while (chars.length > 2 && ctx.measureText(`${chars.join('')}…`).width > safeWidth) {
-            chars.pop();
-        }
-        text = `${chars.join('')}…`;
+    if (lines.length > maxLines) {
+        lines = lines.slice(0, maxLines);
+        const last = Array.from(lines[maxLines - 1]);
+        while (last.length > 2 && ctx.measureText(`${last.join('')}…`).width > safeWidth) last.pop();
+        lines[maxLines - 1] = `${last.join('')}…`;
     }
+
+    const lineHeight = size * 1.08;
+    const firstBaseline = baseline - ((lines.length - 1) * lineHeight) / 2;
+    const clipHeight = lineHeight * lines.length + size * 0.8;
     ctx.save();
     ctx.beginPath();
-    // Keep a real inset from the decorative border. This prevents Safari's
-    // emoji/Thai fallback metrics from touching or escaping the sign frame.
-    ctx.rect(x - maxWidth / 2 + padding, baseline - size * 1.35, safeWidth, size * 1.55);
+    // Keep a real inset from the decorative border on every side.
+    ctx.rect(x - maxWidth / 2 + padding, baseline - clipHeight / 2, safeWidth, clipHeight);
     ctx.clip();
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.direction = 'ltr';
-    ctx.fillText(text, x, baseline);
+    lines.forEach((line, index) => ctx.fillText(line, x, firstBaseline + index * lineHeight));
     ctx.restore();
 }
 
@@ -100,12 +123,13 @@ function createFramedShopLabel(width, height, {
         title,
         width / 2,
         boxY + boxHeight / 2 + titleMaxSize * 0.3,
-        boxWidth - 56,
+        boxWidth - 112,
         titleMaxSize,
         titleMinSize,
         titleColor,
         700,
         18,
+        2,
     );
     return { canvas, ctx };
 }
@@ -4975,9 +4999,9 @@ export class SceneManager {
                 ctx.beginPath();
                 ctx.arc(82, 96, 9, 0, Math.PI * 2);
                 ctx.fill();
-                drawFittedCanvasText(ctx, stall.shop_name || 'ร้านค้า', 384, 102, 640, 62, 26, '#ffd97a', 700, 24);
+                drawFittedCanvasText(ctx, stall.shop_name || 'ร้านค้า', 384, 102, 560, 62, 26, '#ffd97a', 700, 24, 2);
                 ctx.shadowBlur = 0;
-                drawFittedCanvasText(ctx, `ร้านของ ${stall.owner_name || '???'}`, 384, 207, 640, 42, 20, '#cfe0f0', 700, 24);
+                drawFittedCanvasText(ctx, `ร้านของ ${stall.owner_name || '???'}`, 384, 207, 560, 42, 20, '#cfe0f0', 700, 24, 2);
             }
             const sign = new THREE.Sprite(new THREE.SpriteMaterial({
                 map: new THREE.CanvasTexture(canvas), transparent: true
