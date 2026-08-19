@@ -432,6 +432,7 @@ export class SceneManager {
         this.waterFoamMeshes = [];
         this.waterRippleMeshes = [];
         this.waterBubbleField = null;
+        this.waterAquaticProps = [];
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.portalMeshes = [];
@@ -551,6 +552,7 @@ export class SceneManager {
         this.waterFoamMeshes = [];
         this.waterRippleMeshes = [];
         this.waterBubbleField = null;
+        this.waterAquaticProps = [];
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.waterfalls = [];
@@ -1816,6 +1818,7 @@ export class SceneManager {
             this._createWaterRipples(riverLength);
         }
         this._createWaterBubbleField(riverLength);
+        this._createAquaticProps(riverLength);
         this._createAmbientAquaticActors(riverLength);
 
         // Custom riverbank rocks
@@ -1849,6 +1852,91 @@ export class SceneManager {
 
         // Bridge over the winding river at x = 0, z = -2
         this._createBridge(0, -2);
+    }
+
+    _createAquaticProps(riverLength) {
+        const quality = this.graphicsQuality;
+        const propCount = quality === 'high' ? 24 : quality === 'medium' ? 16 : 9;
+        const span = Math.min(riverLength * 0.82, 92);
+        const palette = [0x2f9b63, 0x43b86b, 0x25785b, 0x75c98a];
+        const makePlantMaterial = (color, opacity = 0.86) => new THREE.MeshStandardMaterial({
+            color,
+            roughness: 0.72,
+            metalness: 0.0,
+            transparent: true,
+            opacity,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        const makeRockMaterial = (color) => new THREE.MeshStandardMaterial({
+            color,
+            roughness: 0.92,
+            metalness: 0.0,
+        });
+        for (let i = 0; i < propCount; i++) {
+            const x = -span * 0.5 + (span * i) / Math.max(1, propCount - 1);
+            const centerZ = Math.sin(x * 0.08) * 10 - 2;
+            const phase = i * 1.73 + 0.4;
+            const zone = i % 5;
+            const offset = zone === 0 ? -3.2 : zone === 1 ? 3.1 : zone === 2 ? -1.65 : zone === 3 ? 1.55 : 0.0;
+            const z = centerZ + offset + Math.sin(i * 2.3) * 0.28;
+            const group = new THREE.Group();
+            const type = zone === 4 ? 'underwater-rock' : zone === 2 ? 'reed' : 'seaweed';
+            group.name = `aquatic-prop-${type}`;
+            if (type === 'underwater-rock') {
+                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22 + (i % 3) * 0.06, 0), makeRockMaterial(i % 2 ? 0x3e6873 : 0x2e5664));
+                rock.scale.y = 0.62;
+                rock.position.y = -0.48;
+                rock.rotation.set(0.3 + i * 0.1, phase, 0.2);
+                group.add(rock);
+                const moss = new THREE.Mesh(new THREE.CircleGeometry(0.18 + (i % 2) * 0.06, 7), makePlantMaterial(palette[i % palette.length], 0.64));
+                moss.rotation.x = -Math.PI / 2;
+                moss.position.y = -0.25;
+                group.add(moss);
+            } else {
+                const stemCount = type === 'reed' ? 3 : 4;
+                for (let stemIndex = 0; stemIndex < stemCount; stemIndex++) {
+                    const height = (type === 'reed' ? 0.58 : 0.42) + ((i + stemIndex) % 3) * 0.10;
+                    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.035, height, 5), makePlantMaterial(palette[(i + stemIndex) % palette.length]));
+                    const angle = (stemIndex / stemCount) * Math.PI * 2 + phase;
+                    stem.position.set(Math.cos(angle) * 0.12, -0.25 + height * 0.5, Math.sin(angle) * 0.12);
+                    stem.rotation.z = Math.cos(angle) * (type === 'reed' ? 0.22 : 0.38);
+                    stem.rotation.x = Math.sin(angle) * (type === 'reed' ? 0.18 : 0.30);
+                    group.add(stem);
+                    if (type === 'seaweed') {
+                        const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), makePlantMaterial(palette[(i + stemIndex + 1) % palette.length], 0.78));
+                        leaf.scale.set(0.22, 0.05, 0.48);
+                        leaf.position.set(Math.cos(angle) * 0.22, -0.05 + height * 0.55, Math.sin(angle) * 0.22);
+                        leaf.rotation.y = angle;
+                        group.add(leaf);
+                    }
+                }
+            }
+            group.position.set(x, 0, z);
+            group.userData.aquaticPropType = type;
+            group.userData.phase = phase;
+            group.userData.baseScale = 0.82 + (i % 4) * 0.12;
+            group.userData.sway = type === 'underwater-rock' ? 0.012 : 0.06 + (i % 3) * 0.018;
+            group.scale.setScalar(group.userData.baseScale);
+            this.scene.add(group);
+            this.envObjects.push(group);
+            this.waterAquaticProps.push(group);
+        }
+        // A small set of floating reeds/lilies adds a readable surface layer
+        // without covering the river silhouette on mobile.
+        const surfaceCount = quality === 'high' ? 10 : quality === 'medium' ? 6 : 3;
+        for (let i = 0; i < surfaceCount; i++) {
+            const x = -span * 0.45 + (span * i) / Math.max(1, surfaceCount - 1);
+            const z = Math.sin(x * 0.08) * 10 - 2 + (i % 2 ? 2.1 : -2.0);
+            const pad = new THREE.Mesh(new THREE.CircleGeometry(0.22 + (i % 3) * 0.05, 8), makePlantMaterial(palette[(i + 2) % palette.length], 0.90));
+            pad.rotation.x = -Math.PI / 2;
+            pad.position.set(x, -0.20, z);
+            pad.userData.aquaticPropType = 'surface-pad';
+            pad.userData.phase = i * 1.4;
+            this.scene.add(pad);
+            this.envObjects.push(pad);
+            this.waterAquaticProps.push(pad);
+        }
     }
 
     _createAmbientAquaticActors(riverLength) {
@@ -6279,6 +6367,24 @@ export class SceneManager {
                 );
             });
             position.needsUpdate = true;
+        }
+        if (this.waterAquaticProps?.length) {
+            this.waterAquaticProps.forEach((prop) => {
+                const { aquaticPropType, phase, baseScale, sway = 0.06 } = prop.userData;
+                const t = this.time * 0.72 + phase;
+                if (aquaticPropType === 'underwater-rock') {
+                    prop.rotation.y = phase + Math.sin(t * 0.28) * 0.035;
+                    prop.position.y = Math.sin(t * 0.5) * 0.008;
+                } else if (aquaticPropType === 'surface-pad') {
+                    prop.rotation.z = Math.sin(t * 0.52) * 0.045;
+                    prop.position.y = -0.20 + Math.sin(t * 0.65) * 0.025;
+                    prop.scale.setScalar(baseScale || 1);
+                } else {
+                    prop.rotation.z = Math.sin(t * 0.9) * sway;
+                    prop.rotation.x = Math.cos(t * 0.68) * sway * 0.35;
+                    prop.position.y = Math.sin(t * 0.82 + phase) * 0.018;
+                }
+            });
         }
 
         // Sakura petals drifting down from cherry trees

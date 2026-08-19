@@ -107,6 +107,18 @@ test('river surface stays aligned with the actual bank width instead of a flat o
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
 });
 
+test('river adds tier-scaled aquatic props without covering the readable water silhouette', () => {
+  assert.match(source, /_createAquaticProps\(riverLength\)/);
+  assert.match(source, /const propCount = quality === 'high' \? 24 : quality === 'medium' \? 16 : 9/);
+  assert.match(source, /aquatic-prop-\$\{type\}/);
+  assert.match(source, /aquaticPropType = type/);
+  assert.match(source, /underwater-rock/);
+  assert.match(source, /seaweed/);
+  assert.match(source, /surface-pad/);
+  assert.match(source, /this\.waterAquaticProps\.push/);
+  assert.match(source, /this\.waterAquaticProps\.forEach/);
+});
+
 test('water surface adds mobile-safe air bubbles and wind-driven ripple rings', () => {
   assert.match(source, /_createWaterBubbleField\(riverLength\)/);
   assert.match(source, /const count = quality === 'high' \? 34 : quality === 'medium' \? 22 : 10/);
