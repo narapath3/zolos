@@ -2933,6 +2933,8 @@ function stepWorld(dt) {
                 footPos.y = 1.2 + sceneManager.getWalkableHeight(footPos.x, footPos.z);
             }
             particles?.spawnFootstep?.(footPos, surface);
+            const audioSurface = sceneManager.getFootstepSurface?.(footPos) || (surface === 'water' ? 'water' : 'grass');
+            soundManager?.playFootstep?.(audioSurface, { volume: character.moveSpeed >= 7 ? 0.82 : 0.68 });
         }
     } else if (footstepTravel > 0) {
         footstepTravel = Math.min(footstepTravel, 0.3);

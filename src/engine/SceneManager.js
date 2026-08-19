@@ -434,6 +434,10 @@ export class SceneManager {
         this.waterBubbleField = null;
         this.waterAquaticProps = [];
         this.waterGuardRails = [];
+        this.riverLanterns = [];
+        this.riverNightMotes = null;
+        this.riverNightHaze = [];
+        this.riverNightBlend = 0;
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.portalMeshes = [];
@@ -465,6 +469,13 @@ export class SceneManager {
         // Ambient
         this.ambientLight = new THREE.AmbientLight(0x91a5bd, 0.36);
         this.scene.add(this.ambientLight);
+        this.moonFillLight = new THREE.HemisphereLight(0x6f9bff, 0x091526, 0.0);
+        this.scene.add(this.moonFillLight);
+        this._daySunColor = new THREE.Color(0xffe8c0);
+        this._nightSunColor = new THREE.Color(0x7ea8ff);
+        this._nightAmbientColor = new THREE.Color(0x304d78);
+        this._nightSkyTop = new THREE.Color(0x172a63);
+        this._nightSkyHorizon = new THREE.Color(0x9b6c82);
 
         // Directional (sun)
         this.sunLight = new THREE.DirectionalLight(0xffe8c0, 1.4);
@@ -490,13 +501,13 @@ export class SceneManager {
         this.scene.add(this.skyFillLight);
 
         // Warm atmosphere point lights
-        const warmLight = new THREE.PointLight(0xff9040, 0.3, 30);
-        warmLight.position.set(8, 3, 6);
-        this.scene.add(warmLight);
+        this.warmRiverLight = new THREE.PointLight(0xff9040, 0.3, 30);
+        this.warmRiverLight.position.set(8, 3, 6);
+        this.scene.add(this.warmRiverLight);
 
-        const coolLight = new THREE.PointLight(0x4080ff, 0.3, 30);
-        coolLight.position.set(-8, 4, -8);
-        this.scene.add(coolLight);
+        this.coolRiverLight = new THREE.PointLight(0x4080ff, 0.3, 30);
+        this.coolRiverLight.position.set(-8, 4, -8);
+        this.scene.add(this.coolRiverLight);
     }
 
     // ============ Map Loading ============
@@ -555,6 +566,10 @@ export class SceneManager {
         this.waterBubbleField = null;
         this.waterAquaticProps = [];
         this.waterGuardRails = [];
+        this.riverLanterns = [];
+        this.riverNightMotes = null;
+        this.riverNightHaze = [];
+        this.riverNightBlend = 0;
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.waterfalls = [];
@@ -974,7 +989,7 @@ export class SceneManager {
 
         // Sun core sphere
         const sunGeo = new THREE.SphereGeometry(5.2, 16, 16);
-        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffefb8 });
+        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffefb8, transparent: true, opacity: 1.0, depthWrite: false });
         const sunMesh = new THREE.Mesh(sunGeo, sunMat);
         sunMesh.position.copy(sunPos);
         this.scene.add(sunMesh);
@@ -1822,6 +1837,7 @@ export class SceneManager {
         this._createWaterBubbleField(riverLength);
         this._createAquaticProps(riverLength);
         this._createRiverGuardRails(riverLength);
+        this._createRiverNightAmbience(riverLength);
         this._createAmbientAquaticActors(riverLength);
 
         // Custom riverbank rocks
@@ -2544,6 +2560,97 @@ export class SceneManager {
                 this.envObjects.push(segment);
                 this.waterGuardRails.push(segment);
             }
+        }
+    }
+
+    _createRiverNightAmbience(riverLength) {
+        const quality = this.graphicsQuality;
+        const lanternCount = quality === 'high' ? 12 : quality === 'medium' ? 8 : quality === 'low' ? 5 : 3;
+        const span = Math.min(riverLength * 0.78, 88);
+        const lanternGeo = new THREE.SphereGeometry(0.085, quality === 'high' ? 10 : 6, quality === 'high' ? 8 : 5);
+        const lanternMat = new THREE.MeshBasicMaterial({ color: 0xffd37a, toneMapped: false });
+        for (let i = 0; i < lanternCount; i++) {
+            const x = -span * 0.5 + (span * i) / Math.max(1, lanternCount - 1);
+            const riverZ = Math.sin(x * 0.08) * 10 - 2;
+            const side = i % 2 === 0 ? -1 : 1;
+            const z = riverZ + side * 5.72;
+            const y = this.getWalkableHeight(x, z) + 1.25;
+            const bulb = new THREE.Mesh(lanternGeo, lanternMat);
+            bulb.position.set(x, y, z);
+            bulb.userData.phase = i * 1.71;
+            this.scene.add(bulb);
+            this.envObjects.push(bulb);
+            const light = new THREE.PointLight(0xffa447, 0.0, quality === 'high' ? 8.5 : 6.5, 1.65);
+            light.position.copy(bulb.position);
+            light.userData.phase = bulb.userData.phase;
+            light.userData.bulb = bulb;
+            this.scene.add(light);
+            this.envObjects.push(light);
+            this.riverLanterns.push(light);
+        }
+
+        const moteCount = quality === 'high' ? 54 : quality === 'medium' ? 32 : quality === 'low' ? 18 : 10;
+        const positions = new Float32Array(moteCount * 3);
+        const moteData = [];
+        for (let i = 0; i < moteCount; i++) {
+            const x = -span * 0.5 + ((i * 37) % 101) / 100 * span;
+            const riverZ = Math.sin(x * 0.08) * 10 - 2;
+            const z = riverZ + (((i * 17) % 100) / 100 - 0.5) * 10.4;
+            const y = 0.35 + ((i * 29) % 100) / 100 * 1.25;
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
+            moteData.push({ baseX: x, baseY: y, baseZ: z, phase: i * 0.83, drift: 0.5 + (i % 5) * 0.08 });
+        }
+        const moteGeo = new THREE.BufferGeometry();
+        moteGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const moteMat = new THREE.PointsMaterial({
+            color: 0xffe6a0,
+            size: quality === 'high' ? 0.095 : 0.075,
+            transparent: true,
+            opacity: 0.0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            sizeAttenuation: true,
+        });
+        this.riverNightMotes = new THREE.Points(moteGeo, moteMat);
+        this.riverNightMotes.frustumCulled = false;
+        this.riverNightMotes.userData.motes = moteData;
+        this.scene.add(this.riverNightMotes);
+        this.envObjects.push(this.riverNightMotes);
+
+        // A few low-opacity sprites make the waterline catch warm evening haze
+        // without enabling expensive scene-wide fog on mobile GPUs.
+        const hazeCanvas = document.createElement('canvas');
+        hazeCanvas.width = 96;
+        hazeCanvas.height = 48;
+        const hazeContext = hazeCanvas.getContext('2d');
+        const gradient = hazeContext.createRadialGradient(48, 24, 2, 48, 24, 48);
+        gradient.addColorStop(0, 'rgba(145, 230, 235, 0.30)');
+        gradient.addColorStop(1, 'rgba(145, 230, 235, 0)');
+        hazeContext.fillStyle = gradient;
+        hazeContext.fillRect(0, 0, 96, 48);
+        const hazeTexture = new THREE.CanvasTexture(hazeCanvas);
+        hazeTexture.colorSpace = THREE.SRGBColorSpace;
+        const hazeMat = new THREE.SpriteMaterial({
+            map: hazeTexture,
+            color: 0x9ce5e9,
+            transparent: true,
+            opacity: 0.0,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const hazeCount = quality === 'high' ? 4 : quality === 'medium' ? 3 : 2;
+        for (let i = 0; i < hazeCount; i++) {
+            const x = -span * 0.42 + (span * i) / Math.max(1, hazeCount - 1);
+            const z = Math.sin(x * 0.08) * 10 - 2;
+            const haze = new THREE.Sprite(hazeMat.clone());
+            haze.position.set(x, 0.62 + (i % 2) * 0.08, z);
+            haze.scale.set(8.2, 2.15, 1);
+            haze.userData.phase = i * 1.3;
+            this.scene.add(haze);
+            this.envObjects.push(haze);
+            this.riverNightHaze.push(haze);
         }
     }
 
@@ -6294,6 +6401,18 @@ export class SceneManager {
         return resolved;
     }
 
+    getFootstepSurface(position) {
+        if (!position) return 'grass';
+        if (this.currentMap === 'prontera' && Math.abs(position.x) < 2.2
+            && position.z >= -10 && position.z <= 6) {
+            return 'bridge';
+        }
+        if (this.isInWater(position)) return 'water';
+        const riverCenter = Math.sin(position.x * 0.08) * 10 - 2;
+        if (Math.abs(position.z - riverCenter) < 7.6) return 'wet';
+        return 'grass';
+    }
+
     // Check if a position is in the winding river (and not on the bridge)
     isInWater(position) {
         if (!this.waterMesh) return false;
@@ -6370,8 +6489,69 @@ export class SceneManager {
         });
     }
 
-    // ============ Animate per-frame ==========
+            _updateRiverNightAtmosphere(dt) {
+        const target = this.currentMap === 'prontera' && this.waterMesh ? 0.62 : 0.0;
+        const blendRate = Math.min(1, Math.max(0, dt) * 0.85);
+        this.riverNightBlend += (target - this.riverNightBlend) * blendRate;
+        const night = this.riverNightBlend;
+        const day = 1 - night;
+        const weatherSun = this._weatherCur?.sun ?? 1.4;
+        const weatherAmb = this._weatherCur?.amb ?? 0.36;
+
+        if (this.sunLight) {
+            this.sunLight.intensity = weatherSun * (0.58 + day * 0.42);
+            this.sunLight.color.copy(this._daySunColor).lerp(this._nightSunColor, night * 0.72);
+        }
+        if (this.ambientLight) {
+            this.ambientLight.intensity = weatherAmb * (0.78 + day * 0.22);
+            this.ambientLight.color.set(0x91a5bd).lerp(this._nightAmbientColor, night * 0.65);
+        }
+        if (this.hemiLight) this.hemiLight.intensity = 1.05 * (0.68 + day * 0.32);
+        if (this.moonFillLight) this.moonFillLight.intensity = night * 0.24;
+        if (this.sunMesh?.material) this.sunMesh.material.opacity = 1.0 - night * 0.82;
+        if (this.skyMat?.uniforms?.topColor && this.skyMat?.uniforms?.horizonColor && this._weatherCur) {
+            this.skyMat.uniforms.topColor.value.copy(this._weatherCur.skyTop).lerp(this._nightSkyTop, night * 0.22);
+            this.skyMat.uniforms.horizonColor.value.copy(this._weatherCur.skyHor).lerp(this._nightSkyHorizon, night * 0.22);
+        }
+        if (this.skyFillLight) this.skyFillLight.intensity = 0.20 + day * 0.20;
+        if (this.warmRiverLight) this.warmRiverLight.intensity = 0.10 + night * 0.38;
+        if (this.coolRiverLight) this.coolRiverLight.intensity = 0.12 + night * 0.18;
+
+        if (this.riverLanterns?.length) {
+            this.riverLanterns.forEach((light, i) => {
+                const flicker = 0.18 + Math.sin(this.time * 2.3 + i * 1.7) * 0.045 + Math.sin(this.time * 7.1 + i) * 0.018;
+                light.intensity = night * Math.max(0.08, flicker);
+                const bulb = light.userData?.bulb;
+                if (bulb) {
+                    const glow = 0.88 + Math.sin(this.time * 7.1 + i) * 0.08;
+                    bulb.scale.setScalar(glow);
+                }
+            });
+        }
+        if (this.riverNightMotes) {
+            this.riverNightMotes.material.opacity = night * (0.32 + Math.sin(this.time * 1.4) * 0.08);
+            const positions = this.riverNightMotes.geometry.attributes.position;
+            const motes = this.riverNightMotes.userData.motes || [];
+            for (let i = 0; i < motes.length; i++) {
+                const mote = motes[i];
+                const t = this.time * mote.drift + mote.phase;
+                positions.setX(i, mote.baseX + Math.sin(t * 0.72) * 0.22);
+                positions.setY(i, mote.baseY + Math.sin(t) * 0.12);
+                positions.setZ(i, mote.baseZ + Math.cos(t * 0.61) * 0.18);
+            }
+            positions.needsUpdate = true;
+        }
+        if (this.riverNightHaze?.length) {
+            this.riverNightHaze.forEach((haze, i) => {
+                haze.material.opacity = night * (0.075 + Math.sin(this.time * 0.72 + i * 1.3) * 0.018);
+                haze.position.y = 0.62 + Math.sin(this.time * 0.55 + i) * 0.035;
+            });
+        }
+    }
+
+        // ============ Animate per-frame ==========
     updateAnimations(dt) {
+
         this.time += dt;
         this._updateShopLabelVisibility(dt);
         this._updateWaterAudio(dt);
@@ -6591,6 +6771,7 @@ export class SceneManager {
 
         // Weather / seasons
         this._updateWeather(dt);
+        this._updateRiverNightAtmosphere(dt);
 
         // World boss idle animation
         this._updateWorldBoss(dt);

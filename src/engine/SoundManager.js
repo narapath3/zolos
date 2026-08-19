@@ -12,6 +12,7 @@ export class SoundManager {
         this.environmentVolume = 0.55;
         this._environmentNodes = { water: null, waterfall: null };
         this._environmentNextSplashAt = 0;
+        this._lastFootstepAt = -Infinity;
         this._initOnInteraction();
     }
 
@@ -152,6 +153,60 @@ export class SoundManager {
         osc.connect(gain).connect(ctx.destination);
         osc.start(t);
         osc.stop(t + 0.28);
+    }
+
+    playFootstep(surface = 'grass', { volume = 1 } = {}) {
+        if (!this.enabled) return false;
+        const ctx = this._ensureCtx();
+        const now = ctx.currentTime;
+        const cooldown = surface === 'bridge' ? 0.16 : 0.18;
+        if (now - this._lastFootstepAt < cooldown) return false;
+        this._lastFootstepAt = now;
+        const m = this.masterVolume * Math.max(0, Math.min(1, volume));
+        if (m <= 0.001) return false;
+
+        if (surface === 'bridge') {
+            // Two short wooden knocks with a muted body resonance.
+            this._playNoiseBurst(ctx, now, 0.055, m * 0.20, 280, 900);
+            [155, 225].forEach((frequency, index) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(frequency + Math.random() * 18, now);
+                gain.gain.setValueAtTime(m * (index ? 0.15 : 0.20), now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.13);
+            });
+        } else if (surface === 'water' || surface === 'wet') {
+            // A soft splash for leaving the river or stepping on wet ground.
+            this._playNoiseBurst(ctx, now, 0.09, m * 0.24, 380, 1500);
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(180, now);
+            osc.frequency.exponentialRampToValueAtTime(85, now + 0.13);
+            gain.gain.setValueAtTime(m * 0.16, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.17);
+        } else {
+            // Grass/soil: a quiet low thump plus a short leaf/soil texture.
+            this._playNoiseBurst(ctx, now, 0.045, m * 0.12, 500, 1700);
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(105 + Math.random() * 18, now);
+            osc.frequency.exponentialRampToValueAtTime(62, now + 0.11);
+            gain.gain.setValueAtTime(m * 0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.14);
+        }
+        return true;
     }
 
     // ============ Attack Hit Sound ============
