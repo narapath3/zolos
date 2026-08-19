@@ -430,6 +430,8 @@ export class SceneManager {
         this.waterMesh = null;
         this.waterReflection = null;
         this.waterFoamMeshes = [];
+        this.waterRippleMeshes = [];
+        this.waterBubbleField = null;
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.portalMeshes = [];
@@ -547,6 +549,8 @@ export class SceneManager {
         this.waterMesh = null;
         this.waterReflection = null;
         this.waterFoamMeshes = [];
+        this.waterRippleMeshes = [];
+        this.waterBubbleField = null;
         this.ambientAquaticActors = [];
         this.cloudSprites = [];
         this.waterfalls = [];
@@ -1687,8 +1691,8 @@ export class SceneManager {
                 uFoamStrength: { value: this.graphicsQuality === 'high' ? 0.54 : 0.38 },
                 uReflectionStrength: { value: this.graphicsQuality === 'high' ? 0.68 : 0.48 },
                 uWaveStrength: { value: this.graphicsQuality === 'high' ? 0.72 : 0.52 },
-                uDepthAmount: { value: 0.92 },
-                uWaterOpacity: { value: this.graphicsQuality === 'high' ? 0.94 : 0.91 },
+                uDepthAmount: { value: 0.84 },
+                uWaterOpacity: { value: this.graphicsQuality === 'high' ? 0.78 : 0.74 },
                 uPlanarReflectionStrength: { value: enablePlanarReflection ? 1.0 : 0.0 },
             };
             this.waterShaderUniforms = uniforms;
@@ -1743,6 +1747,9 @@ export class SceneManager {
                         vec3 texB = texture2D(uMap, flowUvB).rgb;
                         float detail = dot(mix(texA, texB, 0.5), vec3(0.30, 0.45, 0.25));
                         float waveMask = smoothstep(0.22, 0.8, detail);
+                        float windWaveA = sin(vUv.x * 19.0 - uTime * 1.6 + vUv.y * 3.0);
+                        float windWaveB = sin(vUv.x * 43.0 - uTime * 2.35 - vUv.y * 5.0);
+                        float windWave = smoothstep(0.22, 0.84, windWaveA * 0.62 + windWaveB * 0.38 + 0.5);
                         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
                         float facing = max(dot(normalize(vNormal), viewDir), 0.0);
                         float fresnel = pow(1.0 - facing, 3.2);
@@ -1751,8 +1758,9 @@ export class SceneManager {
                         // than a static white border.
                         float shoreBand = (1.0 - smoothstep(0.025, 0.16, vUv.y)) + smoothstep(0.84, 0.975, vUv.y);
                         float foamNoise = smoothstep(0.42, 0.82, detail);
-                        float foamMask = clamp(shoreBand * (0.34 + foamNoise * 0.66) * uFoamStrength, 0.0, 1.0);
-                        float reflection = clamp(fresnel * (0.22 + uReflectionStrength * 0.34), 0.0, 0.72);
+                        float crestFoam = smoothstep(0.76, 0.96, windWave) * (0.18 + fresnel * 0.42);
+                        float foamMask = clamp(shoreBand * (0.30 + foamNoise * 0.56) * uFoamStrength + crestFoam * uFoamStrength, 0.0, 1.0);
+                        float reflection = clamp(fresnel * (0.20 + uReflectionStrength * 0.30) + windWave * 0.035, 0.0, 0.68);
                         vec3 skyReflection = mix(vec3(0.11, 0.36, 0.53), vec3(0.60, 0.88, 0.91), waveMask);
                         vec3 planarReflection = texture2DProj(uReflectionMap, vReflectionUv).rgb;
                         vec3 reflectionColor = mix(skyReflection, planarReflection, uPlanarReflectionStrength);
@@ -1761,13 +1769,13 @@ export class SceneManager {
                         vec3 color = mix(uShallowColor, uDeepColor, centerDepth * uDepthAmount);
                         color = mix(color, uColor, 0.10 + waveMask * 0.12);
                         color = mix(color, reflectionColor, reflection);
-                        float glint = smoothstep(0.68, 0.94, detail) * (0.10 + fresnel * 0.28) * uWaveStrength;
+                        float glint = smoothstep(0.68, 0.94, detail) * (0.08 + fresnel * 0.24) * uWaveStrength;
                         float waveRibbon = smoothstep(0.64, 0.94, sin(vUv.x * 31.0 + uTime * 0.9 + detail * 3.0) * 0.5 + 0.5);
-                        color += uHighlightColor * (glint + waveRibbon * (0.018 + fresnel * 0.075));
+                        color += uHighlightColor * (glint + waveRibbon * (0.016 + fresnel * 0.06) + windWave * 0.022);
                         float shoreTint = shoreBand * (0.035 + foamNoise * 0.045);
                         color = mix(color, uShallowColor, shoreTint);
                         color = mix(color, uFoamColor, foamMask * 0.58 + fresnel * 0.018);
-                        float alpha = clamp(uWaterOpacity + fresnel * 0.035 + foamMask * 0.018, 0.0, 0.98);
+                        float alpha = clamp(uWaterOpacity + fresnel * 0.04 + foamMask * 0.02, 0.0, 0.90);
                         gl_FragColor = vec4(color, alpha);
                     }
                 `,
@@ -1783,7 +1791,7 @@ export class SceneManager {
                 color: new THREE.Color(config.waterColor).multiplyScalar(0.62),
                 map: waterTex,
                 transparent: true,
-                opacity: 0.90,
+                opacity: 0.78,
                 shininess: 105,
                 specular: 0x8fd9de,
                 side: THREE.DoubleSide,
@@ -1797,7 +1805,11 @@ export class SceneManager {
         this.scene.add(water);
         this.envObjects.push(water);
         this.waterMesh = water;
-        if (useAdaptiveWater) this._createRiverFoam(config, riverLength);
+        if (useAdaptiveWater) {
+            this._createRiverFoam(config, riverLength);
+            this._createWaterRipples(riverLength);
+        }
+        this._createWaterBubbleField(riverLength);
         this._createAmbientAquaticActors(riverLength);
 
         // Custom riverbank rocks
@@ -1911,6 +1923,78 @@ export class SceneManager {
             this.envObjects.push(actor);
             this.ambientAquaticActors.push(actor);
         }
+    }
+
+    _createWaterRipples(riverLength) {
+        const quality = this.graphicsQuality;
+        const count = quality === 'high' ? 16 : 10;
+        const group = new THREE.Group();
+        group.name = 'water-wind-ripples';
+        const riverHalfWidth = 5.05;
+        const span = Math.min(riverLength * 0.86, 96);
+        for (let i = 0; i < count; i++) {
+            const material = new THREE.MeshBasicMaterial({
+                color: i % 3 === 0 ? 0xd9fff6 : 0x8bd8df,
+                transparent: true,
+                opacity: quality === 'high' ? 0.20 : 0.14,
+                depthWrite: false,
+                depthTest: true,
+                blending: THREE.AdditiveBlending,
+                toneMapped: false,
+            });
+            const ripple = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.25, 18), material);
+            const phase = i * 1.91 + 0.7;
+            const baseX = -span * 0.5 + (span * i) / Math.max(1, count - 1);
+            const side = i % 2 === 0 ? -1 : 1;
+            const baseZ = Math.sin(baseX * 0.08) * 10 - 2 + side * (riverHalfWidth - 0.25);
+            ripple.rotation.x = -Math.PI / 2;
+            ripple.position.set(baseX, -0.17, baseZ);
+            ripple.scale.set(2.4 + (i % 3) * 0.8, 0.55, 1);
+            ripple.userData.phase = phase;
+            ripple.userData.baseX = baseX;
+            ripple.userData.baseZ = baseZ;
+            ripple.userData.baseScale = ripple.scale.x;
+            group.add(ripple);
+            this.waterRippleMeshes.push(ripple);
+        }
+        this.scene.add(group);
+        this.envObjects.push(group);
+    }
+
+    _createWaterBubbleField(riverLength) {
+        const quality = this.graphicsQuality;
+        const count = quality === 'high' ? 34 : quality === 'medium' ? 22 : 10;
+        const positions = new Float32Array(count * 3);
+        const data = [];
+        const span = Math.min(riverLength * 0.82, 92);
+        for (let i = 0; i < count; i++) {
+            const baseX = -span * 0.5 + Math.random() * span;
+            const baseZ = Math.sin(baseX * 0.08) * 10 - 2 + (Math.random() - 0.5) * 7.6;
+            const baseY = -0.29 - Math.random() * 0.58;
+            const phase = Math.random() * Math.PI * 2;
+            data.push({ baseX, baseZ, baseY, phase, speed: 0.045 + Math.random() * 0.035 });
+            positions[i * 3] = baseX;
+            positions[i * 3 + 1] = baseY;
+            positions[i * 3 + 2] = baseZ;
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const material = new THREE.PointsMaterial({
+            color: 0xe7ffff,
+            size: quality === 'high' ? 0.075 : 0.06,
+            sizeAttenuation: true,
+            transparent: true,
+            opacity: quality === 'high' ? 0.52 : 0.38,
+            depthWrite: false,
+            depthTest: true,
+            blending: THREE.AdditiveBlending,
+            toneMapped: false,
+        });
+        const points = new THREE.Points(geometry, material);
+        points.name = 'water-air-bubbles';
+        this.scene.add(points);
+        this.envObjects.push(points);
+        this.waterBubbleField = { points, data };
     }
 
     _createRiverFoam(config, riverLength) {
@@ -6164,6 +6248,31 @@ export class SceneManager {
                 if (body) body.scale.y = (actor.userData.bodyScaleY || 1) * (1 + Math.sin(t * 2.4) * 0.035);
                 if (ripple) ripple.scale.setScalar(0.92 + Math.sin(t * 1.7) * 0.08);
             });
+        }
+        if (this.waterRippleMeshes?.length) {
+            this.waterRippleMeshes.forEach((ripple) => {
+                const { baseX, baseZ, phase, baseScale } = ripple.userData;
+                const t = this.time * 0.34 + phase;
+                ripple.position.x = baseX + Math.sin(t * 0.42) * 0.75;
+                ripple.position.z = baseZ + Math.cos(t * 0.55) * 0.18;
+                ripple.scale.x = baseScale * (0.82 + (Math.sin(t * 1.3) * 0.5 + 0.5) * 0.42);
+                ripple.scale.y = 0.42 + (Math.cos(t * 1.3) * 0.5 + 0.5) * 0.22;
+                ripple.material.opacity = 0.07 + (Math.sin(t * 1.1) * 0.5 + 0.5) * 0.11;
+            });
+        }
+        if (this.waterBubbleField?.points) {
+            const position = this.waterBubbleField.points.geometry.attributes.position;
+            this.waterBubbleField.data.forEach((bubble, i) => {
+                const t = this.time * bubble.speed + bubble.phase;
+                const rise = (t % 1.0) * 0.82;
+                position.setXYZ(
+                    i,
+                    bubble.baseX + Math.sin(t * 1.7) * 0.16,
+                    bubble.baseY + rise,
+                    bubble.baseZ + Math.cos(t * 1.3) * 0.12
+                );
+            });
+            position.needsUpdate = true;
         }
 
         // Sakura petals drifting down from cherry trees

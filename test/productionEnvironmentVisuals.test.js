@@ -41,9 +41,11 @@ test('river water upgrades to an adaptive Fresnel shader on medium/high tiers an
   assert.match(source, /float fresnel = pow/);
   assert.match(source, /float centerDepth = smoothstep/);
   assert.match(source, /mix\(uShallowColor, uDeepColor, centerDepth \* uDepthAmount\)/);
-  assert.match(source, /uWaterOpacity: \{ value: this\.graphicsQuality === 'high' \? 0\.94 : 0\.91 \}/);
+  assert.match(source, /uWaterOpacity: \{ value: this\.graphicsQuality === 'high' \? 0\.78 : 0\.74 \}/);
   assert.match(source, /float alpha = clamp\(uWaterOpacity/);
-  assert.match(source, /opacity: 0\.90/);
+  assert.match(source, /opacity: 0\.78/);
+  assert.match(source, /float windWave = smoothstep/);
+  assert.match(source, /float crestFoam = smoothstep/);
   assert.match(source, /float waveRibbon =/);
   assert.match(source, /waterShaderUniforms\.uTime\.value = this\.time/);
   assert.match(source, /Ultra-low\/low keeps a single inexpensive lit material/);
@@ -90,6 +92,17 @@ test('river surface stays aligned with the actual bank width instead of a flat o
   assert.match(source, /const riverWidth = 11\.4/);
   assert.match(source, /new THREE\.PlaneGeometry\(riverLength, riverWidth/);
   assert.match(source, /The old 40-unit slab made the river read as a flat blue rectangle/);
+});
+
+test('water surface adds mobile-safe air bubbles and wind-driven ripple rings', () => {
+  assert.match(source, /_createWaterBubbleField\(riverLength\)/);
+  assert.match(source, /const count = quality === 'high' \? 34 : quality === 'medium' \? 22 : 10/);
+  assert.match(source, /new THREE\.PointsMaterial/);
+  assert.match(source, /points\.name = 'water-air-bubbles'/);
+  assert.match(source, /_createWaterRipples\(riverLength\)/);
+  assert.match(source, /group\.name = 'water-wind-ripples'/);
+  assert.match(source, /this\.waterBubbleField\.data\.forEach/);
+  assert.match(source, /this\.waterRippleMeshes\.forEach/);
 });
 
 test('river shoreline foam uses bounded geometry and animated bubbles', () => {
