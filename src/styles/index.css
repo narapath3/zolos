@@ -1918,6 +1918,7 @@ a,
   max-height: min(720px, calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom)));
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid rgba(103, 194, 255, .58);
   border-radius: 22px;
@@ -1975,9 +1976,14 @@ a,
 
 .fishing-summary__rows {
   display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 7px;
-  max-height: 330px;
+  max-height: none;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 4px 22px 12px;
   scrollbar-width: thin;
   scrollbar-color: rgba(126, 202, 255, .45) transparent;
@@ -2078,16 +2084,16 @@ a,
   .fishing-summary-overlay { padding: 10px max(10px, var(--safe-right)) 10px max(10px, var(--safe-left)); }
   .fishing-summary-card { max-height: calc(100dvh - 20px - var(--safe-top) - var(--safe-bottom)); border-radius: 18px; }
   .fishing-summary__header { padding: 16px 16px 12px; }
-  .fishing-summary__rows { padding-inline: 16px; max-height: min(300px, 42dvh); }
+  .fishing-summary__rows { flex: 1 1 auto; min-height: 0; max-height: none; padding-inline: 16px; }
   .fishing-summary__row { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 7px; }
   .fishing-summary__art { width: 40px; height: 40px; }
   .fishing-summary__item-art,
   .fishing-summary__art .item-visual,
   .fishing-summary__art .item-visual img { width: 36px; height: 36px; }
   .fishing-summary__subtotal { grid-column: 2 / -1; justify-self: end; font-size: 10px; }
-  .fishing-summary__totals { padding-inline: 16px; }
-  .fishing-summary__note { margin-inline: 16px; }
-  .fishing-summary__done { margin-inline: 16px; margin-bottom: 16px; }
+  .fishing-summary__totals { flex: 0 0 auto; padding-inline: 16px; }
+  .fishing-summary__note { flex: 0 0 auto; margin-inline: 16px; }
+  .fishing-summary__done { flex: 0 0 auto; margin-inline: 16px; margin-bottom: 16px; }
 }
 
 /* ========== KILL COUNTER ========== */
