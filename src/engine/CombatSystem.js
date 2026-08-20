@@ -53,6 +53,38 @@ export function getPortalAvoidanceWaypoint(from, target, portals = [], radius = 
     return leftLength < rightLength ? left : right;
 }
 
+export function getAutoNavigationWaypoints(from, target, sceneManager = null) {
+    if (!target) return [];
+    const direct = target.clone ? target.clone() : new THREE.Vector3(Number(target.x) || 0, Number(target.y) || 0, Number(target.z) || 0);
+    if (!from || (sceneManager?.currentMap || '') !== 'prontera') return [direct];
+
+    // Prontera's river is a winding barrier. When the player and target are on
+    // opposite banks, route through the real bridge corridor instead of asking
+    // movement collision to push the player against a rail forever.
+    const riverCenter = x => Math.sin(x * 0.08) * 10 - 2;
+    const fromDelta = Number(from.z) - riverCenter(Number(from.x) || 0);
+    const targetDelta = Number(target.z) - riverCenter(Number(target.x) || 0);
+    if (fromDelta * targetDelta >= -1.0) return [direct];
+
+    const fromSide = fromDelta >= 0 ? 1 : -1;
+    const bridgeZ = -2;
+    // First line up outside the handrail, then enter the actual deck, cross it,
+    // and leave beyond the opposite rail. This ordering matches the collision
+    // contract: side-entry is blocked, end-entry is allowed.
+    const approachOutsideZ = bridgeZ + fromSide * 8.8;
+    const deckEntryZ = bridgeZ + fromSide * 5.75;
+    const deckExitZ = bridgeZ - fromSide * 5.75;
+    const exitOutsideZ = bridgeZ - fromSide * 8.8;
+    const y = Number(target.y) || Number(from.y) || 0;
+    return [
+        new THREE.Vector3(0, y, approachOutsideZ),
+        new THREE.Vector3(0, y, deckEntryZ),
+        new THREE.Vector3(0, y, deckExitZ),
+        new THREE.Vector3(0, y, exitOutsideZ),
+        direct,
+    ];
+}
+
 export class CombatSystem {
     constructor(characterManager, monsterManager, onCombatEvent, sceneManager) {
         this.character = characterManager;
@@ -73,6 +105,11 @@ export class CombatSystem {
         this.autoSearchStuckTime = 0;
         this.autoSearchLastPosition = null;
         this.autoSearchMap = null;
+        this.autoRoute = [];
+        this.autoRouteIndex = 0;
+        this.autoRouteTarget = null;
+        this.autoRouteReplans = 0;
+        this.autoTargetStuckTime = 0;
     }
 
     toggleAutoFarm() {
@@ -90,6 +127,84 @@ export class CombatSystem {
         this.autoSearchTarget = null;
         this.autoSearchStuckTime = 0;
         this.autoSearchLastPosition = null;
+        this.autoRoute = [];
+        this.autoRouteIndex = 0;
+        this.autoRouteTarget = null;
+        this.autoRouteReplans = 0;
+        this.autoTargetStuckTime = 0;
+    }
+
+    _findBestAutoTarget() {
+        const position = this.character.getPosition();
+        const pools = [this.monsters?.monsters || []];
+        let best = null;
+        let bestScore = Infinity;
+        for (const pool of pools) {
+            for (const monster of pool) {
+                if (!monster?.alive || monster.isAmbient || monster.isWaterMonster) continue;
+                const targetPosition = monster.getPosition();
+                const route = getAutoNavigationWaypoints(position, targetPosition, this.sceneManager);
+                let routeLength = 0;
+                let previous = position;
+                for (const point of route) {
+                    routeLength += Math.hypot(point.x - previous.x, point.z - previous.z);
+                    previous = point;
+                }
+                // Prefer a slightly farther reachable target over a nearer one
+                // across the river or behind a bridge approach.
+                const routePenalty = route.length > 1 ? 1.5 : 0;
+                const score = routeLength + routePenalty;
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = monster;
+                }
+            }
+        }
+        return best || this.monsters?.findNearest?.(position) || null;
+    }
+
+    _ensureAutoRoute(target) {
+        if (this.autoRouteTarget === target && this.autoRoute.length) return;
+        this.autoRoute = getAutoNavigationWaypoints(this.character.getPosition(), target, this.sceneManager);
+        this.autoRouteIndex = 0;
+        this.autoRouteTarget = target;
+        this.autoRouteReplans = 0;
+        this.autoTargetStuckTime = 0;
+    }
+
+    _replanAutoRoute(target) {
+        this.autoRoute = getAutoNavigationWaypoints(this.character.getPosition(), target, this.sceneManager);
+        this.autoRouteIndex = 0;
+        this.autoRouteTarget = target;
+        this.autoRouteReplans += 1;
+    }
+
+    _buildUnstuckRoute(target, currentWaypoint) {
+        const position = this.character.getPosition();
+        const dx = (currentWaypoint?.x ?? target.x) - position.x;
+        const dz = (currentWaypoint?.z ?? target.z) - position.z;
+        const length = Math.hypot(dx, dz) || 1;
+        const fx = dx / length, fz = dz / length;
+        const candidates = [
+            new THREE.Vector3(position.x - fz * 2.6, position.y, position.z + fx * 2.6),
+            new THREE.Vector3(position.x + fz * 2.6, position.y, position.z - fx * 2.6),
+            new THREE.Vector3(position.x - fx * 2.0, position.y, position.z - fz * 2.0),
+        ];
+        const valid = candidates.find(candidate => {
+            if (this.sceneManager?.isInWater?.(candidate)) return false;
+            if (this.sceneManager?.isInArena?.(candidate.x, candidate.z, 0.8)) return false;
+            const probe = candidate.clone();
+            this.sceneManager?.resolveMovementCollision?.(position, probe, this.character);
+            this.sceneManager?.resolvePlayerCollisions?.(probe, position);
+            return probe.distanceToSquared(position) > 0.45;
+        });
+        if (!valid) return false;
+        this.autoRoute = [valid, ...getAutoNavigationWaypoints(valid, target, this.sceneManager)];
+        this.autoRouteIndex = 0;
+        this.autoRouteTarget = target;
+        this.autoRouteReplans += 1;
+        this.autoTargetStuckTime = 0;
+        return true;
     }
 
     _canSearchCurrentMap() {
@@ -142,9 +257,34 @@ export class CombatSystem {
     }
 
     _moveAutoToward(target, dt) {
+        this._ensureAutoRoute(target);
+        while (this.autoRouteIndex < this.autoRoute.length - 1) {
+            const waypoint = this.autoRoute[this.autoRouteIndex];
+            if (Math.hypot(waypoint.x - this.character.mesh.position.x, waypoint.z - this.character.mesh.position.z) > 1.15) break;
+            this.autoRouteIndex += 1;
+        }
+        const routeTarget = this.autoRoute[this.autoRouteIndex] || target;
         const portals = this.sceneManager?.getPortals?.() || [];
-        const waypoint = getPortalAvoidanceWaypoint(this.character.getPosition(), target, portals);
-        return this.character.moveToward(waypoint, dt);
+        const waypoint = getPortalAvoidanceWaypoint(this.character.getPosition(), routeTarget, portals);
+        const before = this.character.getPosition();
+        const moved = this.character.moveToward(waypoint, dt);
+        const after = this.character.getPosition();
+        const progress = Math.hypot(after.x - before.x, after.z - before.z);
+        if (progress < 0.002) {
+            this.autoTargetStuckTime += dt;
+            if (this.autoTargetStuckTime > 0.75) {
+                if (this.autoRouteReplans < 2) this._replanAutoRoute(target);
+                else if (this.autoRouteReplans < 4) this._buildUnstuckRoute(target, routeTarget);
+                else {
+                    this.currentTarget = null;
+                    if (this.character.targetMonster === target) this.character.targetMonster = null;
+                    this._resetAutoSearch();
+                }
+            }
+        } else {
+            this.autoTargetStuckTime = 0;
+        }
+        return moved;
     }
 
     toggleFishing() {
@@ -323,7 +463,7 @@ export class CombatSystem {
         // Only search/move/attack nearest monster automatically if we don't have a manual target & autoFarm is active
         if (!target && this.autoFarm) {
             if (!this.currentTarget || !this.currentTarget.alive) {
-                this.currentTarget = this.monsters.findNearest(this.character.getPosition());
+                this.currentTarget = this._findBestAutoTarget();
             }
             target = this.currentTarget;
         }

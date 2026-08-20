@@ -280,9 +280,14 @@ async function initGame(charData) {
     });
 
     character = new CharacterManager(sceneManager.scene);
-    character.setMovementCollisionResolver?.((fromPosition, toPosition) =>
-        sceneManager.resolveMovementCollision?.(fromPosition, toPosition) || toPosition
-    );
+    character.setMovementCollisionResolver?.((fromPosition, toPosition, movingCharacter) => {
+        const resolved = sceneManager.resolveMovementCollision?.(fromPosition, toPosition, movingCharacter) || toPosition.clone();
+        // Resolve NPC/player-stall overlap in the same movement transaction. The
+        // old post-frame-only pass made Auto Bot believe it had progressed even
+        // when the next frame pushed it back into the same obstacle.
+        sceneManager.resolvePlayerCollisions?.(resolved, fromPosition);
+        return resolved;
+    });
 
     // Load character data
     character.loadStats(charData);

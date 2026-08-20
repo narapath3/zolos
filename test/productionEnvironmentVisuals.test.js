@@ -184,6 +184,7 @@ test('river guard rails block land-to-water movement but keep the bridge crossin
   assert.match(sceneSource, /const enteringFromEnd = Math\.abs\(fromPosition\.x\) < PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(sceneSource, /resolved\.x = Math\.sign\(fromPosition\.x \|\| toPosition\.x\) \* PRONTERA_BRIDGE_HALF_WIDTH/);
   assert.match(mainSource, /setMovementCollisionResolver/);
+  assert.match(mainSource, /sceneManager\.resolvePlayerCollisions\?\.\(resolved, fromPosition\)/);
   assert.match(characterSource, /movementCollisionResolver/);
   assert.match(characterSource, /const resolvedPosition = this\.movementCollisionResolver/);
 });

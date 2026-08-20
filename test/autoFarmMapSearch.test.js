@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAutoSearchWaypoints, getPortalAvoidanceWaypoint } from '../src/engine/CombatSystem.js';
+import { buildAutoSearchWaypoints, getPortalAvoidanceWaypoint, getAutoNavigationWaypoints } from '../src/engine/CombatSystem.js';
 
 test('auto search covers the whole map in a serpentine sweep', () => {
   const points = buildAutoSearchWaypoints({ halfExtent: 44, step: 11 });
@@ -31,4 +31,19 @@ test('AUTO movement detours around warp portals instead of crossing their trigge
 test('AUTO movement keeps a direct route when no portal blocks it', () => {
   const target = { x: 10, y: 1.2, z: 0 };
   assert.equal(getPortalAvoidanceWaypoint({ x: 0, z: 0 }, target, [{ position: { x: 0, z: 10 } }]), target);
+});
+
+test('AUTO routes opposite Prontera river banks through the bridge deck', () => {
+  const route = getAutoNavigationWaypoints(
+    { x: 14, y: 1.2, z: 14 },
+    { x: -14, y: 1.2, z: -16 },
+    { currentMap: 'prontera' },
+  );
+  assert.ok(route.length >= 5);
+  assert.equal(route[0].x, 0);
+  assert.equal(route[1].x, 0);
+  assert.ok(route[1].z > -10.35 && route[1].z < 6.35);
+  assert.ok(route[2].z > -10.35 && route[2].z < 6.35);
+  assert.ok(route[0].z > 6.35 || route[0].z < -10.35);
+  assert.ok(route[3].z > 6.35 || route[3].z < -10.35);
 });
