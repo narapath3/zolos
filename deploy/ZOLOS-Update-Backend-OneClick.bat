@@ -12,14 +12,14 @@ if errorlevel 1 (
   exit /b 1
 )
 
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" -RepoPath "%REPO%"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" -RepoPath "%REPO%" -RunFrontendBuild
 set "RC=%ERRORLEVEL%"
 if "%RC%"=="0" (
   echo.
-  echo [ZOLOS][OK] Backend update completed and RPC route verified.
+  echo [ZOLOS][OK] Game update completed: frontend build, backend restart, and RPC route verified.
 ) else (
   echo.
-  echo [ZOLOS][STOP] Update stopped safely. No force reset or cleanup was performed.
+  echo [ZOLOS][STOP] Update stopped safely. Automatic rollback was attempted if the new commit was already pulled.
 )
 pause
 exit /b %RC%
