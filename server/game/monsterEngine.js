@@ -17,6 +17,7 @@ import { getCardsBySource } from '../cards/CardCatalog.js';
 import { resolveCardDrops } from '../cards/CardDrops.js';
 import { getCardOverrides } from '../api/cardEconomy.js';
 import { AMBIENT_WATER_TYPES } from '../../src/engine/GameData.js';
+import { getMonsterCombatMeta } from '../../src/engine/GameData.js';
 
 const TICK_MS = 100;               // 10 Hz simulation + broadcast
 const SPAWN_RANGE = 12;            // matches client MonsterManager
@@ -39,7 +40,8 @@ const MONSTER_SPECIALS = Object.freeze({
 });
 const SPECIAL_BY_FAMILY = Object.freeze({
     dragon: 'fire_breath', demon: 'arcane_nova', undead: 'arcane_nova',
-    construct: 'ground_slam', beast: 'ground_slam', insect: 'poison_burst', aquatic: 'water_burst',
+    construct: 'ground_slam', beast: 'ground_slam', insect: 'poison_burst',
+    plant: 'poison_burst', slime: 'ground_slam', aquatic: 'water_burst',
 });
 // Longest current player cast range is 10 world units. Keep a small network
 // interpolation allowance without permitting arbitrary off-screen hits.
@@ -90,8 +92,10 @@ const PRONTERA_NAV_OBSTACLES = Object.freeze([
 const PRONTERA_BRIDGE_HALF_WIDTH = 1.8;
 const PRONTERA_BRIDGE_MIN_Z = -10.35;
 const PRONTERA_BRIDGE_MAX_Z = 6.35;
-const isPronteraBridge = (mapId, x, z) => mapId === 'prontera'
-    && Math.abs(x) <= PRONTERA_BRIDGE_HALF_WIDTH
+// The shared river/bridge corridor exists in every playable combat map.
+// Keep this map-agnostic so a monster does not freeze at the river bank after
+// the player crosses into another side of the same world layout.
+const isPronteraBridge = (_mapId, x, z) => Math.abs(x) <= PRONTERA_BRIDGE_HALF_WIDTH
     && z >= PRONTERA_BRIDGE_MIN_Z && z <= PRONTERA_BRIDGE_MAX_Z;
 const isPronteraRailBand = (mapId, x, z, padding = 0) => mapId === 'prontera'
     && !isPronteraBridge(mapId, x, z)
@@ -274,7 +278,12 @@ function playerPos(characterId, mapId) {
 }
 
 function getMonsterSpecial(def) {
-    const skill = SPECIAL_BY_FAMILY[def?.family];
+    // monster_defs predates the combat family field. Resolve it through the
+    // shared GameData metadata so DB-seeded monsters behave identically on every
+    // map instead of silently losing their special ability on the server.
+    const family = def?.family || getMonsterCombatMeta(def?.type, def || {}).family;
+    const skill = SPECIAL_BY_FAMILY[family]
+        || (def?.environment === 'water' ? 'water_burst' : 'ground_slam');
     return skill ? { skill, ...MONSTER_SPECIALS[skill] } : null;
 }
 
@@ -501,7 +510,7 @@ export function applyHit(player, payload) {
     m.dmgByChar.set(charId, (m.dmgByChar.get(charId) || 0) + dmg);
 
     // A hit provokes the monster toward the most recent attacker.
-    m.aggroChar = charId || m.aggroChar;
+    m.aggroChar = charId;
     m.aggroUntil = Date.now() + AGGRO_MS;
 
     m.hp = Math.max(0, m.hp - dmg);

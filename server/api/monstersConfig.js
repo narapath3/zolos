@@ -140,6 +140,59 @@ export async function seedMonstersIfEmpty() {
     return true;
 }
 
+// Repair/complete the live world after new maps or monster types are added.
+// Older VPS databases may already contain monster_defs, which makes the legacy
+// seedMonstersIfEmpty() intentionally skip. This pass is therefore separate and
+// only inserts missing defaults; it never overwrites admin-tuned counts, weights,
+// or existing spawn rows.
+export async function ensureWorldMapDefaults() {
+    let gd;
+    try {
+        gd = await import('../../src/engine/GameData.js');
+    } catch (e) {
+        console.error('[MonsterCfg] world-default repair skipped — cannot import GameData:', e.message);
+        return false;
+    }
+
+    const all = gd.getAllMonsters();
+    for (const [type, d] of Object.entries(all)) {
+        const gold = d.gold || {};
+        await query(
+            `INSERT INTO public.monster_defs
+                (type,name,emoji,color,hp,atk,def,exp,gold_min,gold_max,size,speed,environment,is_boss)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+             ON CONFLICT (type) DO NOTHING`,
+            [type, d.name || type, d.emoji || '', d.color || 0,
+                d.hp || 100, d.atk || 10, d.def || 5, d.exp || 10,
+                gold.min || 0, gold.max || 0, d.size || 0.6, d.speed || 0.5,
+                d.environment || 'ground', d.isBoss === true]);
+    }
+
+    const level = SHARED_SPAWN_LEVEL;
+    for (const m of MAPS) {
+        const isSvarrga = m.id === 'svarrga';
+        const land = isSvarrga ? [] : gd.getSpawnTable(level, m.id);
+        const water = isSvarrga ? [] : gd.getWaterSpawnTable(level);
+        await query(
+            `INSERT INTO public.map_config (map_id,land_count,water_count) VALUES ($1,$2,$3)
+             ON CONFLICT (map_id) DO NOTHING`,
+            [m.id, isSvarrga ? 0 : 12, isSvarrga ? 0 : 4]);
+        for (const e of land) {
+            await query(
+                `INSERT INTO public.map_spawns (map_id,monster_type,weight,is_water) VALUES ($1,$2,$3,false)
+                 ON CONFLICT (map_id,monster_type) DO NOTHING`,
+                [m.id, e.type, e.weight]);
+        }
+        for (const e of water) {
+            await query(
+                `INSERT INTO public.map_spawns (map_id,monster_type,weight,is_water) VALUES ($1,$2,$3,true)
+                 ON CONFLICT (map_id,monster_type) DO NOTHING`,
+                [m.id, e.type, e.weight]);
+        }
+    }
+    return true;
+}
+
 // Idempotent live-world upgrade for the expanded Prontera mountain. Existing
 // admin-tuned rows are preserved; only missing spawn entries are added.
 export async function ensurePronteraMountainExpansion() {

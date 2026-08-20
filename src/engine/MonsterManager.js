@@ -33,8 +33,10 @@ const MONSTER_NAV_OBSTACLES = Object.freeze([
 const MONSTER_BRIDGE_HALF_WIDTH = 1.8;
 const MONSTER_BRIDGE_MIN_Z = -10.35;
 const MONSTER_BRIDGE_MAX_Z = 6.35;
-const isMonsterBridge = (sceneManager, x, z) => sceneManager?.currentMap === 'prontera'
-    && Math.abs(x) <= MONSTER_BRIDGE_HALF_WIDTH
+// The river and its walkable bridge corridor are shared by every playable
+// combat map. Keeping this map-agnostic prevents local fallback monsters from
+// freezing at the bank when the player crosses the river outside Prontera.
+const isMonsterBridge = (_sceneManager, x, z) => Math.abs(x) <= MONSTER_BRIDGE_HALF_WIDTH
     && z >= MONSTER_BRIDGE_MIN_Z && z <= MONSTER_BRIDGE_MAX_Z;
 const isMonsterRailBand = (sceneManager, x, z, padding = 0) => {
     if (sceneManager?.currentMap !== 'prontera' || isMonsterBridge(sceneManager, x, z)) return false;
