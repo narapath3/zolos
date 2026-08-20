@@ -224,15 +224,15 @@ try {
     & $Git -C $RepoPath merge-base --is-ancestor $script:BeforeCommit $remote
     if ($LASTEXITCODE -ne 0) { throw "Local main is not an ancestor of origin/main. Refusing non-fast-forward update. Local=$script:BeforeCommit Remote=$remote" }
     if ($remote -eq $script:BeforeCommit) {
-        Write-Ok "Already up to date at $script:BeforeCommit. Backend was not restarted."
-        exit 0
+        Write-Ok "Already up to date at $script:BeforeCommit. Continuing with dependency check and process restart."
+        $script:AfterCommit = $script:BeforeCommit
+    } else {
+        Write-Step "Fast-forwarding main to $remote..."
+        Invoke-Native $Git @('-C', $RepoPath, 'pull', '--ff-only', 'origin', 'main') (Get-Location).Path
+        $script:AfterCommit = (& $Git -C $RepoPath rev-parse HEAD).Trim()
+        if ($script:AfterCommit -ne $remote) { throw "Unexpected post-pull HEAD: $script:AfterCommit (expected $remote)" }
+        $script:PulledNewCommit = $true
     }
-
-    Write-Step "Fast-forwarding main to $remote..."
-    Invoke-Native $Git @('-C', $RepoPath, 'pull', '--ff-only', 'origin', 'main') (Get-Location).Path
-    $script:AfterCommit = (& $Git -C $RepoPath rev-parse HEAD).Trim()
-    if ($script:AfterCommit -ne $remote) { throw "Unexpected post-pull HEAD: $script:AfterCommit (expected $remote)" }
-    $script:PulledNewCommit = $true
 
     Write-Step 'Checking backend syntax...'
     Invoke-Native $Node @('--check', $ServerEntry) $ServerPath

@@ -11,6 +11,8 @@ test('one-click updater is pinned to the expected repository and main branch', (
   assert.match(ps1, /branch --show-current/);
   assert.match(ps1, /if \(\$branch -ne 'main'\)/);
   assert.match(ps1, /pull', '--ff-only', 'origin', 'main/);
+  assert.match(ps1, /Already up to date[\s\S]*Continuing with dependency check and process restart/);
+  assert.doesNotMatch(ps1, /Already up to date at \$script:BeforeCommit\. Backend was not restarted/);
 });
 
 test('one-click updater protects local work and does not perform routine destructive cleanup', () => {
