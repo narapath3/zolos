@@ -471,6 +471,7 @@ export class SceneManager {
         this.waterAquaticProps = [];
         this.waterGuardRails = [];
         this.riverLanterns = [];
+        this.streetLamps = [];
         this.riverNightMotes = null;
         this.riverNightHaze = [];
         this.riverNightBlend = 0;
@@ -603,6 +604,7 @@ export class SceneManager {
         this.waterAquaticProps = [];
         this.waterGuardRails = [];
         this.riverLanterns = [];
+        this.streetLamps = [];
         this.riverNightMotes = null;
         this.riverNightHaze = [];
         this.riverNightBlend = 0;
@@ -699,6 +701,10 @@ export class SceneManager {
             this._createWeaponSmithNPC();
             this._createPetBoutique();
         }
+
+        // Warm Japanese-minimal path lamps are created after portals and shops so
+        // their exclusion checks use the final interactive layout of the map.
+        this._createStreetLamps(config);
 
         // Perf: point lights must never cast shadows — each would trigger a
         // 6-face cubemap re-render of the whole scene every frame. Only the
@@ -2885,6 +2891,129 @@ export class SceneManager {
         group.position.set(x, 0.25, z);
         this.scene.add(group);
         this.envObjects.push(group);
+    }
+
+    // ============ Japanese-minimal path lighting ============
+    _createStreetLamps(config) {
+        const quality = this.graphicsQuality;
+        const tierCount = quality === 'high' ? 16 : quality === 'medium' ? 11 : quality === 'low' ? 7 : 4;
+        const lightBudget = quality === 'high' ? 10 : quality === 'medium' ? 6 : 0;
+        const palette = {
+            prontera: { wood: 0x302018, woodHi: 0x634332, frame: 0x1a1412, paper: 0xffd990, glow: 0xffa84e },
+            payon: { wood: 0x2b211b, woodHi: 0x765335, frame: 0x191512, paper: 0xffcb78, glow: 0xff9542 },
+            glast_heim: { wood: 0x20182a, woodHi: 0x4c385e, frame: 0x17121d, paper: 0xe5b8ff, glow: 0xb66aff },
+            mjolnir: { wood: 0x283039, woodHi: 0x526c75, frame: 0x141b22, paper: 0xffe4b3, glow: 0xffb45c },
+            abyss_lake: { wood: 0x151c31, woodHi: 0x354978, frame: 0x101525, paper: 0xb5d7ff, glow: 0x6aa8ff },
+            svarrga: { wood: 0x3a2b29, woodHi: 0x8d6a4f, frame: 0x24191a, paper: 0xffefbb, glow: 0xffca6a },
+            skyrail_bazaar: { wood: 0x23182e, woodHi: 0x67456e, frame: 0x17111f, paper: 0xffc7a0, glow: 0xff7bcb },
+        }[this.currentMap] || { wood: 0x302018, woodHi: 0x634332, frame: 0x1a1412, paper: 0xffd990, glow: 0xffa84e };
+        const root = new THREE.Group();
+        root.name = 'japanese-minimal-street-lamps';
+        const postGeo = new THREE.CylinderGeometry(0.055, 0.085, 1.78, quality === 'high' ? 8 : 6);
+        const baseGeo = new THREE.CylinderGeometry(0.22, 0.29, 0.12, quality === 'high' ? 8 : 6);
+        const neckGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.10, 6);
+        const capGeo = new THREE.BoxGeometry(0.44, 0.09, 0.44);
+        const roofGeo = new THREE.ConeGeometry(0.30, 0.20, 4);
+        const lanternGeo = new THREE.BoxGeometry(0.34, 0.38, 0.34);
+        const slatGeo = new THREE.BoxGeometry(0.038, 0.42, 0.038);
+        const postMat = new THREE.MeshStandardMaterial({ color: palette.wood, roughness: 0.88, metalness: 0.02 });
+        const woodHiMat = new THREE.MeshStandardMaterial({ color: palette.woodHi, roughness: 0.82, metalness: 0.02 });
+        const frameMat = new THREE.MeshStandardMaterial({ color: palette.frame, roughness: 0.74, metalness: 0.08 });
+        const paperMat = new THREE.MeshBasicMaterial({ color: palette.paper, transparent: true, opacity: 0.30, toneMapped: false });
+        const glowMat = new THREE.MeshBasicMaterial({ color: palette.glow, transparent: true, opacity: 0.78, toneMapped: false });
+        const roofMat = new THREE.MeshStandardMaterial({ color: palette.frame, roughness: 0.78, metalness: 0.05 });
+        const isNear = (x, z, px, pz, radius) => Math.hypot(x - px, z - pz) < radius;
+        const portalBlocked = (x, z) => (this.portalMeshes || []).some((portal) => portal?.position && isNear(x, z, portal.position.x, portal.position.z, 4.6));
+        const npcBlocked = (x, z) => (this.getNPCs?.() || []).some((npc) => npc?.position && isNear(x, z, npc.position.x, npc.position.z, 4.6));
+        const canPlace = (x, z) => {
+            if (this.currentMap === 'prontera' && !this._isOnLand(x, z)) return false;
+            if (this.isInArena?.(x, z, 2.2)) return false;
+            if (isNearPetBoutique(x, z, 3.0) || isNearWeaponSmith(x, z, 2.8)) return false;
+            if (portalBlocked(x, z) || npcBlocked(x, z)) return false;
+            return true;
+        };
+        const addLamp = (x, z, index, yaw = 0) => {
+            if (!canPlace(x, z)) return false;
+            const lamp = new THREE.Group();
+            lamp.name = `japanese-path-lamp-${index}`;
+            lamp.userData = { isStreetLamp: true, phase: index * 1.37 };
+            const groundY = this.getWalkableHeight(x, z);
+            const base = new THREE.Mesh(baseGeo, woodHiMat);
+            base.position.y = 0.06;
+            base.castShadow = quality === 'high';
+            base.receiveShadow = true;
+            lamp.add(base);
+            const post = new THREE.Mesh(postGeo, postMat);
+            post.position.y = 0.99;
+            post.castShadow = quality === 'high';
+            post.receiveShadow = true;
+            lamp.add(post);
+            const neck = new THREE.Mesh(neckGeo, woodHiMat);
+            neck.position.y = 1.91;
+            lamp.add(neck);
+            const lantern = new THREE.Mesh(lanternGeo, paperMat);
+            lantern.position.y = 2.15;
+            lamp.add(lantern);
+            const glow = new THREE.Mesh(new THREE.SphereGeometry(0.115, quality === 'high' ? 10 : 6, quality === 'high' ? 8 : 5), glowMat);
+            glow.position.y = 2.15;
+            lamp.add(glow);
+            // Four thin dark slats make the lantern read as a soft shoji box from
+            // the isometric camera without adding a texture or dense geometry.
+            for (const side of [-1, 1]) {
+                const slatX = new THREE.Mesh(slatGeo, frameMat);
+                slatX.position.set(side * 0.145, 2.15, 0);
+                lamp.add(slatX);
+                const slatZ = new THREE.Mesh(slatGeo, frameMat);
+                slatZ.position.set(0, 2.15, side * 0.145);
+                lamp.add(slatZ);
+            }
+            const cap = new THREE.Mesh(capGeo, frameMat);
+            cap.position.y = 2.39;
+            lamp.add(cap);
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            roof.rotation.y = Math.PI / 4;
+            roof.position.y = 2.53;
+            lamp.add(roof);
+            lamp.position.set(x, groundY, z);
+            lamp.rotation.y = yaw;
+            root.add(lamp);
+            const entry = { group: lamp, bulb: glow, light: null, phase: index * 1.37 };
+            if (this.streetLamps.length < lightBudget) {
+                const light = new THREE.PointLight(palette.glow, 0.0, quality === 'high' ? 7.2 : 5.5, 1.8);
+                light.position.set(x, groundY + 2.15, z);
+                light.userData.streetLamp = lamp;
+                lamp.add(light);
+                entry.light = light;
+            }
+            this.streetLamps.push(entry);
+            return true;
+        };
+
+        // The existing world path is a readable cross-road around x=0/z=0.
+        // Lamps sit just outside its four-unit walking width and alternate sides.
+        const routeSpan = this.currentMap === 'skyrail_bazaar' ? 34 : 44;
+        const step = Math.max(9, Math.round((routeSpan * 2) / Math.max(2, tierCount)));
+        let index = 0;
+        for (let x = -routeSpan; x <= routeSpan; x += step) {
+            addLamp(x, index % 2 ? 3.15 : -3.15, index++, 0);
+        }
+        for (let z = -routeSpan; z <= routeSpan; z += step) {
+            addLamp(index % 2 ? 3.15 : -3.15, z, index++, Math.PI / 2);
+        }
+
+        // Prontera's northeast trail receives a smaller continuation so the
+        // warm lighting guides players toward the mountain clearing as well.
+        if (this.currentMap === 'prontera') {
+            const trail = [[11, 12], [15, 16], [19, 20], [23, 24], [27, 29], [31, 34], [35, 38], [39, 41], [43, 43]];
+            for (let i = 0; i < trail.length; i += quality === 'high' ? 2 : 3) {
+                const [x, z] = trail[i];
+                addLamp(x - (i % 2 ? 2.35 : -2.35), z, index++, Math.PI * 0.25);
+            }
+        }
+        if (this.streetLamps.length) {
+            this.scene.add(root);
+            this.envObjects.push(root);
+        }
     }
 
     // ============ Environment ============
@@ -6744,6 +6873,20 @@ export class SceneManager {
                 if (bulb) {
                     const glow = 0.88 + Math.sin(this.time * 7.1 + i) * 0.08;
                     bulb.scale.setScalar(glow);
+                }
+            });
+        }
+        if (this.streetLamps?.length) {
+            // Prontera follows the existing river dusk blend. Other maps keep a
+            // restrained 18% baseline so the path lamps remain a readable warm
+            // navigation accent without forcing a full scene-wide night state.
+            const lampNight = this.currentMap === 'prontera' ? night : 0.18;
+            this.streetLamps.forEach((entry, i) => {
+                const flicker = 0.12 + Math.sin(this.time * 2.1 + entry.phase) * 0.018 + Math.sin(this.time * 6.7 + i) * 0.010;
+                if (entry.light) entry.light.intensity = lampNight * Math.max(0.06, flicker);
+                if (entry.bulb) {
+                    const glow = 0.94 + Math.sin(this.time * 5.9 + entry.phase) * 0.045;
+                    entry.bulb.scale.setScalar(glow);
                 }
             });
         }
