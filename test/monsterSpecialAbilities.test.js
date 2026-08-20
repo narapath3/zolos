@@ -31,7 +31,7 @@ test('AoE damage is server-authoritative and sent privately to players in radius
   assert.match(serverSource, /for \(const player of onlinePlayers\.values\(\)\)/);
   assert.match(serverSource, /pending\.radius \* pending\.radius/);
   assert.match(serverSource, /clampMonsterDamage\(player\.level \|\| 1, rawDamage\)/);
-  assert.match(serverSource, /socketForChar\(player\.characterId\)\?\.emit\('mon_skill_hit'/);
+  assert.match(serverSource, /socketForChar\(player\.characterId \|\| player\.userId\)\?\.emit\('mon_skill_hit'/);
   assert.match(serverSource, /emit\('mon_skill_hit', \{/);
 });
 

@@ -55,11 +55,12 @@ test('server and local fallback use the shared bridge corridor on every combat m
   assert.match(clientSource, /if \(requiredEnv !== 'water' && isMonsterBridge\(sceneManager, x, z\)\) return true/);
 });
 
-test('authoritative monster aggro remains bound to the verified character on its current map', () => {
-  assert.match(serverSource, /const charId = player\.characterId;\s*if \(!charId\) return/);
-  assert.match(serverSource, /p\.characterId === characterId && p\.mapId === mapId/);
-  assert.match(serverSource, /m\.aggroChar = charId/);
-  assert.match(serverEntrySource, /clearAggroForCharacter\(player\.characterId\)/);
+test('authoritative monster aggro remains bound to the verified character or guest on its current map', () => {
+  assert.match(serverSource, /const charId = player\.characterId;\s*const aggroId = charId \|\| player\.userId/);
+  assert.match(serverSource, /p\.characterId === characterId \|\| p\.userId === characterId/);
+  assert.match(serverSource, /p\.mapId === mapId && p\.lastPos/);
+  assert.match(serverSource, /m\.aggroChar = aggroId/);
+  assert.match(serverEntrySource, /clearAggroForCharacter\(player\.characterId \|\| player\.userId\)/);
 });
 
 test('server chase avoids map edges and recovers from blocked steering instead of freezing', () => {

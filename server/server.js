@@ -1506,7 +1506,7 @@ io.on('connection', (socket) => {
         // A dead/respawning player must never remain a valid server-authoritative
         // monster target. Clear this before handling the optional announcement so
         // malformed/older clients cannot accidentally keep aggro alive.
-        clearAggroForCharacter(player.characterId);
+        clearAggroForCharacter(player.characterId || player.userId);
 
         if (!isBoundedString(payload?.monsterName, 80)) return;
         const monsterName = payload.monsterName.trim();
@@ -1849,7 +1849,13 @@ httpServer.listen(PORT, HOST, () => {
             try {
                 await ensureMonsterTables();
                 await seedMonstersIfEmpty();
-                await ensureWorldMapDefaults();
+                // Database repair is best-effort. A legacy VPS schema must not
+                // prevent the authoritative Monster engine from starting.
+                try {
+                    await ensureWorldMapDefaults();
+                } catch (error) {
+                    console.error('[MonsterCfg] world-default repair failed; continuing with existing config:', error.message);
+                }
                 await ensurePronteraMountainExpansion();
                 await ensureCardEconomy();
                 await ensureOreEconomy();

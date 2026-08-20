@@ -22,10 +22,18 @@ test('same player cannot burst unlimited hits into one monster', () => {
   assert.match(engine, /const HIT_WINDOW_MS = 500/);
   assert.match(engine, /const MAX_HITS_PER_MONSTER_WINDOW = 2/);
   const hit = engine.match(/export function applyHit[\s\S]*?\n\}/)?.[0] || '';
-  assert.match(hit, /const charId = player\.characterId;\s*if \(!charId\) return/);
-  assert.match(hit, /m\.hitCadenceByChar\.get\(charId\)/);
+  assert.match(hit, /const charId = player\.characterId;\s*const aggroId = charId \|\| player\.userId/);
+  assert.match(hit, /if \(!aggroId\) return/);
+  assert.match(hit, /m\.hitCadenceByChar\.get\(aggroId\)/);
   assert.match(hit, /recent\.length >= MAX_HITS_PER_MONSTER_WINDOW/);
-  assert.match(hit, /m\.hitCadenceByChar\.set\(charId, recent\)/);
+  assert.match(hit, /m\.hitCadenceByChar\.set\(aggroId, recent\)/);
+});
+
+test('guest hits can arm aggro without entering persisted reward contributors', () => {
+  assert.match(engine, /const aggroId = charId \|\| player\.userId/);
+  assert.match(engine, /if \(charId\) m\.dmgByChar\.set\(charId/);
+  assert.match(engine, /m\.aggroChar = aggroId/);
+  assert.match(engine, /p\.characterId === characterId \|\| p\.userId === characterId/);
 });
 
 test('hit cadence state is reset for every monster life', () => {

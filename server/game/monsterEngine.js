@@ -330,7 +330,7 @@ function mapHasPlayers(mapId) {
 function socketForChar(characterId) {
     if (!onlinePlayers || !io) return null;
     for (const [sid, p] of onlinePlayers) {
-        if (p.characterId === characterId) return io.sockets.sockets.get(sid) || null;
+        if (p.characterId === characterId || p.userId === characterId) return io.sockets.sockets.get(sid) || null;
     }
     return null;
 }
@@ -338,7 +338,8 @@ function socketForChar(characterId) {
 function playerPos(characterId, mapId) {
     if (!onlinePlayers) return null;
     for (const p of onlinePlayers.values()) {
-        if (p.characterId === characterId && p.mapId === mapId && p.lastPos) return p.lastPos;
+        if ((p.characterId === characterId || p.userId === characterId)
+            && p.mapId === mapId && p.lastPos) return p.lastPos;
     }
     return null;
 }
@@ -373,7 +374,7 @@ function resolveMonsterSpecial(m, mapId, now) {
         if (dx * dx + dz * dz > pending.radius * pending.radius) continue;
         const rawDamage = Math.max(1, Math.round((def?.atk || 10) * special.multiplier));
         const damage = clampMonsterDamage(player.level || 1, rawDamage);
-        socketForChar(player.characterId)?.emit('mon_skill_hit', {
+        socketForChar(player.characterId || player.userId)?.emit('mon_skill_hit', {
             id: m.id, seq: pending.seq, skill: pending.skill, damage,
             x: pending.x, z: pending.z, radius: pending.radius, color: def?.color || 0xff5a24,
         });
@@ -594,17 +595,20 @@ export function applyHit(player, payload) {
     if (dmg <= 0) return;
 
     const charId = player.characterId;
-    if (!charId) return;
+    const aggroId = charId || player.userId;
+    if (!aggroId) return;
     const now = Date.now();
-    const recent = (m.hitCadenceByChar.get(charId) || []).filter(t => now - t < HIT_WINDOW_MS);
+    const recent = (m.hitCadenceByChar.get(aggroId) || []).filter(t => now - t < HIT_WINDOW_MS);
     if (recent.length >= MAX_HITS_PER_MONSTER_WINDOW) return;
     recent.push(now);
-    m.hitCadenceByChar.set(charId, recent);
+    m.hitCadenceByChar.set(aggroId, recent);
 
-    m.dmgByChar.set(charId, (m.dmgByChar.get(charId) || 0) + dmg);
+    // Guest damage is authoritative for HP/aggro but has no persisted
+    // characterId, so it is deliberately excluded from DB-backed rewards.
+    if (charId) m.dmgByChar.set(charId, (m.dmgByChar.get(charId) || 0) + dmg);
 
     // A hit provokes the monster toward the most recent attacker.
-    m.aggroChar = charId;
+    m.aggroChar = aggroId;
     m.aggroUntil = Date.now() + AGGRO_MS;
     m.chaseWaypoints = [];
     m.chaseWaypointIndex = 0;

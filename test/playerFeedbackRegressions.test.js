@@ -19,8 +19,8 @@ test('player death clears server-authoritative monster aggro before announcement
 
     const handler = server.slice(server.indexOf("socket.on('player_dead'"), server.indexOf('// --- DISCONNECT ---'));
     assert.match(handler, /trustedSender\(socket\)/);
-    assert.ok(handler.indexOf("shouldRateLimitEvent(socket._rateLimitTracker, 'player_dead', 2, 10000)") < handler.indexOf('clearAggroForCharacter(player.characterId)'));
-    assert.ok(handler.indexOf('clearAggroForCharacter(player.characterId)') < handler.indexOf("isBoundedString(payload?.monsterName, 80)"));
+    assert.ok(handler.indexOf("shouldRateLimitEvent(socket._rateLimitTracker, 'player_dead', 2, 10000)") < handler.indexOf('clearAggroForCharacter(player.characterId || player.userId)'));
+    assert.ok(handler.indexOf('clearAggroForCharacter(player.characterId || player.userId)') < handler.indexOf("isBoundedString(payload?.monsterName, 80)"));
     assert.match(handler, /const monsterName = payload\.monsterName\.trim\(\)/);
     assert.match(engine, /export function clearAggroForCharacter\(characterId\)/);
     assert.match(engine, /monster\.aggroChar = null/);
