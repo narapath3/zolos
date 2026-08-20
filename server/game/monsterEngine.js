@@ -30,6 +30,17 @@ const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
 const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 const ATTACK_REACH = 1.8;
 const ATTACK_CD_MS = 1300;
+const MONSTER_SPECIALS = Object.freeze({
+    fire_breath: { family: 'dragon', range: 10.5, radius: 3.6, castMs: 850, cooldownMs: 5200, multiplier: 1.15 },
+    arcane_nova: { family: 'demon', range: 9.0, radius: 4.4, castMs: 750, cooldownMs: 6200, multiplier: 1.05 },
+    ground_slam: { family: 'construct', range: 6.0, radius: 3.4, castMs: 900, cooldownMs: 5600, multiplier: 1.25 },
+    poison_burst: { family: 'insect', range: 8.0, radius: 3.2, castMs: 700, cooldownMs: 5000, multiplier: 0.95 },
+    water_burst: { family: 'aquatic', range: 9.0, radius: 3.7, castMs: 800, cooldownMs: 5400, multiplier: 1.0 },
+});
+const SPECIAL_BY_FAMILY = Object.freeze({
+    dragon: 'fire_breath', demon: 'arcane_nova', undead: 'arcane_nova',
+    construct: 'ground_slam', beast: 'ground_slam', insect: 'poison_burst', aquatic: 'water_burst',
+});
 // Longest current player cast range is 10 world units. Keep a small network
 // interpolation allowance without permitting arbitrary off-screen hits.
 const MAX_PLAYER_HIT_RANGE = 12;
@@ -204,6 +215,9 @@ function makeMonster(id, type, isWater) {
         respawnAt: 0,
         moving: false,
         bullRush: false,
+        specialReadyAt: 0,
+        pendingSpecial: null,
+        specialSeq: 0,
     };
 }
 
@@ -259,9 +273,65 @@ function playerPos(characterId, mapId) {
     return null;
 }
 
+function getMonsterSpecial(def) {
+    const skill = SPECIAL_BY_FAMILY[def?.family];
+    return skill ? { skill, ...MONSTER_SPECIALS[skill] } : null;
+}
+
+function resolveMonsterSpecial(m, mapId, now) {
+    const pending = m.pendingSpecial;
+    if (!pending || now < pending.resolveAt) return false;
+    const def = cfg.defs.get(m.type);
+    const special = getMonsterSpecial(def);
+    m.pendingSpecial = null;
+    if (!special || !onlinePlayers) return true;
+
+    io.to(`map:${mapId}`).emit('mon_skill_impact', {
+        id: m.id, seq: pending.seq, skill: pending.skill,
+        x: pending.x, z: pending.z, radius: pending.radius, color: def?.color || 0xff5a24,
+    });
+
+    for (const player of onlinePlayers.values()) {
+        if (player.mapId !== mapId || !player.lastPos) continue;
+        const dx = player.lastPos.x - pending.x;
+        const dz = player.lastPos.z - pending.z;
+        if (dx * dx + dz * dz > pending.radius * pending.radius) continue;
+        const rawDamage = Math.max(1, Math.round((def?.atk || 10) * special.multiplier));
+        const damage = clampMonsterDamage(player.level || 1, rawDamage);
+        socketForChar(player.characterId)?.emit('mon_skill_hit', {
+            id: m.id, seq: pending.seq, skill: pending.skill, damage,
+            x: pending.x, z: pending.z, radius: pending.radius, color: def?.color || 0xff5a24,
+        });
+    }
+    return true;
+}
+
+function tryStartMonsterSpecial(m, mapId, now, pp, def, dist) {
+    const special = getMonsterSpecial(def);
+    if (!special || m.pendingSpecial || now < m.specialReadyAt || dist > special.range) return false;
+    const seq = (m.specialSeq + 1) & 0xffff;
+    m.specialSeq = seq;
+    m.specialReadyAt = now + special.cooldownMs;
+    m.pendingSpecial = {
+        seq, skill: special.skill, x: pp.x, z: pp.z,
+        radius: special.radius, resolveAt: now + special.castMs,
+    };
+    io.to(`map:${mapId}`).emit('mon_skill_fx', {
+        id: m.id, seq, skill: special.skill, x: pp.x, z: pp.z,
+        radius: special.radius, castMs: special.castMs, color: def?.color || 0xff5a24,
+    });
+    return true;
+}
+
 // ---------------- simulation ----------------
 function stepMonster(m, mapId, now, dtSec) {
     if (!m.alive) return;
+    if (resolveMonsterSpecial(m, mapId, now)) return;
+    if (m.pendingSpecial) {
+        m.moving = false;
+        m.bullRush = false;
+        return;
+    }
     m.moving = false;
     m.bullRush = false;
     const def = cfg.defs.get(m.type);
@@ -282,6 +352,7 @@ function stepMonster(m, mapId, now, dtSec) {
         if (pp) {
             const dx = pp.x - m.x, dz = pp.z - m.z;
             const dist = Math.hypot(dx, dz) || 0.001;
+            if (tryStartMonsterSpecial(m, mapId, now, pp, def, dist)) return;
             if (dist > BULL_RUSH_ATTACK_REACH) {
                 // Keep chasing while the player retreats, but stop after a
                 // generous readable leash instead of following across the map.
@@ -394,6 +465,9 @@ function respawnMonster(m, mapId) {
     m.alive = true; m.respawnAt = 0;
     m.aggroChar = null; m.aggroUntil = 0;
     m.atkReadyAt = 0;
+    m.specialReadyAt = 0;
+    m.pendingSpecial = null;
+    m.specialSeq = 0;
     m.dmgByChar = new Map();
     m.hitCadenceByChar = new Map();
 }

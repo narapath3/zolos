@@ -281,6 +281,45 @@ export class ParticleSystem {
         }
     }
 
+    spawnMonsterSkillTelegraph(position, skill = 'fire_breath', radius = 3, color = 0xff5a24, duration = 0.85) {
+        if (!this.effectsEnabled || !position || this._throttleEffect(true)) return;
+        const at = position.clone ? position.clone() : new THREE.Vector3(position.x, position.y, position.z);
+        const skillColor = Number(color) || 0xff5a24;
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(Math.max(0.12, radius * 0.72), Math.max(0.18, radius * 0.82), 36),
+            new THREE.MeshBasicMaterial({ color: skillColor, transparent: true, opacity: 0.68, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+        );
+        ring.position.set(at.x, 0.055, at.z);
+        ring.rotation.x = -Math.PI / 2;
+        this.scene.add(ring);
+        this.shockwaves.push({ mesh: ring, life: duration, maxLife: duration, type: 'monster-telegraph', radius, skill });
+        if (skill === 'fire_breath') this._fxPillar(at, skillColor, duration, 0.7, Math.max(0.2, radius * 0.22));
+        if (skill === 'arcane_nova') this._fxRing(at, 0xd7a4ff, duration, 0.07, radius * 0.32, radius * 0.48);
+    }
+
+    spawnMonsterSkillImpact(position, skill = 'fire_breath', radius = 3, color = 0xff5a24) {
+        if (!this.effectsEnabled || !position || this._throttleEffect(true)) return;
+        const at = position.clone ? position.clone() : new THREE.Vector3(position.x, position.y, position.z);
+        const skillColor = Number(color) || 0xff5a24;
+        const ground = at.clone(); ground.y = 0;
+        if (skill === 'fire_breath') {
+            this._fxPillar(at, skillColor, 0.72, 2.8, Math.max(0.32, radius * 0.28));
+            this._fxRing(ground, 0xffd166, 0.7, 0.06, radius * 0.35, radius);
+            this._fxBurst(at, 0xff7a24, this.perfMonitor.isLowEndDevice ? 8 : 18, 5.5, { life: 0.7, yOff: 0.35, size: 0.12, useGlow: true });
+        } else if (skill === 'arcane_nova') {
+            this._fxRing(ground, 0xd7a4ff, 0.8, 0.07, radius * 0.25, radius);
+            this._fxPillar(at, 0xa96dff, 0.65, 2.2, radius * 0.24);
+            this._fxBurst(at, 0xf0d6ff, this.perfMonitor.isLowEndDevice ? 8 : 18, 4.2, { life: 0.65, yOff: 0.25, size: 0.1, useGlow: true });
+        } else if (skill === 'ground_slam') {
+            this._fxRing(ground, 0xffc16a, 0.75, 0.06, radius * 0.25, radius);
+            this._fxPillar(at, 0xff7a40, 0.55, 1.5, radius * 0.25);
+            this._fxBurst(at, 0xffdf9a, this.perfMonitor.isLowEndDevice ? 6 : 14, 3.8, { life: 0.55, yOff: 0.15, size: 0.1, useGlow: true });
+        } else {
+            this._fxRing(ground, skillColor, 0.65, 0.06, radius * 0.3, radius);
+            this._fxBurst(at, skillColor, this.perfMonitor.isLowEndDevice ? 6 : 14, 4.2, { life: 0.55, yOff: 0.25, size: 0.1, useGlow: true });
+        }
+    }
+
     spawnMonsterAttackEffect(startPosition, targetPosition, style = 'lunge', color = 0xff6848) {
         if (!this.effectsEnabled || this._throttleEffect(false)) return;
         const start = startPosition.clone ? startPosition.clone() : new THREE.Vector3(startPosition.x, startPosition.y, startPosition.z);
@@ -1575,6 +1614,11 @@ export class ParticleSystem {
                 wave.mesh.rotation.z -= deltaTime * 1.0;
                 wave.mesh.scale.set(1 + progress * 2, 1 + progress * 2, 1);
                 wave.mesh.material.opacity = 0.9 * (1 - progress);
+            } else if (wave.type === 'monster-telegraph') {
+                const pulse = 0.78 + Math.sin(progress * Math.PI * 8) * 0.16;
+                const scale = 0.72 + progress * 0.32;
+                wave.mesh.scale.set(scale, scale, 1);
+                wave.mesh.material.opacity = Math.max(0.08, 0.72 * (1 - progress) * pulse);
             } else {
                 // Generic shockwave behavior
                 wave.mesh.scale.set(1 + progress * 2, 1, 1 + progress * 2);

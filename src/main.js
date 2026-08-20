@@ -149,6 +149,7 @@ let lastBroadcastTime = 0;
 // The server sends a shared visual cue plus a private damage event. Keep a
 // short-lived sequence guard so the target gets one clear attack FX, not two.
 const lastMonsterAttackFx = new Map();
+const lastMonsterSkillFx = new Map();
 // Attack signal broadcast to other players so they hear our weapon. `localAtkSeq`
 // bumps once per swing; `localWsc` is the current weapon's sound class.
 let localAtkSeq = 0;
@@ -781,6 +782,71 @@ async function initGame(charData) {
                 if (character && !character.isAlive()) {
                     character.respawn();
                     if (gameUI) { gameUI.addCombatLog?.('💚 คุณเกิดใหม่แล้ว!', 'system'); gameUI.updateHUD?.(character.stats); }
+                }
+            }, 3000);
+        }
+    };
+    window.onMonSkillFx = (payload) => {
+        if (!payload || !particles) return;
+        const seq = Number.isSafeInteger(payload.seq) ? payload.seq : 0;
+        const key = `${payload.id}:${seq}`;
+        if (lastMonsterSkillFx.has(key)) return;
+        lastMonsterSkillFx.set(key, true);
+        const mon = monsters?.getServerMonster?.(payload.id);
+        mon?.triggerAttackPresentation?.();
+        const center = new THREE.Vector3(Number(payload.x) || 0, character?.baseY || 1.2, Number(payload.z) || 0);
+        particles.spawnMonsterSkillTelegraph?.(
+            center,
+            payload.skill || 'fire_breath',
+            Math.max(1, Number(payload.radius) || 3),
+            Number(payload.color) || mon?.data?.color || 0xff5a24,
+            Math.max(0.25, Math.min(1.5, Number(payload.castMs) / 1000 || 0.85))
+        );
+    };
+    window.onMonSkillImpact = (payload) => {
+        if (!payload || !particles) return;
+        const seq = Number.isSafeInteger(payload.seq) ? payload.seq : 0;
+        const key = `${payload.id}:${seq}`;
+        if (lastMonsterSkillFx.get(`impact:${key}`)) return;
+        lastMonsterSkillFx.set(`impact:${key}`, true);
+        const center = new THREE.Vector3(Number(payload.x) || 0, character?.baseY || 1.2, Number(payload.z) || 0);
+        const mon = monsters?.getServerMonster?.(payload.id);
+        particles.spawnMonsterSkillImpact?.(
+            center,
+            payload.skill || 'fire_breath',
+            Math.max(1, Number(payload.radius) || 3),
+            Number(payload.color) || mon?.data?.color || 0xff5a24
+        );
+    };
+    window.onMonSkillHit = (payload) => {
+        if (!character || !character.isAlive?.() || !payload) return;
+        if (window.bossEngaged || duelState) return;
+        const damage = Math.max(1, Math.round(Number(payload.damage) || 1));
+        const seq = Number.isSafeInteger(payload.seq) ? payload.seq : 0;
+        const key = `${payload.id}:${seq}`;
+        if (!lastMonsterSkillFx.get(`impact:${key}`)) {
+            lastMonsterSkillFx.set(`impact:${key}`, true);
+            const center = new THREE.Vector3(Number(payload.x) || character.mesh.position.x, character?.baseY || 1.2, Number(payload.z) || character.mesh.position.z);
+            const mon = monsters?.getServerMonster?.(payload.id);
+            particles?.spawnMonsterSkillImpact?.(center, payload.skill || 'fire_breath', Number(payload.radius) || 3, Number(payload.color) || mon?.data?.color);
+        }
+        const actual = character.takeDamage(damage, { preMitigated: true });
+        if (particles) {
+            const sp = worldToScreen(character.getPosition(), 1.6);
+            particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
+        }
+        gameUI?.updateHUD?.(character.stats);
+        gameUI?.addCombatLog?.(`⚠️ มอนสเตอร์ใช้ ${payload.skill || 'สกิลพิเศษ'} -${actual}`, 'warning');
+        if (!character.isAlive()) {
+            combatSystem && (combatSystem.autoFarm = false);
+            character.targetMonster = null;
+            gameUI?.setAutoFarmState?.(false);
+            gameUI?.showDeathBanner?.('สกิลมอนสเตอร์');
+            setTimeout(() => {
+                if (character && !character.isAlive()) {
+                    character.respawn();
+                    gameUI?.addCombatLog?.('💚 คุณเกิดใหม่แล้ว!', 'system');
+                    gameUI?.updateHUD?.(character.stats);
                 }
             }, 3000);
         }

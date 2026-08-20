@@ -2035,6 +2035,11 @@ export async function joinPresence(userId, username, level, onPlayersUpdate, onP
             // A server monster struck us while chasing.
             socket.on('mon_atk', (payload) => { if (payload) window.onMonAtk?.(payload); });
             socket.on('mon_atk_fx', (payload) => { if (payload) window.onMonAtkFx?.(payload); });
+            // Monster special skill lifecycle: shared telegraph/impact, with
+            // private authoritative damage only for players inside the AoE.
+            socket.on('mon_skill_fx', (payload) => { if (payload) window.onMonSkillFx?.(payload); });
+            socket.on('mon_skill_impact', (payload) => { if (payload) window.onMonSkillImpact?.(payload); });
+            socket.on('mon_skill_hit', (payload) => { if (payload) window.onMonSkillHit?.(payload); });
             // Admin changed world config — refetch defs if the version moved.
             socket.on('world_config', (payload) => { if (payload) window.onWorldConfig?.(payload); });
 
