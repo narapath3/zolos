@@ -2897,6 +2897,7 @@ export class SceneManager {
     _createStreetLamps(config) {
         const quality = this.graphicsQuality;
         const tierCount = quality === 'high' ? 16 : quality === 'medium' ? 11 : quality === 'low' ? 7 : 4;
+        const lampLimit = quality === 'high' ? 32 : quality === 'medium' ? 22 : quality === 'low' ? 14 : 8;
         const lightBudget = quality === 'high' ? 10 : quality === 'medium' ? 6 : 0;
         const palette = {
             prontera: { wood: 0x302018, woodHi: 0x634332, frame: 0x1a1412, paper: 0xffd990, glow: 0xffa84e },
@@ -2933,7 +2934,7 @@ export class SceneManager {
             return true;
         };
         const addLamp = (x, z, index, yaw = 0) => {
-            if (!canPlace(x, z)) return false;
+            if (this.streetLamps.length >= lampLimit || !canPlace(x, z)) return false;
             const lamp = new THREE.Group();
             lamp.name = `japanese-path-lamp-${index}`;
             lamp.userData = { isStreetLamp: true, phase: index * 1.37 };
@@ -2953,9 +2954,12 @@ export class SceneManager {
             lamp.add(neck);
             const lantern = new THREE.Mesh(lanternGeo, paperMat);
             lantern.position.y = 2.15;
+            lantern.renderOrder = 2;
             lamp.add(lantern);
             const glow = new THREE.Mesh(new THREE.SphereGeometry(0.115, quality === 'high' ? 10 : 6, quality === 'high' ? 8 : 5), glowMat);
             glow.position.y = 2.15;
+            glow.renderOrder = 3;
+            glow.material.depthTest = false;
             lamp.add(glow);
             // Four thin dark slats make the lantern read as a soft shoji box from
             // the isometric camera without adding a texture or dense geometry.
@@ -2976,6 +2980,7 @@ export class SceneManager {
             lamp.add(roof);
             lamp.position.set(x, groundY, z);
             lamp.rotation.y = yaw;
+            lamp.frustumCulled = false;
             root.add(lamp);
             const entry = { group: lamp, bulb: glow, light: null, phase: index * 1.37 };
             if (this.streetLamps.length < lightBudget) {
@@ -2988,6 +2993,14 @@ export class SceneManager {
             this.streetLamps.push(entry);
             return true;
         };
+
+        // Place a few guaranteed landmark lamps close to the starting approach
+        // first. They are deliberately outside the four-unit walking corridor,
+        // but close enough that the Japanese silhouette is immediately readable.
+        const anchorPoints = this.currentMap === 'prontera'
+            ? [[-6, 10], [6, 10], [-6, -10], [6, -10], [-10, 10], [10, 10]]
+            : [[-6, 6], [6, 6], [-6, -6], [6, -6]];
+        anchorPoints.forEach(([x, z], i) => addLamp(x, z, i, i % 2 ? Math.PI / 2 : 0));
 
         // The existing world path is a readable cross-road around x=0/z=0.
         // Lamps sit just outside its four-unit walking width and alternate sides.
@@ -3011,6 +3024,8 @@ export class SceneManager {
             }
         }
         if (this.streetLamps.length) {
+            root.frustumCulled = false;
+            root.visible = true;
             this.scene.add(root);
             this.envObjects.push(root);
         }

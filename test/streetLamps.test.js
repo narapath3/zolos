@@ -8,7 +8,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const source = fs.readFileSync(path.join(root, 'src/engine/SceneManager.js'), 'utf8');
 
- test('Japanese-minimal street lamps are procedural shoji-style assets', () => {
+test('Japanese-minimal street lamps are procedural shoji-style assets', () => {
     assert.match(source, /_createStreetLamps\(config\)/);
     assert.match(source, /root\.name = 'japanese-minimal-street-lamps'/);
     assert.match(source, /const postGeo = new THREE\.CylinderGeometry/);
@@ -31,11 +31,20 @@ test('street lamps follow route corridors but avoid interaction and arena zones'
 
 test('street lamp quality tiers keep geometry, point lights, and shadows mobile-safe', () => {
     assert.match(source, /const tierCount = quality === 'high' \? 16 : quality === 'medium' \? 11 : quality === 'low' \? 7 : 4/);
+    assert.match(source, /const lampLimit = quality === 'high' \? 32 : quality === 'medium' \? 22 : quality === 'low' \? 14 : 8/);
     assert.match(source, /const lightBudget = quality === 'high' \? 10 : quality === 'medium' \? 6 : 0/);
+    assert.match(source, /this\.streetLamps\.length >= lampLimit/);
     assert.match(source, /if \(this\.streetLamps\.length < lightBudget\)/);
     assert.match(source, /base\.castShadow = quality === 'high'/);
     assert.match(source, /post\.castShadow = quality === 'high'/);
     assert.match(source, /const lampNight = this\.currentMap === 'prontera' \? night : 0\.18/);
+});
+
+test('street lamps have visible near-spawn anchors and opt out of frustum culling', () => {
+    assert.match(source, /anchorPoints = this\.currentMap === 'prontera'/);
+    assert.match(source, /lamp\.frustumCulled = false/);
+    assert.match(source, /root\.frustumCulled = false/);
+    assert.match(source, /root\.visible = true/);
 });
 
 test('street lamps are reset on map changes and animated through the existing atmosphere loop', () => {
