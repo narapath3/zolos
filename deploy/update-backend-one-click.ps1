@@ -1,4 +1,5 @@
 [CmdletBinding()]
+# ZOLOS updater release marker: windows-lock-retry-4c65b96
 param(
     [string]$RepoPath = 'C:\Users\Administrator\Desktop\zolos',
     [string]$ProbeUrl = 'https://rt.zolos.online/api/rpc/open_vending_stall',

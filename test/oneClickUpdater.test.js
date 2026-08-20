@@ -40,7 +40,9 @@ test('updater validates code, installs deterministic dependencies, and checks he
 });
 
 test('one-click launcher downloads the latest updater and builds the VPS frontend', () => {
-  assert.match(bat, /raw\.githubusercontent\.com\/narapath3\/zolos\/main\/deploy\/update-backend-one-click\.ps1/);
+  assert.match(bat, /raw\.githubusercontent\.com\/narapath3\/zolos\/main\/deploy\/update-backend-one-click\.ps1\?cachebust=/);
+  assert.match(bat, /MARKER=windows-lock-retry-4c65b96/);
+  assert.match(bat, /findstr \/C:/);
   assert.match(bat, /-ExecutionPolicy Bypass/);
   assert.match(bat, /-RunFrontendBuild/);
   assert.match(guide, /ZOLOS-Update-Backend-OneClick\.bat/);
