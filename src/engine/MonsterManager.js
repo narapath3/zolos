@@ -192,6 +192,7 @@ export class Monster {
         this._enraged = next;
         this._serverEnraged = next;
         this._aggroState = next ? 'enraged' : 'idle';
+        this._setAngryStarsVisible(next);
         this._aggroBlockedTime = 0;
         this._enragedUntil = next
             ? (this._serverControlled ? Infinity : this.animTimer + Math.max(0.1, Number(duration) || 8))
@@ -235,6 +236,12 @@ export class Monster {
             ringMat.needsUpdate = true;
         }
         return next;
+    }
+
+    _setAngryStarsVisible(active) {
+        if (!this._angryStars) return;
+        this._angryStars.visible = Boolean(active) && this.alive;
+        if (!active) this._angryStarTime = 0;
     }
 
     setServerEnraged(active) {
@@ -1011,7 +1018,10 @@ export class Monster {
             pupilR.add(shineL.clone());
         }
 
-        if (!this.isAmbient) this._addRemasterAura(size, color);
+        if (!this.isAmbient) {
+            this._addRemasterAura(size, color);
+            this._createAngryStars(size);
+        }
 
         if (!this.isAmbient) {
         // HP bar above monster
@@ -1074,6 +1084,84 @@ export class Monster {
         this.scene.add(this.mesh);
     }
 
+    _createAngryStars(size) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 96;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const cx = 48, cy = 48;
+        ctx.clearRect(0, 0, 96, 96);
+        ctx.shadowColor = 'rgba(255, 76, 34, 0.8)';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const angle = -Math.PI / 2 + i * Math.PI / 5;
+            const radius = i % 2 === 0 ? 40 : 17;
+            const x = cx + Math.cos(angle) * radius;
+            const y = cy + Math.sin(angle) * radius;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#ffd43b';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#a93226';
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+        ctx.beginPath();
+        ctx.arc(39, 34, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0.96,
+            depthWrite: false,
+            depthTest: false,
+        });
+        const stars = new THREE.Group();
+        stars.name = 'angry-stars';
+        stars.position.y = size + 1.15;
+        stars.visible = false;
+        const orbitRadius = Math.max(0.22, size * 0.58);
+        for (let i = 0; i < 3; i++) {
+            const star = new THREE.Sprite(material);
+            const angle = i * Math.PI * 2 / 3;
+            star.position.set(Math.cos(angle) * orbitRadius, Math.sin(angle * 1.5) * size * 0.12, Math.sin(angle) * size * 0.16);
+            const baseScale = size * (0.42 - i * 0.035);
+            star.scale.set(baseScale, baseScale, 1);
+            star.userData.baseScale = baseScale;
+            star.userData.baseY = star.position.y;
+            stars.add(star);
+        }
+        this.mesh.add(stars);
+        this._angryStars = stars;
+        this._angryStarTexture = texture;
+        this._angryStarTime = 0;
+    }
+
+    _animateAngryStars(dt) {
+        if (!this._angryStars) return;
+        if (!this._enraged || !this.alive) {
+            this._angryStars.visible = false;
+            return;
+        }
+        this._angryStars.visible = true;
+        this._angryStarTime = (this._angryStarTime || 0) + dt;
+        const t = this._angryStarTime;
+        this._angryStars.rotation.y = Math.sin(t * 2.4) * 0.12;
+        this._angryStars.rotation.z = Math.sin(t * 3.1) * 0.08;
+        this._angryStars.children.forEach((star, i) => {
+            const pulse = 1 + Math.sin(t * 7 + i * 2.1) * 0.1;
+            const scale = star.userData.baseScale * pulse;
+            star.scale.set(scale, scale, 1);
+            star.position.y = star.userData.baseY + Math.sin(t * 5 + i) * 0.035;
+        });
+    }
+
     _addRemasterAura(size, color) {
         const familyColors = { undead: 0x9b5cff, demon: 0xff365f, dragon: 0x42cfff, construct: 0xffc857, aquatic: 0x28cfff, plant: 0x72e36b, insect: 0xd9ef62, beast: 0xff9b52, slime: color };
         const auraColor = familyColors[this.data.family] || color;
@@ -1131,6 +1219,12 @@ export class Monster {
 
         if (this.hp <= 0) {
             this.alive = false;
+            this._aggroUntil = 0;
+            this._aggroState = 'idle';
+            this._bullRushActive = false;
+            this._serverBullRush = false;
+            this.setEnraged(false);
+            this._setAngryStarsVisible(false);
             this.mesh.visible = false;
         }
 
@@ -1150,6 +1244,12 @@ export class Monster {
         if (this.hpBarFill) this.hpBarFill.scale.x = Math.max(0.01, this.hp / this.maxHp);
         if (this.hp <= 0) {
             this.alive = false;
+            this._aggroUntil = 0;
+            this._aggroState = 'idle';
+            this._bullRushActive = false;
+            this._serverBullRush = false;
+            this.setEnraged(false);
+            this._setAngryStarsVisible(false);
             this.mesh.visible = false;
             return true;
         }
@@ -1259,6 +1359,7 @@ export class Monster {
     // but run no AI, wander, aggro, or collision.
     _updateServerRendered(dt, camera) {
         this.animTimer += dt;
+        this._animateAngryStars(dt);
         this.hitFlash = Math.max(0, this.hitFlash - dt);
         if (this._remasterAura) this._remasterAura.rotation.z += dt * 0.32;
         if (this._remasterMotes) this._remasterMotes.rotation.y -= dt * 0.48;
@@ -1339,6 +1440,7 @@ export class Monster {
         if (this._serverControlled) return this._updateServerRendered(dt, camera);
 
         this.animTimer += dt;
+        this._animateAngryStars(dt);
         this._updateEnragedState();
         this.hitFlash = Math.max(0, this.hitFlash - dt);
         if (this._remasterAura) this._remasterAura.rotation.z += dt * 0.32;
@@ -1646,7 +1748,9 @@ export class Monster {
         this._bullRushActive = false;
         this._serverBullRush = false;
         this._rushDustCooldown = 0;
+        this._angryStarTime = 0;
         this.setEnraged(false);
+        this._setAngryStarsVisible(false);
         this.bodyMesh.rotation.x = 0;
         this.bodyMesh.rotation.z = 0;
         this.bodyMesh.position.z = 0;
@@ -1819,6 +1923,12 @@ export class MonsterManager {
         m._awaitingServerRespawn = true;
         m._seenAbsentSinceDeath = false;
         if (m.mesh) m.mesh.visible = false;
+        m._aggroUntil = 0;
+        m._aggroState = 'idle';
+        m._bullRushActive = false;
+        m._serverBullRush = false;
+        m.setEnraged?.(false);
+        m._setAngryStarsVisible?.(false);
         return m;
     }
 

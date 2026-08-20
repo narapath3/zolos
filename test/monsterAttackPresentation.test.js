@@ -49,6 +49,17 @@ test('enraged monsters use a universal threat pose even without a species limb r
   assert.match(monsterSource, /const AGGRO_LEASH_DISTANCE = 42/);
 });
 
+test('angry stars appear on rage and clear on death or respawn', () => {
+  assert.match(monsterSource, /_createAngryStars\(size\)/);
+  assert.match(monsterSource, /stars\.name = 'angry-stars'/);
+  assert.match(monsterSource, /this\._setAngryStarsVisible\(next\)/);
+  assert.match(monsterSource, /_animateAngryStars\(dt\)/);
+  assert.match(monsterSource, /this\._angryStars\.visible = false/);
+  assert.match(monsterSource, /this\._angryStarTime = 0/);
+  assert.match(monsterSource, /this\.setEnraged\(false\);/);
+  assert.match(monsterSource, /this\._aggroUntil = 0/);
+});
+
 test('aggro chase keeps moving around blocked terrain instead of cancelling revenge', () => {
   assert.match(monsterSource, /isMonsterNavObstacle/);
   assert.match(monsterSource, /const angles = \[0, Math\.PI \/ 7/);
