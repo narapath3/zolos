@@ -113,6 +113,73 @@ export class Monster {
         // Reused for environment probes during movement. Avoid producing
         // short-lived Vector3 objects for every active monster and frame.
         this._environmentProbe = new THREE.Vector3();
+        this._enraged = false;
+        this._enragedUntil = 0;
+        this._serverEnraged = false;
+        this._enrageMaterialCache = new Map();
+    }
+
+    setEnraged(active, duration = 8) {
+        if (this.isAmbient) return false;
+        const next = Boolean(active);
+        if (this._enraged === next) {
+            if (next && !this._serverControlled && Number.isFinite(duration)) {
+                this._enragedUntil = Math.max(this._enragedUntil, this.animTimer + duration);
+            }
+            return next;
+        }
+        this._enraged = next;
+        this._serverEnraged = next;
+        this._enragedUntil = next
+            ? (this._serverControlled ? Infinity : this.animTimer + Math.max(0.1, Number(duration) || 8))
+            : 0;
+        if (!this.mesh) return next;
+
+        this.mesh.traverse((child) => {
+            if (!child.isMesh || !child.material) return;
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            for (const material of materials) {
+                if (!material?.color) continue;
+                if (!this._enrageMaterialCache.has(material)) {
+                    this._enrageMaterialCache.set(material, {
+                        color: material.color.clone(),
+                        emissive: material.emissive?.clone?.() || null,
+                        emissiveIntensity: material.emissiveIntensity,
+                    });
+                }
+                const original = this._enrageMaterialCache.get(material);
+                if (next) {
+                    material.color.copy(original.color).lerp(new THREE.Color(0xff2028), 0.72);
+                    if (material.emissive) {
+                        material.emissive.copy(original.emissive || new THREE.Color(0x000000))
+                            .lerp(new THREE.Color(0xff1018), 0.78);
+                        material.emissiveIntensity = Math.max(Number(original.emissiveIntensity) || 0, 0.42);
+                    }
+                } else {
+                    material.color.copy(original.color);
+                    if (material.emissive && original.emissive) material.emissive.copy(original.emissive);
+                    if (original.emissiveIntensity !== undefined) material.emissiveIntensity = original.emissiveIntensity;
+                }
+                material.needsUpdate = true;
+            }
+        });
+        return next;
+    }
+
+    setServerEnraged(active) {
+        if (this.isAmbient) return false;
+        this._serverControlled = true;
+        return this.setEnraged(active, Infinity);
+    }
+
+    isEnraged() {
+        return this._enraged === true;
+    }
+
+    _updateEnragedState() {
+        if (!this._serverControlled && this._enraged && this.animTimer >= this._enragedUntil) {
+            this.setEnraged(false);
+        }
     }
 
     _createModel(position) {
@@ -977,8 +1044,10 @@ export class Monster {
         if (this.isAmbient) return { killed: false, damage: 0 };
         const actualDmg = resolveMonsterDamage(amount, this.data.def, options);
         this.hp = Math.max(0, this.hp - actualDmg);
-        // Getting hit provokes it — chase the attacker for a while.
+        // Getting hit provokes it — chase the attacker for a while and make
+        // the enraged state visually obvious on every monster archetype.
         this._aggroUntil = (this.animTimer || 0) + 8;
+        this.setEnraged(true, 8);
         // Step 6: Enhanced monster impact flash durations
         this.hitFlash = isCritical ? 0.35 : 0.18;
         this.isCriticalHit = isCritical;
@@ -1001,6 +1070,7 @@ export class Monster {
     applyRemoteDamage(amount) {
         if (!this.alive) return false;
         this.hp = Math.max(0, this.hp - Math.max(0, amount | 0));
+        this.setEnraged(true, 8);
         this.hitFlash = Math.max(this.hitFlash, 0.12);
         if (this.hpBarFill) this.hpBarFill.scale.x = Math.max(0.01, this.hp / this.maxHp);
         if (this.hp <= 0) {
@@ -1036,6 +1106,9 @@ export class Monster {
     flashHit(isCritical = false) {
         this.hitFlash = isCritical ? 0.35 : 0.18;
         this.isCriticalHit = isCritical;
+        // Server mode receives the authoritative aggro flag in mon_state, but
+        // show rage immediately on the attacker's screen before that snapshot.
+        this.setEnraged(true, Infinity);
     }
 
     triggerAttackPresentation() {
@@ -1142,6 +1215,7 @@ export class Monster {
         if (this._serverControlled) return this._updateServerRendered(dt, camera);
 
         this.animTimer += dt;
+        this._updateEnragedState();
         this.hitFlash = Math.max(0, this.hitFlash - dt);
         if (this._remasterAura) this._remasterAura.rotation.z += dt * 0.32;
         if (this._remasterMotes) this._remasterMotes.rotation.y -= dt * 0.48;
@@ -1160,7 +1234,7 @@ export class Monster {
 
         // ===== Aggro: chase & attack the player when provoked or approached =====
         let aggroActive = false;
-        if (player && player.mesh && this.alive && !this.isWaterMonster) {
+        if (player && player.mesh && this.alive) {
             const adx = player.mesh.position.x - this.mesh.position.x;
             const adz = player.mesh.position.z - this.mesh.position.z;
             const pdist = Math.hypot(adx, adz) || 0.001;
@@ -1354,6 +1428,8 @@ export class Monster {
         this._aggroUntil = 0;
         this._atkCd = 0;
         this._attackAnim = 0;
+        this._serverEnraged = false;
+        this.setEnraged(false);
         this.bodyMesh.rotation.x = 0;
         this.bodyMesh.rotation.z = 0;
         this.wanderTarget = null;
@@ -1490,6 +1566,7 @@ export class MonsterManager {
                 } catch { /* ignore */ }
             }
             m.setServerHp(s.hp, s.mhp);
+            m.setServerEnraged?.(Boolean(s.aggro));
             m.setServerTarget(s.x, s.z, s.r);
             if (!m.isWaterMonster && m.mesh) {
                 m.mesh.position.y = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;

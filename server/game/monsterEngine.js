@@ -196,6 +196,15 @@ function stepMonster(m, mapId, now, dtSec) {
     const def = cfg.defs.get(m.type);
     const speed = def ? Math.max(0.7, def.speed) : 1;
 
+    // Expired aggro returns the monster to neutral before the next wander tick.
+    if (m.aggroChar && now >= m.aggroUntil) {
+        m.aggroChar = null;
+        m.aggroUntil = 0;
+        m.atkReadyAt = 0;
+        m.targetX = m.spawnX;
+        m.targetZ = m.spawnZ;
+    }
+
     // Aggro: chase + strike the player who provoked it.
     if (m.aggroChar && now < m.aggroUntil) {
         const pp = playerPos(m.aggroChar, mapId);
@@ -267,6 +276,9 @@ function broadcastMap(mapId, world) {
             x: Math.round(m.x * 100) / 100, z: Math.round(m.z * 100) / 100,
             r: Math.round(m.rot * 100) / 100,
             hp: m.hp, mhp: m.maxHp,
+            // Presentation-only state; target ownership and combat timing stay
+            // authoritative on the server.
+            aggro: Boolean(m.aggroChar && Date.now() < m.aggroUntil),
         });
     }
     io.to(`map:${mapId}`).emit('mon_state', { v: cfg.version, mapId, mons });

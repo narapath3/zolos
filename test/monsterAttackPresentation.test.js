@@ -28,6 +28,21 @@ test('server-owned monsters broadcast the same skill action on every populated m
   assert.match(monsterSource, /triggerAttackPresentation\(\)/);
 });
 
+test('every damaged monster enters a visible red enraged state', () => {
+  assert.match(monsterSource, /setEnraged\(active, duration = 8\)/);
+  assert.match(monsterSource, /new THREE\.Color\(0xff2028\)/);
+  assert.match(monsterSource, /this\.setEnraged\(true, 8\)/);
+  assert.match(monsterSource, /this\._updateEnragedState\(\)/);
+  assert.match(monsterSource, /if \(player && player\.mesh && this\.alive\)/);
+});
+
+test('server aggro state is replicated as presentation-only state and clears on expiry', () => {
+  assert.match(serverSource, /aggro: Boolean\(m\.aggroChar && Date\.now\(\) < m\.aggroUntil\)/);
+  assert.match(serverSource, /Expired aggro returns the monster to neutral/);
+  assert.match(monsterSource, /setServerEnraged\?\.\(Boolean\(s\.aggro\)\)/);
+  assert.match(monsterSource, /setEnraged\(true, Infinity\)/);
+});
+
 test('respawn clears every local revenge and unfinished attack state', () => {
   const reset = monsterSource.match(/reset\(position\) \{[\s\S]*?\r?\n    \}\r?\n\r?\n    destroy\(\)/)?.[0] || '';
   assert.match(reset, /this\._aggroUntil = 0/);
