@@ -38,3 +38,14 @@ test('categorized menus support click-away, escape and accessible expanded state
   assert.match(css, /\.hud-menu-popover\[hidden\]/);
   assert.match(css, /@media \(max-width: 1024px\)[\s\S]*?#hud-bottom[\s\S]*?overflow: visible/);
 });
+
+test('warp modal has a premium travel hierarchy and mobile-safe interaction contract', () => {
+  assert.match(ui, /FAST TRAVEL · MIDGARD/);
+  assert.match(ui, /class="warp-summary"/);
+  assert.match(ui, /class="warp-status"/);
+  assert.match(ui, /class="tile-action-muted"/);
+  assert.match(ui, /type="button" class="tile-warp-btn"/);
+  assert.match(ui, /max-height: calc\(100dvh/);
+  assert.match(ui, /env\(safe-area-inset-top\)/);
+  assert.match(ui, /this\._doWarp\(targetMap\)/);
+});

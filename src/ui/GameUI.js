@@ -11148,51 +11148,64 @@ export class GameUI {
         #warp-modal {
           position: fixed; inset: 0; z-index: 1800; pointer-events: auto;
           display: none; align-items: center; justify-content: center;
-          background: rgba(4, 8, 18, 0.85); backdrop-filter: blur(6px);
-          padding: 12px; box-sizing: border-box;
+          background: linear-gradient(180deg, rgba(5, 11, 25, 0.76), rgba(4, 7, 17, 0.92));
+          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+          padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+          box-sizing: border-box;
         }
         #warp-card {
-          width: min(820px, 96vw); max-height: 92vh;
+          width: min(980px, 96vw); max-height: min(760px, calc(100dvh - 24px));
           display: flex; flex-direction: column;
-          border-radius: 18px;
-          background: linear-gradient(180deg, #151b30, #0d1120);
-          border: 1px solid rgba(240, 192, 64, 0.35);
-          box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+          border-radius: 22px;
+          background: linear-gradient(180deg, rgba(18, 29, 52, 0.98), rgba(8, 15, 29, 0.99));
+          border: 1px solid rgba(142, 190, 255, 0.24);
+          box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(240, 192, 64, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
           overflow: hidden;
           pointer-events: auto;
         }
         .warp-head {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 18px;
-          border-bottom: 1px solid rgba(240, 192, 64, 0.15);
-          background: linear-gradient(90deg, rgba(240, 192, 64, 0.14), transparent);
+          padding: 16px 20px 14px;
+          border-bottom: 1px solid rgba(142, 190, 255, 0.14);
+          background: linear-gradient(105deg, rgba(54, 119, 214, 0.24), rgba(240, 192, 64, 0.08) 55%, transparent);
         }
         .warp-head h2 {
           font-family: var(--font-main, inherit);
-          font-size: 17px; color: #fff;
-          text-shadow: 0 0 14px rgba(240, 192, 64, 0.5); margin: 0;
+          font-size: clamp(17px, 2.2vw, 21px); color: #fff;
+          letter-spacing: -0.02em; text-shadow: 0 0 18px rgba(115, 184, 255, 0.34); margin: 0;
         }
-        .warp-head .sub { font-size: 11px; color: #9aa5c0; margin-top: 3px; }
+        .warp-head .sub { font-size: 11px; line-height: 1.45; color: #aebbd2; margin-top: 5px; max-width: 680px; }
+        .warp-kicker { display: block; margin-bottom: 4px; color: #70bfff; font-size: 9px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+        .warp-status { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; padding: 5px 9px; border: 1px solid rgba(255, 215, 111, 0.25); border-radius: 999px; background: rgba(255, 207, 88, 0.08); color: #ffe8a3; font-size: 10px; font-weight: 800; }
+        .warp-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #7ee7b2; box-shadow: 0 0 10px rgba(126, 231, 178, .8); }
+        .warp-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 18px 14px; padding: 10px 12px; border: 1px solid rgba(142, 190, 255, 0.13); border-radius: 14px; background: rgba(5, 12, 27, 0.5); }
+        .warp-summary-item { min-width: 0; }
+        .warp-summary-label { color: #71819f; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .warp-summary-value { overflow: hidden; margin-top: 3px; color: #e8f1ff; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
         .warp-x {
           background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);
-          color: #9aa5c0; width: 36px; height: 36px; border-radius: 9px;
+          color: #d5e3f7; width: 42px; height: 42px; border-radius: 12px;
           cursor: pointer; font-size: 16px;
           display: flex; align-items: center; justify-content: center;
           flex: 0 0 auto; transition: all 0.2s;
         }
         .warp-x:hover { background: rgba(231, 76, 60, 0.2); color: #ff7675; border-color: rgba(231, 76, 60, 0.4); }
         .warp-main {
-          flex: 1 1 auto; min-height: 0; overflow-y: auto;
-          -webkit-overflow-scrolling: touch; padding: 12px;
+          flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch; padding: 0 18px 18px;
         }
         .warp-grid {
           display: grid; grid-template-columns: repeat(2, 1fr);
-          gap: 10px;
+          gap: 12px;
         }
         @media (max-width: 680px) {
           .warp-grid { grid-template-columns: 1fr; }
-          #warp-modal { align-items: flex-start; padding: 8px 8px 108px; }
-          #warp-card { max-height: calc(100dvh - 116px); }
+          #warp-modal { align-items: flex-start; padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+          #warp-card { width: 100%; max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom))); border-radius: 18px; }
+          .warp-head { padding: 14px 14px 12px; }
+          .warp-main { padding: 0 12px 14px; }
+          .warp-summary { margin: 0 12px 12px; }
+          .warp-grid { grid-template-columns: 1fr; gap: 10px; }
         }
         .warp-tile {
           position: relative; border-radius: 14px; overflow: hidden;
@@ -11218,42 +11231,42 @@ export class GameUI {
         }
         .warp-tile .tile-content {
           position: relative; z-index: 1;
-          padding: 14px; display: flex; flex-direction: column; gap: 6px;
-          min-height: 140px;
+          padding: 15px; display: flex; flex-direction: column; gap: 7px;
+          min-height: 174px;
         }
         .warp-tile .tile-top {
-          display: flex; align-items: center; justify-content: space-between;
+          display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
         }
-        .warp-tile .tile-emoji { font-size: 32px; }
+        .warp-tile .tile-emoji { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 13px; background: rgba(5, 10, 23, 0.28); font-size: 24px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18); }
         .warp-tile .tile-badge {
-          font-size: 10px; font-weight: 800; padding: 2px 8px;
-          border-radius: 10px; background: rgba(0, 0, 0, 0.5);
+          font-size: 9px; font-weight: 900; padding: 5px 8px;
+          border-radius: 999px; background: rgba(0, 0, 0, 0.42);
           color: #fff; backdrop-filter: blur(4px);
         }
         .warp-tile .tile-name {
-          font-size: 16px; font-weight: 800; color: #fff;
-          text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+          font-size: 16px; line-height: 1.18; font-weight: 900; color: #fff;
+          letter-spacing: -0.015em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
         }
         .warp-tile .tile-name-th {
-          font-size: 12px; color: rgba(255, 255, 255, 0.75); font-weight: 600;
+          font-size: 11px; color: rgba(255, 255, 255, 0.78); font-weight: 700;
         }
         .warp-tile .tile-desc {
-          font-size: 11px; color: rgba(255, 255, 255, 0.65);
-          line-height: 1.4; margin-top: auto;
+          display: -webkit-box; overflow: hidden; color: rgba(255, 255, 255, 0.68);
+          font-size: 10px; line-height: 1.45; margin-top: auto; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
         }
         .warp-tile .tile-footer {
           display: flex; align-items: center; justify-content: space-between;
-          margin-top: 4px; padding-top: 6px;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          margin-top: 4px; padding-top: 8px;
+          border-top: 1px solid rgba(255, 255, 255, 0.14);
         }
         .warp-tile .tile-level {
-          font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.6);
+          font-size: 10px; font-weight: 800; color: rgba(255, 255, 255, 0.72);
         }
         .warp-tile .tile-warp-btn {
-          font-size: 11px; font-weight: 800; padding: 4px 12px;
-          border-radius: 8px; border: none; cursor: pointer;
-          background: linear-gradient(135deg, #ffe89a, #f0c040);
-          color: #2a1c00; transition: all 0.2s;
+          min-width: 92px; min-height: 40px; padding: 7px 13px;
+          border-radius: 11px; border: 1px solid rgba(255, 246, 194, 0.68); cursor: pointer;
+          background: linear-gradient(135deg, #fff1ae, #f4c94e);
+          color: #2a1c00; font-size: 11px; font-weight: 900; letter-spacing: .01em; transition: all 0.2s;
         }
         @media (hover: hover) {
           .warp-tile .tile-warp-btn:hover {
@@ -11265,15 +11278,18 @@ export class GameUI {
           transform: scale(0.97);
         }
         .warp-tile .tile-current-badge {
-          position: absolute; top: 8px; right: 8px; z-index: 2;
-          font-size: 9px; font-weight: 800; padding: 3px 10px;
+          position: absolute; top: 10px; right: 10px; z-index: 2;
+          font-size: 8px; font-weight: 900; padding: 5px 9px;
           border-radius: 10px; background: rgba(240, 192, 64, 0.9);
           color: #2a1c00; letter-spacing: 0.5px;
         }
         .warp-tile .tile-glow {
           position: absolute; inset: 0; z-index: 0;
-          opacity: 0.35;
+          opacity: 0.35; pointer-events: none;
         }
+        .tile-encounters { overflow: hidden; color: rgba(255, 255, 255, 0.58); font-size: 9px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+        .tile-safe { color: #7ee7b2; }
+        .tile-action-muted { color: #aebbd2; font-size: 10px; font-weight: 800; }
         @keyframes warpPulse {
           0%, 100% { opacity: 0.3; }
           50% { opacity: 0.6; }
@@ -11314,49 +11330,56 @@ export class GameUI {
     const tiles = maps.map(m => {
       const isCurrent = m.id === currentMapId;
       const isLocked = m.id === SKYRAIL_MAP_ID && !skyrailStatus.isOpen;
-      const glowOpacity = isCurrent ? '0.5' : '0.2';
+      const glowOpacity = isCurrent ? '0.62' : '0.24';
+      const encounters = m.monsters.length > 0
+        ? `👾 ${m.monsters.slice(0, 3).join(' · ')}${m.monsters.length > 3 ? ' · …' : ''}`
+        : '✦ พื้นที่ปลอดภัย · ไม่มีมอนสเตอร์';
       return `
-        <div class="warp-tile ${isCurrent ? 'current' : ''} ${isLocked ? 'locked' : ''}" data-map="${m.id}"
-             style="background: ${m.bgGradient};">
+        <article class="warp-tile ${isCurrent ? 'current' : ''} ${isLocked ? 'locked' : ''}" data-map="${m.id}"
+                 style="background: ${m.bgGradient};" aria-label="${m.name}">
           <div class="tile-glow"
-               style="background: radial-gradient(ellipse at 30% 20%, ${m.color}40 0%, transparent 70%);
+               style="background: radial-gradient(ellipse at 30% 20%, ${m.color}55 0%, transparent 72%);
                       opacity: ${glowOpacity}; animation: warpPulse ${isCurrent ? '2s' : '3s'} ease-in-out infinite;">
           </div>
-          ${isCurrent ? '<div class="tile-current-badge">📍 YOU ARE HERE</div>' : ''}
+          ${isCurrent ? '<div class="tile-current-badge">● อยู่ที่นี่</div>' : ''}
           <div class="tile-content">
             <div class="tile-top">
-              <span class="tile-emoji">${m.emoji}</span>
+              <span class="tile-emoji" aria-hidden="true">${m.emoji}</span>
               <span class="tile-badge ${m.difficultyClass}">${m.difficulty}</span>
             </div>
             <div class="tile-name">${m.name}</div>
             <div class="tile-name-th">${m.nameTh}</div>
             <div class="tile-desc">${m.desc}</div>
             <div class="tile-footer">
-              <span class="tile-level">${m.level}</span>
+              <div>
+                <div class="tile-level">${m.level}</div>
+                <div class="tile-encounters">${encounters}</div>
+              </div>
               ${isCurrent
-          ? '<span style="font-size:10px;color:#9aa5c0;font-weight:600;">คุณอยู่ที่นี่</span>'
+          ? '<span class="tile-action-muted">ตำแหน่งปัจจุบัน</span>'
           : isLocked
-            ? '<button class="tile-warp-btn" disabled>🔒 เปิด 18:00</button>'
-            : `<button class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">🌀 วาร์ป</button>`
+            ? '<button type="button" class="tile-warp-btn" disabled>🔒 เปิด 18:00</button>'
+            : `<button type="button" class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">เดินทาง</button>`
         }
             </div>
-            ${m.monsters.length > 0 ? `
-              <div style="font-size:10px;color:rgba(255,255,255,0.5);margin-top:2px;">
-                👾 ${m.monsters.slice(0, 3).join(' · ')}${m.monsters.length > 3 ? ' · …' : ''}
-              </div>
-            ` : '<div style="font-size:10px;color:#57e08a;margin-top:2px;">✅ ไม่มีมอนสเตอร์ — พื้นที่ปลอดภัย</div>'}
           </div>
-        </div>
+        </article>
       `;
     }).join('');
 
     card.innerHTML = `
       <div class="warp-head">
         <div>
-          <h2>🌀 วาร์ปไปยังแผนที่</h2>
-          <div class="sub">เลือกจุดหมายแล้วกดปุ่ม "วาร์ป" — ตำแหน่งปัจจุบัน: <b style="color:var(--primary)">${this._currentMapLabel()}</b></div>
+          <span class="warp-kicker">FAST TRAVEL · MIDGARD</span>
+          <h2>วาร์ปไปยังแผนที่</h2>
+          <div class="sub">เลือกจุดหมายเพื่อเดินทางทันที คุณสามารถกลับมาเปิดเมนูนี้ได้ทุกเมื่อ</div>
+          <div class="warp-status"><span class="warp-status-dot"></span> ตำแหน่งปัจจุบัน · ${this._currentMapLabel()}</div>
         </div>
-        <button class="warp-x" id="warp-close">✕</button>
+        <button type="button" class="warp-x" id="warp-close" aria-label="ปิดเมนูวาป">✕</button>
+      </div>
+      <div class="warp-summary" aria-label="ข้อมูลการเดินทาง">
+        <div class="warp-summary-item"><div class="warp-summary-label">จุดหมายทั้งหมด</div><div class="warp-summary-value">${maps.length} แผนที่พร้อมเดินทาง</div></div>
+        <div class="warp-summary-item"><div class="warp-summary-label">ระดับของคุณ</div><div class="warp-summary-value">Lv.${playerLevel} · เลือกเส้นทางที่เหมาะกับคุณ</div></div>
       </div>
       <div class="warp-main">
         <div class="warp-grid">${tiles}</div>
