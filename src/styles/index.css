@@ -1905,6 +1905,8 @@ a,
   position: fixed;
   inset: 0;
   z-index: 12000;
+  pointer-events: auto;
+  touch-action: auto;
   display: grid;
   place-items: center;
   padding: max(14px, var(--safe-top)) max(14px, var(--safe-right)) max(14px, var(--safe-bottom)) max(14px, var(--safe-left));
@@ -2099,6 +2101,7 @@ a,
 /* ========== PREMIUM FISHING RESULTS POLISH ========== */
 .fishing-summary-card {
   position: relative;
+  pointer-events: auto;
   width: min(560px, 100%);
   height: min(720px, calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom)));
   max-height: min(720px, calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom)));
@@ -2223,6 +2226,7 @@ a,
   pointer-events: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
   overscroll-behavior-y: contain;
   gap: 8px;
   padding: 4px 22px 13px;

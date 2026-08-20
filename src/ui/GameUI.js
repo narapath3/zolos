@@ -9032,9 +9032,14 @@ export class GameUI {
         target.closest('#chat-panel') || target.closest('#tutorial-tooltip') ||
         target.closest('.tutorial-tooltip') || target.closest('.tutorial-close') ||
         target.closest('.tutorial-btn-primary') || target.closest('.tutorial-btn-secondary') ||
+        target.closest('#fishing-summary-modal') || target.closest('.fishing-summary-overlay') ||
         target.closest('#warp-modal') ||
         target.closest('.warp-tile') ||
         target.closest('.tile-warp-btn')) return;
+
+      // Fishing results own their touch gesture: native button clicks and vertical
+      // scrolling must not be converted into world movement or preventDefault.
+      if (target.closest?.('#fishing-summary-modal') || target.closest?.('.fishing-summary-overlay')) return;
 
       // Never spawn the joystick over the chat UI — block the WHOLE panel
       // (messages + input) so a tap on the chat bar opens the input/keyboard

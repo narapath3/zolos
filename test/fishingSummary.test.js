@@ -18,11 +18,16 @@ test('fishing session summary waits for pending online claims and renders totals
   assert.match(gameUI, /จำนวนปลาทั้งหมด/);
   assert.match(main, /gameUI\?\.beginFishingSession\?\.\(\)/);
   assert.match(main, /gameUI\?\.endFishingSession\?\.\(\)/);
+  assert.match(gameUI, /target\.closest\('#fishing-summary-modal'\)/);
+  assert.match(gameUI, /target\.closest\('\.fishing-summary-overlay'\)/);
   assert.match(main, /gameUI\.resolveFishingReward\?\.\(\)/);
 });
 
 test('fishing summary is mobile-safe and clearly labels estimated value', () => {
   assert.match(css, /\.fishing-summary-overlay\s*\{[\s\S]*z-index:\s*12000/);
+  assert.match(css, /\.fishing-summary-overlay\s*\{[\s\S]*pointer-events:\s*auto/);
+  assert.match(css, /\.fishing-summary-overlay\s*\{[\s\S]*touch-action:\s*auto/);
+  assert.match(css, /\.fishing-summary-card\s*\{[\s\S]*pointer-events:\s*auto/);
   assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*flex:\s*1 1 auto/);
   assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*min-height:\s*0/);
   assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*overflow-y:\s*auto/);
