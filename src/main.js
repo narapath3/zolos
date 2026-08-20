@@ -1902,6 +1902,13 @@ window.addEventListener('online', () => {
 });
 
 // ============ Input Handling ============
+function disengageManualCombat() {
+    if (combatSystem?.autoFarm) return false;
+    const canceled = combatSystem?.disengageManualCombat?.() || false;
+    if (canceled) gameUI?.clearTarget?.();
+    return canceled;
+}
+
 function handleMouseInteraction(event) {
     if (!isGameStarted) return;
     // Only the left button (or touch, which has no button) moves/targets.
@@ -1928,6 +1935,7 @@ function handleMouseInteraction(event) {
     // Handle PVP Duels: limit targeting to only ground and the opponent
     if (duelState) {
         if (hit.type === 'ground') {
+            disengageManualCombat();
             autoPath = hit.point;
             character.targetMonster = null;
             particles.createClickIndicator(hit.point, 0x44ff44);
@@ -1961,6 +1969,7 @@ function handleMouseInteraction(event) {
         }
         // Walk to the node first if we're not close enough, then mine.
         if (character.getPosition().distanceTo(node.position) > 3.5) {
+            disengageManualCombat();
             autoPath = node.position.clone();
             character.targetMonster = null;
             particles.createClickIndicator(node.position, 0x7fe0ff);
@@ -1984,6 +1993,7 @@ function handleMouseInteraction(event) {
         } else if (!(combatSystem && combatSystem.isFishing)) {
             // PC left-click on a player: walk toward them (profile opens on
             // right-click instead). Suppressed while fishing so the pose holds.
+            disengageManualCombat();
             autoPath = hit.point;
             character.targetMonster = null;
             particles.createClickIndicator(hit.point, 0x44ff44);
@@ -2009,6 +2019,7 @@ function handleMouseInteraction(event) {
         }
         particles.createClickIndicator(hit.point, 0xffff44);
     } else if (hit.type === 'ground') {
+        disengageManualCombat();
         autoPath = hit.point;
         character.targetMonster = null;
         // Step 11: Ground click: green indicator
@@ -2997,7 +3008,11 @@ function stepWorld(dt) {
     const isFishingActive = combatSystem && combatSystem.isFishing;
     const moveDir = (!isFishingActive && inputManager) ? inputManager.getMovementDirection() : null;
 
-    if (moveDir) {
+    const hasManualMove = !!moveDir && (Math.abs(moveDir.x) > 0.08 || Math.abs(moveDir.z) > 0.08);
+    if (hasManualMove) {
+        // Manual steering cancels a manually selected target immediately. AUTO
+        // remains untouched so bot farming keeps its intentional target lock.
+        disengageManualCombat();
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 9 : 5.5;
         // Rotate the input by the camera yaw so "forward" always means
@@ -3092,7 +3107,7 @@ function stepWorld(dt) {
     }
 
     // 3. Combat
-    if (character.targetMonster) {
+    if (character.targetMonster && !hasManualMove) {
         const dist = character.getPosition().distanceTo(character.targetMonster.mesh.position);
         if (dist <= character.getAttackRange()) {
             autoPath = null;

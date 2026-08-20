@@ -134,6 +134,20 @@ export class CombatSystem {
         this.autoTargetStuckTime = 0;
     }
 
+    // Manual movement is an explicit disengage signal. Once AUTO is off, a
+    // player who starts walking away should not be turned back toward the last
+    // manually selected monster by the combat loop. AUTO retains its target by
+    // design, so bot farming behavior remains unchanged.
+    disengageManualCombat() {
+        if (this.autoFarm) return false;
+        const hadTarget = !!this.character?.targetMonster || !!this.currentTarget;
+        this.currentTarget = null;
+        this._resetAutoSearch();
+        if (this.character?.targetMonster) this.character.targetMonster = null;
+        if (this.character?.state === 'attacking') this.character.state = 'idle';
+        return hadTarget;
+    }
+
     _findBestAutoTarget() {
         const position = this.character.getPosition();
         const pools = [this.monsters?.monsters || []];
