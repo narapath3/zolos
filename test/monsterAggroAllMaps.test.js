@@ -61,3 +61,28 @@ test('authoritative monster aggro remains bound to the verified character on its
   assert.match(serverSource, /m\.aggroChar = charId/);
   assert.match(serverEntrySource, /clearAggroForCharacter\(player\.characterId\)/);
 });
+
+test('server chase avoids map edges and recovers from blocked steering instead of freezing', () => {
+  assert.match(serverSource, /const MAP_WALKABLE_HALF = 32\.5/);
+  assert.match(serverSource, /const PRONTERA_WALKABLE_HALF = 52\.5/);
+  assert.match(serverSource, /isInsideWalkableBounds\(mapId, x, z/);
+  assert.match(serverSource, /const angles = \[0, Math\.PI \/ 7, -Math\.PI \/ 7, Math\.PI \/ 10/);
+  assert.match(serverSource, /m\.chaseStuckTime = \(m\.chaseStuckTime \|\| 0\) \+ dtSec/);
+  assert.match(serverSource, /m\.chaseBias = -\(Number\(m\.chaseBias\) \|\| 1\)/);
+});
+
+test('all combat maps can route an aggro target through the shared bridge corridor', () => {
+  assert.match(serverSource, /function buildBridgeChaseRoute\(m, pp\)/);
+  assert.match(serverSource, /function getChaseGoal\(m, pp\)/);
+  assert.match(serverSource, /m\.chaseWaypoints = bridgeRoute/);
+  assert.match(serverSource, /const BRIDGE_CENTER_Z = -2/);
+  assert.match(clientSource, /const buildMonsterBridgeRoute = \(monster, player\)/);
+  assert.match(clientSource, /this\._chaseWaypoints = buildMonsterBridgeRoute\(this, player\)/);
+});
+
+test('local fallback leaves cave/mountain biome labels during revenge chase but still blocks water and arena', () => {
+  assert.match(clientSource, /During an active revenge chase, land monsters may leave/);
+  assert.match(clientSource, /if \(requiredEnv !== 'water'\) return true/);
+  assert.match(clientSource, /if \(!isMonsterInsideBounds\(sceneManager, x, z, 0\.8\)\) return false/);
+  assert.match(clientSource, /sceneManager\.getEnvironmentAt\(this\._environmentProbe/);
+});

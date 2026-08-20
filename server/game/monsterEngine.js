@@ -63,14 +63,28 @@ const worlds = new Map();
 
 // ---------------- terrain (minimal port of SceneManager) ----------------
 const riverZ = (x) => Math.sin(x * 0.08) * 10 - 2;
-const isWaterAt = (x, z) => Math.abs(z - riverZ(x)) < 5.5;
+const MAP_WALKABLE_HALF = 32.5; // 70-unit maps keep a safe 2.5-unit edge margin
+const PRONTERA_WALKABLE_HALF = 52.5; // 110-unit Prontera field + mountain
+const BRIDGE_HALF_WIDTH = 1.8;
+const BRIDGE_MIN_Z = -10.35;
+const BRIDGE_MAX_Z = 6.35;
+const BRIDGE_CENTER_Z = -2;
+const isBridgeCorridor = (x, z) => Math.abs(x) <= BRIDGE_HALF_WIDTH
+    && z >= BRIDGE_MIN_Z && z <= BRIDGE_MAX_Z;
+const isWaterAt = (x, z, mapId = '') => !isBridgeCorridor(x, z)
+    && Math.abs(z - riverZ(x)) < 5.5;
+const edgeClearance = (mapId, x, z) => {
+    const half = mapId === 'prontera' ? PRONTERA_WALKABLE_HALF : MAP_WALKABLE_HALF;
+    return Math.min(half - Math.abs(x), half - Math.abs(z));
+};
+const isInsideWalkableBounds = (mapId, x, z, padding = 0.8) => edgeClearance(mapId, x, z) >= padding;
 const inArena = (mapId, x, z) => {
     if (mapId !== 'prontera') return false;
     const dx = x - (-14), dz = z - 14;
     return dx * dx + dz * dz < 7.5 * 7.5;
 };
 const environmentAt = (mapId, x, z) => {
-    if (isWaterAt(x, z)) return 'water';
+    if (isWaterAt(x, z, mapId)) return 'water';
     if (x < -6 && z < -6) return 'cave';
     if (x > 6 && z > 6) return 'mountain';
     return 'ground';
@@ -112,22 +126,25 @@ function isNavigationObstacle(mapId, x, z, padding = 0) {
 
 function canMonsterChaseOccupy(m, mapId, x, z, padding = 0.0) {
     if (!Number.isFinite(x) || !Number.isFinite(z) || inArena(mapId, x, z)) return false;
+    if (!isInsideWalkableBounds(mapId, x, z, Math.max(0.8, padding))) return false;
     if (!m.isWater && isNavigationObstacle(mapId, x, z, padding)) return false;
     if (!m.isWater && isPronteraRailBand(mapId, x, z, padding)) return false;
     if (!m.isWater && isPronteraBridge(mapId, x, z)) return true;
-    return m.isWater ? isWaterAt(x, z) : !isWaterAt(x, z);
+    return m.isWater ? isWaterAt(x, z, mapId) : !isWaterAt(x, z, mapId);
 }
 
 function chooseChaseStep(m, mapId, dx, dz, dist, step) {
-    const forwardX = dx / dist;
-    const forwardZ = dz / dist;
+    const forwardX = dx / Math.max(0.001, dist);
+    const forwardZ = dz / Math.max(0.001, dist);
     const sideX = -forwardZ;
     const sideZ = forwardX;
-    // Test a fan instead of only left/right. This lets a monster choose a
-    // shallow arc around rails, stalls, shops, and corners while preserving
-    // forward pressure during Bull Rush.
-    const angles = [0, Math.PI / 7, -Math.PI / 7, Math.PI * 2 / 7, -Math.PI * 2 / 7,
-        Math.PI * 3 / 7, -Math.PI * 3 / 7, Math.PI / 2, -Math.PI / 2];
+    // A wider fan plus a small alternating side bias lets the monster escape
+    // corners instead of repeatedly selecting the same blocked forward cell.
+    const angles = [0, Math.PI / 7, -Math.PI / 7, Math.PI / 10, -Math.PI / 10,
+        Math.PI / 5, -Math.PI / 5, Math.PI * 3 / 10, -Math.PI * 3 / 10,
+        Math.PI * 2 / 5, -Math.PI * 2 / 5, Math.PI / 2, -Math.PI / 2,
+        Math.PI * 3 / 5, -Math.PI * 3 / 5, Math.PI * 4 / 5, -Math.PI * 4 / 5, Math.PI];
+    const sideBias = Number(m.chaseBias) || 1;
     let best = null;
     let bestScore = -Infinity;
     for (const angle of angles) {
@@ -137,14 +154,62 @@ function chooseChaseStep(m, mapId, dx, dz, dist, step) {
         const candidateZ = m.z + dirZ * step;
         if (!canMonsterChaseOccupy(m, mapId, candidateX, candidateZ, 0.65)) continue;
         const progress = (candidateX - m.x) * forwardX + (candidateZ - m.z) * forwardZ;
-        const lateral = Math.abs((candidateX - m.x) * sideX + (candidateZ - m.z) * sideZ);
-        const score = progress - lateral * 0.22 - Math.abs(angle) * 0.04;
+        const lateralSigned = (candidateX - m.x) * sideX + (candidateZ - m.z) * sideZ;
+        const lateral = Math.abs(lateralSigned);
+        const edge = Math.max(0, edgeClearance(mapId, candidateX, candidateZ));
+        const edgeRisk = Math.max(0, 3.5 - edge);
+        const score = progress - lateral * 0.22
+            - lateral * 0.16 + lateralSigned * sideBias * 0.035
+            + Math.min(8, edge) * 0.025
+            - edgeRisk * 1.35 - Math.abs(angle) * 0.018;
         if (score > bestScore) {
             bestScore = score;
             best = [candidateX, candidateZ];
         }
     }
     return best;
+}
+
+function buildBridgeChaseRoute(m, pp) {
+    if (m.isWater || !pp) return null;
+    const fromDelta = m.z - riverZ(m.x);
+    const targetDelta = pp.z - riverZ(pp.x);
+    if (fromDelta * targetDelta >= -1.0) return null;
+    const fromSide = fromDelta >= 0 ? 1 : -1;
+    return [
+        { x: 0, z: BRIDGE_CENTER_Z + fromSide * 8.8 },
+        { x: 0, z: BRIDGE_CENTER_Z + fromSide * 5.75 },
+        { x: 0, z: BRIDGE_CENTER_Z - fromSide * 5.75 },
+        { x: 0, z: BRIDGE_CENTER_Z - fromSide * 8.8 },
+        { x: pp.x, z: pp.z },
+    ];
+}
+
+function getChaseGoal(m, pp) {
+    const oppositeBanks = !m.isWater
+        && (m.z - riverZ(m.x)) * (pp.z - riverZ(pp.x)) < -1.0;
+    if (!oppositeBanks && m.chaseWaypoints?.length) {
+        m.chaseWaypoints = [];
+        m.chaseWaypointIndex = 0;
+    }
+    const route = m.chaseWaypoints;
+    if (oppositeBanks && (!route || !route.length)) {
+        const bridgeRoute = buildBridgeChaseRoute(m, pp);
+        if (bridgeRoute) {
+            m.chaseWaypoints = bridgeRoute;
+            m.chaseWaypointIndex = 0;
+        }
+    }
+    if (!m.chaseWaypoints?.length) return pp;
+    const final = m.chaseWaypoints.length - 1;
+    m.chaseWaypoints[final] = { x: pp.x, z: pp.z };
+    const current = m.chaseWaypoints[Math.min(m.chaseWaypointIndex || 0, final)];
+    const waypointDist = Math.hypot(current.x - m.x, current.z - m.z);
+    if (waypointDist <= 1.35 && (m.chaseWaypointIndex || 0) < final) {
+        m.chaseWaypointIndex += 1;
+        return m.chaseWaypoints[m.chaseWaypointIndex];
+    }
+    return current;
 }
 function pickLandPos(mapId, environment = 'ground') {
     for (let i = 0; i < 60; i++) {
@@ -216,6 +281,7 @@ function makeMonster(id, type, isWater) {
         wanderUntil: 0, targetX: pos.x, targetZ: pos.z,
         dmgByChar: new Map(),
         hitCadenceByChar: new Map(),
+        chaseWaypoints: [], chaseWaypointIndex: 0, chaseStuckTime: 0, chaseBias: 1,
         respawnAt: 0,
         moving: false,
         bullRush: false,
@@ -351,6 +417,9 @@ function stepMonster(m, mapId, now, dtSec) {
         m.aggroChar = null;
         m.aggroUntil = 0;
         m.atkReadyAt = 0;
+        m.chaseWaypoints = [];
+        m.chaseWaypointIndex = 0;
+        m.chaseStuckTime = 0;
         m.targetX = m.spawnX;
         m.targetZ = m.spawnZ;
     }
@@ -369,16 +438,40 @@ function stepMonster(m, mapId, now, dtSec) {
                     m.aggroChar = null;
                     m.aggroUntil = 0;
                     m.atkReadyAt = 0;
+                    m.chaseWaypoints = [];
+                    m.chaseWaypointIndex = 0;
+                    m.chaseStuckTime = 0;
                     m.targetX = m.spawnX;
                     m.targetZ = m.spawnZ;
                     return;
                 }
+                const goal = getChaseGoal(m, pp);
+                const goalDx = goal.x - m.x;
+                const goalDz = goal.z - m.z;
+                const goalDist = Math.hypot(goalDx, goalDz) || 0.001;
                 const chaseSpeed = Math.max(BULL_RUSH_SPEED, speed * 2.2 + 6.0);
-                const step = Math.min(dist, chaseSpeed * dtSec);
+                const step = Math.min(dist, Math.min(goalDist, chaseSpeed * dtSec));
                 m.bullRush = true;
                 const detour = chooseChaseStep(m, mapId, dx, dz, dist, step);
-                const nextX = detour ? detour[0] : m.x;
-                const nextZ = detour ? detour[1] : m.z;
+                const routeDetour = m.chaseWaypoints?.length
+                    ? chooseChaseStep(m, mapId, goalDx, goalDz, goalDist, step)
+                    : detour;
+                let recoveryDetour = routeDetour;
+                if (!recoveryDetour) {
+                    m.chaseStuckTime = (m.chaseStuckTime || 0) + dtSec;
+                    // Retry with a larger probe and the opposite lateral bias.
+                    // This is cheap at 10 Hz and breaks corner oscillation.
+                    if (m.chaseStuckTime >= 0.18) {
+                        m.chaseBias = -(Number(m.chaseBias) || 1);
+                        recoveryDetour = chooseChaseStep(m, mapId, goalDx, goalDz, goalDist,
+                            Math.min(dist, Math.min(goalDist, chaseSpeed * dtSec * 2.4)));
+                        m.chaseStuckTime = recoveryDetour ? 0 : Math.min(1.2, m.chaseStuckTime);
+                    }
+                } else {
+                    m.chaseStuckTime = 0;
+                }
+                const nextX = recoveryDetour ? recoveryDetour[0] : m.x;
+                const nextZ = recoveryDetour ? recoveryDetour[1] : m.z;
                 if (nextX !== m.x || nextZ !== m.z) {
                     m.x = nextX;
                     m.z = nextZ;
@@ -473,6 +566,7 @@ function respawnMonster(m, mapId) {
     m.hp = m.maxHp = def ? def.hp : 100;
     m.alive = true; m.respawnAt = 0;
     m.aggroChar = null; m.aggroUntil = 0;
+    m.chaseWaypoints = []; m.chaseWaypointIndex = 0; m.chaseStuckTime = 0;
     m.atkReadyAt = 0;
     m.specialReadyAt = 0;
     m.pendingSpecial = null;
@@ -512,6 +606,9 @@ export function applyHit(player, payload) {
     // A hit provokes the monster toward the most recent attacker.
     m.aggroChar = charId;
     m.aggroUntil = Date.now() + AGGRO_MS;
+    m.chaseWaypoints = [];
+    m.chaseWaypointIndex = 0;
+    m.chaseStuckTime = 0;
 
     m.hp = Math.max(0, m.hp - dmg);
     if (m.hp <= 0) killMonster(world, m, mapId);
@@ -706,6 +803,9 @@ export function clearAggroForCharacter(characterId) {
             if (monster.aggroChar !== characterId) continue;
             monster.aggroChar = null;
             monster.aggroUntil = 0;
+            monster.chaseWaypoints = [];
+            monster.chaseWaypointIndex = 0;
+            monster.chaseStuckTime = 0;
             monster.atkReadyAt = 0;
             monster.targetX = monster.spawnX;
             monster.targetZ = monster.spawnZ;

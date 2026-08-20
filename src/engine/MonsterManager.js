@@ -33,11 +33,33 @@ const MONSTER_NAV_OBSTACLES = Object.freeze([
 const MONSTER_BRIDGE_HALF_WIDTH = 1.8;
 const MONSTER_BRIDGE_MIN_Z = -10.35;
 const MONSTER_BRIDGE_MAX_Z = 6.35;
+const MONSTER_MAP_WALKABLE_HALF = 32.5;
+const MONSTER_PRONTERA_WALKABLE_HALF = 52.5;
+const monsterEdgeClearance = (sceneManager, x, z) => {
+    const half = sceneManager?.currentMap === 'prontera' ? MONSTER_PRONTERA_WALKABLE_HALF : MONSTER_MAP_WALKABLE_HALF;
+    return Math.min(half - Math.abs(x), half - Math.abs(z));
+};
+const isMonsterInsideBounds = (sceneManager, x, z, padding = 0.8) => monsterEdgeClearance(sceneManager, x, z) >= padding;
 // The river and its walkable bridge corridor are shared by every playable
 // combat map. Keeping this map-agnostic prevents local fallback monsters from
 // freezing at the bank when the player crosses the river outside Prontera.
 const isMonsterBridge = (_sceneManager, x, z) => Math.abs(x) <= MONSTER_BRIDGE_HALF_WIDTH
     && z >= MONSTER_BRIDGE_MIN_Z && z <= MONSTER_BRIDGE_MAX_Z;
+const buildMonsterBridgeRoute = (monster, player) => {
+    if (monster.isWaterMonster || !player) return null;
+    const riverCenter = x => Math.sin(x * 0.08) * 10 - 2;
+    const fromDelta = monster.mesh.position.z - riverCenter(monster.mesh.position.x);
+    const targetDelta = player.mesh.position.z - riverCenter(player.mesh.position.x);
+    if (fromDelta * targetDelta >= -1.0) return null;
+    const side = fromDelta >= 0 ? 1 : -1;
+    return [
+        new THREE.Vector3(0, monster.mesh.position.y, -2 + side * 8.8),
+        new THREE.Vector3(0, monster.mesh.position.y, -2 + side * 5.75),
+        new THREE.Vector3(0, monster.mesh.position.y, -2 - side * 5.75),
+        new THREE.Vector3(0, monster.mesh.position.y, -2 - side * 8.8),
+        player.mesh.position.clone(),
+    ];
+};
 const isMonsterRailBand = (sceneManager, x, z, padding = 0) => {
     if (sceneManager?.currentMap !== 'prontera' || isMonsterBridge(sceneManager, x, z)) return false;
     const center = Math.sin(x * 0.08) * 10 - 2;
@@ -136,6 +158,10 @@ export class Monster {
 
         // Aggro state (chase + attack the player when provoked or approached).
         this._aggroUntil = 0;
+        this._chaseWaypoints = [];
+        this._chaseWaypointIndex = 0;
+        this._chaseStuckTime = 0;
+        this._chaseBias = 1;
         this._atkCd = 0;
         this._attackAnim = 0;
         this._attackAnimDuration = 0.72;
@@ -1325,45 +1351,89 @@ export class Monster {
                 const reach = 1.0 + this.data.size * (this._scale || 1) * 0.6;
                 if (pdist > reach) {
                     const spd = Math.max(0.2, (this.data.speed * 2.2 + 6.0) * dt);
+                    const oppositeBanks = !this.isWaterMonster
+                        && (this.mesh.position.z - (Math.sin(this.mesh.position.x * 0.08) * 10 - 2))
+                        * (player.mesh.position.z - (Math.sin(player.mesh.position.x * 0.08) * 10 - 2)) < -1.0;
+                    if (!oppositeBanks) {
+                        this._chaseWaypoints = [];
+                        this._chaseWaypointIndex = 0;
+                    } else if (!this._chaseWaypoints.length) {
+                        this._chaseWaypoints = buildMonsterBridgeRoute(this, player) || [];
+                        this._chaseWaypointIndex = 0;
+                    }
+                    const finalWaypoint = this._chaseWaypoints.length - 1;
+                    if (finalWaypoint >= 0) this._chaseWaypoints[finalWaypoint].copy(player.mesh.position);
+                    const waypoint = finalWaypoint >= 0
+                        ? this._chaseWaypoints[Math.min(this._chaseWaypointIndex, finalWaypoint)]
+                        : player.mesh.position;
+                    const goalDx = waypoint.x - this.mesh.position.x;
+                    const goalDz = waypoint.z - this.mesh.position.z;
+                    const goalDist = Math.hypot(goalDx, goalDz) || 0.001;
                     const requiredEnv = this.data.environment || 'ground';
                     const validStep = (x, z) => {
+                        if (!isMonsterInsideBounds(sceneManager, x, z, 0.8)) return false;
                         if (!sceneManager) return true;
                         if (sceneManager.isInArena?.(x, z)) return false;
                         if (requiredEnv !== 'water' && isMonsterNavObstacle(sceneManager, x, z, 0.65)) return false;
                         if (requiredEnv !== 'water' && isMonsterRailBand(sceneManager, x, z, 0.65)) return false;
                         if (requiredEnv !== 'water' && isMonsterBridge(sceneManager, x, z)) return true;
+                        // During an active revenge chase, land monsters may leave
+                        // their spawn biome. Otherwise cave/mountain labels can
+                        // trap them forever at the edge of the player's path.
+                        if (requiredEnv !== 'water') return true;
                         return sceneManager.getEnvironmentAt(this._environmentProbe.set(x, 0, z)) === requiredEnv;
                     };
-                    const forwardX = adx / pdist;
-                    const forwardZ = adz / pdist;
+                    const forwardX = goalDx / goalDist;
+                    const forwardZ = goalDz / goalDist;
                     const sideX = -forwardZ;
                     const sideZ = forwardX;
-                    const angles = [0, Math.PI / 7, -Math.PI / 7, Math.PI * 2 / 7,
-                        -Math.PI * 2 / 7, Math.PI * 3 / 7, -Math.PI * 3 / 7,
-                        Math.PI / 2, -Math.PI / 2];
+                    const angles = [0, Math.PI / 7, -Math.PI / 7, Math.PI / 10, -Math.PI / 10,
+                        Math.PI / 5, -Math.PI / 5, Math.PI * 3 / 10, -Math.PI * 3 / 10,
+                        Math.PI * 2 / 5, -Math.PI * 2 / 5, Math.PI / 2, -Math.PI / 2,
+                        Math.PI * 3 / 5, -Math.PI * 3 / 5, Math.PI * 4 / 5, -Math.PI * 4 / 5, Math.PI];
                     let nextX = this.mesh.position.x;
                     let nextZ = this.mesh.position.z;
                     let bestScore = -Infinity;
-                    for (const angle of angles) {
-                        const dirX = forwardX * Math.cos(angle) + sideX * Math.sin(angle);
-                        const dirZ = forwardZ * Math.cos(angle) + sideZ * Math.sin(angle);
-                        const candidateX = this.mesh.position.x + dirX * spd;
-                        const candidateZ = this.mesh.position.z + dirZ * spd;
-                        if (!validStep(candidateX, candidateZ)) continue;
-                        const progress = (candidateX - this.mesh.position.x) * forwardX + (candidateZ - this.mesh.position.z) * forwardZ;
-                        const lateral = Math.abs((candidateX - this.mesh.position.x) * sideX + (candidateZ - this.mesh.position.z) * sideZ);
-                        const score = progress - lateral * 0.22 - Math.abs(angle) * 0.04;
-                        if (score > bestScore) {
-                            bestScore = score;
-                            nextX = candidateX;
-                            nextZ = candidateZ;
+                    const probeSteps = [Math.min(goalDist, spd), Math.min(goalDist, spd * 2.4)];
+                    for (const probeStep of probeSteps) {
+                        for (const angle of angles) {
+                            const dirX = forwardX * Math.cos(angle) + sideX * Math.sin(angle);
+                            const dirZ = forwardZ * Math.cos(angle) + sideZ * Math.sin(angle);
+                            const candidateX = this.mesh.position.x + dirX * probeStep;
+                            const candidateZ = this.mesh.position.z + dirZ * probeStep;
+                            if (!validStep(candidateX, candidateZ)) continue;
+                            const progress = (candidateX - this.mesh.position.x) * forwardX + (candidateZ - this.mesh.position.z) * forwardZ;
+                            const lateralSigned = (candidateX - this.mesh.position.x) * sideX + (candidateZ - this.mesh.position.z) * sideZ;
+                            const lateral = Math.abs(lateralSigned);
+                            const edge = Math.max(0, monsterEdgeClearance(sceneManager, candidateX, candidateZ));
+                            const edgeRisk = Math.max(0, 3.5 - edge);
+                            const score = progress - lateral * 0.22
+                                - lateral * 0.16 + lateralSigned * this._chaseBias * 0.035
+                                + Math.min(8, edge) * 0.025 - edgeRisk * 1.35
+                                - Math.abs(angle) * 0.018;
+                            if (score > bestScore) {
+                                bestScore = score;
+                                nextX = candidateX;
+                                nextZ = candidateZ;
+                            }
                         }
+                        if (bestScore > -Infinity) break;
                     }
-                    if (bestScore <= -Infinity) this._aggroBlockedTime += dt;
-                    else this._aggroBlockedTime = 0;
+                    if (bestScore <= -Infinity) {
+                        this._aggroBlockedTime += dt;
+                        this._chaseStuckTime += dt;
+                        if (this._chaseStuckTime >= 0.18) this._chaseBias *= -1;
+                    } else {
+                        this._aggroBlockedTime = 0;
+                        this._chaseStuckTime = 0;
+                    }
                     const moved = Math.hypot(nextX - this.mesh.position.x, nextZ - this.mesh.position.z) > 0.0001;
                     this.mesh.position.x = nextX;
                     this.mesh.position.z = nextZ;
+                    if (finalWaypoint >= 0 && this._chaseWaypointIndex < finalWaypoint
+                        && this.mesh.position.distanceTo(this._chaseWaypoints[this._chaseWaypointIndex]) <= 1.35) {
+                        this._chaseWaypointIndex += 1;
+                    }
                     this.mesh.rotation.y = Math.atan2(adx, adz);
                     this._aggroState = 'enraged';
                     this._bullRushActive = moved;
@@ -1544,6 +1614,10 @@ export class Monster {
         // BUGFIX: Reset aggro state when monster respawns
         // Prevents monster from immediately attacking player after respawn
         this._aggroUntil = 0;
+        this._chaseWaypoints = [];
+        this._chaseWaypointIndex = 0;
+        this._chaseStuckTime = 0;
+        this._chaseBias = 1;
         this._atkCd = 0;
         this._attackAnim = 0;
         this._serverEnraged = false;
