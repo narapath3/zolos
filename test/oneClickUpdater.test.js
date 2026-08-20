@@ -37,6 +37,9 @@ test('updater validates code, installs deterministic dependencies, and checks he
   assert.match(ps1, /Windows file-lock error/);
   assert.match(ps1, /Stop-ZolosBackend[\s\S]*Invoke-NpmCiWithRetry/);
   assert.match(ps1, /Restarting the previous backend after a failed same-commit update/);
+  assert.match(ps1, /continuing with the existing dependency tree/);
+  assert.match(ps1, /building with the existing frontend node_modules tree/);
+  assert.match(ps1, /return \$false/);
 });
 
 test('one-click launcher downloads the latest updater and builds the VPS frontend', () => {

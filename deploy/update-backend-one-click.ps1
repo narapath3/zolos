@@ -64,11 +64,15 @@ function Invoke-NpmCiWithRetry([string]$NpmPath, [string]$WorkingDirectory, [str
         try {
             Write-Step "$Label (attempt $attempt/$maxAttempts)..."
             Invoke-Native $NpmPath $Arguments $WorkingDirectory
-            return
+            return $true
         } catch {
             $message = $_.Exception.Message
             $isWindowsLock = $message -match '(?i)(-4048|EPERM|EBUSY|operation was rejected|file already in use|access is denied)'
-            if (-not $isWindowsLock -or $attempt -eq $maxAttempts) { throw }
+            if (-not $isWindowsLock) { throw }
+            if ($attempt -eq $maxAttempts) {
+                Write-Warn "$Label remains blocked by a Windows file lock after $maxAttempts attempts; continuing with the existing dependency tree. Do not run npm audit fix manually."
+                return $false
+            }
             Write-Warn "$Label encountered a Windows file-lock error; waiting before retry $($attempt + 1)/$maxAttempts. Do not run npm audit fix manually."
             Start-Sleep -Seconds (3 * $attempt)
         }
@@ -265,10 +269,12 @@ try {
     Stop-ZolosBackend
     Stop-ZolosFrontendIfRunning
 
-    Invoke-NpmCiWithRetry $Npm $ServerPath @('ci', '--omit=dev', '--no-audit', '--no-fund') 'Installing backend production dependencies with npm.cmd'
+    $backendInstallOk = Invoke-NpmCiWithRetry $Npm $ServerPath @('ci', '--omit=dev', '--no-audit', '--no-fund') 'Installing backend production dependencies with npm.cmd'
+    if ($backendInstallOk -eq $false) { Write-Warn 'Backend dependency install was locked; preserving the existing backend node_modules tree.' }
 
     if ($RunFrontendBuild) {
-        Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--no-audit', '--no-fund') 'Installing frontend dependencies with npm.cmd'
+        $frontendInstallOk = Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--no-audit', '--no-fund') 'Installing frontend dependencies with npm.cmd'
+        if ($frontendInstallOk -eq $false) { Write-Warn 'Frontend dependency install was locked; building with the existing frontend node_modules tree.' }
         Write-Step 'Building frontend dist for the VPS static server...'
         Invoke-Native $Npm @('run', 'build') $RepoPath
     }
@@ -308,7 +314,8 @@ try {
             Write-Warn "Rolling back code to known-good commit $script:BeforeCommit..."
             & $Git -C $RepoPath reset --hard $script:BeforeCommit
             if ($LASTEXITCODE -eq 0) {
-                Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--omit=dev', '--no-audit', '--no-fund', '--prefix', (Join-Path $RepoPath 'server')) 'Installing rollback backend dependencies'
+                $rollbackInstallOk = Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--omit=dev', '--no-audit', '--no-fund', '--prefix', (Join-Path $RepoPath 'server')) 'Installing rollback backend dependencies'
+                if ($rollbackInstallOk -eq $false) { Write-Warn 'Rollback dependency install was locked; starting with the existing dependency tree.' }
                 $script:StartedProcess = Start-ZolosBackend $Node $ServerPath $LogDir
                 if ($script:FrontendWasRunning) {
                     $rollbackFrontend = Start-ZolosFrontend $Node $RepoPath $LogDir
