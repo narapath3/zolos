@@ -1113,12 +1113,13 @@ export class Monster {
 
     // ===== Server-authoritative helpers (Phase 2) =====
     // The server owns HP + position; the client only renders + interpolates.
-    setServerTarget(x, z, rot, serverMoving = false) {
+    setServerTarget(x, z, rot, serverMoving = false, bullRush = false) {
         const targetMoved = this._srvTargetX !== undefined
             && Math.hypot(Number(x) - this._srvTargetX, Number(z) - this._srvTargetZ) > 0.003;
         this._srvTargetX = x; this._srvTargetZ = z; this._srvRot = rot;
-        if (targetMoved || serverMoving) this._srvMotionHold = 0.24;
+        if (targetMoved || serverMoving || bullRush) this._srvMotionHold = bullRush ? 0.42 : 0.24;
         this._serverMoving = Boolean(serverMoving);
+        this._serverBullRush = Boolean(bullRush);
         this._serverControlled = true;
     }
     setServerHp(hp, maxHp) {
@@ -1154,7 +1155,8 @@ export class Monster {
         if (this.isAmbient || !this.bodyMesh) return;
         const size = Number(this.data.size) || 1;
         const enraged = this._enraged ? 1 : 0;
-        const phase = this.animTimer * (enraged ? 8.2 : 3.0);
+        const bullRush = this._bullRushActive === true;
+        const phase = this.animTimer * (bullRush ? 13.5 : (enraged ? 8.2 : 3.0));
         const gait = moving ? Math.sin(phase) : 0;
         const gaitAbs = moving ? Math.abs(gait) : 0;
         const attackActive = this._attackAnim > 0;
@@ -1167,10 +1169,12 @@ export class Monster {
         const baseY = size * 0.4;
         const attackHop = style === 'slam' ? Math.sin(Math.min(1, p / 0.55) * Math.PI) * 0.28 : strike * 0.14;
         const forwardLunge = style === 'lunge' ? strike * 0.24 : strike * 0.12;
+        const rushBob = bullRush ? gaitAbs * 0.11 * size : 0;
+        const rushLean = bullRush ? -0.34 : (enraged ? (moving ? -0.18 : -0.08) : 0);
 
-        this.bodyMesh.position.y = baseY + bounce + attackHop * size;
-        this.bodyMesh.position.z = (moving ? gaitAbs * 0.045 * size : 0) + forwardLunge * size;
-        this.bodyMesh.rotation.x = (enraged ? (moving ? -0.18 : -0.08) : 0)
+        this.bodyMesh.position.y = baseY + bounce + attackHop * size + (bullRush ? gaitAbs * 0.035 * size : 0);
+        this.bodyMesh.position.z = (moving ? gaitAbs * 0.045 * size : 0) + rushBob + forwardLunge * size;
+        this.bodyMesh.rotation.x = rushLean
             - windup * 0.24 + strike * (style === 'lunge' ? 0.48 : 0.28);
         this.bodyMesh.rotation.z = (enraged ? gait * 0.075 : gait * 0.018)
             + (style === 'energy' ? Math.sin(p * Math.PI * 2) * 0.16 : -windup * 0.12 + strike * 0.18);
@@ -1200,12 +1204,15 @@ export class Monster {
             const movedThisFrame = Math.hypot(this.mesh.position.x - beforeX, this.mesh.position.z - beforeZ);
             const residual = Math.hypot(this._srvTargetX - this.mesh.position.x, this._srvTargetZ - this.mesh.position.z);
             const serverMoving = this._serverMoving === true;
+            const serverBullRush = this._serverBullRush === true;
             this._serverMoving = false;
+            this._serverBullRush = false;
             this._srvMotionHold = Math.max(0, (this._srvMotionHold || 0) - dt);
             // A 10 Hz server may move only a few centimeters per frame after
             // interpolation. Target delta + a short hold keeps the legs moving
             // visibly instead of snapping back to idle between snapshots.
-            this.isMoving = serverMoving || movedThisFrame > 0.001 || residual > 0.012 || this._srvMotionHold > 0;
+            this.isMoving = serverMoving || serverBullRush || movedThisFrame > 0.001 || residual > 0.012 || this._srvMotionHold > 0;
+            this._bullRushActive = serverBullRush || this._srvMotionHold > 0.05;
             if (this._srvRot !== undefined) this.mesh.rotation.y = this._srvRot;
         }
 
@@ -1509,6 +1516,8 @@ export class Monster {
         this._serverEnraged = false;
         this._aggroState = 'idle';
         this._aggroBlockedTime = 0;
+        this._bullRushActive = false;
+        this._serverBullRush = false;
         this.setEnraged(false);
         this.bodyMesh.rotation.x = 0;
         this.bodyMesh.rotation.z = 0;
@@ -1648,7 +1657,7 @@ export class MonsterManager {
             }
             m.setServerHp(s.hp, s.mhp);
             m.setServerEnraged?.(Boolean(s.aggro));
-            m.setServerTarget(s.x, s.z, s.r, s.mv === true);
+            m.setServerTarget(s.x, s.z, s.r, s.mv === true, s.rush === true);
             if (!m.isWaterMonster && m.mesh) {
                 m.mesh.position.y = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
             }

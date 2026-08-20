@@ -22,8 +22,10 @@ const TICK_MS = 100;               // 10 Hz simulation + broadcast
 const SPAWN_RANGE = 12;            // matches client MonsterManager
 const PRONTERA_SPAWN_RANGE = 50;   // expanded field + explorable mountain
 const RESPAWN_MS = 4000;
-const AGGRO_MS = 8000;             // how long a hit keeps a monster hunting
-const AGGRO_LEASH_DISTANCE = 42;   // readable retreat window before revenge ends
+const AGGRO_MS = 10000;             // long enough for a visible revenge charge
+const AGGRO_LEASH_DISTANCE = 60;    // bull rush can cross a readable combat lane
+const BULL_RUSH_SPEED = 12.5;       // faster than the player's 9u/s sprint
+const BULL_RUSH_ATTACK_REACH = 2.2;
 const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
 const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 const ATTACK_REACH = 1.8;
@@ -145,6 +147,7 @@ function makeMonster(id, type, isWater) {
         hitCadenceByChar: new Map(),
         respawnAt: 0,
         moving: false,
+        bullRush: false,
     };
 }
 
@@ -204,6 +207,7 @@ function playerPos(characterId, mapId) {
 function stepMonster(m, mapId, now, dtSec) {
     if (!m.alive) return;
     m.moving = false;
+    m.bullRush = false;
     const def = cfg.defs.get(m.type);
     const speed = def ? Math.max(0.7, def.speed) : 1;
 
@@ -222,7 +226,7 @@ function stepMonster(m, mapId, now, dtSec) {
         if (pp) {
             const dx = pp.x - m.x, dz = pp.z - m.z;
             const dist = Math.hypot(dx, dz) || 0.001;
-            if (dist > ATTACK_REACH) {
+            if (dist > BULL_RUSH_ATTACK_REACH) {
                 // Keep chasing while the player retreats, but stop after a
                 // generous readable leash instead of following across the map.
                 if (dist > AGGRO_LEASH_DISTANCE) {
@@ -233,8 +237,9 @@ function stepMonster(m, mapId, now, dtSec) {
                     m.targetZ = m.spawnZ;
                     return;
                 }
-                const chaseSpeed = Math.max(5.8, speed * 1.9 + 4.5);
+                const chaseSpeed = Math.max(BULL_RUSH_SPEED, speed * 2.2 + 6.0);
                 const step = Math.min(dist, chaseSpeed * dtSec);
+                m.bullRush = true;
                 let nextX = m.x + (dx / dist) * step;
                 let nextZ = m.z + (dz / dist) * step;
                 if (!canMonsterChaseOccupy(m, mapId, nextX, nextZ)) {
@@ -312,6 +317,7 @@ function broadcastMap(mapId, world) {
             r: Math.round(m.rot * 100) / 100,
             hp: m.hp, mhp: m.maxHp,
             mv: Boolean(m.moving),
+            rush: Boolean(m.bullRush),
             // Presentation-only state; target ownership and combat timing stay
             // authoritative on the server.
             aggro: Boolean(m.aggroChar && Date.now() < m.aggroUntil),

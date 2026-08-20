@@ -57,8 +57,11 @@ test('aggro chase keeps moving around blocked terrain instead of cancelling reve
   assert.match(serverSource, /const sideX = -dz \/ dist/);
   assert.match(serverSource, /const detour = candidates\.find/);
   assert.match(serverSource, /if \(dist > AGGRO_LEASH_DISTANCE\)/);
-  assert.match(serverSource, /const chaseSpeed = Math\.max\(5\.8/);
+  assert.match(serverSource, /const chaseSpeed = Math\.max\(BULL_RUSH_SPEED/);
+  assert.match(serverSource, /const BULL_RUSH_SPEED = 12\.5/);
+  assert.match(serverSource, /BULL_RUSH_ATTACK_REACH = 2\.2/);
   assert.match(serverSource, /mv: Boolean\(m\.moving\)/);
+  assert.match(serverSource, /rush: Boolean\(m\.bullRush\)/);
 });
 
 test('local and server attack presentations count down instead of staying frozen', () => {
@@ -68,9 +71,11 @@ test('local and server attack presentations count down instead of staying frozen
   assert.match(mainSource, /lastMonsterAttackFx/);
   assert.match(mainSource, /spawnMonsterHitImpact/);
   assert.match(serverSource, /seq: m\.attackSeq/);
-  assert.match(monsterSource, /setServerTarget\(x, z, rot, serverMoving = false\)/);
-  assert.match(monsterSource, /this\._srvMotionHold = 0\.24/);
-  assert.match(monsterSource, /s\.mv === true/);
+  assert.match(monsterSource, /setServerTarget\(x, z, rot, serverMoving = false, bullRush = false\)/);
+  assert.match(monsterSource, /this\._srvMotionHold = bullRush \? 0\.42 : 0\.24/);
+  assert.match(monsterSource, /const bullRush = this\._bullRushActive === true/);
+  assert.match(monsterSource, /const rushLean = bullRush \? -0\.34/);
+  assert.match(monsterSource, /s\.mv === true, s\.rush === true/);
 });
 
 test('server aggro state is replicated as presentation-only state and clears on expiry', () => {
