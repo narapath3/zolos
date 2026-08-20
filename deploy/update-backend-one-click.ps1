@@ -18,6 +18,8 @@ $script:PulledNewCommit = $false
 $script:FrontendWasRunning = $false
 $script:BackendWasRunning = $false
 $script:BackendStopped = $false
+$script:FrontendStagePath = $null
+$script:FrontendDistBackup = $null
 $script:LogFile = $null
 
 function Write-Step([string]$Message) {
@@ -77,6 +79,45 @@ function Invoke-NpmCiWithRetry([string]$NpmPath, [string]$WorkingDirectory, [str
             Start-Sleep -Seconds (3 * $attempt)
         }
     }
+}
+
+function Build-FrontendInStaging([string]$NpmPath, [string]$RepoPath) {
+    $stageRoot = Join-Path $env:TEMP ("zolos-frontend-stage-{0}" -f (Get-Date -Format 'yyyyMMddHHmmss'))
+    New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
+    $script:FrontendStagePath = $stageRoot
+    $entries = @(
+        'index.html', 'package.json', 'package-lock.json', 'tsconfig.json',
+        'tsconfig.app.json', 'vite.config.js', 'vite.config.ts', 'vite.config.mjs',
+        'public', 'src'
+    )
+    foreach ($entry in $entries) {
+        $source = Join-Path $RepoPath $entry
+        if (Test-Path $source) {
+            Copy-Item -LiteralPath $source -Destination $stageRoot -Recurse -Force
+        }
+    }
+    if (-not (Test-Path (Join-Path $stageRoot 'package-lock.json'))) {
+        throw "Frontend staging is missing package-lock.json: $stageRoot"
+    }
+    Write-Step "Installing frontend dependencies in isolated staging: $stageRoot"
+    $stageInstallOk = Invoke-NpmCiWithRetry $NpmPath $stageRoot @('ci', '--no-audit', '--no-fund') 'Installing staged frontend dependencies'
+    if ($stageInstallOk -eq $false) {
+        throw 'Staging dependency install remained locked; refusing to build from an incomplete dependency tree.'
+    }
+    Write-Step 'Building frontend dist from isolated staging...'
+    Invoke-Native $NpmPath @('run', 'build') $stageRoot
+    $stageDist = Join-Path $stageRoot 'dist'
+    if (-not (Test-Path $stageDist)) { throw "Staging frontend build did not produce dist: $stageDist" }
+
+    $distPath = Join-Path $RepoPath 'dist'
+    if (Test-Path $distPath) {
+        $backup = Join-Path $env:TEMP ("zolos-dist-backup-{0}" -f (Get-Date -Format 'yyyyMMddHHmmss'))
+        Copy-Item -LiteralPath $distPath -Destination $backup -Recurse -Force
+        $script:FrontendDistBackup = $backup
+        Remove-Item -LiteralPath $distPath -Recurse -Force
+    }
+    Copy-Item -LiteralPath $stageDist -Destination $distPath -Recurse -Force
+    Write-Ok 'Frontend dist replaced from the successful isolated staging build.'
 }
 
 function Stop-ZolosBackend {
@@ -273,10 +314,7 @@ try {
     if ($backendInstallOk -eq $false) { Write-Warn 'Backend dependency install was locked; preserving the existing backend node_modules tree.' }
 
     if ($RunFrontendBuild) {
-        $frontendInstallOk = Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--no-audit', '--no-fund') 'Installing frontend dependencies with npm.cmd'
-        if ($frontendInstallOk -eq $false) { Write-Warn 'Frontend dependency install was locked; building with the existing frontend node_modules tree.' }
-        Write-Step 'Building frontend dist for the VPS static server...'
-        Invoke-Native $Npm @('run', 'build') $RepoPath
+        Build-FrontendInStaging $Npm $RepoPath
     }
     $script:StartedProcess = Start-ZolosBackend $Node $ServerPath $LogDir
     Start-Sleep -Seconds 3
@@ -297,6 +335,8 @@ try {
         Write-Ok "Frontend static server restarted (PID=$($frontend.Id))."
     }
 
+    if ($script:FrontendStagePath -and (Test-Path $script:FrontendStagePath)) { Remove-Item -LiteralPath $script:FrontendStagePath -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($script:FrontendDistBackup -and (Test-Path $script:FrontendDistBackup)) { Remove-Item -LiteralPath $script:FrontendDistBackup -Recurse -Force -ErrorAction SilentlyContinue }
     Write-Ok "Backend update completed. Commit=$script:AfterCommit PID=$($script:StartedProcess.Id)"
     Write-Host "[ZOLOS] Logs: $LogDir" -ForegroundColor Gray
     Write-Host "[ZOLOS] Backup: $backupDir" -ForegroundColor Gray
@@ -307,6 +347,15 @@ try {
 
     if ($script:StartedProcess) {
         try { Stop-Process -Id $script:StartedProcess.Id -Force -ErrorAction SilentlyContinue } catch { }
+    }
+    if ($script:FrontendStagePath -and (Test-Path $script:FrontendStagePath)) { Remove-Item -LiteralPath $script:FrontendStagePath -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($script:FrontendDistBackup -and (Test-Path $script:FrontendDistBackup)) {
+        try {
+            $distPath = Join-Path $RepoPath 'dist'
+            if (Test-Path $distPath) { Remove-Item -LiteralPath $distPath -Recurse -Force }
+            Copy-Item -LiteralPath $script:FrontendDistBackup -Destination $distPath -Recurse -Force
+            Write-Warn 'Restored the previous frontend dist after update failure.'
+        } catch { Write-Warn "Could not restore the previous frontend dist: $($_.Exception.Message)" }
     }
 
     if ($script:PulledNewCommit -and $script:BeforeCommit) {

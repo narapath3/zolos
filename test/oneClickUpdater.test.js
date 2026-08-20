@@ -38,8 +38,12 @@ test('updater validates code, installs deterministic dependencies, and checks he
   assert.match(ps1, /Stop-ZolosBackend[\s\S]*Invoke-NpmCiWithRetry/);
   assert.match(ps1, /Restarting the previous backend after a failed same-commit update/);
   assert.match(ps1, /continuing with the existing dependency tree/);
-  assert.match(ps1, /building with the existing frontend node_modules tree/);
   assert.match(ps1, /return \$false/);
+  assert.match(ps1, /Build-FrontendInStaging/);
+  assert.match(ps1, /zolos-frontend-stage-/);
+  assert.match(ps1, /Staging dependency install remained locked/);
+  assert.match(ps1, /Frontend dist replaced from the successful isolated staging build/);
+  assert.match(ps1, /Restored the previous frontend dist after update failure/);
 });
 
 test('one-click launcher downloads the latest updater and builds the VPS frontend', () => {
