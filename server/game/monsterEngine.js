@@ -65,6 +65,14 @@ function canMonsterOccupy(m, mapId, x, z, def) {
     const required = m.isWater ? 'water' : (def?.environment || 'ground');
     return environmentAt(mapId, x, z) === required;
 }
+
+// Aggro movement is allowed to cross land biome labels. A cave or mountain
+// monster can be struck at the edge and must be able to leave that edge to
+// pursue the attacker; only water and arena boundaries remain hard blockers.
+function canMonsterChaseOccupy(m, mapId, x, z) {
+    if (!Number.isFinite(x) || !Number.isFinite(z) || inArena(mapId, x, z)) return false;
+    return m.isWater ? isWaterAt(x, z) : !isWaterAt(x, z);
+}
 function pickLandPos(mapId, environment = 'ground') {
     for (let i = 0; i < 60; i++) {
         let x, z;
@@ -136,6 +144,7 @@ function makeMonster(id, type, isWater) {
         dmgByChar: new Map(),
         hitCadenceByChar: new Map(),
         respawnAt: 0,
+        moving: false,
     };
 }
 
@@ -194,6 +203,7 @@ function playerPos(characterId, mapId) {
 // ---------------- simulation ----------------
 function stepMonster(m, mapId, now, dtSec) {
     if (!m.alive) return;
+    m.moving = false;
     const def = cfg.defs.get(m.type);
     const speed = def ? Math.max(0.7, def.speed) : 1;
 
@@ -223,10 +233,11 @@ function stepMonster(m, mapId, now, dtSec) {
                     m.targetZ = m.spawnZ;
                     return;
                 }
-                const step = Math.min(dist, (speed + 1.4) * 1.5 * dtSec);
+                const chaseSpeed = Math.max(5.8, speed * 1.9 + 4.5);
+                const step = Math.min(dist, chaseSpeed * dtSec);
                 let nextX = m.x + (dx / dist) * step;
                 let nextZ = m.z + (dz / dist) * step;
-                if (!canMonsterOccupy(m, mapId, nextX, nextZ, def)) {
+                if (!canMonsterChaseOccupy(m, mapId, nextX, nextZ)) {
                     // Arc around the obstacle instead of dropping aggro. This is
                     // especially important beside Prontera's curved river bank.
                     const sideX = -dz / dist;
@@ -238,13 +249,14 @@ function stepMonster(m, mapId, now, dtSec) {
                         [m.x - sideX * sideStep + (dx / dist) * step * 0.35,
                             m.z - sideZ * sideStep + (dz / dist) * step * 0.35],
                     ];
-                    const detour = candidates.find(([x, z]) => canMonsterOccupy(m, mapId, x, z, def));
+                    const detour = candidates.find(([x, z]) => canMonsterChaseOccupy(m, mapId, x, z));
                     if (detour) [nextX, nextZ] = detour;
                     else { nextX = m.x; nextZ = m.z; }
                 }
                 if (nextX !== m.x || nextZ !== m.z) {
                     m.x = nextX;
                     m.z = nextZ;
+                    m.moving = true;
                 }
             } else if (now >= m.atkReadyAt) {
                 m.atkReadyAt = now + ATTACK_CD_MS;
@@ -299,6 +311,7 @@ function broadcastMap(mapId, world) {
             x: Math.round(m.x * 100) / 100, z: Math.round(m.z * 100) / 100,
             r: Math.round(m.rot * 100) / 100,
             hp: m.hp, mhp: m.maxHp,
+            mv: Boolean(m.moving),
             // Presentation-only state; target ownership and combat timing stay
             // authoritative on the server.
             aggro: Boolean(m.aggroChar && Date.now() < m.aggroUntil),

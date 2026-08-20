@@ -1113,8 +1113,12 @@ export class Monster {
 
     // ===== Server-authoritative helpers (Phase 2) =====
     // The server owns HP + position; the client only renders + interpolates.
-    setServerTarget(x, z, rot) {
+    setServerTarget(x, z, rot, serverMoving = false) {
+        const targetMoved = this._srvTargetX !== undefined
+            && Math.hypot(Number(x) - this._srvTargetX, Number(z) - this._srvTargetZ) > 0.003;
         this._srvTargetX = x; this._srvTargetZ = z; this._srvRot = rot;
+        if (targetMoved || serverMoving) this._srvMotionHold = 0.24;
+        this._serverMoving = Boolean(serverMoving);
         this._serverControlled = true;
     }
     setServerHp(hp, maxHp) {
@@ -1188,11 +1192,20 @@ export class Monster {
 
         // Interpolate toward the latest server position (~10 Hz snapshots).
         if (this._srvTargetX !== undefined) {
+            const beforeX = this.mesh.position.x;
+            const beforeZ = this.mesh.position.z;
             const k = Math.min(1, dt * 12);
             this.mesh.position.x += (this._srvTargetX - this.mesh.position.x) * k;
             this.mesh.position.z += (this._srvTargetZ - this.mesh.position.z) * k;
-            const moved = Math.hypot(this._srvTargetX - this.mesh.position.x, this._srvTargetZ - this.mesh.position.z);
-            this.isMoving = moved > 0.02;
+            const movedThisFrame = Math.hypot(this.mesh.position.x - beforeX, this.mesh.position.z - beforeZ);
+            const residual = Math.hypot(this._srvTargetX - this.mesh.position.x, this._srvTargetZ - this.mesh.position.z);
+            const serverMoving = this._serverMoving === true;
+            this._serverMoving = false;
+            this._srvMotionHold = Math.max(0, (this._srvMotionHold || 0) - dt);
+            // A 10 Hz server may move only a few centimeters per frame after
+            // interpolation. Target delta + a short hold keeps the legs moving
+            // visibly instead of snapping back to idle between snapshots.
+            this.isMoving = serverMoving || movedThisFrame > 0.001 || residual > 0.012 || this._srvMotionHold > 0;
             if (this._srvRot !== undefined) this.mesh.rotation.y = this._srvRot;
         }
 
@@ -1635,7 +1648,7 @@ export class MonsterManager {
             }
             m.setServerHp(s.hp, s.mhp);
             m.setServerEnraged?.(Boolean(s.aggro));
-            m.setServerTarget(s.x, s.z, s.r);
+            m.setServerTarget(s.x, s.z, s.r, s.mv === true);
             if (!m.isWaterMonster && m.mesh) {
                 m.mesh.position.y = this.sceneManager?.getTerrainHeight?.(s.x, s.z) || 0;
             }

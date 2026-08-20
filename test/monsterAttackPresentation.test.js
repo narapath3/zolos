@@ -57,6 +57,8 @@ test('aggro chase keeps moving around blocked terrain instead of cancelling reve
   assert.match(serverSource, /const sideX = -dz \/ dist/);
   assert.match(serverSource, /const detour = candidates\.find/);
   assert.match(serverSource, /if \(dist > AGGRO_LEASH_DISTANCE\)/);
+  assert.match(serverSource, /const chaseSpeed = Math\.max\(5\.8/);
+  assert.match(serverSource, /mv: Boolean\(m\.moving\)/);
 });
 
 test('local and server attack presentations count down instead of staying frozen', () => {
@@ -66,6 +68,9 @@ test('local and server attack presentations count down instead of staying frozen
   assert.match(mainSource, /lastMonsterAttackFx/);
   assert.match(mainSource, /spawnMonsterHitImpact/);
   assert.match(serverSource, /seq: m\.attackSeq/);
+  assert.match(monsterSource, /setServerTarget\(x, z, rot, serverMoving = false\)/);
+  assert.match(monsterSource, /this\._srvMotionHold = 0\.24/);
+  assert.match(monsterSource, /s\.mv === true/);
 });
 
 test('server aggro state is replicated as presentation-only state and clears on expiry', () => {
