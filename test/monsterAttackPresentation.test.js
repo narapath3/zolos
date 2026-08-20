@@ -71,7 +71,8 @@ test('bull rush speed and dust trail are bounded presentation contracts', () => 
   assert.match(monsterSource, /_rushDustCooldown/);
   assert.match(monsterSource, /spawnMonsterRushDust/);
   assert.match(particleSource, /spawnMonsterRushDust\(position, direction = null, intensity = 1\)/);
-  assert.match(particleSource, /this\.perfMonitor\.isLowEndDevice \? 1 : 3/);
+  assert.match(particleSource, /if \(this\.perfMonitor\.isLowEndDevice\) return/);
+  assert.match(particleSource, /particleScale < 0\.6 \? 2 : \(particleScale < 0\.85 \? 3 : 4\)/);
   assert.match(particleSource, /this\.splashEffects\.push\(\{ mesh, velocity, life:/);
 });
 

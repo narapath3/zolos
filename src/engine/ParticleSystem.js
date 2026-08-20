@@ -286,9 +286,9 @@ export class ParticleSystem {
     // reuses the existing splash lifecycle/budget so mobile devices stay safe.
     spawnMonsterRushDust(position, direction = null, intensity = 1) {
         if (!this.effectsEnabled || !position || this._throttleEffect(false)) return;
+        if (this.perfMonitor.isLowEndDevice) return; // ultra-low: skip decorative dust
         const particleScale = this.perfMonitor.getParticleCount();
-        const baseCount = this.perfMonitor.isLowEndDevice ? 1 : 3;
-        const count = Math.max(1, Math.floor(baseCount * particleScale * Math.min(1.25, Math.max(0.6, intensity))));
+        const count = particleScale < 0.6 ? 2 : (particleScale < 0.85 ? 3 : 4);
         const segments = this.perfMonitor.getGeometrySegments();
         const dirX = Number(direction?.x) || 0;
         const dirZ = Number(direction?.z) || 0;
