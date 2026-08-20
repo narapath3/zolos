@@ -13,9 +13,13 @@ test('server monster simulation enforces the same terrain categories as clients'
 
 test('server validates both chase and wander steps and cannot overshoot targets', () => {
   const step = engine.match(/function stepMonster[\s\S]*?\n\}/)?.[0] || '';
-  const occupancyChecks = (step.match(/canMonsterOccupy\(|canMonsterChaseOccupy\(/g) || []).length;
-  assert.ok(occupancyChecks >= 3);
+  assert.match(engine, /function chooseChaseStep\(m, mapId, dx, dz, dist, step\)/);
+  assert.match(engine, /const angles = \[0, Math\.PI \/ 7/);
+  assert.match(engine, /canMonsterChaseOccupy\(m, mapId, candidateX, candidateZ, 0\.65\)/);
   assert.ok((step.match(/Math\.min\(dist,/g) || []).length >= 2);
   assert.match(step, /m\.aggroChar = null;[\s\S]*m\.targetX = m\.spawnX/);
-  assert.match(step, /if \(!canMonster(?:Occupy|ChaseOccupy)\(m, mapId, nextX, nextZ(?:, def)?\)\) \{/);
+  assert.match(step, /const detour = chooseChaseStep\(m, mapId, dx, dz, dist, step\)/);
+  assert.match(engine, /isPronteraRailBand/);
+  assert.match(engine, /isPronteraBridge/);
+  assert.match(engine, /PRONTERA_NAV_OBSTACLES/);
 });

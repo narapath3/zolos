@@ -26,6 +26,29 @@ const RESPAWN_TIME = 3;
 // This is intentionally wider than the attack range so retreating players can
 // see the monster close the gap instead of watching it freeze in place.
 const AGGRO_LEASH_DISTANCE = 42;
+const MONSTER_NAV_OBSTACLES = Object.freeze([
+    { x: 6, z: -15, radius: 5.6 },
+    { x: 10, z: -8, radius: 5.3 },
+]);
+const MONSTER_BRIDGE_HALF_WIDTH = 1.8;
+const MONSTER_BRIDGE_MIN_Z = -10.35;
+const MONSTER_BRIDGE_MAX_Z = 6.35;
+const isMonsterBridge = (sceneManager, x, z) => sceneManager?.currentMap === 'prontera'
+    && Math.abs(x) <= MONSTER_BRIDGE_HALF_WIDTH
+    && z >= MONSTER_BRIDGE_MIN_Z && z <= MONSTER_BRIDGE_MAX_Z;
+const isMonsterRailBand = (sceneManager, x, z, padding = 0) => {
+    if (sceneManager?.currentMap !== 'prontera' || isMonsterBridge(sceneManager, x, z)) return false;
+    const center = Math.sin(x * 0.08) * 10 - 2;
+    return Math.abs(z - center) < 6.35 + padding;
+};
+const isMonsterNavObstacle = (sceneManager, x, z, padding = 0) => {
+    if (sceneManager?.currentMap !== 'prontera') return false;
+    return MONSTER_NAV_OBSTACLES.some((o) => {
+        const dx = x - o.x, dz = z - o.z;
+        const r = o.radius + padding;
+        return dx * dx + dz * dz < r * r;
+    });
+};
 const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 
 let sharedMonsterSkinTexture = null;
@@ -1299,41 +1322,49 @@ export class Monster {
             if (aggroActive) {
                 const reach = 1.0 + this.data.size * (this._scale || 1) * 0.6;
                 if (pdist > reach) {
-                    const spd = (this.data.speed + 1.4) * 1.5 * dt;
-                    const nx = this.mesh.position.x + (adx / pdist) * spd;
-                    const nz = this.mesh.position.z + (adz / pdist) * spd;
+                    const spd = Math.max(0.2, (this.data.speed * 2.2 + 6.0) * dt);
                     const requiredEnv = this.data.environment || 'ground';
                     const validStep = (x, z) => {
                         if (!sceneManager) return true;
                         if (sceneManager.isInArena?.(x, z)) return false;
+                        if (requiredEnv !== 'water' && isMonsterNavObstacle(sceneManager, x, z, 0.65)) return false;
+                        if (requiredEnv !== 'water' && isMonsterRailBand(sceneManager, x, z, 0.65)) return false;
+                        if (requiredEnv !== 'water' && isMonsterBridge(sceneManager, x, z)) return true;
                         return sceneManager.getEnvironmentAt(this._environmentProbe.set(x, 0, z)) === requiredEnv;
                     };
-                    let nextX = nx;
-                    let nextZ = nz;
-                    if (!validStep(nextX, nextZ)) {
-                        // Do not freeze at a fence, rock, or curved river edge.
-                        // Probe perpendicular steps so the monster can arc around
-                        // the obstacle while preserving its environment boundary.
-                        const sideX = -adz / pdist;
-                        const sideZ = adx / pdist;
-                        const sideStep = spd * 1.35;
-                        const candidates = [
-                            [this.mesh.position.x + sideX * sideStep + (adx / pdist) * spd * 0.35,
-                                this.mesh.position.z + sideZ * sideStep + (adz / pdist) * spd * 0.35],
-                            [this.mesh.position.x - sideX * sideStep + (adx / pdist) * spd * 0.35,
-                                this.mesh.position.z - sideZ * sideStep + (adz / pdist) * spd * 0.35],
-                        ];
-                        const detour = candidates.find(([x, z]) => validStep(x, z));
-                        if (detour) [nextX, nextZ] = detour;
-                        else { this._aggroBlockedTime += dt; nextX = this.mesh.position.x; nextZ = this.mesh.position.z; }
-                    } else {
-                        this._aggroBlockedTime = 0;
+                    const forwardX = adx / pdist;
+                    const forwardZ = adz / pdist;
+                    const sideX = -forwardZ;
+                    const sideZ = forwardX;
+                    const angles = [0, Math.PI / 7, -Math.PI / 7, Math.PI * 2 / 7,
+                        -Math.PI * 2 / 7, Math.PI * 3 / 7, -Math.PI * 3 / 7,
+                        Math.PI / 2, -Math.PI / 2];
+                    let nextX = this.mesh.position.x;
+                    let nextZ = this.mesh.position.z;
+                    let bestScore = -Infinity;
+                    for (const angle of angles) {
+                        const dirX = forwardX * Math.cos(angle) + sideX * Math.sin(angle);
+                        const dirZ = forwardZ * Math.cos(angle) + sideZ * Math.sin(angle);
+                        const candidateX = this.mesh.position.x + dirX * spd;
+                        const candidateZ = this.mesh.position.z + dirZ * spd;
+                        if (!validStep(candidateX, candidateZ)) continue;
+                        const progress = (candidateX - this.mesh.position.x) * forwardX + (candidateZ - this.mesh.position.z) * forwardZ;
+                        const lateral = Math.abs((candidateX - this.mesh.position.x) * sideX + (candidateZ - this.mesh.position.z) * sideZ);
+                        const score = progress - lateral * 0.22 - Math.abs(angle) * 0.04;
+                        if (score > bestScore) {
+                            bestScore = score;
+                            nextX = candidateX;
+                            nextZ = candidateZ;
+                        }
                     }
+                    if (bestScore <= -Infinity) this._aggroBlockedTime += dt;
+                    else this._aggroBlockedTime = 0;
                     const moved = Math.hypot(nextX - this.mesh.position.x, nextZ - this.mesh.position.z) > 0.0001;
                     this.mesh.position.x = nextX;
                     this.mesh.position.z = nextZ;
                     this.mesh.rotation.y = Math.atan2(adx, adz);
                     this._aggroState = 'enraged';
+                    this._bullRushActive = moved;
                     this.isMoving = moved;
                 } else {
                     // In range — telegraph a threatening windup and strike on a

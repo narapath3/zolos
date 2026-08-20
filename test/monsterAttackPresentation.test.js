@@ -50,12 +50,12 @@ test('enraged monsters use a universal threat pose even without a species limb r
 });
 
 test('aggro chase keeps moving around blocked terrain instead of cancelling revenge', () => {
-  assert.match(monsterSource, /Do not freeze at a fence, rock, or curved river edge/);
-  assert.match(monsterSource, /const sideX = -adz \/ pdist/);
-  assert.match(monsterSource, /const detour = candidates\.find/);
-  assert.match(serverSource, /Arc around the obstacle instead of dropping aggro/);
-  assert.match(serverSource, /const sideX = -dz \/ dist/);
-  assert.match(serverSource, /const detour = candidates\.find/);
+  assert.match(monsterSource, /isMonsterNavObstacle/);
+  assert.match(monsterSource, /const angles = \[0, Math\.PI \/ 7/);
+  assert.match(monsterSource, /const score = progress - lateral \* 0\.22/);
+  assert.match(serverSource, /function chooseChaseStep\(m, mapId, dx, dz, dist, step\)/);
+  assert.match(serverSource, /const angles = \[0, Math\.PI \/ 7/);
+  assert.match(serverSource, /const detour = chooseChaseStep/);
   assert.match(serverSource, /if \(dist > AGGRO_LEASH_DISTANCE\)/);
   assert.match(serverSource, /const chaseSpeed = Math\.max\(BULL_RUSH_SPEED/);
   assert.match(serverSource, /const BULL_RUSH_SPEED = 12\.5/);

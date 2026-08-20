@@ -71,9 +71,65 @@ function canMonsterOccupy(m, mapId, x, z, def) {
 // Aggro movement is allowed to cross land biome labels. A cave or mountain
 // monster can be struck at the edge and must be able to leave that edge to
 // pursue the attacker; only water and arena boundaries remain hard blockers.
-function canMonsterChaseOccupy(m, mapId, x, z) {
+const PRONTERA_NAV_OBSTACLES = Object.freeze([
+    // Interactive shop footprints; keep monsters from wedging into their props.
+    { x: 6, z: -15, radius: 5.6 },
+    { x: 10, z: -8, radius: 5.3 },
+]);
+const PRONTERA_BRIDGE_HALF_WIDTH = 1.8;
+const PRONTERA_BRIDGE_MIN_Z = -10.35;
+const PRONTERA_BRIDGE_MAX_Z = 6.35;
+const isPronteraBridge = (mapId, x, z) => mapId === 'prontera'
+    && Math.abs(x) <= PRONTERA_BRIDGE_HALF_WIDTH
+    && z >= PRONTERA_BRIDGE_MIN_Z && z <= PRONTERA_BRIDGE_MAX_Z;
+const isPronteraRailBand = (mapId, x, z, padding = 0) => mapId === 'prontera'
+    && !isPronteraBridge(mapId, x, z)
+    && Math.abs(z - riverZ(x)) < 6.35 + padding;
+
+function isNavigationObstacle(mapId, x, z, padding = 0) {
+    if (mapId !== 'prontera') return false;
+    return PRONTERA_NAV_OBSTACLES.some((o) => {
+        const dx = x - o.x, dz = z - o.z;
+        const radius = o.radius + padding;
+        return dx * dx + dz * dz < radius * radius;
+    });
+}
+
+function canMonsterChaseOccupy(m, mapId, x, z, padding = 0.0) {
     if (!Number.isFinite(x) || !Number.isFinite(z) || inArena(mapId, x, z)) return false;
+    if (!m.isWater && isNavigationObstacle(mapId, x, z, padding)) return false;
+    if (!m.isWater && isPronteraRailBand(mapId, x, z, padding)) return false;
+    if (!m.isWater && isPronteraBridge(mapId, x, z)) return true;
     return m.isWater ? isWaterAt(x, z) : !isWaterAt(x, z);
+}
+
+function chooseChaseStep(m, mapId, dx, dz, dist, step) {
+    const forwardX = dx / dist;
+    const forwardZ = dz / dist;
+    const sideX = -forwardZ;
+    const sideZ = forwardX;
+    // Test a fan instead of only left/right. This lets a monster choose a
+    // shallow arc around rails, stalls, shops, and corners while preserving
+    // forward pressure during Bull Rush.
+    const angles = [0, Math.PI / 7, -Math.PI / 7, Math.PI * 2 / 7, -Math.PI * 2 / 7,
+        Math.PI * 3 / 7, -Math.PI * 3 / 7, Math.PI / 2, -Math.PI / 2];
+    let best = null;
+    let bestScore = -Infinity;
+    for (const angle of angles) {
+        const dirX = forwardX * Math.cos(angle) + sideX * Math.sin(angle);
+        const dirZ = forwardZ * Math.cos(angle) + sideZ * Math.sin(angle);
+        const candidateX = m.x + dirX * step;
+        const candidateZ = m.z + dirZ * step;
+        if (!canMonsterChaseOccupy(m, mapId, candidateX, candidateZ, 0.65)) continue;
+        const progress = (candidateX - m.x) * forwardX + (candidateZ - m.z) * forwardZ;
+        const lateral = Math.abs((candidateX - m.x) * sideX + (candidateZ - m.z) * sideZ);
+        const score = progress - lateral * 0.22 - Math.abs(angle) * 0.04;
+        if (score > bestScore) {
+            bestScore = score;
+            best = [candidateX, candidateZ];
+        }
+    }
+    return best;
 }
 function pickLandPos(mapId, environment = 'ground') {
     for (let i = 0; i < 60; i++) {
@@ -240,24 +296,9 @@ function stepMonster(m, mapId, now, dtSec) {
                 const chaseSpeed = Math.max(BULL_RUSH_SPEED, speed * 2.2 + 6.0);
                 const step = Math.min(dist, chaseSpeed * dtSec);
                 m.bullRush = true;
-                let nextX = m.x + (dx / dist) * step;
-                let nextZ = m.z + (dz / dist) * step;
-                if (!canMonsterChaseOccupy(m, mapId, nextX, nextZ)) {
-                    // Arc around the obstacle instead of dropping aggro. This is
-                    // especially important beside Prontera's curved river bank.
-                    const sideX = -dz / dist;
-                    const sideZ = dx / dist;
-                    const sideStep = step * 1.35;
-                    const candidates = [
-                        [m.x + sideX * sideStep + (dx / dist) * step * 0.35,
-                            m.z + sideZ * sideStep + (dz / dist) * step * 0.35],
-                        [m.x - sideX * sideStep + (dx / dist) * step * 0.35,
-                            m.z - sideZ * sideStep + (dz / dist) * step * 0.35],
-                    ];
-                    const detour = candidates.find(([x, z]) => canMonsterChaseOccupy(m, mapId, x, z));
-                    if (detour) [nextX, nextZ] = detour;
-                    else { nextX = m.x; nextZ = m.z; }
-                }
+                const detour = chooseChaseStep(m, mapId, dx, dz, dist, step);
+                const nextX = detour ? detour[0] : m.x;
+                const nextZ = detour ? detour[1] : m.z;
                 if (nextX !== m.x || nextZ !== m.z) {
                     m.x = nextX;
                     m.z = nextZ;
