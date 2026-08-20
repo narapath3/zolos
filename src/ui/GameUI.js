@@ -1325,15 +1325,23 @@ export class GameUI {
     const existing = document.getElementById('fishing-summary-modal');
     if (existing) existing.remove();
     const rarityLabel = { common: 'ธรรมดา', uncommon: 'พบไม่บ่อย', rare: 'หายาก', legendary: 'ตำนาน' };
+    const rarityClass = { common: 'common', uncommon: 'uncommon', rare: 'rare', legendary: 'legendary' };
     const rows = [...session.catches.values()].sort((a, b) => (b.price * b.quantity) - (a.price * a.quantity));
-    const rowMarkup = rows.map(item => `
-      <div class="fishing-summary__row" role="listitem">
+    const featured = rows[0];
+    const rowMarkup = rows.map((item, index) => {
+      const tier = rarityClass[item.rarity] || 'common';
+      const label = rarityLabel[item.rarity] || this._escapeFishingText(item.rarity);
+      return `
+      <article class="fishing-summary__row rarity-${tier}" role="listitem">
+        <span class="fishing-summary__rank">${String(index + 1).padStart(2, '0')}</span>
         <div class="fishing-summary__art">${itemIconMarkup(item.name, item.emoji, 'fishing-summary__item-art')}</div>
-        <div class="fishing-summary__item-copy"><strong>${this._escapeFishingText(item.name)}</strong><span>${rarityLabel[item.rarity] || this._escapeFishingText(item.rarity)} · ${item.price.toLocaleString()} Zeny/ชิ้น</span></div>
-        <strong class="fishing-summary__qty">×${item.quantity.toLocaleString()}</strong>
+        <div class="fishing-summary__item-copy"><div class="fishing-summary__name-line"><strong>${this._escapeFishingText(item.name)}</strong><span class="fishing-summary__rarity-tag">${label}</span></div><span class="fishing-summary__price"><span class="fishing-summary__coin">◈</span> ${item.price.toLocaleString()} Zeny / ชิ้น</span></div>
+        <div class="fishing-summary__qty-block"><strong class="fishing-summary__qty">×${item.quantity.toLocaleString()}</strong><span>จับได้</span></div>
         <strong class="fishing-summary__subtotal">${(item.price * item.quantity).toLocaleString()} Z</strong>
-      </div>`).join('');
+      </article>`;
+    }).join('');
     const duration = Math.max(1, Math.round((Date.now() - session.startedAt) / 1000));
+    const featuredTier = rarityClass[featured?.rarity] || 'common';
     const overlay = document.createElement('div');
     overlay.id = 'fishing-summary-modal';
     overlay.className = 'fishing-summary-overlay';
@@ -1342,11 +1350,14 @@ export class GameUI {
     overlay.setAttribute('aria-labelledby', 'fishing-summary-title');
     overlay.innerHTML = `
       <section class="fishing-summary-card">
-        <header class="fishing-summary__header"><div><p class="fishing-summary__eyebrow">FISHING REPORT</p><h2 id="fishing-summary-title">สรุปผลการตกปลา</h2><p>รอบนี้ใช้เวลา ${duration} วินาที · มูลค่าขายโดยประมาณ</p></div><button type="button" class="fishing-summary__close" aria-label="ปิดสรุปผล">×</button></header>
+        <header class="fishing-summary__header"><div class="fishing-summary__title-wrap"><p class="fishing-summary__eyebrow">FISHING SESSION COMPLETE</p><h2 id="fishing-summary-title">สรุปผลการตกปลา</h2><p>รอบนี้จบแล้ว · มาดูของที่ได้กัน</p></div><button type="button" class="fishing-summary__close" aria-label="ปิดสรุปผล">×</button></header>
+        <div class="fishing-summary__hero rarity-${featuredTier}"><div class="fishing-summary__hero-art">${featured ? itemIconMarkup(featured.name, featured.emoji, 'fishing-summary__featured-art') : ''}<span class="fishing-summary__hero-sparkle">✦</span></div><div class="fishing-summary__hero-copy"><span class="fishing-summary__hero-label">BEST CATCH</span><strong>${featured ? this._escapeFishingText(featured.name) : '—'}</strong><span>${featured ? `${rarityLabel[featured.rarity] || this._escapeFishingText(featured.rarity)} · ×${featured.quantity.toLocaleString()} · ${(featured.price * featured.quantity).toLocaleString()} Z` : 'ไม่มีข้อมูล'}</span></div><div class="fishing-summary__hero-badge">✦<small>TOP<br>CATCH</small></div></div>
+        <div class="fishing-summary__session-stats"><div><strong>${session.totalCount.toLocaleString()}</strong><span>ปลาที่จับได้</span></div><div><strong>${rows.length.toLocaleString()}</strong><span>ชนิดปลา</span></div><div><strong>${duration}<small>s</small></strong><span>เวลาที่ใช้</span></div></div>
+        <div class="fishing-summary__section-head"><span>YOUR CATCHES</span><small>${rows.length.toLocaleString()} รายการ</small></div>
         <div class="fishing-summary__rows" role="list">${rowMarkup}</div>
-        <div class="fishing-summary__totals"><div><span>จำนวนปลาทั้งหมด</span><strong>${session.totalCount.toLocaleString()} ตัว</strong></div><div><span>มูลค่ารวม</span><strong>${session.totalValue.toLocaleString()} Zeny</strong></div></div>
+        <div class="fishing-summary__totals"><div class="fishing-summary__count-total"><span>จำนวนปลาทั้งหมด</span><strong>${session.totalCount.toLocaleString()} <small>ตัว</small></strong></div><div class="fishing-summary__value-total"><span><b>◈</b> มูลค่ารวมโดยประมาณ</span><strong>${session.totalValue.toLocaleString()} <small>Zeny</small></strong></div></div>
         <p class="fishing-summary__note">มูลค่านี้เป็นราคาขายโดยประมาณ ยังไม่ได้หักหรือเพิ่มเงินในกระเป๋า</p>
-        <button type="button" class="fishing-summary__done">ตกลง</button>
+        <button type="button" class="fishing-summary__done"><span>เก็บผลลัพธ์</span><b>→</b></button>
       </section>`;
     document.body.appendChild(overlay);
     const close = () => overlay.remove();
