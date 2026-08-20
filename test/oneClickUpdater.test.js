@@ -31,6 +31,12 @@ test('updater validates code, installs deterministic dependencies, and checks he
   assert.match(ps1, /unknown rpc/);
   assert.match(ps1, /Assert-ProbeHealthy 'Local backend'/);
   assert.match(ps1, /Assert-ProbeHealthy 'Public backend'/);
+  assert.match(ps1, /Invoke-NpmCiWithRetry/);
+  assert.match(ps1, /--no-audit/);
+  assert.match(ps1, /--no-fund/);
+  assert.match(ps1, /Windows file-lock error/);
+  assert.match(ps1, /Stop-ZolosBackend[\s\S]*Invoke-NpmCiWithRetry/);
+  assert.match(ps1, /Restarting the previous backend after a failed same-commit update/);
 });
 
 test('one-click launcher downloads the latest updater and builds the VPS frontend', () => {

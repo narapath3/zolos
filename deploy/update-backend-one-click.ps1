@@ -15,6 +15,8 @@ $script:BeforeCommit = $null
 $script:AfterCommit = $null
 $script:PulledNewCommit = $false
 $script:FrontendWasRunning = $false
+$script:BackendWasRunning = $false
+$script:BackendStopped = $false
 $script:LogFile = $null
 
 function Write-Step([string]$Message) {
@@ -55,6 +57,23 @@ function Get-NativePath([string]$CommandName, [string]$Fallback) {
     throw "Required command was not found: $CommandName"
 }
 
+function Invoke-NpmCiWithRetry([string]$NpmPath, [string]$WorkingDirectory, [string[]]$Arguments, [string]$Label) {
+    $maxAttempts = 3
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            Write-Step "$Label (attempt $attempt/$maxAttempts)..."
+            Invoke-Native $NpmPath $Arguments $WorkingDirectory
+            return
+        } catch {
+            $message = $_.Exception.Message
+            $isWindowsLock = $message -match '(?i)(-4048|EPERM|EBUSY|operation was rejected|file already in use|access is denied)'
+            if (-not $isWindowsLock -or $attempt -eq $maxAttempts) { throw }
+            Write-Warn "$Label encountered a Windows file-lock error; waiting before retry $($attempt + 1)/$maxAttempts. Do not run npm audit fix manually."
+            Start-Sleep -Seconds (3 * $attempt)
+        }
+    }
+}
+
 function Stop-ZolosBackend {
     $processes = @(Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
         Where-Object { $_.CommandLine -match '(?i)(^|[\\/\s])server\.js([\s\"]|$)' })
@@ -67,8 +86,10 @@ function Stop-ZolosBackend {
         return
     }
     $backendPid = [int]$processes[0].ProcessId
+    $script:BackendWasRunning = $true
     Write-Step "Stopping backend PID $backendPid..."
     Stop-Process -Id $backendPid -Force
+    $script:BackendStopped = $true
     Start-Sleep -Seconds 2
 }
 
@@ -238,18 +259,18 @@ try {
     Invoke-Native $Node @('--check', $ServerEntry) $ServerPath
     Invoke-Native $Node @('--check', (Join-Path $RepoPath 'server\game\monsterEngine.js')) $ServerPath
 
-    Write-Step 'Installing backend production dependencies with npm.cmd...'
-    Invoke-Native $Npm @('ci', '--omit=dev') $ServerPath
+    # Stop consumers before npm ci. Windows otherwise may keep native modules
+    # locked and return EPERM/EBUSY (-4048), leaving the old backend alive.
+    Stop-ZolosBackend
+    Stop-ZolosFrontendIfRunning
+
+    Invoke-NpmCiWithRetry $Npm $ServerPath @('ci', '--omit=dev', '--no-audit', '--no-fund') 'Installing backend production dependencies with npm.cmd'
 
     if ($RunFrontendBuild) {
-        Write-Step 'Installing frontend dependencies with npm.cmd...'
-        Invoke-Native $Npm @('ci') $RepoPath
+        Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--no-audit', '--no-fund') 'Installing frontend dependencies with npm.cmd'
         Write-Step 'Building frontend dist for the VPS static server...'
         Invoke-Native $Npm @('run', 'build') $RepoPath
     }
-
-    Stop-ZolosBackend
-    Stop-ZolosFrontendIfRunning
     $script:StartedProcess = Start-ZolosBackend $Node $ServerPath $LogDir
     Start-Sleep -Seconds 3
     if (-not (Get-Process -Id $script:StartedProcess.Id -ErrorAction SilentlyContinue)) {
@@ -286,7 +307,7 @@ try {
             Write-Warn "Rolling back code to known-good commit $script:BeforeCommit..."
             & $Git -C $RepoPath reset --hard $script:BeforeCommit
             if ($LASTEXITCODE -eq 0) {
-                & $Npm 'ci' '--omit=dev' '--prefix' (Join-Path $RepoPath 'server')
+                Invoke-NpmCiWithRetry $Npm $RepoPath @('ci', '--omit=dev', '--no-audit', '--no-fund', '--prefix', (Join-Path $RepoPath 'server')) 'Installing rollback backend dependencies'
                 $script:StartedProcess = Start-ZolosBackend $Node $ServerPath $LogDir
                 if ($script:FrontendWasRunning) {
                     $rollbackFrontend = Start-ZolosFrontend $Node $RepoPath $LogDir
@@ -296,6 +317,20 @@ try {
             }
         } catch {
             Write-Host "[ZOLOS][CRITICAL] Automatic rollback could not complete: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    } elseif ($script:BackendStopped) {
+        # No new commit was pulled, but the process was stopped before npm ci.
+        # Restore service availability instead of leaving the VPS offline.
+        try {
+            Write-Warn 'Restarting the previous backend after a failed same-commit update...'
+            $script:StartedProcess = Start-ZolosBackend $Node $ServerPath $LogDir
+            if ($script:FrontendWasRunning) {
+                $recoveryFrontend = Start-ZolosFrontend $Node $RepoPath $LogDir
+                Write-Warn "Recovery frontend started with PID $($recoveryFrontend.Id)."
+            }
+            Write-Warn "Recovery backend started with PID $($script:StartedProcess.Id)."
+        } catch {
+            Write-Host "[ZOLOS][CRITICAL] Service recovery could not complete: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
     exit 1
