@@ -1304,11 +1304,18 @@ export class GameUI {
     if (!data) return;
     const price = Math.max(0, Number(item.price ?? data.price) || 0);
     const current = this._fishingSession.catches.get(name) || {
-      name, emoji: item.emoji || data.emoji || '🐟', rarity: item.rarity || data.rarity,
-      price, quantity: 0,
+            name,
+      emoji: item.emoji || data.emoji || '🐟',
+      rarity: item.rarity || data.rarity,
+      price,
+      mapName: item.mapName || item.map_name || 'แหล่งน้ำทั่วไป',
+      mapTier: Number(item.mapTier ?? item.map_tier) || 1,
+      quantity: 0,
     };
     current.quantity += 1;
     current.price = price;
+    current.mapName = item.mapName || item.map_name || current.mapName;
+    current.mapTier = Number(item.mapTier ?? item.map_tier) || current.mapTier;
     this._fishingSession.catches.set(name, current);
     this._fishingSession.totalCount += 1;
     this._fishingSession.totalValue += price;
@@ -1335,7 +1342,7 @@ export class GameUI {
       <article class="fishing-summary__row rarity-${tier}" role="listitem">
         <span class="fishing-summary__rank">${String(index + 1).padStart(2, '0')}</span>
         <div class="fishing-summary__art">${itemIconMarkup(item.name, item.emoji, 'fishing-summary__item-art')}</div>
-        <div class="fishing-summary__item-copy"><div class="fishing-summary__name-line"><strong>${this._escapeFishingText(item.name)}</strong><span class="fishing-summary__rarity-tag">${label}</span></div><span class="fishing-summary__price"><span class="fishing-summary__coin">◈</span> ${item.price.toLocaleString()} Zeny / ชิ้น</span></div>
+        <div class="fishing-summary__item-copy"><div class="fishing-summary__name-line"><strong>${this._escapeFishingText(item.name)}</strong><span class="fishing-summary__rarity-tag">${label}</span></div><span class="fishing-summary__price"><span class="fishing-summary__coin">◈</span> ${item.price.toLocaleString()} Zeny / ชิ้น · ${this._escapeFishingText(item.mapName)}</span></div>
         <div class="fishing-summary__qty-block"><strong class="fishing-summary__qty">×${item.quantity.toLocaleString()}</strong><span>จับได้</span></div>
         <strong class="fishing-summary__subtotal">${(item.price * item.quantity).toLocaleString()} Z</strong>
       </article>`;
@@ -1350,7 +1357,7 @@ export class GameUI {
     overlay.setAttribute('aria-labelledby', 'fishing-summary-title');
     overlay.innerHTML = `
       <section class="fishing-summary-card">
-        <header class="fishing-summary__header"><div class="fishing-summary__title-wrap"><p class="fishing-summary__eyebrow">FISHING SESSION COMPLETE</p><h2 id="fishing-summary-title">สรุปผลการตกปลา</h2><p>รอบนี้จบแล้ว · มาดูของที่ได้กัน</p></div><button type="button" class="fishing-summary__close" aria-label="ปิดสรุปผล">×</button></header>
+        <header class="fishing-summary__header"><div class="fishing-summary__title-wrap"><p class="fishing-summary__eyebrow">FISHING SESSION COMPLETE</p><h2 id="fishing-summary-title">สรุปผลการตกปลา</h2><p>รอบนี้จบแล้ว · ${featured ? `${this._escapeFishingText(featured.mapName)} · Map Tier ${featured.mapTier}` : 'มาดูของที่ได้กัน'}</p></div><button type="button" class="fishing-summary__close" aria-label="ปิดสรุปผล">×</button></header>
         <div class="fishing-summary__hero rarity-${featuredTier}"><div class="fishing-summary__hero-art">${featured ? itemIconMarkup(featured.name, featured.emoji, 'fishing-summary__featured-art') : ''}<span class="fishing-summary__hero-sparkle">✦</span></div><div class="fishing-summary__hero-copy"><span class="fishing-summary__hero-label">BEST CATCH</span><strong>${featured ? this._escapeFishingText(featured.name) : '—'}</strong><span>${featured ? `${rarityLabel[featured.rarity] || this._escapeFishingText(featured.rarity)} · ×${featured.quantity.toLocaleString()} · ${(featured.price * featured.quantity).toLocaleString()} Z` : 'ไม่มีข้อมูล'}</span></div><div class="fishing-summary__hero-badge">✦<small>TOP<br>CATCH</small></div></div>
         <div class="fishing-summary__session-stats"><div><strong>${session.totalCount.toLocaleString()}</strong><span>ปลาที่จับได้</span></div><div><strong>${rows.length.toLocaleString()}</strong><span>ชนิดปลา</span></div><div><strong>${duration}<small>s</small></strong><span>เวลาที่ใช้</span></div></div>
         <div class="fishing-summary__section-head"><span>YOUR CATCHES</span><small>${rows.length.toLocaleString()} รายการ</small></div>

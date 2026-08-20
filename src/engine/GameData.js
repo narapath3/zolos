@@ -263,6 +263,71 @@ export const FISH_RARITY_WEIGHTS = {
     legendary: 0.04
 };
 
+// Map-aware fishing progression. The server and offline fallback both use this
+// catalog so dangerous maps can offer genuinely better fish without trusting a
+// client-supplied rarity or item name.
+export const FISHING_MAP_CONFIG = Object.freeze({
+    prontera: {
+        label: 'Prontera River', tier: 1, danger: 'safe',
+        rarityWeights: { common: 0.78, uncommon: 0.18, rare: 0.035, legendary: 0.005 },
+        fish: ['Tilapia', 'Catfish', 'Carp', 'Perch', 'Goby', 'Mullet', 'Bass', 'Crucian Carp', 'Bluegill', 'Minnow', 'Rainbow Trout', 'Eel', 'Barramundi', 'Golden Koi'],
+    },
+    prontera_field: {
+        label: 'Prontera Field', tier: 1, danger: 'safe',
+        rarityWeights: { common: 0.78, uncommon: 0.18, rare: 0.035, legendary: 0.005 },
+        fish: ['Tilapia', 'Catfish', 'Carp', 'Perch', 'Goby', 'Mullet', 'Bass', 'Crucian Carp', 'Bluegill', 'Minnow', 'Rainbow Trout', 'Eel', 'Barramundi', 'Golden Koi'],
+    },
+    payon: {
+        label: 'Payon Forest', tier: 2, danger: 'low',
+        rarityWeights: { common: 0.62, uncommon: 0.28, rare: 0.085, legendary: 0.015 },
+        fish: ['Trout', 'Pike', 'Sunfish', 'Roach', 'Dace', 'Rainbow Trout', 'Salmon', 'Eel', 'Arapaima', 'Golden Koi', 'Arowana', 'Giant Catfish', 'Moonfish', 'Emperor Fish'],
+    },
+    glast_heim: {
+        label: 'Glast Heim Ruins', tier: 3, danger: 'dangerous',
+        rarityWeights: { common: 0.46, uncommon: 0.34, rare: 0.16, legendary: 0.04 },
+        fish: ['Catfish', 'Goby', 'Sole', 'Pike', 'Eel', 'Walleye', 'Sturgeon', 'Piranha', 'Ghost Fish', 'Coelacanth', 'Anglerfish', 'Leviathan', 'Frost Dragon Fish'],
+    },
+    mjolnir: {
+        label: 'Mjolnir Highlands', tier: 4, danger: 'very_dangerous',
+        rarityWeights: { common: 0.36, uncommon: 0.36, rare: 0.21, legendary: 0.07 },
+        fish: ['Perch', 'Trout', 'Dace', 'Mackerel', 'Rainbow Trout', 'Salmon', 'Sturgeon', 'Oarfish', 'Crystal Fish', 'Electric Eel', 'Marlin', 'Frost Dragon Fish', 'Emperor Fish'],
+    },
+    abyss_lake: {
+        label: 'Abyss Lake Depths', tier: 5, danger: 'extreme',
+        rarityWeights: { common: 0.22, uncommon: 0.36, rare: 0.28, legendary: 0.14 },
+        fish: ['Sea Bass', 'Cod', 'Pollock', 'Tuna', 'Swordfish', 'Grouper', 'Sailfish', 'Marlin', 'Arowana', 'Anglerfish', 'Great White Shark', 'Hammerhead', 'Raja Ampat Shark', 'Leviathan', 'Phoenix Fish', 'Emperor Fish'],
+    },
+});
+
+export function getFishingMapConfig(mapId = 'prontera') {
+    return FISHING_MAP_CONFIG[String(mapId || '').toLowerCase()] || FISHING_MAP_CONFIG.prontera;
+}
+
+export function pickFishingCatch(mapId = 'prontera', random = Math.random) {
+    const config = getFishingMapConfig(mapId);
+    const rarityEntries = Object.entries(config.rarityWeights);
+    const roll = Math.min(0.999999999, Math.max(0, Number(random()) || 0));
+    let rarity = rarityEntries[rarityEntries.length - 1]?.[0] || 'common';
+    let cumulative = 0;
+    for (const [candidate, weight] of rarityEntries) {
+        cumulative += Number(weight) || 0;
+        if (roll < cumulative) { rarity = candidate; break; }
+    }
+    const pool = config.fish.filter(name => FISH_SPECIES[name]?.rarity === rarity);
+    const fallback = config.fish.filter(name => FISH_SPECIES[name]);
+    const source = pool.length ? pool : fallback;
+    const fishName = source[Math.min(source.length - 1, Math.floor((Number(random()) || 0) * source.length))];
+    const fishData = FISH_SPECIES[fishName] || FISH_SPECIES.Tilapia;
+    return {
+        name: fishName || 'Tilapia',
+        ...fishData,
+        mapId: String(mapId || 'prontera').toLowerCase(),
+        mapName: config.label,
+        mapTier: config.tier,
+        mapDanger: config.danger,
+    };
+}
+
 // Auto-register all fish into ITEMS registry
 Object.entries(FISH_SPECIES).forEach(([name, data]) => {
     ITEMS[name] = {

@@ -1,5 +1,5 @@
 import { query, tx } from './db.js';
-import { FISH_SPECIES, FISH_RARITY_WEIGHTS } from '../../src/engine/GameData.js';
+import { FISH_SPECIES, pickFishingCatch, getFishingMapConfig } from '../../src/engine/GameData.js';
 
 const REQUEST_ID_RE = /^[a-zA-Z0-9:_-]{1,160}$/;
 
@@ -12,30 +12,19 @@ export async function ensureFishingEconomy() {
   )`);
 }
 
-function rollFishingCatch(random = Math.random) {
-  const rarityEntries = Object.entries(FISH_RARITY_WEIGHTS);
-  const roll = Math.min(0.999999999, Math.max(0, Number(random()) || 0));
-  let rarity = rarityEntries[rarityEntries.length - 1]?.[0] || 'common';
-  let cumulative = 0;
-  for (const [candidate, weight] of rarityEntries) {
-    cumulative += Number(weight) || 0;
-    if (roll < cumulative) {
-      rarity = candidate;
-      break;
-    }
-  }
-
-  const pool = Object.entries(FISH_SPECIES).filter(([, fish]) => fish.rarity === rarity);
-  const fallback = Object.entries(FISH_SPECIES);
-  const source = pool.length ? pool : fallback;
-  const [name, data] = source[Math.min(source.length - 1, Math.floor((Number(random()) || 0) * source.length))] || [];
-  if (!name || !data) throw new Error('ไม่มีข้อมูลปลาสำหรับรางวัล');
+function rollFishingCatch(random = Math.random, mapId = 'prontera') {
+  const selected = pickFishingCatch(mapId, random);
+  if (!selected?.name || !FISH_SPECIES[selected.name]) throw new Error('ไม่มีข้อมูลปลาสำหรับรางวัล');
   return {
-    name,
-    emoji: String(data.emoji || '🐟').slice(0, 16),
-    rarity: String(data.rarity || rarity).slice(0, 24),
-    price: Math.max(0, Math.floor(Number(data.price) || 0)),
-    desc: String(data.desc || '').slice(0, 240),
+    name: selected.name,
+    emoji: String(selected.emoji || '🐟').slice(0, 16),
+    rarity: String(selected.rarity || 'common').slice(0, 24),
+    price: Math.max(0, Math.floor(Number(selected.price) || 0)),
+    desc: String(selected.desc || '').slice(0, 240),
+    mapId: selected.mapId,
+    mapName: selected.mapName,
+    mapTier: selected.mapTier,
+    mapDanger: selected.mapDanger,
   };
 }
 
@@ -43,7 +32,7 @@ export function isFishingRequestId(value) {
   return typeof value === 'string' && REQUEST_ID_RE.test(value);
 }
 
-export async function claimFishingReward({ characterId, userId, requestId, random = Math.random }) {
+export async function claimFishingReward({ characterId, userId, requestId, mapId = 'prontera', random = Math.random }) {
   if (!characterId || !userId || !isFishingRequestId(requestId)) {
     throw new Error('คำขอตกปลาไม่ถูกต้อง');
   }
@@ -71,7 +60,7 @@ export async function claimFishingReward({ characterId, userId, requestId, rando
     );
     if (!owner.rows[0]) throw new Error('ไม่พบตัวละครหรือไม่มีสิทธิ์');
 
-    const fish = rollFishingCatch(random);
+    const fish = rollFishingCatch(random, mapId);
     const inventory = await client.query(
       `INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
        VALUES ($1, $2, 'fish', 1, '{}'::jsonb)
@@ -93,6 +82,10 @@ export async function claimFishingReward({ characterId, userId, requestId, rando
       rarity: fish.rarity,
       price: fish.price,
       desc: fish.desc,
+      map_id: fish.mapId,
+      map_name: fish.mapName,
+      map_tier: fish.mapTier,
+      map_danger: fish.mapDanger,
     };
 
     await client.query(
@@ -103,4 +96,4 @@ export async function claimFishingReward({ characterId, userId, requestId, rando
   });
 }
 
-export { rollFishingCatch };
+export { rollFishingCatch, getFishingMapConfig };

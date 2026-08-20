@@ -23,12 +23,28 @@ const main = read('../src/main.js');
   assert.match(fishing, /SELECT pg_advisory_xact_lock/);
 });
 
+test('map fishing pools scale rare catches into dangerous maps', async () => {
+  const { rollFishingCatch, getFishingMapConfig } = await import('../server/api/fishing.js');
+  const sequence = (...values) => { let index = 0; return () => values[Math.min(index++, values.length - 1)]; };
+  const safe = rollFishingCatch(sequence(0.999, 0), 'prontera');
+  const abyss = rollFishingCatch(sequence(0.999, 0), 'abyss_lake');
+  assert.equal(getFishingMapConfig('unknown_map').tier, 1);
+  assert.equal(safe.mapId, 'prontera');
+  assert.equal(abyss.mapId, 'abyss_lake');
+  assert.equal(abyss.mapTier, 5);
+  assert.equal(abyss.mapDanger, 'extreme');
+  assert.equal(abyss.rarity, 'legendary');
+  assert.ok(abyss.price >= safe.price);
+  assert.match(abyss.mapName, /Abyss Lake/);
+});
+
 test('socket fishing claim is authenticated, state-gated, rate-limited and server-owned', () => {
   assert.match(server, /socket\.on\('fish_claim', async \(payload\) =>/);
   assert.match(server, /!player\?\.verified \|\| !player\.characterId \|\| !supabase/);
   assert.match(server, /player\.lastMotionState !== 'fishing'/);
   assert.match(server, /shouldRateLimitEvent\(socket\._rateLimitTracker, 'fish_claim'/);
   assert.match(server, /claimFishingReward\(\{/);
+  assert.match(server, /mapId: player\.mapId/);
   assert.doesNotMatch(server, /claimFishingReward\(\{[\s\S]{0,420}payload\.(item|fish)/);
 });
 
@@ -39,4 +55,5 @@ test('online client accepts fish only from a validated server receipt', () => {
   assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)\) break/);
   assert.match(main, /addItemLocal\(item, receipt\.quantity\)/);
   assert.match(main, /recordFishCatch\?\.\(item\)/);
+  assert.match(main, /mapName: receipt\.map_name/);
 });

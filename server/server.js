@@ -1124,6 +1124,7 @@ io.on('connection', (socket) => {
                 characterId: player.characterId,
                 userId: player.userId,
                 requestId,
+                mapId: player.mapId,
             });
             socket.emit('fish_claim_result', result);
         } catch (error) {

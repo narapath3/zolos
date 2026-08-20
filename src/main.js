@@ -617,11 +617,15 @@ async function initGame(charData) {
                             rarity: receipt.rarity,
                             price: receipt.price,
                             desc: receipt.desc,
+                            mapId: receipt.map_id,
+                            mapName: receipt.map_name,
+                            mapTier: receipt.map_tier,
+                            mapDanger: receipt.map_danger,
                         };
                         gameUI.addItemLocal(item, receipt.quantity);
                         const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
                         const e = rarityEmoji[item.rarity] || '⚪';
-                        gameUI.addCombatLog(`🎣 ได้รับ ${e} ${item.name} แล้ว!`, 'loot', item);
+                        gameUI.addCombatLog(`🎣 ได้รับ ${e} ${item.name} แล้ว${item.mapName ? ` จาก ${item.mapName}` : ''}!`, 'loot', item);
                         gameUI.incrementQuestProgress('fish', 'any');
                         gameUI.recordFishCatch?.(item);
                     }).catch((error) => {

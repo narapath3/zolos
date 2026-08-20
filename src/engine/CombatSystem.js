@@ -1,6 +1,6 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
-import { MONSTERS, FISH_SPECIES, FISH_RARITY_WEIGHTS, getPetCombat } from './GameData.js';
+import { MONSTERS, pickFishingCatch, getPetCombat } from './GameData.js';
 import { isSocketConnected } from '../network/SocketClient.js';
 
 export function buildAutoSearchWaypoints({ halfExtent = 46, step = 11, isBlocked = () => false } = {}) {
@@ -856,29 +856,18 @@ export class CombatSystem {
                     // Catch fish!
                     setTimeout(() => {
                         if (this.isFishing && this.character.state === 'fishing') {
-                            // Weighted random selection of rarity
-                            const roll = Math.random();
-                            let selectedRarity = 'common';
-                            let cumulative = 0;
-                            for (const [rarity, weight] of Object.entries(FISH_RARITY_WEIGHTS)) {
-                                cumulative += weight;
-                                if (roll <= cumulative) {
-                                    selectedRarity = rarity;
-                                    break;
-                                }
-                            }
-
-                            // Pick a random fish from the matching rarity pool
-                            const pool = Object.entries(FISH_SPECIES).filter(([_, data]) => data.rarity === selectedRarity);
-                            const [fishName, fishData] = pool[Math.floor(Math.random() * pool.length)];
-
+                            const fishData = pickFishingCatch(this.sceneManager?.currentMap || 'prontera', Math.random);
                             const fishItem = {
-                                name: fishName,
+                                name: fishData.name,
                                 emoji: fishData.emoji,
                                 type: 'fish',
                                 rarity: fishData.rarity,
                                 price: fishData.price,
-                                desc: fishData.desc
+                                desc: fishData.desc,
+                                mapId: fishData.mapId,
+                                mapName: fishData.mapName,
+                                mapTier: fishData.mapTier,
+                                mapDanger: fishData.mapDanger,
                             };
 
                             this.onEvent({
