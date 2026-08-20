@@ -2938,8 +2938,9 @@ function stepWorld(dt) {
                 footPos.y = 1.2 + sceneManager.getWalkableHeight(footPos.x, footPos.z);
             }
             particles?.spawnFootstep?.(footPos, surface);
-            const audioSurface = sceneManager.getFootstepSurface?.(footPos) || (surface === 'water' ? 'water' : 'grass');
-            soundManager?.playFootstep?.(audioSurface, { volume: character.moveSpeed >= 7 ? 0.82 : 0.68 });
+            // Footstep audio is intentionally disabled for now. Keep the visual
+            // footprint particle so movement feedback remains clear without
+            // competing with water, music, and combat audio on mobile.
         }
     } else if (footstepTravel > 0) {
         footstepTravel = Math.min(footstepTravel, 0.3);

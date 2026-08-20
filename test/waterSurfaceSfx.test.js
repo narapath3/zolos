@@ -14,10 +14,10 @@ test('procedural footstep SFX exposes distinct grass, bridge, wet, and water sur
   assert.match(sound, /const cooldown = surface === 'bridge' \? 0\.16 : 0\.18/);
 });
 
-test('main movement stride routes footsteps through the detected surface', () => {
-  assert.match(main, /const audioSurface = sceneManager\.getFootstepSurface\?\./);
-  assert.match(main, /soundManager\?\.playFootstep\?\./);
-  assert.match(main, /character\.moveSpeed >= 7/);
+test('main movement keeps visual footprints while footstep audio stays disabled', () => {
+  assert.match(main, /particles\?\.spawnFootstep\?\./);
+  assert.doesNotMatch(main, /soundManager\?\.playFootstep\?\./);
+  assert.match(main, /Footstep audio is intentionally disabled/);
 });
 
 test('SceneManager detects bridge and wet riverbank surfaces', () => {
