@@ -2,6 +2,7 @@ import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNI
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
+import { FIRST_THIRTY_STEPS, createFirstThirtyState, firstThirtyProgress, getFirstThirtyStep, sanitizeFirstThirtyState, updateFirstThirtyState } from '../progression/FirstThirtyJourney.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
 import { observeItemPortraits } from './ItemPortraitRenderer.js';
 import { LayoutManager } from './LayoutManager.js';
@@ -67,6 +68,9 @@ export class GameUI {
     this.adventureJournal = createAdventureJournal();
     this._journalSaveTimer = null;
     this._fishingSession = null;
+    this.firstThirtyJourney = createFirstThirtyState();
+    this._journeySaveTimer = null;
+    this._journeyResizeObserver = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -345,6 +349,8 @@ export class GameUI {
     clearTimeout(this._duelOverlayTimer);
     clearTimeout(this._chatIdleTimer);
     clearTimeout(this._journalSaveTimer);
+    clearTimeout(this._journeySaveTimer);
+    this._journeyResizeObserver?.disconnect?.();
     clearTimeout(this._cardTradeSuggestTimer);
     clearTimeout(this.tradeTimeout);
     this._equipToastTimer = null;
@@ -415,7 +421,10 @@ export class GameUI {
     });
 
     // Panel toggle buttons
-    document.getElementById('btn-inventory').addEventListener('click', () => this._togglePanel('inventory-panel'));
+    document.getElementById('btn-inventory').addEventListener('click', () => {
+      this._togglePanel('inventory-panel');
+      this._completeFirstThirtyStep('open_inventory');
+    });
     document.getElementById('btn-mycard')?.addEventListener('click', () => this._openMyCard());
 
 
@@ -449,6 +458,10 @@ export class GameUI {
     if (btnWiki) {
       btnWiki.addEventListener('click', () => {
         this._togglePanel('wiki-panel');
+        this._completeFirstThirtyStep('open_journal');
+        if (this.firstThirtyJourney.completed.includes('catch_first_fish') && this.firstThirtyJourney.completed.includes('visit_new_map')) {
+          this._completeFirstThirtyStep('read_codex');
+        }
         this._renderWiki();
       });
     }
@@ -653,6 +666,7 @@ export class GameUI {
   setMapName(mapName, mapId) {
     if (mapId) {
       this.currentMapId = mapId;
+      if (!['prontera', 'prontera_field'].includes(mapId)) this._completeFirstThirtyStep('visit_new_map');
     }
     this._updateHUDMapAndPing();
     if (mapId) {
@@ -9320,13 +9334,30 @@ export class GameUI {
 
     // Search events
     const searchInput = document.getElementById('wiki-search-input');
-    if (searchInput) {
+        if (searchInput) {
       searchInput.addEventListener('input', () => {
         this._renderWikiList();
       });
     }
 
+    const wikiPanel = document.getElementById('wiki-panel');
+    if (wikiPanel && !wikiPanel.dataset.journeyBound) {
+      wikiPanel.dataset.journeyBound = '1';
+      wikiPanel.addEventListener('click', event => {
+        const action = event.target.closest?.('[data-journey-action]')?.dataset?.journeyAction;
+        if (!action) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (action === 'complete') this._completeFirstThirtyStep(event.target.closest('[data-journey-step]')?.dataset?.journeyStep);
+        if (action === 'skip') this._skipFirstThirtyStep(event.target.closest('[data-journey-step]')?.dataset?.journeyStep);
+        if (action === 'resume') this._resumeFirstThirtyStep(event.target.closest('[data-journey-step]')?.dataset?.journeyStep);
+        if (action === 'navigate') this._navigateFirstThirtyStep();
+        if (action === 'open-journal') { this.currentWikiTab = 'journal'; this._renderWiki(); }
+      });
+    }
+
     this.currentWikiTab = 'journal';
+
     this.selectedWikiItem = null;
   }
 
@@ -9345,14 +9376,158 @@ export class GameUI {
     const remote = await loadAdventureJournal(characterId);
     if (!this._isCharacterLoadCurrent(characterId, generation)) return;
     this.adventureJournal = sanitizeAdventureJournal(remote || local);
+    this.firstThirtyJourney = sanitizeFirstThirtyState(this.adventureJournal.journey);
+    this.adventureJournal.journey = this.firstThirtyJourney;
     this._renderWiki();
   }
 
   _saveAdventureJournalSoon() {
     if (!this.characterId) return;
+    this.adventureJournal.journey = sanitizeFirstThirtyState(this.firstThirtyJourney);
     localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
     clearTimeout(this._journalSaveTimer);
     this._journalSaveTimer = setTimeout(() => saveAdventureJournal(this.characterId, this.adventureJournal), 700);
+  }
+
+  _journeyEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  }
+
+  _journeyMapLabel(mapId) {
+    const labels = { prontera: 'Prontera', prontera_field: 'Prontera Field', payon: 'Payon', glast_heim: 'Glast Heim', mjolnir: 'Mjolnir', abyss_lake: 'Abyss Lake' };
+    return labels[mapId] || mapId || 'พื้นที่ปัจจุบัน';
+  }
+
+  _journeyHTML() {
+    const progress = firstThirtyProgress(this.firstThirtyJourney);
+    const state = progress.state;
+    const active = progress.active;
+    const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
+    const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
+    const escape = value => this._journeyEscape(value);
+    const actionLabel = active?.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active?.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active?.kind === 'world' ? (sameStarterMap(active.mapId) ? 'นำทางไปยังจุดหมาย' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : 'ดูสรุปเส้นทาง';
+    const routeLabel = active?.kind === 'world'
+      ? (sameStarterMap(active.mapId) ? `หมุดอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))} ก่อน`)
+      : active?.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
+        : active?.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้ตามขนาดหน้าจอ' : 'เส้นทางแรกของคุณพร้อมแล้ว';
+    const timeline = FIRST_THIRTY_STEPS.map(step => {
+      const done = state.completed.includes(step.id);
+      const skipped = state.skipped.includes(step.id);
+      const isActive = active?.id === step.id;
+      return `<li class="journey-step-row ${done ? 'is-complete' : ''}${skipped ? ' is-skipped' : ''}${isActive ? ' is-active' : ''}" data-journey-step="${step.id}">
+        <span class="journey-step-index">${done ? '✓' : skipped ? '–' : step.chapter}</span>
+        <span class="journey-step-copy"><b>${escape(step.title)}</b><small>${escape(done ? 'เสร็จแล้ว' : skipped ? 'ข้ามไว้ — กลับมาทำต่อได้' : step.titleEn)}</small></span>
+        ${isActive ? '<span class="journey-step-live">NOW</span>' : ''}
+      </li>`;
+    }).join('');
+    if (!active) {
+      return `<section class="journey-home journey-home--complete" data-testid="first-thirty-journey" aria-labelledby="journey-title">
+        <div class="journey-hero"><div><small>FIRST 30 MINUTES</small><h2 id="journey-title">เส้นทางแรกสำเร็จแล้ว</h2><p>คุณรู้จักโลกของ ZOLOS แล้ว เลือกเส้นทางต่อไปจาก Combat, Fishing หรือ Exploration ได้เลย</p></div><div class="journey-progress-ring" style="--journey-progress:100%"><b>100%</b><span>READY</span></div></div>
+        <div class="journey-next-grid"><button type="button" data-journey-action="open-journal" class="journey-next-card"><strong>⚔️ Combat</strong><span>ฝึก Monster Mastery และท้าทายพื้นที่อันตราย</span></button><button type="button" data-journey-action="open-journal" class="journey-next-card"><strong>🎣 Fishing</strong><span>ตามหาปลาหายากจาก Map ระดับสูง</span></button><button type="button" data-journey-action="open-journal" class="journey-next-card"><strong>🗺️ Exploration</strong><span>เปิด Map Contracts และบันทึกจุดค้นพบ</span></button></div>
+      </section>`;
+    }
+    return `<section class="journey-home" data-testid="first-thirty-journey" aria-labelledby="journey-title">
+      <div class="journey-hero"><div><small>FIRST 30 MINUTES · ADVENTURER'S NOTEBOOK</small><h2 id="journey-title">เส้นทางเริ่มต้นของคุณ</h2><p>ทำทีละขั้น ระบบจะชี้ปุ่มหรือหมุดบนแผนที่ให้พอดีกับหน้าจอของคุณ</p></div><div class="journey-progress-ring" style="--journey-progress:${progress.percent}%"><b>${progress.percent}%</b><span>${progress.completed}/${progress.total}</span></div></div>
+      <article class="journey-active-card" data-journey-step="${active.id}">
+        <div class="journey-active-icon" aria-hidden="true">${active.icon}</div><div class="journey-active-copy"><small>บทที่ ${active.chapter} · กำลังทำอยู่</small><h3>${escape(active.title)}</h3><p>${escape(active.description)}</p><span class="journey-route-hint">${active.kind === 'world' ? '⌖' : active.kind === 'map' ? '✦' : '◉'} ${routeLabel}</span></div>
+        <div class="journey-active-actions"><button type="button" class="journey-primary" data-journey-action="navigate">${actionLabel} <span>→</span></button><button type="button" class="journey-secondary" data-journey-action="skip" data-journey-step="${active.id}">ข้ามชั่วคราว</button></div>
+      </article>
+      <div class="journey-timeline-head"><span>YOUR JOURNEY</span><small>Map ปัจจุบัน: ${escape(this._journeyMapLabel(currentMap))}</small></div>
+      <ol class="journey-timeline" aria-label="ลำดับ First 30 Minutes">${timeline}</ol>
+    </section>`;
+  }
+
+  _completeFirstThirtyStep(stepId, { silent = false } = {}) {
+    const step = getFirstThirtyStep(stepId);
+    if (!step || this.firstThirtyJourney.completed.includes(step.id)) return false;
+    this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'complete', stepId: step.id }, new Date().toISOString());
+    this.adventureJournal.journey = this.firstThirtyJourney;
+    this._saveAdventureJournalSoon();
+    if (!silent) this.addCombatLog(`✅ เสร็จสิ้นบทที่ ${step.chapter}: ${step.title}`, 'levelup');
+    if (this.currentWikiTab === 'journal') this._renderWiki();
+    return true;
+  }
+
+  _skipFirstThirtyStep(stepId) {
+    const step = getFirstThirtyStep(stepId || this.firstThirtyJourney.activeStep);
+    if (!step) return;
+    this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'skip', stepId: step.id }, new Date().toISOString());
+    this.adventureJournal.journey = this.firstThirtyJourney;
+    this._saveAdventureJournalSoon();
+    this.addCombatLog(`↪️ ข้ามบทชั่วคราว: ${step.title} กลับมาเปิดสมุดเพื่อทำต่อได้`, 'system');
+    this._renderWiki();
+  }
+
+  _resumeFirstThirtyStep(stepId) {
+    const step = getFirstThirtyStep(stepId || this.firstThirtyJourney.activeStep);
+    if (!step) return;
+    this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'resume', stepId: step.id }, new Date().toISOString());
+    this.adventureJournal.journey = this.firstThirtyJourney;
+    this._saveAdventureJournalSoon();
+    this._renderWiki();
+  }
+
+  _navigateFirstThirtyStep() {
+    const step = getFirstThirtyStep(this.firstThirtyJourney.activeStep);
+    if (!step) return;
+    if (step.kind === 'summary') {
+      this._completeFirstThirtyStep(step.id);
+      return;
+    }
+    if (step.kind === 'ui') {
+      const target = document.querySelector(step.target);
+      if (target) return this._showJourneySpotlight(target, step);
+      this.addCombatLog('ไม่พบปุ่มเป้าหมายในหน้าจอนี้ กรุณาเปิดเมนูหลักแล้วลองอีกครั้ง', 'warning');
+      return;
+    }
+    if (step.kind === 'map') {
+      this.openWarpMap(step.targetMap);
+      return;
+    }
+    if (step.kind === 'world') {
+      const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
+      if (!(currentMap === step.mapId || (step.mapId === 'prontera' && currentMap === 'prontera_field'))) return this.openWarpMap(step.mapId);
+      if (typeof window.startJourneyNavigation === 'function') {
+        window.startJourneyNavigation(step.position, step.radius, step.id);
+      } else {
+        this.addCombatLog('ระบบนำทางยังไม่พร้อม กรุณาลองอีกครั้งในอีกสักครู่', 'warning');
+      }
+    }
+  }
+
+  _showJourneySpotlight(target, step) {
+    let overlay = document.getElementById('journey-spotlight');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'journey-spotlight';
+      document.body.appendChild(overlay);
+    }
+    const escape = value => this._journeyEscape(value);
+    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">ทำแล้ว <span>✓</span></button></div>`;
+    overlay.style.display = 'block';
+    const ring = overlay.querySelector('.journey-spotlight-ring');
+    const card = overlay.querySelector('.journey-spotlight-card');
+    const position = () => {
+      const rect = target.getBoundingClientRect();
+      const pad = 8;
+      ring.style.left = `${Math.max(4, rect.left - pad)}px`;
+      ring.style.top = `${Math.max(4, rect.top - pad)}px`;
+      ring.style.width = `${Math.max(20, rect.width + pad * 2)}px`;
+      ring.style.height = `${Math.max(20, rect.height + pad * 2)}px`;
+      const box = card.getBoundingClientRect();
+      const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - box.width - 12));
+      let top = rect.bottom + 18;
+      if (top + box.height > window.innerHeight - 12) top = rect.top - box.height - 18;
+      if (top < 12) top = Math.min(window.innerHeight - box.height - 12, Math.max(12, window.innerHeight * 0.5 - box.height * 0.5));
+      card.style.left = `${left}px`;
+      card.style.top = `${Math.max(12, top)}px`;
+    };
+    position();
+    const close = () => { overlay.style.display = 'none'; window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
+    overlay.querySelector('.journey-spotlight-close').onclick = close;
+    overlay.querySelector('.journey-spotlight-done').onclick = () => { this._completeFirstThirtyStep(step.id); close(); };
+    window.addEventListener('resize', position, { passive: true });
+    window.addEventListener('scroll', position, { passive: true, capture: true });
   }
 
   _journalHTML() {
@@ -9460,7 +9635,7 @@ export class GameUI {
     if (this.currentWikiTab === 'journal') {
       if (journalEl) {
         journalEl.style.display = 'block';
-        journalEl.innerHTML = this._journalHTML();
+        journalEl.innerHTML = this._journeyHTML() + this._journalHTML();
         journalEl.querySelectorAll('[data-monster-key]').forEach(el => el.addEventListener('click', () => {
           this.currentWikiTab = 'monsters'; this.selectedWikiItem = el.dataset.monsterKey;
           document.querySelectorAll('.wiki-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'monsters'));
@@ -9729,6 +9904,7 @@ export class GameUI {
     this.incrementQuestProgress('hunt', monsterName);
     const result = recordMonsterDefeat(this.adventureJournal, monsterName);
     this.adventureJournal = result.journal;
+    this._completeFirstThirtyStep('defeat_first_monster');
     this._saveAdventureJournalSoon();
     if (result.firstDiscovery) this.addCombatLog(`📔 Monster Codex: ค้นพบ ${monsterName}!`, 'loot');
     if (result.tierUnlocked) this.addCombatLog(`🏅 ${monsterName} ถึงระดับ ${masteryForKills(result.entry.kills).label} Mastery!`, 'levelup');
@@ -11267,7 +11443,7 @@ export class GameUI {
     },
   ];
 
-  openWarpMap() {
+  openWarpMap(preselectedMapId = null) {
     console.log('[GameUI] openWarpMap called');
     // Inject styles once
     if (!document.getElementById('warp-style')) {
@@ -11442,12 +11618,12 @@ export class GameUI {
     // Close side panels
     document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
 
-    this._renderWarpMap();
+    this._renderWarpMap(preselectedMapId);
     modal.style.display = 'flex';
     this.updateMobileControlsVisibility();
   }
 
-  _renderWarpMap() {
+  _renderWarpMap(preselectedMapId = null) {
     const card = document.getElementById('warp-card');
     if (!card) return;
 
@@ -11528,6 +11704,13 @@ export class GameUI {
         this._doWarp(targetMap);
       });
     });
+    if (preselectedMapId) {
+      const targetTile = [...card.querySelectorAll('[data-map]')].find(tile => tile.dataset.map === preselectedMapId);
+      if (targetTile) {
+        targetTile.classList.add('journey-target');
+        requestAnimationFrame(() => targetTile.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+      }
+    }
   }
 
   _currentMapLabel() {

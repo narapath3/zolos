@@ -1,3 +1,5 @@
+import { createFirstThirtyState, sanitizeFirstThirtyState } from './FirstThirtyJourney.js';
+
 export const JOURNAL_VERSION = 1;
 
 export const MONSTER_MASTERY_TIERS = Object.freeze([
@@ -7,7 +9,7 @@ export const MONSTER_MASTERY_TIERS = Object.freeze([
 ]);
 
 export function createAdventureJournal() {
-  return { version: JOURNAL_VERSION, monsters: {}, totalKills: 0, lastUpdated: null };
+  return { version: JOURNAL_VERSION, monsters: {}, totalKills: 0, lastUpdated: null, journey: createFirstThirtyState() };
 }
 
 export function normalizeMonsterName(value) {
@@ -30,6 +32,7 @@ export function sanitizeAdventureJournal(raw) {
   }
   result.totalKills = Object.values(result.monsters).reduce((sum, entry) => sum + entry.kills, 0);
   result.lastUpdated = typeof raw.lastUpdated === 'string' ? raw.lastUpdated : null;
+  result.journey = sanitizeFirstThirtyState(raw.journey);
   return result;
 }
 

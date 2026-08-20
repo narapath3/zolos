@@ -179,6 +179,68 @@ let lastMinimapTime = 0;
 let autoPath = null;
 window.autoPath = autoPath;
 let isShiftPressed = false;
+let journeyNavigation = null;
+
+function stopJourneyNavigation() {
+    journeyNavigation = null;
+    const marker = document.getElementById('journey-world-marker');
+    if (marker) marker.style.display = 'none';
+}
+
+function updateJourneyNavigation() {
+    if (!journeyNavigation || !character || !sceneManager) return;
+    const marker = document.getElementById('journey-world-marker');
+    const target = journeyNavigation.target;
+    const distance = character.getPosition().distanceTo(target);
+    if (distance <= journeyNavigation.radius) {
+        const stepId = journeyNavigation.stepId;
+        stopJourneyNavigation();
+        autoPath = null;
+        window.autoPath = null;
+        gameUI?._completeFirstThirtyStep?.(stepId, { silent: true });
+        gameUI?.addCombatLog?.('📍 ถึงจุดหมายของบทเรียนแล้ว', 'levelup');
+        return;
+    }
+    if (!marker) return;
+    const screen = sceneManager.worldToScreen(target);
+    const margin = 28;
+    const x = Math.min(window.innerWidth - margin, Math.max(margin, screen.x));
+    const y = Math.min(window.innerHeight - margin, Math.max(margin, screen.y));
+    marker.style.display = 'grid';
+    marker.style.left = `${x}px`;
+    marker.style.top = `${y}px`;
+    const label = marker.querySelector('[data-marker-label]');
+    if (label) label.textContent = `${Math.ceil(distance)}m`;
+}
+
+window.startJourneyNavigation = (position, radius = 3.2, stepId = null) => {
+    if (!sceneManager || !character || !position) return false;
+    let marker = document.getElementById('journey-world-marker');
+    if (!marker) {
+        marker = document.createElement('div');
+        marker.id = 'journey-world-marker';
+        marker.innerHTML = '<span class="journey-world-marker-pin">✦</span><span data-marker-label>0m</span>';
+        marker.style.cssText = 'position:fixed;z-index:1450;display:none;transform:translate(-50%,-50%);pointer-events:none;place-items:center;gap:2px;color:#ffe68b;font:900 11px/1 system-ui,sans-serif;text-shadow:0 2px 8px #000;filter:drop-shadow(0 0 10px rgba(255,205,84,.72));';
+        marker.querySelector('.journey-world-marker-pin').style.cssText = 'display:grid;place-items:center;width:32px;height:32px;border:2px solid #ffeaa0;border-radius:50%;background:rgba(24,18,4,.7);font-size:20px;animation:journeyMarkerPulse 1.2s ease-in-out infinite;';
+        document.body.appendChild(marker);
+        if (!document.getElementById('journey-marker-style')) {
+            const style = document.createElement('style');
+            style.id = 'journey-marker-style';
+            style.textContent = '@keyframes journeyMarkerPulse{0%,100%{transform:scale(.9);box-shadow:0 0 0 0 rgba(255,214,90,.55)}50%{transform:scale(1.08);box-shadow:0 0 0 12px rgba(255,214,90,0)}}';
+            document.head.appendChild(style);
+        }
+    }
+    const target = new THREE.Vector3(Number(position.x) || 0, Number(character.baseY) || 1.2, Number(position.z) || 0);
+    journeyNavigation = { target, radius: Math.max(1, Number(radius) || 3.2), stepId };
+    disengageManualCombat();
+    character.targetMonster = null;
+    autoPath = target.clone();
+    window.autoPath = autoPath;
+    particles?.createClickIndicator?.(target, 0xffd65a);
+    gameUI?.addCombatLog?.('🧭 กำลังนำทางไปยังจุดหมายสีทอง แตะพื้นเพื่อเปลี่ยนเส้นทางได้', 'system');
+    updateJourneyNavigation();
+    return true;
+};
 
 // Reusable vector for per-frame rod tip queries (avoids per-frame allocation)
 const rodTipTmp = new THREE.Vector3();
@@ -628,6 +690,7 @@ async function initGame(charData) {
                         gameUI.addCombatLog(`🎣 ได้รับ ${e} ${item.name} แล้ว${item.mapName ? ` จาก ${item.mapName}` : ''}!`, 'loot', item);
                         gameUI.incrementQuestProgress('fish', 'any');
                         gameUI.recordFishCatch?.(item);
+                    gameUI._completeFirstThirtyStep?.('catch_first_fish');
                     }).catch((error) => {
                         gameUI.addCombatLog(`⚠️ บันทึกรางวัลปลาไม่สำเร็จ: ${error.message}`, 'warning');
                     }).finally(() => {
@@ -642,6 +705,7 @@ async function initGame(charData) {
                     // Offline mode persists the local item through lootDrop below.
                     gameUI.incrementQuestProgress('fish', 'any');
                     gameUI.recordFishCatch?.(event.item);
+                    gameUI._completeFirstThirtyStep?.('catch_first_fish');
                 }
                 break;
             case 'monsterKilled':
@@ -2005,6 +2069,7 @@ function handleMouseInteraction(event) {
     }
 
     if (hit.type === 'monster') {
+        stopJourneyNavigation();
         character.targetMonster = hit.object;
         autoPath = hit.point;
         // Step 11: Monster click: red indicator
@@ -2043,6 +2108,7 @@ function handleMouseInteraction(event) {
         }
         particles.createClickIndicator(hit.point, 0xffff44);
     } else if (hit.type === 'ground') {
+        stopJourneyNavigation();
         disengageManualCombat();
         autoPath = hit.point;
         character.targetMonster = null;
@@ -3036,6 +3102,7 @@ function stepWorld(dt) {
     if (hasManualMove) {
         // Manual steering cancels a manually selected target immediately. AUTO
         // remains untouched so bot farming keeps its intentional target lock.
+        stopJourneyNavigation();
         disengageManualCombat();
         autoPath = null;
         character.moveSpeed = isShiftPressed ? 9 : 5.5;
@@ -3162,6 +3229,7 @@ function stepWorld(dt) {
     // 5. Updates
     character.update(dt);
     updateRemotePlayers(dt); // smooth remote heroes toward their latest target
+    updateJourneyNavigation();
 
     // Fishing line follows the live rod tip (incl. the catch yank)
     if (isFishingActive && sceneManager && character.getRodTipPosition) {
