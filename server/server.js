@@ -21,6 +21,7 @@ import { ensureCardEconomy, getCardEconomy, getStardust } from './api/cardEconom
 import { ensureOreEconomy } from './api/oreEconomy.js';
 import { ensurePetEconomy, PET_CATALOG } from './api/petEconomy.js';
 import { ensureNpcSaleEconomy, sellItemToNpc } from './api/npcSale.js';
+import { ensureFishingEconomy, claimFishingReward, isFishingRequestId } from './api/fishing.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -499,6 +500,9 @@ io.on('connection', (socket) => {
             lastPos: { x: 0, y: 1.2, z: 10, mapId: normalizedPresence.mapId },
             lastPosTime: Date.now(),
             ip: socket._clientIp || 'unknown',
+            lastMotionState: 'idle',
+            nextFishingCatchAt: 0,
+            lastFishingRequestId: null,
         };
         if (socket._clientIp) ipMonitor.recordConnect(socket._clientIp, playerInfo.username);
 
@@ -560,6 +564,7 @@ io.on('connection', (socket) => {
             rY: Number.isFinite(payload.rY) ? Math.atan2(Math.sin(payload.rY), Math.cos(payload.rY)) : 0,
             state: PLAYER_MOTION_STATES.has(payload.state) ? payload.state : 'idle',
         };
+        self.lastMotionState = out.state;
         if (Number.isSafeInteger(payload.aseq) && payload.aseq >= 0 && payload.aseq <= 2_147_483_647) {
             const sequenceChanged = payload.aseq !== socket._lastAttackSequence;
             if (!sequenceChanged || !shouldRateLimitEvent(socket._rateLimitTracker, 'pos_attack', 8, 1000)) {
@@ -1098,6 +1103,34 @@ io.on('connection', (socket) => {
         if (!sender?.verified || !sender.characterId || !isSafeTradeRequest(payload)) return;
         if (shouldRateLimitEvent(socket._rateLimitTracker, 'trade_request', 5, 10000)) return;
         relayRequest('trade_request', { ...payload, senderCharacterId: sender.characterId }, sender);
+    });
+
+    socket.on('fish_claim', async (payload) => {
+        const player = trustedSender(socket);
+        const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+        const reject = message => socket.emit('fish_claim_error', { requestId, message });
+        if (!player?.verified || !player.characterId || !supabase) return reject('กรุณาเข้าสู่ระบบก่อนตกปลา');
+        if (!isFishingRequestId(requestId)) return reject('รหัสคำขอตกปลาไม่ถูกต้อง');
+        if (player.lastMotionState !== 'fishing') return reject('ต้องอยู่ในท่าตกปลาก่อนรับรางวัล');
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'fish_claim', 6, 10000)) return reject('รับรางวัลปลาถี่เกินไป กรุณารอสักครู่');
+        const now = Date.now();
+        if (requestId !== player.lastFishingRequestId && now < (player.nextFishingCatchAt || 0)) {
+            return reject('ยังตกปลาไม่เสร็จ กรุณารอสักครู่');
+        }
+        player.lastFishingRequestId = requestId;
+        player.nextFishingCatchAt = now + 2500;
+        try {
+            const result = await claimFishingReward({
+                characterId: player.characterId,
+                userId: player.userId,
+                requestId,
+            });
+            socket.emit('fish_claim_result', result);
+        } catch (error) {
+            player.nextFishingCatchAt = Math.min(player.nextFishingCatchAt, Date.now() + 1000);
+            console.error('[Server] Fishing reward failed:', error?.message || error);
+            reject('บันทึกรางวัลปลาไม่สำเร็จ กรุณาลองใหม่');
+        }
     });
 
     socket.on('npc_sell', async (payload) => {
@@ -1861,6 +1894,7 @@ httpServer.listen(PORT, HOST, () => {
                 await ensureOreEconomy();
                 await ensurePetEconomy();
                 await ensureNpcSaleEconomy();
+                await ensureFishingEconomy();
                 await ensureBugReportTables();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }

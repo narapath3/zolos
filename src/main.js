@@ -543,13 +543,9 @@ async function initGame(charData) {
                 if (gameUI && gameUI.persistPetProgress) gameUI.persistPetProgress();
                 break;
             case 'lootDrop':
-                // Fishing loot is still rolled locally. Never turn a connected
-                // session into a client-minted inventory item until the server
-                // advertises the separate reward capability.
-                if (event.item?.type === 'fish' && gameUI?._onlineSessionWithoutAuthority?.()) {
-                    gameUI.addCombatLog('🚫 เซิร์ฟเวอร์ยังไม่พร้อมยืนยันรางวัลปลา จึงไม่เพิ่มไอเทม', 'warning');
-                    break;
-                }
+                // Online fish rewards are committed by the server in fishCaught;
+                // never persist the local prediction from CombatSystem as a second item.
+                if (event.item?.type === 'fish' && gameUI?._onlineSessionWithoutAuthority?.()) break;
                 if (gameUI) gameUI.addCombatLog(`🎁 Dropped: ${event.item.name}`, 'loot');
                 if (gameUI) gameUI.addItem(event.item);
                 break;
@@ -605,20 +601,38 @@ async function initGame(charData) {
                 break;
             case 'fishCaught':
                 // Full yank: lift the rod overhead to hoist the fish out,
-                // hold at the top briefly, then ease back down
+                // hold at the top briefly, then ease back down.
                 if (character) character.triggerRodLift(1, 1.0);
                 if (gameUI && gameUI._onlineSessionWithoutAuthority?.()) {
-                    gameUI.addCombatLog('🚫 จับปลาได้แต่ยังไม่ได้เพิ่มรางวัล เพราะเซิร์ฟเวอร์ยังไม่ยืนยันผล', 'warning');
+                    const requestId = `fish_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+                    gameUI.addCombatLog('🎣 กำลังยืนยันรางวัลปลากับเซิร์ฟเวอร์...', 'system');
+                    import('./network/GameSync.js').then(({ requestFishingReward }) => requestFishingReward(requestId)).then((receipt) => {
+                        const item = {
+                            name: receipt.item_name,
+                            emoji: receipt.emoji || '🐟',
+                            type: 'fish',
+                            rarity: receipt.rarity,
+                            price: receipt.price,
+                            desc: receipt.desc,
+                        };
+                        gameUI.addItemLocal(item, receipt.quantity);
+                        const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
+                        const e = rarityEmoji[item.rarity] || '⚪';
+                        gameUI.addCombatLog(`🎣 ได้รับ ${e} ${item.name} แล้ว!`, 'loot');
+                        gameUI.incrementQuestProgress('fish', 'any');
+                        gameUI.recordFishCatch?.(item);
+                    }).catch((error) => {
+                        gameUI.addCombatLog(`⚠️ บันทึกรางวัลปลาไม่สำเร็จ: ${error.message}`, 'warning');
+                    });
                     break;
                 }
                 if (gameUI) {
                     const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
                     const e = rarityEmoji[event.rarity] || '⚪';
                     gameUI.addCombatLog(`🎣 You caught a ${e} ${event.item.name}!`, 'loot');
-                    // Item is added via 'lootDrop' event in CombatSystem.js
+                    // Offline mode persists the local item through lootDrop below.
                     gameUI.incrementQuestProgress('fish', 'any');
-                    // Record it in the Fishing Almanac (discovery bonus on new species)
-                    if (gameUI.recordFishCatch) gameUI.recordFishCatch(event.item);
+                    gameUI.recordFishCatch?.(event.item);
                 }
                 break;
             case 'monsterKilled':

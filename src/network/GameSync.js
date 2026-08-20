@@ -22,6 +22,7 @@ const pendingCardFusions = new Map();
 const pendingOreConversions = new Map();
 const pendingPetPurchases = new Map();
 const pendingNpcSales = new Map();
+const pendingFishingClaims = new Map();
 let clientMeasuredPing = null;
 const inventoryMutationQueues = new Map();
 
@@ -42,6 +43,18 @@ function isCommittedPetPurchase(result) {
         && Number.isInteger(result.quantity) && result.quantity >= 1
         && result.stats && Array.isArray(result.stats.instances)
         && result.stats.instances.length === result.quantity);
+}
+
+function isCommittedFishingReward(result) {
+    return Boolean(result
+        && result.ok === true
+        && result.serverAuthoritative === true
+        && typeof result.requestId === 'string'
+        && typeof result.item_name === 'string' && result.item_name.length > 0
+        && result.item_type === 'fish'
+        && Number.isInteger(result.quantity) && result.quantity === 1
+        && Number.isInteger(result.inventory_quantity) && result.inventory_quantity >= 1
+        && typeof result.rarity === 'string');
 }
 
 function enqueueInventoryMutation(characterId, itemName, mutation) {
@@ -67,6 +80,7 @@ function rejectPendingSocketRequests() {
     rejectPendingMap(pendingOreConversions, message);
     rejectPendingMap(pendingPetPurchases, message);
     rejectPendingMap(pendingNpcSales, message);
+    rejectPendingMap(pendingFishingClaims, message);
     rejectPendingMap(pendingCardFusions, message);
     rejectPendingMap(pendingCardRefines, message);
 }
@@ -164,6 +178,36 @@ function attachPetPurchaseListeners(socket) {
         clearTimeout(pending.timeout);
         pendingPetPurchases.delete(error.requestId);
         pending.reject(new Error(error?.message || 'ซื้อสัตว์เลี้ยงไม่สำเร็จ'));
+    });
+}
+
+export function requestFishingReward(requestId) {
+    if (isOfflineMode || !isSocketMode()) throw new Error('การรับรางวัลปลาต้องใช้โหมดออนไลน์');
+    if (typeof requestId !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) throw new Error('รหัสคำขอตกปลาไม่ถูกต้อง');
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณาลองใหม่');
+    if (pendingFishingClaims.has(requestId)) throw new Error('กำลังยืนยันรางวัลปลาอยู่');
+    if (!socket._zolosFishingListeners) {
+        socket._zolosFishingListeners = true;
+        socket.on('fish_claim_result', result => {
+            const pending = pendingFishingClaims.get(result?.requestId); if (!pending) return;
+            clearTimeout(pending.timeout); pendingFishingClaims.delete(result.requestId);
+            if (!isCommittedFishingReward(result)) return pending.reject(new Error('ผลรางวัลปลาไม่ถูกต้อง'));
+            pending.resolve(result);
+        });
+        socket.on('fish_claim_error', error => {
+            const pending = pendingFishingClaims.get(error?.requestId); if (!pending) return;
+            clearTimeout(pending.timeout); pendingFishingClaims.delete(error.requestId);
+            pending.reject(new Error(error.message || 'รับรางวัลปลาไม่สำเร็จ'));
+        });
+    }
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingFishingClaims.delete(requestId);
+            reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า รางวัลปลายังไม่ถูกบันทึก'));
+        }, 12000);
+        pendingFishingClaims.set(requestId, { resolve, reject, timeout });
+        socket.emit('fish_claim', { requestId });
     });
 }
 

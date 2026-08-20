@@ -173,7 +173,10 @@ test('connected sessions fail closed for client-only reward paths', () => {
   assert.match(gameUI, /_claimQuestReward\(idx\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
   assert.match(gameUI, /_spinRoulette\(\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
   assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)/);
-  assert.match(main, /case 'fishCaught':[\s\S]*gameUI && gameUI\._onlineSessionWithoutAuthority\?\.\(\)/);
+  assert.match(main, /case 'fishCaught':[\s\S]*requestFishingReward/);
+  assert.match(main, /addItemLocal\(item, receipt\.quantity\)/);
+  assert.match(gameSync, /export function requestFishingReward\(requestId\)/);
+  assert.match(gameSync, /fish_claim_result/);
 });
 
 test('guest splash distinguishes a new guest from resuming the active session', () => {
