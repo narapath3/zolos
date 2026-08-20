@@ -150,10 +150,22 @@ let lastBroadcastTime = 0;
 // bumps once per swing; `localWsc` is the current weapon's sound class.
 let localAtkSeq = 0;
 let localWsc = 'unarmed';
-function registerLocalAttack(wsc) {
+function registerLocalAttack(wsc, opts = {}) {
     localWsc = wsc || 'sword';
-    localAtkSeq = (localAtkSeq + 1) & 0xffff; // wrap so the number stays small
-    if (soundManager) soundManager.playWeaponAttack(localWsc);
+    if (opts.broadcast !== false) {
+        localAtkSeq = (localAtkSeq + 1) & 0xffff; // wrap so the number stays small
+    }
+    if (soundManager) {
+        soundManager.playCombatAction?.({
+            weaponClass: localWsc,
+            phase: opts.phase || 'release',
+            volume: opts.volume == null ? 1 : opts.volume,
+            critical: !!opts.critical,
+            finisher: !!opts.finisher,
+            element: opts.element || 'physical',
+            priority: opts.priority,
+        });
+    }
 }
 let lastHUDTime = 0;
 let lastStatsTime = 0;
@@ -429,9 +441,9 @@ async function initGame(charData) {
                         particles.spawnArrow(event.startPos, event.target, resolveHit);
                     }
                 }
-                // Ranged weapons sound at release (gun bang / bow twang); this
-                // also broadcasts the attack so nearby players hear it.
-                registerLocalAttack(event.weaponClass || 'bow');
+                // Ranged weapons announce their release here. The impact layer is
+                // emitted when the projectile resolves so the two moments stay readable.
+                registerLocalAttack(event.weaponClass || 'bow', { phase: 'release' });
                 break;
             case 'playerAttack':
                 if (particles) {
@@ -447,10 +459,19 @@ async function initGame(charData) {
                     const dmgType = event.critical ? 'critical-dmg' : 'player-dmg';
                     particles.spawnDamageNumber(screenPos.x, screenPos.y, event.damage, dmgType);
                 }
-                // Melee weapons sound on the hit itself (ranged weapons already
-                // sounded at release, so don't double up). Broadcasts to others.
-                if (event.weaponClass === 'melee') {
-                    registerLocalAttack(character && character.getWeaponSoundClass ? character.getWeaponSoundClass() : 'sword');
+                // All hit-confirming attacks get an impact layer. Ranged attacks
+                // already had a release layer, so this completes the projectile sound.
+                if (event.weaponClass === 'melee' || event.weaponClass === 'thief' || event.weaponClass === 'bow' || event.weaponClass === 'gun' || event.weaponClass === 'magic' || event.weaponClass === 'acolyte') {
+                    const hitWeapon = character && character.getWeaponSoundClass
+                        ? character.getWeaponSoundClass()
+                        : (event.weaponClass === 'thief' ? 'shadowslash' : event.weaponClass);
+                    registerLocalAttack(hitWeapon, {
+                        phase: 'impact',
+                        critical: !!event.critical,
+                        finisher: !!event.finisher,
+                        priority: event.critical || event.finisher ? 2 : 0,
+                        broadcast: event.weaponClass === 'melee' || event.weaponClass === 'thief',
+                    });
                 }
                 // Broadcast the hit to other players so they see the slash/sparks/damage number too
                 if (typeof broadcastAttackHit === 'function' && event.targetPos) {
@@ -458,7 +479,7 @@ async function initGame(charData) {
                     broadcastAttackHit(
                         event.targetPos.x, event.targetPos.z,
                         event.critical, event.damage, wsc,
-                        sceneManager.currentMap
+                        sceneManager.currentMap, event.finisher
                     );
                 }
                 if (gameUI) {
@@ -769,10 +790,11 @@ async function initGame(charData) {
     window.onRemoteAttackHit = (payload) => {
         if (!particles || !payload || !payload.userId) return;
         const rp = remotePlayersMap.get(payload.userId);
-        if (!rp || !rp.mesh) return;
+        if (!rp || !rp.mesh || !character?.getPosition) return;
         // Cull far-away hits
         if (character && character.getPosition && rp.mesh.position.distanceTo(character.getPosition()) > 46) return;
         const isCritical = payload.tc === 1;
+        const isFinisher = payload.fin === 1;
         const damage = payload.dmg || 0;
         const wsc = payload.wsc || 'melee';
         // Target position: use server-provided coords or cast forward from caster
@@ -784,6 +806,17 @@ async function initGame(charData) {
             const forward = new THREE.Vector3(0, 0, 3).applyQuaternion(rp.character.mesh.quaternion);
             targetPos = rp.mesh.position.clone().add(forward);
         }
+        const remoteMe = character.getPosition();
+        const remoteDistance = rp.mesh.position.distanceTo(remoteMe);
+        const remoteVolume = Math.max(0, 1 - remoteDistance / 46);
+        soundManager?.playCombatAction?.({
+            weaponClass: wsc,
+            phase: 'impact',
+            volume: remoteVolume * 0.78,
+            critical: isCritical,
+            finisher: isFinisher,
+            priority: isCritical || isFinisher ? 2 : 0,
+        });
         // Sword slash arc for melee weapons
         if (wsc === 'melee' || wsc === 'sword' || wsc === 'blunt' || wsc === 'staff' || wsc === 'spear' || wsc === 'unarmed') {
             particles.spawnSlash(targetPos, isCritical);

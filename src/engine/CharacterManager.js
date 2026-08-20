@@ -3247,7 +3247,7 @@ export class CharacterManager {
 
         // Sound effect
         if (soundManager) {
-            soundManager.playSkillSound(skillId);
+            soundManager.playSkillSound(skillId, { phase: 'cast' });
         }
 
         // ---- Execute: dispatched on skill.type, so every skill is pure data ----
@@ -3281,6 +3281,9 @@ export class CharacterManager {
             const actualDmg = serverOwned
                 ? this.resolveCardDamage(currentTarget, finalDmg).damage
                 : this.applyCardDamage(currentTarget, finalDmg);
+            const finisher = !serverOwned && (currentTarget.data
+                ? !currentTarget.alive
+                : typeof currentTarget.isAlive === 'function' && !currentTarget.isAlive());
             if (serverOwned) {
                 currentTarget.flashHit?.(false);
                 currentTarget._localContributed = true;
@@ -3306,7 +3309,12 @@ export class CharacterManager {
                 }
             }
 
-            if (effectCallback) effectCallback(skillId, currentTarget, actualDmg, { serverOwned, isCritical: false });
+            soundManager?.playSkillSound?.(skillId, {
+                phase: finisher ? 'finisher' : 'impact',
+                finisher,
+                priority: finisher ? 2 : undefined,
+            });
+            if (effectCallback) effectCallback(skillId, currentTarget, actualDmg, { serverOwned, isCritical: false, finisher });
 
         } else if (skill.type === 'physical_aoe' || skill.type === 'magic_aoe') {
             // NOTE: this used to read skill.radius, which no skill defines — the
@@ -3352,6 +3360,9 @@ export class CharacterManager {
                 });
             }
 
+            if (hits > 0) {
+                soundManager?.playSkillSound?.(skillId, { phase: 'impact', priority: 2 });
+            }
             if (hits === 0 && gameUI) {
                 gameUI.addCombatLog('...แต่ไม่มีศัตรูอยู่ในระยะ', 'system');
             }

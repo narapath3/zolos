@@ -645,6 +645,7 @@ export class CombatSystem {
                 targetPos: monster.getPosition(),
                 monsterName: monster.data.name,
                 weaponClass: weaponClass || (this.character.getWeaponClass ? this.character.getWeaponClass() : 'melee'),
+                finisher: false,
             });
             return;
         }
@@ -666,6 +667,7 @@ export class CombatSystem {
             targetPos: monster.getPosition(),
             monsterName: monster.data.name,
             weaponClass: weaponClass || (this.character.getWeaponClass ? this.character.getWeaponClass() : 'melee'),
+            finisher: !monster.alive,
         });
 
         // Monster counter-attacks (if alive and within range)

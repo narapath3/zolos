@@ -656,6 +656,7 @@ io.on('connection', (socket) => {
             tc: typeof payload.tc === 'number' ? payload.tc : undefined, // critical flag
             dmg: clampedDmg,
             wsc: weaponClass,
+            fin: payload.fin === 1 ? 1 : 0,
         };
         const hasTarget = payload.tx !== undefined || payload.tz !== undefined;
         if (hasTarget) {

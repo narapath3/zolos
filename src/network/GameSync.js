@@ -2102,7 +2102,7 @@ export function reportMonsterHit(monsterId, damage, crit = false) {
 }
 
 // Tell the map that we hit a target so everyone can render the slash/sparks/damage number.
-export function broadcastAttackHit(targetX, targetZ, isCritical, damage, weaponSoundClass, currentMapId = 'prontera') {
+export function broadcastAttackHit(targetX, targetZ, isCritical, damage, weaponSoundClass, currentMapId = 'prontera', isFinisher = false) {
     if (isOfflineMode) return;
     const socket = getSocket();
     if (socket && isSocketConnected()) {
@@ -2110,6 +2110,7 @@ export function broadcastAttackHit(targetX, targetZ, isCritical, damage, weaponS
             tc: isCritical ? 1 : 0,
             dmg: Math.max(0, Math.min(99999, Math.floor(damage || 0))),
             wsc: weaponSoundClass || 'melee',
+            fin: isFinisher ? 1 : 0,
             tx: targetX,
             tz: targetZ,
             mapId: currentMapId,
