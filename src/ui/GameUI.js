@@ -1298,7 +1298,7 @@ export class GameUI {
       this.updateHUD(this.character.stats);
     }
     const rEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' }[rarity] || '⚪';
-    this.addCombatLog(`📖 พบปลาชนิดใหม่! ${item.emoji || '🐟'} ${name} ${rEmoji} (+${bonus} Gold) — สมุดสะสม ${this._almanacTierCounts().caughtTotal}/${this._almanacTierCounts().grandTotal}`, 'loot');
+    this.addCombatLog(`📖 พบปลาชนิดใหม่! ${name} ${rEmoji} (+${bonus} Gold) — สมุดสะสม ${this._almanacTierCounts().caughtTotal}/${this._almanacTierCounts().grandTotal}`, 'loot', item);
     this._saveFishingAlmanac();
     // If a tier just got completed, nudge the player
     this._notifyAlmanacCompletions();
@@ -4962,10 +4962,24 @@ export class GameUI {
   }
 
   // ============ Combat Log ============
-  addCombatLog(message, type = 'system') {
+  addCombatLog(message, type = 'system', itemMeta = null) {
     const el = document.createElement('div');
     el.className = `combat-msg ${type}`;
-    el.textContent = message;
+    const item = itemMeta?.item || itemMeta;
+    const itemName = item?.item_name || item?.name;
+    if (itemName) {
+      el.classList.add('combat-msg--item');
+      const art = document.createElement('span');
+      art.className = 'combat-msg__item-icon';
+      art.innerHTML = itemIconMarkup(itemName, item?.emoji || '🐟', 'combat-msg__item-art');
+      const text = document.createElement('span');
+      text.className = 'combat-msg__item-text';
+      text.textContent = message;
+      el.append(art, text);
+    } else {
+      // Keep every existing log message text-only and XSS-safe.
+      el.textContent = message;
+    }
 
     // Append to system tab
     if (this.combatLogEl) {

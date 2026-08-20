@@ -1801,6 +1801,71 @@ a,
   animation: msgFadeIn 0.3s ease-out;
 }
 
+/* Inline item art for trusted loot messages, especially fish catches. */
+.combat-msg--item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.combat-msg__item-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: radial-gradient(circle at 35% 28%, rgba(126, 210, 255, .42), rgba(20, 63, 102, .72));
+  border: 1px solid rgba(132, 205, 255, .52);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .32), 0 0 8px rgba(83, 174, 255, .16);
+  overflow: hidden;
+}
+
+.combat-msg__item-art,
+.combat-msg__item-icon .item-visual,
+.combat-msg__item-icon .item-visual img {
+  width: 22px;
+  height: 22px;
+}
+
+.combat-msg__item-icon .item-visual {
+  display: grid;
+  place-items: center;
+}
+
+.combat-msg__item-icon .item-visual img {
+  display: block;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.combat-msg__item-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .combat-msg--item {
+    gap: 4px;
+  }
+
+  .combat-msg__item-icon {
+    flex-basis: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .combat-msg__item-art,
+  .combat-msg__item-icon .item-visual,
+  .combat-msg__item-icon .item-visual img {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 .combat-msg.damage {
   color: #ff8080;
 }

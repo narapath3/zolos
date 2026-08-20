@@ -618,7 +618,7 @@ async function initGame(charData) {
                         gameUI.addItemLocal(item, receipt.quantity);
                         const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
                         const e = rarityEmoji[item.rarity] || '⚪';
-                        gameUI.addCombatLog(`🎣 ได้รับ ${e} ${item.name} แล้ว!`, 'loot');
+                        gameUI.addCombatLog(`🎣 ได้รับ ${e} ${item.name} แล้ว!`, 'loot', item);
                         gameUI.incrementQuestProgress('fish', 'any');
                         gameUI.recordFishCatch?.(item);
                     }).catch((error) => {
@@ -629,7 +629,7 @@ async function initGame(charData) {
                 if (gameUI) {
                     const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
                     const e = rarityEmoji[event.rarity] || '⚪';
-                    gameUI.addCombatLog(`🎣 You caught a ${e} ${event.item.name}!`, 'loot');
+                    gameUI.addCombatLog(`🎣 You caught a ${e} ${event.item.name}!`, 'loot', event.item);
                     // Offline mode persists the local item through lootDrop below.
                     gameUI.incrementQuestProgress('fish', 'any');
                     gameUI.recordFishCatch?.(event.item);
