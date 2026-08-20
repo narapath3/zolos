@@ -1900,6 +1900,196 @@ a,
   }
 }
 
+/* ========== FISHING REWARD SUMMARY ========== */
+.fishing-summary-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: max(14px, var(--safe-top)) max(14px, var(--safe-right)) max(14px, var(--safe-bottom)) max(14px, var(--safe-left));
+  background: rgba(3, 8, 18, .78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.fishing-summary-card {
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom)));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(103, 194, 255, .58);
+  border-radius: 22px;
+  color: #eef7ff;
+  background: linear-gradient(155deg, rgba(16, 39, 69, .98), rgba(7, 15, 29, .98));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .65), 0 0 42px rgba(59, 170, 255, .18);
+  animation: fishingSummaryIn .24s ease-out;
+}
+
+@keyframes fishingSummaryIn {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fishing-summary__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px 15px;
+  background: radial-gradient(circle at 20% 0%, rgba(77, 195, 255, .2), transparent 54%);
+}
+
+.fishing-summary__eyebrow {
+  margin: 0 0 4px;
+  color: #77d8ff;
+  font: 800 10px/1.2 var(--font-display);
+  letter-spacing: .18em;
+}
+
+.fishing-summary__header h2 {
+  margin: 0;
+  color: #fff;
+  font: 900 clamp(20px, 5vw, 28px)/1.15 var(--font-display);
+}
+
+.fishing-summary__header p:last-child {
+  margin: 6px 0 0;
+  color: #a8c5dd;
+  font-size: 11px;
+}
+
+.fishing-summary__close {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(180, 222, 255, .28);
+  border-radius: 12px;
+  color: #d8efff;
+  background: rgba(255, 255, 255, .08);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fishing-summary__rows {
+  display: grid;
+  gap: 7px;
+  max-height: 330px;
+  overflow-y: auto;
+  padding: 4px 22px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 202, 255, .45) transparent;
+}
+
+.fishing-summary__row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(125, 194, 255, .14);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, .055);
+}
+
+.fishing-summary__art {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: radial-gradient(circle, rgba(92, 201, 255, .28), rgba(16, 47, 80, .28));
+}
+
+.fishing-summary__item-art,
+.fishing-summary__art .item-visual,
+.fishing-summary__art .item-visual img {
+  width: 43px;
+  height: 43px;
+}
+
+.fishing-summary__art .item-visual img {
+  display: block;
+  object-fit: contain;
+}
+
+.fishing-summary__item-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.fishing-summary__item-copy strong,
+.fishing-summary__item-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fishing-summary__item-copy strong { color: #f5fbff; font-size: 13px; }
+.fishing-summary__item-copy span { color: #9ebbd2; font-size: 10px; }
+.fishing-summary__qty { color: #ffdc75; font-size: 13px; white-space: nowrap; }
+.fishing-summary__subtotal { color: #8ee5ac; font-size: 12px; white-space: nowrap; }
+
+.fishing-summary__totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  padding: 10px 22px 0;
+}
+
+.fishing-summary__totals > div {
+  display: grid;
+  gap: 4px;
+  padding: 11px 13px;
+  border-radius: 13px;
+  background: rgba(0, 0, 0, .2);
+}
+
+.fishing-summary__totals span { color: #9fb9cd; font-size: 10px; }
+.fishing-summary__totals strong { color: #ffe27e; font-size: 16px; }
+.fishing-summary__note {
+  margin: 11px 22px 0;
+  color: #7894aa;
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.fishing-summary__done {
+  min-height: 46px;
+  margin: 14px 22px 20px;
+  border: 0;
+  border-radius: 13px;
+  color: #06213a;
+  background: linear-gradient(135deg, #83e0ff, #3d9dff);
+  box-shadow: 0 8px 22px rgba(47, 161, 255, .22);
+  font: 900 14px var(--font-ui);
+  cursor: pointer;
+}
+
+.fishing-summary__close:focus-visible,
+.fishing-summary__done:focus-visible { outline: 3px solid rgba(255, 222, 117, .9); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .fishing-summary-overlay { padding: 10px max(10px, var(--safe-right)) 10px max(10px, var(--safe-left)); }
+  .fishing-summary-card { max-height: calc(100dvh - 20px - var(--safe-top) - var(--safe-bottom)); border-radius: 18px; }
+  .fishing-summary__header { padding: 16px 16px 12px; }
+  .fishing-summary__rows { padding-inline: 16px; max-height: min(300px, 42dvh); }
+  .fishing-summary__row { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 7px; }
+  .fishing-summary__art { width: 40px; height: 40px; }
+  .fishing-summary__item-art,
+  .fishing-summary__art .item-visual,
+  .fishing-summary__art .item-visual img { width: 36px; height: 36px; }
+  .fishing-summary__subtotal { grid-column: 2 / -1; justify-self: end; font-size: 10px; }
+  .fishing-summary__totals { padding-inline: 16px; }
+  .fishing-summary__note { margin-inline: 16px; }
+  .fishing-summary__done { margin-inline: 16px; margin-bottom: 16px; }
+}
+
 /* ========== KILL COUNTER ========== */
 #kill-counter {
   position: fixed;

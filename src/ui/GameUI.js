@@ -66,6 +66,7 @@ export class GameUI {
     this.cardDropRevealQueue = [];
     this.adventureJournal = createAdventureJournal();
     this._journalSaveTimer = null;
+    this._fishingSession = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -1272,13 +1273,104 @@ export class GameUI {
     return { totals, got, caughtTotal: caught.size, grandTotal: Object.keys(FISH_SPECIES).length };
   }
 
+  beginFishingSession() {
+    this._fishingSession = {
+      startedAt: Date.now(), ended: false, pendingClaims: 0,
+      totalCount: 0, totalValue: 0, catches: new Map(),
+    };
+  }
+
+  queueFishingReward() {
+    if (!this._fishingSession) this.beginFishingSession();
+    this._fishingSession.pendingClaims += 1;
+  }
+
+  resolveFishingReward() {
+    if (!this._fishingSession) return;
+    this._fishingSession.pendingClaims = Math.max(0, this._fishingSession.pendingClaims - 1);
+    this._maybeFinishFishingSession();
+  }
+
+  endFishingSession() {
+    if (!this._fishingSession) return;
+    this._fishingSession.ended = true;
+    this._maybeFinishFishingSession();
+  }
+
+  _recordFishingSessionCatch(item) {
+    if (!this._fishingSession) this.beginFishingSession();
+    const name = item.name || item.item_name;
+    const data = FISH_SPECIES[name];
+    if (!data) return;
+    const price = Math.max(0, Number(item.price ?? data.price) || 0);
+    const current = this._fishingSession.catches.get(name) || {
+      name, emoji: item.emoji || data.emoji || '🐟', rarity: item.rarity || data.rarity,
+      price, quantity: 0,
+    };
+    current.quantity += 1;
+    current.price = price;
+    this._fishingSession.catches.set(name, current);
+    this._fishingSession.totalCount += 1;
+    this._fishingSession.totalValue += price;
+  }
+
+  _maybeFinishFishingSession() {
+    const session = this._fishingSession;
+    if (!session || !session.ended || session.pendingClaims > 0) return;
+    this._fishingSession = null;
+    if (session.totalCount > 0) this.openFishingSummary(session);
+  }
+
+  openFishingSummary(session) {
+    const existing = document.getElementById('fishing-summary-modal');
+    if (existing) existing.remove();
+    const rarityLabel = { common: 'ธรรมดา', uncommon: 'พบไม่บ่อย', rare: 'หายาก', legendary: 'ตำนาน' };
+    const rows = [...session.catches.values()].sort((a, b) => (b.price * b.quantity) - (a.price * a.quantity));
+    const rowMarkup = rows.map(item => `
+      <div class="fishing-summary__row" role="listitem">
+        <div class="fishing-summary__art">${itemIconMarkup(item.name, item.emoji, 'fishing-summary__item-art')}</div>
+        <div class="fishing-summary__item-copy"><strong>${this._escapeFishingText(item.name)}</strong><span>${rarityLabel[item.rarity] || this._escapeFishingText(item.rarity)} · ${item.price.toLocaleString()} Zeny/ชิ้น</span></div>
+        <strong class="fishing-summary__qty">×${item.quantity.toLocaleString()}</strong>
+        <strong class="fishing-summary__subtotal">${(item.price * item.quantity).toLocaleString()} Z</strong>
+      </div>`).join('');
+    const duration = Math.max(1, Math.round((Date.now() - session.startedAt) / 1000));
+    const overlay = document.createElement('div');
+    overlay.id = 'fishing-summary-modal';
+    overlay.className = 'fishing-summary-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'fishing-summary-title');
+    overlay.innerHTML = `
+      <section class="fishing-summary-card">
+        <header class="fishing-summary__header"><div><p class="fishing-summary__eyebrow">FISHING REPORT</p><h2 id="fishing-summary-title">สรุปผลการตกปลา</h2><p>รอบนี้ใช้เวลา ${duration} วินาที · มูลค่าขายโดยประมาณ</p></div><button type="button" class="fishing-summary__close" aria-label="ปิดสรุปผล">×</button></header>
+        <div class="fishing-summary__rows" role="list">${rowMarkup}</div>
+        <div class="fishing-summary__totals"><div><span>จำนวนปลาทั้งหมด</span><strong>${session.totalCount.toLocaleString()} ตัว</strong></div><div><span>มูลค่ารวม</span><strong>${session.totalValue.toLocaleString()} Zeny</strong></div></div>
+        <p class="fishing-summary__note">มูลค่านี้เป็นราคาขายโดยประมาณ ยังไม่ได้หักหรือเพิ่มเงินในกระเป๋า</p>
+        <button type="button" class="fishing-summary__done">ตกลง</button>
+      </section>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector('.fishing-summary__close')?.addEventListener('click', close);
+    overlay.querySelector('.fishing-summary__done')?.addEventListener('click', close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    const onKey = event => { if (event.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+    overlay.querySelector('.fishing-summary__done')?.focus();
+  }
+
+  _escapeFishingText(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+  }
+
   // Called from the fishCaught flow. Records a species; grants the discovery
   // bonus the first time it's seen and auto-refreshes the almanac if open.
   recordFishCatch(item) {
     if (!item || (item.type && item.type !== 'fish')) return;
-    if (this._onlineSessionWithoutAuthority()) return;
+    const trustedServerReward = item.serverAuthoritative === true;
+    if (this._onlineSessionWithoutAuthority() && !trustedServerReward) return;
     const name = item.name || item.item_name;
     if (!name || !FISH_SPECIES[name]) return;
+    this._recordFishingSessionCatch(item);
     if (!this.almanac) this.almanac = { caught: [], claimed: [], counts: {} };
     if (!this.almanac.counts) this.almanac.counts = {};
     const firstDiscovery = !this.almanac.caught.includes(name);

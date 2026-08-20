@@ -581,6 +581,7 @@ async function initGame(charData) {
                 }
                 break;
             case 'fishingStart':
+                gameUI?.beginFishingSession?.();
                 if (gameUI) gameUI.addCombatLog('🎣 Walking to water...', 'system');
                 break;
             case 'fishingNoWater':
@@ -604,6 +605,7 @@ async function initGame(charData) {
                 // hold at the top briefly, then ease back down.
                 if (character) character.triggerRodLift(1, 1.0);
                 if (gameUI && gameUI._onlineSessionWithoutAuthority?.()) {
+                    gameUI.queueFishingReward?.();
                     const requestId = `fish_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
                     gameUI.addCombatLog('🎣 กำลังยืนยันรางวัลปลากับเซิร์ฟเวอร์...', 'system');
                     import('./network/GameSync.js').then(({ requestFishingReward }) => requestFishingReward(requestId)).then((receipt) => {
@@ -611,6 +613,7 @@ async function initGame(charData) {
                             name: receipt.item_name,
                             emoji: receipt.emoji || '🐟',
                             type: 'fish',
+                            serverAuthoritative: true,
                             rarity: receipt.rarity,
                             price: receipt.price,
                             desc: receipt.desc,
@@ -623,6 +626,8 @@ async function initGame(charData) {
                         gameUI.recordFishCatch?.(item);
                     }).catch((error) => {
                         gameUI.addCombatLog(`⚠️ บันทึกรางวัลปลาไม่สำเร็จ: ${error.message}`, 'warning');
+                    }).finally(() => {
+                        gameUI.resolveFishingReward?.();
                     });
                     break;
                 }
@@ -641,6 +646,7 @@ async function initGame(charData) {
             case 'fishingStop':
                 if (sceneManager) sceneManager.removeFishingLine();
                 if (character) character.setRodLineVisible(true);
+                gameUI?.endFishingSession?.();
                 break;
         }
     }, sceneManager);
