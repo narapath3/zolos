@@ -27,6 +27,10 @@ test('fishing summary is mobile-safe and clearly labels estimated value', () => 
   assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*min-height:\s*0/);
   assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*overflow-y:\s*auto/);
   assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*touch-action:\s*pan-y/);
+  assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*height:\s*clamp\(/);
+  assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*overflow-y:\s*scroll/);
+  assert.match(css, /\.fishing-summary__rows\s*\{[\s\S]*pointer-events:\s*auto/);
+  assert.match(css, /\.fishing-summary-card\s*\{[\s\S]*height:\s*min\(/);
   assert.match(css, /\.fishing-summary__totals\s*\{[\s\S]*grid-template-columns:\s*1fr 1fr/);
   assert.match(css, /@media \(max-width: 520px\)[\s\S]*\.fishing-summary-card/);
   assert.match(css, /\.fishing-summary__totals\s*\{\s*flex:\s*0 0 auto/s);

@@ -2100,6 +2100,8 @@ a,
 .fishing-summary-card {
   position: relative;
   width: min(560px, 100%);
+  height: min(720px, calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom)));
+  max-height: min(720px, calc(100dvh - 28px - var(--safe-top) - var(--safe-bottom)));
   border-color: rgba(128, 211, 255, .62);
   border-radius: 26px;
   background:
@@ -2212,7 +2214,19 @@ a,
 .fishing-summary__session-stats span { color: #87a9bd; font-size: 9px; }
 .fishing-summary__section-head { display: flex; justify-content: space-between; align-items: center; padding: 0 23px 7px; color: #83d8fb; font: 800 9px var(--font-display); letter-spacing: .16em; }
 .fishing-summary__section-head small { color: #718fa4; font: 500 10px var(--font-ui); letter-spacing: 0; }
-.fishing-summary__rows { gap: 8px; padding: 4px 22px 13px; }
+.fishing-summary__rows {
+  flex: 0 1 auto;
+  height: clamp(170px, 34dvh, 330px);
+  min-height: 150px;
+  max-height: 330px;
+  overflow-y: scroll;
+  pointer-events: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  gap: 8px;
+  padding: 4px 22px 13px;
+}
 .fishing-summary__row {
   position: relative;
   grid-template-columns: 22px 52px minmax(0, 1fr) auto auto;
@@ -2252,7 +2266,12 @@ a,
 .fishing-summary__done:hover b { transform: translateX(4px); }
 
 @media (max-width: 520px) {
-  .fishing-summary-card { width: 100%; border-radius: 22px; }
+  .fishing-summary-card {
+    width: 100%;
+    height: calc(100dvh - 20px - var(--safe-top) - var(--safe-bottom));
+    max-height: calc(100dvh - 20px - var(--safe-top) - var(--safe-bottom));
+    border-radius: 22px;
+  }
   .fishing-summary__header { padding: 18px 17px 13px; }
   .fishing-summary__hero { grid-template-columns: 66px minmax(0, 1fr) 43px; gap: 10px; margin: 11px 16px 9px; padding: 8px; }
   .fishing-summary__hero-art { width: 62px; height: 62px; }
@@ -2261,7 +2280,14 @@ a,
   .fishing-summary__hero-copy > span:last-child { font-size: 10px; }
   .fishing-summary__session-stats { margin-inline: 16px; }
   .fishing-summary__section-head { padding-inline: 17px; }
-  .fishing-summary__rows { padding-inline: 16px; }
+  .fishing-summary__rows {
+    flex: 0 1 auto;
+    height: clamp(180px, 34dvh, 300px);
+    min-height: 160px;
+    max-height: 300px;
+    overflow-y: scroll;
+    padding-inline: 16px;
+  }
   .fishing-summary__row { grid-template-columns: 16px 42px minmax(0, 1fr) auto; gap: 7px; padding: 8px 8px 8px 4px; }
   .fishing-summary__rank { font-size: 8px; }
   .fishing-summary__art { width: 40px; height: 40px; }
