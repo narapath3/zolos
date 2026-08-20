@@ -204,6 +204,17 @@ const isNearPetBoutique = (x, z, extra = 0) => {
     const radius = PET_BOUTIQUE_CLEAR_RADIUS + extra;
     return dx * dx + dz * dz < radius * radius;
 };
+// Weapon smith sits on the south-east dry field, well outside the river cut.
+// Keep this as the single placement source so terrain, props, and interaction
+// all agree on the same grounded footprint.
+export const WEAPON_SMITH_POSITION = Object.freeze({ x: 10, z: -8 });
+const WEAPON_SMITH_CLEAR_RADIUS = 4.8;
+const isNearWeaponSmith = (x, z, extra = 0) => {
+    const dx = x - WEAPON_SMITH_POSITION.x;
+    const dz = z - WEAPON_SMITH_POSITION.z;
+    const radius = WEAPON_SMITH_CLEAR_RADIUS + extra;
+    return dx * dx + dz * dz < radius * radius;
+};
 
 // ============ Map Configs ============
 const MAP_CONFIGS = {
@@ -2363,6 +2374,7 @@ export class SceneManager {
         const okSpot = (x, z) => {
             const riverZ = Math.sin(x * 0.08) * 10 - 2;
             if (Math.abs(z - riverZ) < 8.5) return false;      // river + banks
+            if (isNearPetBoutique(x, z) || isNearWeaponSmith(x, z)) return false;
             if (this.isInArena && this.isInArena(x, z, 1)) return false;
             if (Math.abs(x) < 2.2 || Math.abs(z) < 2.2) return false; // paths
             // The expanded mountain and cave highlands are walkable meadows;
@@ -3231,7 +3243,7 @@ export class SceneManager {
         ];
 
         treePositions.forEach(([x, z], idx) => {
-            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8)) {
+            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8) && !isNearWeaponSmith(x, z, 0.8)) {
                 const typeIdx = idx % config.treeTypes.length;
                 const type = config.treeTypes[typeIdx];
                 this._createTree(x, z, type);
@@ -3246,7 +3258,7 @@ export class SceneManager {
             [14, -3], [-2, -11], [7, 12], [-13, 14], [3, 14],
         ];
         rockPosMain.forEach(([x, z]) => {
-            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8)) this._createRock(x, z);
+            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8) && !isNearWeaponSmith(x, z, 0.8)) this._createRock(x, z);
         });
 
         const density = config.decorDensity;
@@ -3260,7 +3272,7 @@ export class SceneManager {
             if (!this._isOnLand(x, z)) continue;
             if (x < -6 && z < -6) continue; // Skip Cave
             if (x > 6 && z > 6) continue; // Skip Mountain
-            if (isNearPetBoutique(x, z)) continue;
+            if (isNearPetBoutique(x, z) || isNearWeaponSmith(x, z)) continue;
             this._createFlower(x, z);
         }
 
@@ -3268,7 +3280,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(100 * density); i++) {
             const x = (Math.random() - 0.5) * 48;
             const z = (Math.random() - 0.5) * 48;
-            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z)) continue;
             this._createGrassTuft(x, z);
         }
 
@@ -5690,6 +5702,7 @@ export class SceneManager {
         const group = new THREE.Group();
         group.userData.isNPC = true;
         group.userData.npcType = 'weaponsmith';
+        group.userData.collisionRadius = 2.15;
 
         const stone = new THREE.MeshLambertMaterial({ color: 0x5c5c66 });
         const darkStone = new THREE.MeshLambertMaterial({ color: 0x3a3a42 });
@@ -5799,8 +5812,15 @@ export class SceneManager {
         nameTag.scale.set(5.0, 0.625, 1);
         group.add(nameTag);
 
-        // ---- Place on dry land, away from the general shop ----
-        group.position.set(9, 0, 6);
+        // ---- Place on the south-east dry field, away from the river ----
+        // The previous (9, 6) position sits inside the winding river at x=9.
+        // Use the shared terrain height so the platform rests on the field and
+        // keep the placement in one constant used by prop exclusion/tests.
+        group.position.set(
+            WEAPON_SMITH_POSITION.x,
+            this.getTerrainHeight(WEAPON_SMITH_POSITION.x, WEAPON_SMITH_POSITION.z),
+            WEAPON_SMITH_POSITION.z
+        );
         group.rotation.y = -0.4;
         this.scene.add(group);
         this.envObjects.push(group);

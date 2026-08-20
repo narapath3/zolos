@@ -130,11 +130,25 @@ test('pet sanctuary is placed on a clear dry-land meadow', () => {
   assert.match(source, /group\.userData\.npcType = 'pet_boutique'/);
   assert.match(source, /group\.userData\.collisionRadius = 3\.4/);
   assert.match(source, /this\.getTerrainHeight\(PET_BOUTIQUE_POSITION\.x, PET_BOUTIQUE_POSITION\.z\)/);
-  assert.match(source, /if \(this\._isOnLand\(x, z\) && !isNearPetBoutique\(x, z, 0\.8\)\)/);
-  assert.match(source, /if \(!this\._isOnLand\(x, z\) \|\| isNearPetBoutique\(x, z\)\) continue/);
+  assert.match(source, /this\._isOnLand\(x, z\).*isNearPetBoutique\(x, z, 0\.8\).*isNearWeaponSmith\(x, z, 0\.8\)/);
+  assert.match(source, /isNearPetBoutique\(x, z\).*isNearWeaponSmith\(x, z\)\) continue/);
 
   const riverZ = Math.sin(6 * 0.08) * 10 - 2;
   assert.ok(Math.abs(-15 - riverZ) > 7, 'boutique must be outside the river keep-out band');
+});
+
+test('weapon smith is placed on a clear dry-land field away from the river', () => {
+  assert.match(source, /export const WEAPON_SMITH_POSITION = Object\.freeze\(\{ x: 10, z: -8 \}\)/);
+  assert.match(source, /const WEAPON_SMITH_CLEAR_RADIUS = 4\.8/);
+  assert.match(source, /const isNearWeaponSmith = \(x, z, extra = 0\) =>/);
+  assert.match(source, /group\.userData\.npcType = 'weaponsmith'/);
+  assert.match(source, /group\.userData\.collisionRadius = 2\.15/);
+  assert.match(source, /this\.getTerrainHeight\(WEAPON_SMITH_POSITION\.x, WEAPON_SMITH_POSITION\.z\)/);
+  assert.match(source, /!isNearWeaponSmith\(x, z, 0\.8\)/);
+  assert.match(source, /\|\| isNearWeaponSmith\(x, z\)\) continue/);
+
+  const riverZ = Math.sin(10 * 0.08) * 10 - 2;
+  assert.ok(Math.abs(-8 - riverZ) > 8, 'weapon smith must be outside the river and bank keep-out band');
 });
 
 test('generic ground fence is removed while river guard rails remain shoreline-only', () => {
