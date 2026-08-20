@@ -213,16 +213,27 @@ function stepMonster(m, mapId, now, dtSec) {
             const dist = Math.hypot(dx, dz) || 0.001;
             if (dist > ATTACK_REACH) {
                 const step = Math.min(dist, (speed + 1.4) * 1.5 * dtSec);
-                const nextX = m.x + (dx / dist) * step;
-                const nextZ = m.z + (dz / dist) * step;
-                if (canMonsterOccupy(m, mapId, nextX, nextZ, def)) {
+                let nextX = m.x + (dx / dist) * step;
+                let nextZ = m.z + (dz / dist) * step;
+                if (!canMonsterOccupy(m, mapId, nextX, nextZ, def)) {
+                    // Arc around the obstacle instead of dropping aggro. This is
+                    // especially important beside Prontera's curved river bank.
+                    const sideX = -dz / dist;
+                    const sideZ = dx / dist;
+                    const sideStep = step * 1.35;
+                    const candidates = [
+                        [m.x + sideX * sideStep + (dx / dist) * step * 0.35,
+                            m.z + sideZ * sideStep + (dz / dist) * step * 0.35],
+                        [m.x - sideX * sideStep + (dx / dist) * step * 0.35,
+                            m.z - sideZ * sideStep + (dz / dist) * step * 0.35],
+                    ];
+                    const detour = candidates.find(([x, z]) => canMonsterOccupy(m, mapId, x, z, def));
+                    if (detour) [nextX, nextZ] = detour;
+                    else { nextX = m.x; nextZ = m.z; }
+                }
+                if (nextX !== m.x || nextZ !== m.z) {
                     m.x = nextX;
                     m.z = nextZ;
-                } else {
-                    m.aggroChar = null;
-                    m.aggroUntil = 0;
-                    m.targetX = m.spawnX;
-                    m.targetZ = m.spawnZ;
                 }
             } else if (now >= m.atkReadyAt) {
                 m.atkReadyAt = now + ATTACK_CD_MS;

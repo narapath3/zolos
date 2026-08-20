@@ -731,10 +731,11 @@ async function initGame(charData) {
     // Shared server strike presentation: everyone on the map sees the monster
     // participate, while authoritative damage is still private to its target.
     window.onMonAtkFx = (payload) => {
-        if (!payload || !monsters || !particles) return;
+        if (!payload || !monsters) return;
         const mon = monsters.getServerMonster?.(payload.id);
         if (!mon || !mon.alive) return;
         const style = mon.triggerAttackPresentation?.() || 'lunge';
+        if (!particles) return;
         const target = new THREE.Vector3(Number(payload.x) || 0, character?.baseY || 1.2, Number(payload.z) || 0);
         particles.spawnMonsterAttackEffect?.(mon.getPosition(), target, style, mon.data?.color);
     };

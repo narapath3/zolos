@@ -117,6 +117,10 @@ export class Monster {
         this._enragedUntil = 0;
         this._serverEnraged = false;
         this._enrageMaterialCache = new Map();
+        this._aggroState = 'idle'; // idle | enraged | attack
+        this._aggroPoseTime = 0;
+        this._aggroBlockedTime = 0;
+        this._attackStyle = 'burst';
     }
 
     setEnraged(active, duration = 8) {
@@ -130,6 +134,8 @@ export class Monster {
         }
         this._enraged = next;
         this._serverEnraged = next;
+        this._aggroState = next ? 'enraged' : 'idle';
+        this._aggroBlockedTime = 0;
         this._enragedUntil = next
             ? (this._serverControlled ? Infinity : this.animTimer + Math.max(0.1, Number(duration) || 8))
             : 0;
@@ -145,6 +151,7 @@ export class Monster {
                         color: material.color.clone(),
                         emissive: material.emissive?.clone?.() || null,
                         emissiveIntensity: material.emissiveIntensity,
+                        opacity: material.opacity,
                     });
                 }
                 const original = this._enrageMaterialCache.get(material);
@@ -159,10 +166,17 @@ export class Monster {
                     material.color.copy(original.color);
                     if (material.emissive && original.emissive) material.emissive.copy(original.emissive);
                     if (original.emissiveIntensity !== undefined) material.emissiveIntensity = original.emissiveIntensity;
+                    if (original.opacity !== undefined) material.opacity = original.opacity;
                 }
                 material.needsUpdate = true;
             }
         });
+        if (this._remasterAura?.material) {
+            const ringMat = this._remasterAura.material;
+            const originalRing = this._enrageMaterialCache.get(ringMat);
+            ringMat.opacity = next ? Math.max(0.28, Number(originalRing?.opacity) || 0.1) : (originalRing?.opacity ?? ringMat.opacity);
+            ringMat.needsUpdate = true;
+        }
         return next;
     }
 
@@ -1047,6 +1061,8 @@ export class Monster {
         // Getting hit provokes it — chase the attacker for a while and make
         // the enraged state visually obvious on every monster archetype.
         this._aggroUntil = (this.animTimer || 0) + 8;
+        this._aggroBlockedTime = 0;
+        this._aggroState = 'enraged';
         this.setEnraged(true, 8);
         // Step 6: Enhanced monster impact flash durations
         this.hitFlash = isCritical ? 0.35 : 0.18;
@@ -1070,6 +1086,8 @@ export class Monster {
     applyRemoteDamage(amount) {
         if (!this.alive) return false;
         this.hp = Math.max(0, this.hp - Math.max(0, amount | 0));
+        this._aggroBlockedTime = 0;
+        this._aggroState = 'enraged';
         this.setEnraged(true, 8);
         this.hitFlash = Math.max(this.hitFlash, 0.12);
         if (this.hpBarFill) this.hpBarFill.scale.x = Math.max(0.01, this.hp / this.maxHp);
@@ -1114,7 +1132,45 @@ export class Monster {
     triggerAttackPresentation() {
         if (this.isAmbient) return null;
         this._attackAnim = this._attackAnimDuration;
-        return getMonsterAttackStyle(this);
+        this._attackStyle = getMonsterAttackStyle(this);
+        this._aggroState = 'attack';
+        this._aggroPoseTime = 0;
+        return this._attackStyle;
+    }
+
+    // A universal threat pose supplements species-specific limb rigs. Many of
+    // the smaller monsters intentionally use a single sculpted body, so moving
+    // only rigged limbs makes them look frozen while chasing. This pose gives
+    // every archetype a readable forward lean, predatory bob, lunge and recoil.
+    _applyThreatPose(moving, bounce = 0) {
+        if (this.isAmbient || !this.bodyMesh) return;
+        const size = Number(this.data.size) || 1;
+        const enraged = this._enraged ? 1 : 0;
+        const phase = this.animTimer * (enraged ? 8.2 : 3.0);
+        const gait = moving ? Math.sin(phase) : 0;
+        const gaitAbs = moving ? Math.abs(gait) : 0;
+        const attackActive = this._attackAnim > 0;
+        const p = attackActive ? 1 - this._attackAnim / this._attackAnimDuration : 0;
+        const windup = attackActive && p < 0.34 ? p / 0.34 : 0;
+        const strike = attackActive && p >= 0.34
+            ? Math.sin(Math.min(1, (p - 0.34) / 0.5) * Math.PI)
+            : 0;
+        const style = this._attackStyle || 'burst';
+        const baseY = size * 0.4;
+        const attackHop = style === 'slam' ? Math.sin(Math.min(1, p / 0.55) * Math.PI) * 0.28 : strike * 0.14;
+        const forwardLunge = style === 'lunge' ? strike * 0.24 : strike * 0.12;
+
+        this.bodyMesh.position.y = baseY + bounce + attackHop * size;
+        this.bodyMesh.position.z = (moving ? gaitAbs * 0.045 * size : 0) + forwardLunge * size;
+        this.bodyMesh.rotation.x = (enraged ? (moving ? -0.18 : -0.08) : 0)
+            - windup * 0.24 + strike * (style === 'lunge' ? 0.48 : 0.28);
+        this.bodyMesh.rotation.z = (enraged ? gait * 0.075 : gait * 0.018)
+            + (style === 'energy' ? Math.sin(p * Math.PI * 2) * 0.16 : -windup * 0.12 + strike * 0.18);
+        const menace = enraged ? 1 + gaitAbs * 0.055 : 1;
+        this.bodyMesh.scale.y = menace * (1 + bounce * 0.5) * (1 - windup * 0.09 + strike * 0.08);
+        this.bodyMesh.scale.x = (1 - bounce * 0.15) * (1 + windup * 0.06 - strike * 0.04);
+        this.bodyMesh.scale.z = (1 - bounce * 0.15) * (1 + windup * 0.06 - strike * 0.04);
+        if (!attackActive && this._aggroState === 'attack') this._aggroState = enraged ? 'enraged' : 'idle';
     }
 
     // Render-only update for server-controlled monsters: smooth toward the last
@@ -1137,36 +1193,10 @@ export class Monster {
         }
 
         const bounce = Math.abs(Math.sin(this.animTimer * 2.5)) * 0.1;
-        if (this.isWaterMonster) {
-            this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
-            this.mesh.position.y = -0.3 + Math.sin(this.animTimer * 1.5) * 0.05;
-        } else {
-            this.bodyMesh.position.y = this.data.size * 0.4 + bounce;
-        }
-        this.bodyMesh.scale.y = 1 + bounce * 0.5;
-        this.bodyMesh.scale.x = 1 - bounce * 0.15;
-        this.bodyMesh.scale.z = 1 - bounce * 0.15;
-
-        // Full-body monster strike: anticipation -> forceful release -> recovery.
-        // This is visual only; combat timing and damage remain authoritative.
-        if (this._attackAnim > 0) {
-            this._attackAnim = Math.max(0, this._attackAnim - dt);
-            const p = 1 - this._attackAnim / this._attackAnimDuration;
-            const windup = p < 0.34 ? p / 0.34 : Math.max(0, 1 - (p - 0.34) / 0.18);
-            const strike = p < 0.34 ? 0 : Math.sin(Math.min(1, (p - 0.34) / 0.5) * Math.PI);
-            const style = getMonsterAttackStyle(this);
-            const hop = style === 'slam' ? Math.sin(Math.min(1, p / 0.55) * Math.PI) * 0.28 : strike * 0.14;
-            this.bodyMesh.position.y += hop * this.data.size;
-            this.bodyMesh.rotation.x = -windup * 0.24 + strike * (style === 'lunge' ? 0.48 : 0.28);
-            this.bodyMesh.rotation.z = (style === 'energy' ? Math.sin(p * Math.PI * 2) * 0.16 : -windup * 0.12 + strike * 0.18);
-            this.bodyMesh.scale.y *= 1 - windup * 0.09 + strike * 0.08;
-            this.bodyMesh.scale.x *= 1 + windup * 0.06 - strike * 0.04;
-            this.bodyMesh.scale.z *= 1 + windup * 0.06 - strike * 0.04;
-        } else {
-            this.bodyMesh.rotation.x *= Math.max(0, 1 - dt * 15);
-            this.bodyMesh.rotation.z *= Math.max(0, 1 - dt * 15);
-        }
-        animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this.hitFlash > 0);
+        if (this.isWaterMonster) this.mesh.position.y = -0.3 + Math.sin(this.animTimer * 1.5) * 0.05;
+        if (this._attackAnim > 0) this._attackAnim = Math.max(0, this._attackAnim - dt);
+        this._applyThreatPose(this.isMoving, bounce);
+        animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this._attackAnim > 0);
 
         this._applyHitFlash();
 
@@ -1248,16 +1278,43 @@ export class Monster {
                     const spd = (this.data.speed + 1.4) * 1.5 * dt;
                     const nx = this.mesh.position.x + (adx / pdist) * spd;
                     const nz = this.mesh.position.z + (adz / pdist) * spd;
-                    let ok = true;
-                    if (sceneManager) {
-                        if (sceneManager.isInArena && sceneManager.isInArena(nx, nz)) ok = false;
-                        else if (sceneManager.getEnvironmentAt(this._environmentProbe.set(nx, 0, nz)) !== (this.data.environment || 'ground')) ok = false;
+                    const requiredEnv = this.data.environment || 'ground';
+                    const validStep = (x, z) => {
+                        if (!sceneManager) return true;
+                        if (sceneManager.isInArena?.(x, z)) return false;
+                        return sceneManager.getEnvironmentAt(this._environmentProbe.set(x, 0, z)) === requiredEnv;
+                    };
+                    let nextX = nx;
+                    let nextZ = nz;
+                    if (!validStep(nextX, nextZ)) {
+                        // Do not freeze at a fence, rock, or curved river edge.
+                        // Probe perpendicular steps so the monster can arc around
+                        // the obstacle while preserving its environment boundary.
+                        const sideX = -adz / pdist;
+                        const sideZ = adx / pdist;
+                        const sideStep = spd * 1.35;
+                        const candidates = [
+                            [this.mesh.position.x + sideX * sideStep + (adx / pdist) * spd * 0.35,
+                                this.mesh.position.z + sideZ * sideStep + (adz / pdist) * spd * 0.35],
+                            [this.mesh.position.x - sideX * sideStep + (adx / pdist) * spd * 0.35,
+                                this.mesh.position.z - sideZ * sideStep + (adz / pdist) * spd * 0.35],
+                        ];
+                        const detour = candidates.find(([x, z]) => validStep(x, z));
+                        if (detour) [nextX, nextZ] = detour;
+                        else { this._aggroBlockedTime += dt; nextX = this.mesh.position.x; nextZ = this.mesh.position.z; }
+                    } else {
+                        this._aggroBlockedTime = 0;
                     }
-                    if (ok) { this.mesh.position.x = nx; this.mesh.position.z = nz; }
+                    const moved = Math.hypot(nextX - this.mesh.position.x, nextZ - this.mesh.position.z) > 0.0001;
+                    this.mesh.position.x = nextX;
+                    this.mesh.position.z = nextZ;
                     this.mesh.rotation.y = Math.atan2(adx, adz);
-                    this.isMoving = true;
+                    this._aggroState = 'enraged';
+                    this.isMoving = moved;
                 } else {
-                    // In range — strike on a cooldown.
+                    // In range — telegraph a threatening windup and strike on a
+                    // server-compatible cooldown. Damage remains authoritative in
+                    // the callback; this branch only drives presentation timing.
                     this.isMoving = false;
                     this.mesh.rotation.y = Math.atan2(adx, adz);
                     this._atkCd -= dt;
@@ -1265,6 +1322,8 @@ export class Monster {
                         this._atkCd = 1.3;
                         this.triggerAttackPresentation();
                         if (onAttackPlayer) onAttackPlayer(this);
+                    } else if (this._attackAnim <= 0) {
+                        this._aggroState = 'enraged';
                     }
                 }
                 this.wanderTarget = null; // hunting overrides wandering
@@ -1396,6 +1455,8 @@ export class Monster {
             this.isMoving = false;
         }
 
+        if (this._attackAnim > 0) this._attackAnim = Math.max(0, this._attackAnim - dt);
+        this._applyThreatPose(this.isMoving, bounce);
         animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this._attackAnim > 0);
 
         // Billboard HP bar to camera (throttled: update every 3rd frame)
@@ -1429,9 +1490,12 @@ export class Monster {
         this._atkCd = 0;
         this._attackAnim = 0;
         this._serverEnraged = false;
+        this._aggroState = 'idle';
+        this._aggroBlockedTime = 0;
         this.setEnraged(false);
         this.bodyMesh.rotation.x = 0;
         this.bodyMesh.rotation.z = 0;
+        this.bodyMesh.position.z = 0;
         this.wanderTarget = null;
         this.wanderTimer = 0;
         this._localContributed = false; // fresh monster — no shared-damage credit yet

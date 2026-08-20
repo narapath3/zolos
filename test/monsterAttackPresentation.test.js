@@ -33,7 +33,33 @@ test('every damaged monster enters a visible red enraged state', () => {
   assert.match(monsterSource, /new THREE\.Color\(0xff2028\)/);
   assert.match(monsterSource, /this\.setEnraged\(true, 8\)/);
   assert.match(monsterSource, /this\._updateEnragedState\(\)/);
+  assert.match(monsterSource, /this\._remasterAura\?\.material/);
+  assert.match(monsterSource, /ringMat\.opacity = next \? Math\.max\(0\.28/);
   assert.match(monsterSource, /if \(player && player\.mesh && this\.alive\)/);
+});
+
+test('enraged monsters use a universal threat pose even without a species limb rig', () => {
+  assert.match(monsterSource, /_applyThreatPose\(moving, bounce = 0\)/);
+  assert.match(monsterSource, /enraged \? \(moving \? -0\.18 : -0\.08\)/);
+  assert.match(monsterSource, /forwardLunge/);
+  assert.match(monsterSource, /this\.bodyMesh\.position\.z/);
+  assert.match(monsterSource, /this\._aggroState = 'attack'/);
+  assert.match(monsterSource, /this\._attackStyle = getMonsterAttackStyle\(this\)/);
+});
+
+test('aggro chase keeps moving around blocked terrain instead of cancelling revenge', () => {
+  assert.match(monsterSource, /Do not freeze at a fence, rock, or curved river edge/);
+  assert.match(monsterSource, /const sideX = -adz \/ pdist/);
+  assert.match(monsterSource, /const detour = candidates\.find/);
+  assert.match(serverSource, /Arc around the obstacle instead of dropping aggro/);
+  assert.match(serverSource, /const sideX = -dz \/ dist/);
+  assert.match(serverSource, /const detour = candidates\.find/);
+});
+
+test('local and server attack presentations count down instead of staying frozen', () => {
+  assert.match(monsterSource, /if \(this\._attackAnim > 0\) this\._attackAnim = Math\.max\(0, this\._attackAnim - dt\)/);
+  assert.match(monsterSource, /this\._applyThreatPose\(this\.isMoving, bounce\)/);
+  assert.match(monsterSource, /animateMonsterRig\(this\._professionalRig, this\.animTimer, this\.isMoving, this\._attackAnim > 0\)/);
 });
 
 test('server aggro state is replicated as presentation-only state and clears on expiry', () => {
@@ -48,6 +74,7 @@ test('respawn clears every local revenge and unfinished attack state', () => {
   assert.match(reset, /this\._aggroUntil = 0/);
   assert.match(reset, /this\._atkCd = 0/);
   assert.match(reset, /this\._attackAnim = 0/);
+  assert.match(reset, /this\._aggroState = 'idle'/);
   assert.match(reset, /this\.wanderTarget = null/);
   assert.match(reset, /this\._localContributed = false/);
   assert.match(serverSource, /m\.aggroChar = null; m\.aggroUntil = 0;[\s\S]{0,80}m\.atkReadyAt = 0/);
