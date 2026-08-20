@@ -146,6 +146,9 @@ function removeRemotePlayer(userId) {
     remotePlayersMap.delete(userId);
 }
 let lastBroadcastTime = 0;
+// The server sends a shared visual cue plus a private damage event. Keep a
+// short-lived sequence guard so the target gets one clear attack FX, not two.
+const lastMonsterAttackFx = new Map();
 // Attack signal broadcast to other players so they hear our weapon. `localAtkSeq`
 // bumps once per swing; `localWsc` is the current weapon's sound class.
 let localAtkSeq = 0;
@@ -735,6 +738,8 @@ async function initGame(charData) {
         const mon = monsters.getServerMonster?.(payload.id);
         if (!mon || !mon.alive) return;
         const style = mon.triggerAttackPresentation?.() || 'lunge';
+        const seq = Number.isSafeInteger(payload.seq) ? payload.seq : null;
+        if (seq !== null) lastMonsterAttackFx.set(payload.id, seq);
         if (!particles) return;
         const target = new THREE.Vector3(Number(payload.x) || 0, character?.baseY || 1.2, Number(payload.z) || 0);
         particles.spawnMonsterAttackEffect?.(mon.getPosition(), target, style, mon.data?.color);
@@ -743,11 +748,24 @@ async function initGame(charData) {
     window.onMonAtk = (payload) => {
         if (!character || !character.isAlive || !character.isAlive() || !payload) return;
         if (window.bossEngaged || duelState) return;
+        const serverMon = monsters?.getServerMonster?.(payload.id);
+        const style = serverMon?._attackStyle || (serverMon?.data?.family === 'construct' ? 'slam'
+            : (['dragon', 'demon', 'undead'].includes(serverMon?.data?.family) ? 'energy'
+                : (['beast', 'insect', 'aquatic'].includes(serverMon?.data?.family) ? 'lunge' : 'burst')));
+        const seq = Number.isSafeInteger(payload.seq) ? payload.seq : null;
+        // A dropped shared FX packet should not make the target miss the attack
+        // telegraph completely; reconstruct it from the private hit event.
+        if (serverMon && seq !== null && lastMonsterAttackFx.get(payload.id) !== seq) {
+            serverMon.triggerAttackPresentation?.();
+            lastMonsterAttackFx.set(payload.id, seq);
+            particles?.spawnMonsterAttackEffect?.(serverMon.getPosition(), character.getPosition(), style, serverMon.data?.color);
+        }
         const atk = Number(payload.atk) || 10;
         const def = character.stats.def || 0;
         const dmg = Math.max(1, atk - Math.floor(def * 0.3) + Math.floor(Math.random() * 3));
         const actual = character.takeDamage(dmg, { preMitigated: true });
         if (particles) {
+            particles.spawnMonsterHitImpact?.(character.getPosition(), style, serverMon?.data?.color);
             const sp = worldToScreen(character.getPosition(), 1.6);
             particles.spawnDamageNumber(sp.x, sp.y, actual, 'monster-dmg');
         }

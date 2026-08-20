@@ -22,6 +22,10 @@ const MAX_WATER_MONSTERS = 4;
 const SPAWN_RANGE = 12;
 const PRONTERA_SPAWN_RANGE = 50;
 const RESPAWN_TIME = 3;
+// Keep the revenge chase readable without letting a monster follow forever.
+// This is intentionally wider than the attack range so retreating players can
+// see the monster close the gap instead of watching it freeze in place.
+const AGGRO_LEASH_DISTANCE = 42;
 const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 
 let sharedMonsterSkinTexture = null;
@@ -1271,7 +1275,7 @@ export class Monster {
             const t = this.animTimer;
             // Only provoked monsters hunt — never aggro on approach alone. The
             // aggro window is armed in takeDamage() when the player hits it.
-            aggroActive = t < this._aggroUntil && pdist < 20;
+            aggroActive = t < this._aggroUntil && pdist < AGGRO_LEASH_DISTANCE;
             if (aggroActive) {
                 const reach = 1.0 + this.data.size * (this._scale || 1) * 0.6;
                 if (pdist > reach) {

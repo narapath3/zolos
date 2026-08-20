@@ -25,6 +25,7 @@ test('server-owned monsters broadcast the same skill action on every populated m
   assert.match(syncSource, /socket\.on\('mon_atk_fx'/);
   assert.match(mainSource, /window\.onMonAtkFx/);
   assert.match(mainSource, /getServerMonster\?\.\(payload\.id\)/);
+  assert.match(mainSource, /spawnMonsterAttackEffect/);
   assert.match(monsterSource, /triggerAttackPresentation\(\)/);
 });
 
@@ -45,6 +46,7 @@ test('enraged monsters use a universal threat pose even without a species limb r
   assert.match(monsterSource, /this\.bodyMesh\.position\.z/);
   assert.match(monsterSource, /this\._aggroState = 'attack'/);
   assert.match(monsterSource, /this\._attackStyle = getMonsterAttackStyle\(this\)/);
+  assert.match(monsterSource, /const AGGRO_LEASH_DISTANCE = 42/);
 });
 
 test('aggro chase keeps moving around blocked terrain instead of cancelling revenge', () => {
@@ -54,12 +56,16 @@ test('aggro chase keeps moving around blocked terrain instead of cancelling reve
   assert.match(serverSource, /Arc around the obstacle instead of dropping aggro/);
   assert.match(serverSource, /const sideX = -dz \/ dist/);
   assert.match(serverSource, /const detour = candidates\.find/);
+  assert.match(serverSource, /if \(dist > AGGRO_LEASH_DISTANCE\)/);
 });
 
 test('local and server attack presentations count down instead of staying frozen', () => {
   assert.match(monsterSource, /if \(this\._attackAnim > 0\) this\._attackAnim = Math\.max\(0, this\._attackAnim - dt\)/);
   assert.match(monsterSource, /this\._applyThreatPose\(this\.isMoving, bounce\)/);
   assert.match(monsterSource, /animateMonsterRig\(this\._professionalRig, this\.animTimer, this\.isMoving, this\._attackAnim > 0\)/);
+  assert.match(mainSource, /lastMonsterAttackFx/);
+  assert.match(mainSource, /spawnMonsterHitImpact/);
+  assert.match(serverSource, /seq: m\.attackSeq/);
 });
 
 test('server aggro state is replicated as presentation-only state and clears on expiry', () => {

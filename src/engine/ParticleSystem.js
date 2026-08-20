@@ -288,35 +288,65 @@ export class ParticleSystem {
         start.y += 0.8;
         target.y += 0.75;
         const fxColor = Number(color) || 0xff6848;
+        const groundTarget = target.clone();
+        groundTarget.y = 0;
 
         if (style === 'energy') {
             const direction = new THREE.Vector3().subVectors(target, start);
             const length = direction.length();
             const beam = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.055, 0.16, length, 7),
-                new THREE.MeshBasicMaterial({ color: fxColor, transparent: true, opacity: 0.82, depthWrite: false })
+                new THREE.MeshBasicMaterial({ color: fxColor, transparent: true, opacity: 0.86, blending: THREE.AdditiveBlending, depthWrite: false })
             );
             beam.position.copy(start).add(target).multiplyScalar(0.5);
             beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
             this.scene.add(beam);
-            this.hitEffects.push({ mesh: beam, velocity: new THREE.Vector3(), gravity: 0, life: 0.32, maxLife: 0.32 });
+            this.hitEffects.push({ mesh: beam, velocity: new THREE.Vector3(), gravity: 0, life: 0.36, maxLife: 0.36 });
             this._fxRing(start, fxColor, 0.45, start.y - 0.72, 0.18, 0.85);
+            this._fxPillar(target, fxColor, 0.44, 1.8, 0.38);
+            this._fxRing(groundTarget, 0xb8ecff, 0.5, 0.04, 0.25, 1.45);
         } else if (style === 'slam') {
             this._fxRing(start, fxColor, 0.55, 0.05, 0.35, 2.2);
-            this._fxRing(target, 0xffd080, 0.45, 0.05, 0.18, 1.1);
+            this._fxRing(groundTarget, 0xffd080, 0.58, 0.05, 0.18, 1.45);
+            this._fxPillar(groundTarget, 0xff7a42, 0.35, 1.05, 0.65);
         } else if (style === 'lunge') {
             const arc = new THREE.Mesh(
                 new THREE.TorusGeometry(0.72, 0.065, 7, 22, Math.PI * 1.15),
-                new THREE.MeshBasicMaterial({ color: fxColor, transparent: true, opacity: 0.9, depthWrite: false })
+                new THREE.MeshBasicMaterial({ color: fxColor, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
             );
             arc.position.copy(target);
             arc.rotation.set(0.25, Math.atan2(target.x - start.x, target.z - start.z), -0.55);
             this.scene.add(arc);
-            this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(), gravity: 0, life: 0.28, maxLife: 0.28 });
+            this.hitEffects.push({ mesh: arc, velocity: new THREE.Vector3(), gravity: 0, life: 0.32, maxLife: 0.32 });
+            this._fxRing(groundTarget, 0xffb05e, 0.4, 0.04, 0.2, 0.9);
         } else {
             this._fxRing(start, fxColor, 0.4, 0.05, 0.15, 0.9);
+            this._fxRing(groundTarget, fxColor, 0.42, 0.04, 0.18, 0.9);
         }
-        this._fxBurst(target, fxColor, this.perfMonitor.isLowEndDevice ? 6 : 12, 4.5, { life: 0.48, yOff: 0.2, size: 0.1, useGlow: true });
+        this._fxBurst(target, fxColor, this.perfMonitor.isLowEndDevice ? 6 : 12, 4.5, { life: 0.52, yOff: 0.2, size: 0.1, useGlow: true });
+    }
+
+    // Target-side impact used by the private damage event. Keeping it separate
+    // from the shared attack path makes the effect readable even when the
+    // broadcast telegraph arrived a few frames earlier or was throttled.
+    spawnMonsterHitImpact(position, style = 'lunge', color = 0xff6848) {
+        if (!this.effectsEnabled || !position || this._throttleEffect(false)) return;
+        const at = position.clone ? position.clone() : new THREE.Vector3(position.x, position.y, position.z);
+        const ground = at.clone(); ground.y = 0;
+        const fxColor = Number(color) || 0xff6848;
+        if (style === 'energy') {
+            this._fxPillar(at, fxColor, 0.42, 1.55, 0.34);
+            this._fxRing(ground, 0xc9f6ff, 0.5, 0.04, 0.25, 1.35);
+        } else if (style === 'slam') {
+            this._fxRing(ground, 0xffc16a, 0.52, 0.04, 0.22, 1.65);
+            this._fxBurst(at, 0xff7a40, this.perfMonitor.isLowEndDevice ? 5 : 10, 3.8, { life: 0.44, yOff: 0.12, size: 0.09, useGlow: true });
+        } else if (style === 'lunge') {
+            this._fxRing(ground, 0xffe0a0, 0.42, 0.04, 0.16, 0.95);
+            this._fxBurst(at, fxColor, this.perfMonitor.isLowEndDevice ? 5 : 9, 3.5, { life: 0.38, yOff: 0.35, size: 0.09, useGlow: true });
+        } else {
+            this._fxRing(ground, fxColor, 0.42, 0.04, 0.14, 0.9);
+            this._fxBurst(at, fxColor, this.perfMonitor.isLowEndDevice ? 4 : 8, 3.2, { life: 0.34, yOff: 0.25, size: 0.08, useGlow: true });
+        }
     }
 
     // Spawn floating damage number (using DOM overlay)

@@ -23,6 +23,7 @@ const SPAWN_RANGE = 12;            // matches client MonsterManager
 const PRONTERA_SPAWN_RANGE = 50;   // expanded field + explorable mountain
 const RESPAWN_MS = 4000;
 const AGGRO_MS = 8000;             // how long a hit keeps a monster hunting
+const AGGRO_LEASH_DISTANCE = 42;   // readable retreat window before revenge ends
 const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
 const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
 const ATTACK_REACH = 1.8;
@@ -130,7 +131,7 @@ function makeMonster(id, type, isWater) {
         x: pos.x, z: pos.z, rot: Math.random() * Math.PI * 2,
         spawnX: pos.x, spawnZ: pos.z,
         hp, maxHp: hp, alive: true,
-        aggroChar: null, aggroUntil: 0, atkReadyAt: 0,
+        aggroChar: null, aggroUntil: 0, atkReadyAt: 0, attackSeq: 0,
         wanderUntil: 0, targetX: pos.x, targetZ: pos.z,
         dmgByChar: new Map(),
         hitCadenceByChar: new Map(),
@@ -212,6 +213,16 @@ function stepMonster(m, mapId, now, dtSec) {
             const dx = pp.x - m.x, dz = pp.z - m.z;
             const dist = Math.hypot(dx, dz) || 0.001;
             if (dist > ATTACK_REACH) {
+                // Keep chasing while the player retreats, but stop after a
+                // generous readable leash instead of following across the map.
+                if (dist > AGGRO_LEASH_DISTANCE) {
+                    m.aggroChar = null;
+                    m.aggroUntil = 0;
+                    m.atkReadyAt = 0;
+                    m.targetX = m.spawnX;
+                    m.targetZ = m.spawnZ;
+                    return;
+                }
                 const step = Math.min(dist, (speed + 1.4) * 1.5 * dtSec);
                 let nextX = m.x + (dx / dist) * step;
                 let nextZ = m.z + (dz / dist) * step;
@@ -237,11 +248,12 @@ function stepMonster(m, mapId, now, dtSec) {
                 }
             } else if (now >= m.atkReadyAt) {
                 m.atkReadyAt = now + ATTACK_CD_MS;
+                m.attackSeq = (m.attackSeq + 1) & 0xffff;
                 io.to(`map:${mapId}`).emit('mon_atk_fx', {
-                    id: m.id, targetCharacterId: m.aggroChar, x: pp.x, z: pp.z,
+                    id: m.id, seq: m.attackSeq, targetCharacterId: m.aggroChar, x: pp.x, z: pp.z,
                 });
                 const sock = socketForChar(m.aggroChar);
-                if (sock && def) sock.emit('mon_atk', { id: m.id, atk: def.atk });
+                if (sock && def) sock.emit('mon_atk', { id: m.id, seq: m.attackSeq, atk: def.atk });
             }
             m.rot = Math.atan2(dx, dz);
             return;
