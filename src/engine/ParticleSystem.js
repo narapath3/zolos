@@ -281,6 +281,48 @@ export class ParticleSystem {
         }
     }
 
+    // Short-lived ground dust kicked up by a charging monster. This is a
+    // deliberately small incidental effect: no textures, no emitters, and it
+    // reuses the existing splash lifecycle/budget so mobile devices stay safe.
+    spawnMonsterRushDust(position, direction = null, intensity = 1) {
+        if (!this.effectsEnabled || !position || this._throttleEffect(false)) return;
+        const particleScale = this.perfMonitor.getParticleCount();
+        const baseCount = this.perfMonitor.isLowEndDevice ? 1 : 3;
+        const count = Math.max(1, Math.floor(baseCount * particleScale * Math.min(1.25, Math.max(0.6, intensity))));
+        const segments = this.perfMonitor.getGeometrySegments();
+        const dirX = Number(direction?.x) || 0;
+        const dirZ = Number(direction?.z) || 0;
+        const length = Math.hypot(dirX, dirZ) || 1;
+        const backX = -dirX / length;
+        const backZ = -dirZ / length;
+        const colors = [0x9b7758, 0xb08a65, 0x76563f, 0xc09a70];
+        for (let i = 0; i < count; i++) {
+            const size = 0.08 + Math.random() * 0.1;
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(size, segments, segments),
+                new THREE.MeshBasicMaterial({
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    transparent: true,
+                    opacity: 0.42,
+                    depthWrite: false,
+                })
+            );
+            const spread = (Math.random() - 0.5) * 0.48;
+            mesh.position.set(
+                position.x + backX * (0.18 + Math.random() * 0.32) - backZ * spread,
+                0.05 + Math.random() * 0.08,
+                position.z + backZ * (0.18 + Math.random() * 0.32) + backX * spread
+            );
+            const velocity = new THREE.Vector3(
+                backX * (0.25 + Math.random() * 0.6) - backZ * spread * 0.35,
+                0.55 + Math.random() * 0.65,
+                backZ * (0.25 + Math.random() * 0.6) + backX * spread * 0.35
+            );
+            this.scene.add(mesh);
+            this.splashEffects.push({ mesh, velocity, life: 0.32 + Math.random() * 0.16 });
+        }
+    }
+
     spawnMonsterSkillTelegraph(position, skill = 'fire_breath', radius = 3, color = 0xff5a24, duration = 0.85) {
         if (!this.effectsEnabled || !position || this._throttleEffect(true)) return;
         const at = position.clone ? position.clone() : new THREE.Vector3(position.x, position.y, position.z);

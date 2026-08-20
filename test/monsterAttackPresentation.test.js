@@ -58,10 +58,21 @@ test('aggro chase keeps moving around blocked terrain instead of cancelling reve
   assert.match(serverSource, /const detour = chooseChaseStep/);
   assert.match(serverSource, /if \(dist > AGGRO_LEASH_DISTANCE\)/);
   assert.match(serverSource, /const chaseSpeed = Math\.max\(BULL_RUSH_SPEED/);
-  assert.match(serverSource, /const BULL_RUSH_SPEED = 12\.5/);
+  assert.match(serverSource, /const BULL_RUSH_SPEED = 7\.5/);
   assert.match(serverSource, /BULL_RUSH_ATTACK_REACH = 2\.2/);
   assert.match(serverSource, /mv: Boolean\(m\.moving\)/);
   assert.match(serverSource, /rush: Boolean\(m\.bullRush\)/);
+});
+
+test('bull rush speed and dust trail are bounded presentation contracts', () => {
+  assert.match(serverSource, /const BULL_RUSH_SPEED = 7\.5/);
+  assert.match(serverSource, /const chaseSpeed = Math\.max\(BULL_RUSH_SPEED/);
+  assert.match(monsterSource, /_spawnRushDust\(dt\)/);
+  assert.match(monsterSource, /_rushDustCooldown/);
+  assert.match(monsterSource, /spawnMonsterRushDust/);
+  assert.match(particleSource, /spawnMonsterRushDust\(position, direction = null, intensity = 1\)/);
+  assert.match(particleSource, /this\.perfMonitor\.isLowEndDevice \? 1 : 3/);
+  assert.match(particleSource, /this\.splashEffects\.push\(\{ mesh, velocity, life:/);
 });
 
 test('local and server attack presentations count down instead of staying frozen', () => {

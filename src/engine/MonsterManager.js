@@ -176,6 +176,8 @@ export class Monster {
         this._aggroPoseTime = 0;
         this._aggroBlockedTime = 0;
         this._attackStyle = 'burst';
+        this._rushDustCooldown = 0;
+        this._rushDustDirection = new THREE.Vector3();
     }
 
     setEnraged(active, duration = 8) {
@@ -1236,6 +1238,22 @@ export class Monster {
         if (!attackActive && this._aggroState === 'attack') this._aggroState = enraged ? 'enraged' : 'idle';
     }
 
+    _spawnRushDust(dt) {
+        this._rushDustCooldown = Math.max(0, (this._rushDustCooldown || 0) - dt);
+        if (!this._bullRushActive || !this.isMoving || this._rushDustCooldown > 0) return;
+        const particleSystem = typeof window !== 'undefined' ? window.particles : null;
+        if (!particleSystem?.spawnMonsterRushDust) return;
+        const direction = this._rushDustDirection.set(
+            Math.sin(this.mesh.rotation.y), 0, Math.cos(this.mesh.rotation.y)
+        );
+        particleSystem.spawnMonsterRushDust(
+            this.mesh.position,
+            direction,
+            this._serverBullRush ? 1.1 : 1
+        );
+        this._rushDustCooldown = this._serverBullRush ? 0.13 : 0.15;
+    }
+
     // Render-only update for server-controlled monsters: smooth toward the last
     // server position, keep the idle bounce + hit flash + HP-bar billboarding,
     // but run no AI, wander, aggro, or collision.
@@ -1272,6 +1290,7 @@ export class Monster {
         if (this._attackAnim > 0) this._attackAnim = Math.max(0, this._attackAnim - dt);
         this._applyThreatPose(this.isMoving, bounce);
         animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this._attackAnim > 0);
+        this._spawnRushDust(dt);
 
         this._applyHitFlash();
 
@@ -1350,7 +1369,7 @@ export class Monster {
             if (aggroActive) {
                 const reach = 1.0 + this.data.size * (this._scale || 1) * 0.6;
                 if (pdist > reach) {
-                    const spd = Math.max(0.2, (this.data.speed * 2.2 + 6.0) * dt);
+                    const spd = Math.max(0.2, Math.max(7.5, this.data.speed * 1.65 + 4.0) * dt);
                     const oppositeBanks = !this.isWaterMonster
                         && (this.mesh.position.z - (Math.sin(this.mesh.position.x * 0.08) * 10 - 2))
                         * (player.mesh.position.z - (Math.sin(player.mesh.position.x * 0.08) * 10 - 2)) < -1.0;
@@ -1585,6 +1604,7 @@ export class Monster {
         if (this._attackAnim > 0) this._attackAnim = Math.max(0, this._attackAnim - dt);
         this._applyThreatPose(this.isMoving, bounce);
         animateMonsterRig(this._professionalRig, this.animTimer, this.isMoving, this._attackAnim > 0);
+        this._spawnRushDust(dt);
 
         // Billboard HP bar to camera (throttled: update every 3rd frame)
         if (camera) {
@@ -1625,6 +1645,7 @@ export class Monster {
         this._aggroBlockedTime = 0;
         this._bullRushActive = false;
         this._serverBullRush = false;
+        this._rushDustCooldown = 0;
         this.setEnraged(false);
         this.bodyMesh.rotation.x = 0;
         this.bodyMesh.rotation.z = 0;

@@ -25,7 +25,7 @@ const PRONTERA_SPAWN_RANGE = 50;   // expanded field + explorable mountain
 const RESPAWN_MS = 4000;
 const AGGRO_MS = 10000;             // long enough for a visible revenge charge
 const AGGRO_LEASH_DISTANCE = 60;    // bull rush can cross a readable combat lane
-const BULL_RUSH_SPEED = 12.5;       // faster than the player's 9u/s sprint
+const BULL_RUSH_SPEED = 7.5;        // readable chase — the player can sprint away at 9u/s
 const BULL_RUSH_ATTACK_REACH = 2.2;
 const WANDER_RADIUS = 3.5;         // how far a monster roams from its spawn
 const AMBIENT_WATER_SET = new Set(AMBIENT_WATER_TYPES);
@@ -450,7 +450,7 @@ function stepMonster(m, mapId, now, dtSec) {
                 const goalDx = goal.x - m.x;
                 const goalDz = goal.z - m.z;
                 const goalDist = Math.hypot(goalDx, goalDz) || 0.001;
-                const chaseSpeed = Math.max(BULL_RUSH_SPEED, speed * 2.2 + 6.0);
+                const chaseSpeed = Math.max(BULL_RUSH_SPEED, speed * 1.65 + 4.0);
                 const step = Math.min(dist, Math.min(goalDist, chaseSpeed * dtSec));
                 m.bullRush = true;
                 const detour = chooseChaseStep(m, mapId, dx, dz, dist, step);
