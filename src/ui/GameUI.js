@@ -9954,7 +9954,7 @@ export class GameUI {
     overlay._journeyClose?.();
     this._setJourneySpotlightState(true);
     const escape = value => this._journeyEscape(value);
-    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">ทำแล้ว <span>✓</span></button></div>`;
+    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"><span class="journey-spotlight-ring-label">แตะตรงนี้</span></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">ทำแล้ว <span>✓</span></button></div>`;
     overlay.style.display = 'block';
     const ring = overlay.querySelector('.journey-spotlight-ring');
     const card = overlay.querySelector('.journey-spotlight-card');
@@ -9965,6 +9965,8 @@ export class GameUI {
       ring.style.top = `${Math.max(4, rect.top - pad)}px`;
       ring.style.width = `${Math.max(20, rect.width + pad * 2)}px`;
       ring.style.height = `${Math.max(20, rect.height + pad * 2)}px`;
+      const ringLabel = ring.querySelector('.journey-spotlight-ring-label');
+      if (ringLabel) ringLabel.style.top = rect.top < 48 ? `${Math.max(8, rect.height + 10)}px` : '-34px';
       const box = card.getBoundingClientRect();
       const edge = window.innerWidth <= 700 ? 10 : 12;
       const maxLeft = Math.max(edge, window.innerWidth - box.width - edge);

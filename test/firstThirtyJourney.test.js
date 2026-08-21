@@ -165,3 +165,14 @@ test('Auto-advance prompt buttons are protected from world touch input on mobile
   assert.match(css, /#journey-next-prompt,\.journey-next-prompt-card,\.journey-next-prompt-card button\{touch-action:manipulation/);
   assert.match(css, /#journey-next-prompt \.journey-next-prompt-continue,[\s\S]*pointer-events:auto/);
 });
+
+
+test('Journey spotlight visibly guides the player to the target button', () => {
+  assert.match(gameUI, /journey-spotlight-ring-label/);
+  assert.match(gameUI, /แตะตรงนี้/);
+  assert.match(gameUI, /ringLabel\.style\.top/);
+  assert.match(css, /\.journey-spotlight-ring::before\{[^}]*conic-gradient/);
+  assert.match(css, /@keyframes journeyLightSweep/);
+  assert.match(css, /\.journey-spotlight-ring-label\{[^}]*pointer-events:none/);
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.journey-spotlight-ring::before/);
+});
