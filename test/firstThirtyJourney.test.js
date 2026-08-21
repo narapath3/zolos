@@ -59,6 +59,9 @@ test('Home-screen guide is mounted outside the journal and exposes game-style co
   assert.match(gameUI, /this\._renderJourneyGuide\(\)/);
   assert.match(gameUI, /if \(!active\)[\s\S]*guide\.hidden = true/);
   assert.match(gameUI, /_prepareJourneyTarget\(target\)/);
+  assert.match(gameUI, /_setJourneySpotlightState\(true\)/);
+  assert.match(gameUI, /guide\.classList\.add\('is-spotlighting'\)/);
+  assert.match(gameUI, /overlay\._journeyClose/);
   assert.match(gameUI, /target\.closest\('#home-journey-guide'\)/);
 });
 
@@ -73,4 +76,6 @@ test('Journey responsive styles keep touch actions, safe area and compact mobile
   assert.match(css, /@media\(max-width:700px\)/);
   assert.match(css, /\.journey-active-card\{grid-template-columns:auto minmax\(0,1fr\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /\.home-journey-guide\.is-spotlighting\{display:none!important/);
+  assert.match(css, /@media\(max-width:700px\)\{#journey-spotlight\{z-index:2600/);
 });

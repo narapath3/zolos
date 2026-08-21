@@ -9560,6 +9560,20 @@ export class GameUI {
     return true;
   }
 
+  _setJourneySpotlightState(isOpen) {
+    const guide = this._journeyGuideEl || document.getElementById('home-journey-guide');
+    if (!guide) return;
+    if (isOpen) {
+      this._journeyGuideCollapsed = true;
+      guide.classList.add('is-spotlighting');
+      guide.setAttribute('aria-hidden', 'true');
+    } else {
+      guide.classList.remove('is-spotlighting');
+      guide.removeAttribute('aria-hidden');
+      this._renderJourneyGuide();
+    }
+  }
+
   _navigateFirstThirtyStep() {
     const step = getFirstThirtyStep(this.firstThirtyJourney.activeStep);
     if (!step) return;
@@ -9592,12 +9606,14 @@ export class GameUI {
   }
 
   _showJourneySpotlight(target, step) {
+    this._setJourneySpotlightState(true);
     let overlay = document.getElementById('journey-spotlight');
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'journey-spotlight';
       document.body.appendChild(overlay);
     }
+    overlay._journeyClose?.();
     const escape = value => this._journeyEscape(value);
     overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">ทำแล้ว <span>✓</span></button></div>`;
     overlay.style.display = 'block';
@@ -9619,7 +9635,14 @@ export class GameUI {
       card.style.top = `${Math.max(12, top)}px`;
     };
     position();
-    const close = () => { overlay.style.display = 'none'; window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
+    const close = () => {
+      overlay.style.display = 'none';
+      window.removeEventListener('resize', position);
+      window.removeEventListener('scroll', position, true);
+      overlay._journeyClose = null;
+      this._setJourneySpotlightState(false);
+    };
+    overlay._journeyClose = close;
     overlay.querySelector('.journey-spotlight-close').onclick = close;
     overlay.querySelector('.journey-spotlight-done').onclick = () => { this._completeFirstThirtyStep(step.id); close(); };
     window.addEventListener('resize', position, { passive: true });

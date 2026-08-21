@@ -8533,3 +8533,9 @@ a,
 @media(max-width:700px){.home-journey-guide.is-collapsed{top:clamp(118px,18vh,190px);right:max(8px,var(--safe-right,0px));left:auto;width:min(232px,calc(100vw - 16px))}.home-journey-guide.is-collapsed .home-journey-collapsed-button{min-height:48px;padding:7px 9px}}
 @media(max-width:420px){.home-journey-guide.is-collapsed{top:clamp(110px,17vh,165px);width:min(218px,calc(100vw - 16px))}.home-journey-guide.is-collapsed .home-journey-collapsed-copy small{letter-spacing:.05em}}
 @media(max-height:480px){.home-journey-guide.is-collapsed{top:96px}}
+
+
+/* The main guide must leave the interaction surface while a target spotlight is open. */
+.home-journey-guide.is-spotlighting{display:none!important;pointer-events:none!important}
+#journey-spotlight{z-index:2400}
+@media(max-width:700px){#journey-spotlight{z-index:2600}.journey-spotlight-card{max-height:min(42dvh,260px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.journey-spotlight-card button{touch-action:manipulation}}
