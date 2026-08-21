@@ -66,7 +66,9 @@ test('Journey responsive styles keep touch actions, safe area and compact mobile
   assert.match(css, /\.journey-primary[^}]*touch-action:manipulation/);
   assert.match(css, /\.journey-spotlight-card[^}]*pointer-events:auto/);
   assert.match(css, /\.home-journey-guide\{[^}]*pointer-events:none/);
-  assert.match(css, /\.home-journey-guide\.is-collapsed\{[^}]*width:min\(238px/);
+  assert.match(css, /\.home-journey-guide\.is-collapsed\{top:clamp\(120px,20vh,220px\)[^}]*width:min\(238px/);
+  assert.match(css, /@media\(max-width:700px\)\{\.home-journey-guide\.is-collapsed\{top:clamp\(118px,18vh,190px\)/);
+  assert.match(css, /@media\(max-height:480px\)\{\.home-journey-guide\.is-collapsed\{top:96px\}/);
   assert.match(css, /\.home-journey-next\{[^}]*touch-action:manipulation/);
   assert.match(css, /@media\(max-width:700px\)/);
   assert.match(css, /\.journey-active-card\{grid-template-columns:auto minmax\(0,1fr\)/);
