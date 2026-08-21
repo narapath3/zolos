@@ -9032,6 +9032,115 @@ export class GameUI {
       });
     };
 
+    // Landscape phones/tablets need runtime placement rather than percentage
+    // positions. The browser viewport can change with device emulation, split
+    // screen, safe-area insets, or an orientation change, so calculate a
+    // collision-safe two-row dock from the actual available rectangle.
+    const setupAdaptiveLandscapeControls = () => {
+      const actionDock = document.getElementById('mobile-actions');
+      const autoRail = document.getElementById('auto-farm-container');
+      if (!actionDock || !autoRail) return;
+      const buttons = {
+        sprint: document.getElementById('btn-mobile-sprint'),
+        skill1: document.getElementById('btn-mobile-skill-1'),
+        skill2: document.getElementById('btn-mobile-skill-2'),
+        skill3: document.getElementById('btn-mobile-skill-3'),
+        attack: document.getElementById('btn-mobile-attack'),
+      };
+      const railButtons = [...autoRail.querySelectorAll('.btn-auto, .btn-fishing')];
+      let frame = 0;
+
+      const readSafeInset = (name) => {
+        const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+        return Number.isFinite(value) ? value : 0;
+      };
+      const setImportant = (element, property, value) => element.style.setProperty(property, value, 'important');
+      const clearInline = (element, properties) => properties.forEach(property => element.style.removeProperty(property));
+      const clearLayout = () => {
+        if (actionDock.dataset.adaptiveLayout !== 'landscape') return;
+        delete actionDock.dataset.adaptiveLayout;
+        clearInline(actionDock, ['width', 'height', 'right', 'bottom', 'z-index']);
+        clearInline(autoRail, ['width', 'right', 'bottom', 'top', 'z-index', 'gap']);
+        Object.values(buttons).forEach(button => button && clearInline(button, ['width', 'height', 'left', 'top', 'right', 'bottom', 'inset', 'z-index']));
+        railButtons.forEach(button => clearInline(button, ['width', 'height', 'margin']));
+      };
+      const updateLayout = () => {
+        frame = 0;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const isLandscapeMobile = width > height && width <= 1366 && getComputedStyle(pad).display !== 'none';
+        if (!isLandscapeMobile) return clearLayout();
+
+        const safeRight = readSafeInset('--safe-right');
+        const safeBottom = readSafeInset('--safe-bottom');
+        const navRect = document.getElementById('hud-bottom')?.getBoundingClientRect();
+        const navClearance = Math.max(48, height - (navRect?.top || height) + 8, safeBottom + 44);
+        const topClearance = Math.max(8, readSafeInset('--safe-top'));
+        const availableHeight = Math.max(72, height - navClearance - topClearance);
+        const gap = Math.max(4, Math.min(9, Math.floor(height * 0.018)));
+        const visibleRailButtons = railButtons.filter(button => getComputedStyle(button).display !== 'none');
+        const railCount = Math.max(1, visibleRailButtons.length);
+        const mainSize = Math.floor((availableHeight - gap) / 2);
+        const railSize = Math.floor((availableHeight - gap * (railCount - 1)) / railCount);
+        const size = Math.max(28, Math.min(52, mainSize, railSize));
+        const actionWidth = size * 3 + gap * 2;
+        const actionHeight = size * 2 + gap;
+        const railWidth = size;
+        const rightGap = Math.max(8, Math.min(14, Math.floor(width * 0.014)));
+        const rightRail = safeRight + 8;
+        const dockRight = rightRail + railWidth + rightGap;
+        const bottom = navClearance;
+        const slots = {
+          sprint: [0, 0],
+          skill2: [1, 0],
+          skill1: [2, 0],
+          skill3: [0, 1],
+          attack: [2, 1],
+        };
+
+        actionDock.dataset.adaptiveLayout = 'landscape';
+        setImportant(actionDock, 'width', `${actionWidth}px`);
+        setImportant(actionDock, 'height', `${actionHeight}px`);
+        setImportant(actionDock, 'right', `${dockRight}px`);
+        setImportant(actionDock, 'bottom', `${bottom}px`);
+        setImportant(actionDock, 'z-index', '1600');
+        Object.entries(slots).forEach(([key, [column, row]]) => {
+          const button = buttons[key];
+          if (!button) return;
+          setImportant(button, 'width', `${size}px`);
+          setImportant(button, 'height', `${size}px`);
+          setImportant(button, 'left', `${column * (size + gap)}px`);
+          setImportant(button, 'top', `${row * (size + gap)}px`);
+          setImportant(button, 'right', 'auto');
+          setImportant(button, 'bottom', 'auto');
+        });
+        setImportant(autoRail, 'width', `${railWidth}px`);
+        setImportant(autoRail, 'right', `${rightRail}px`);
+        setImportant(autoRail, 'bottom', `${bottom}px`);
+        setImportant(autoRail, 'top', 'auto');
+        setImportant(autoRail, 'z-index', '1600');
+        setImportant(autoRail, 'gap', `${gap}px`);
+        visibleRailButtons.forEach(button => {
+          setImportant(button, 'width', `${railWidth}px`);
+          setImportant(button, 'height', `${railWidth}px`);
+          button.style.setProperty('margin', '0', 'important');
+        });
+      };
+      const schedule = () => {
+        if (frame) return;
+        frame = requestAnimationFrame(updateLayout);
+      };
+      schedule();
+      listen(window, 'resize', schedule, { passive: true });
+      listen(window, 'orientationchange', schedule, { passive: true });
+      if (window.visualViewport) listen(window.visualViewport, 'resize', schedule, { passive: true });
+      removers.push(() => {
+        if (frame) cancelAnimationFrame(frame);
+        clearLayout();
+      });
+    };
+    setupAdaptiveLandscapeControls();
+
     // Show joystick at a specific position
     const showJoystickAt = (x, y) => {
       const size = container.offsetWidth || 130;
