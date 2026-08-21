@@ -176,3 +176,15 @@ test('Journey spotlight visibly guides the player to the target button', () => {
   assert.match(css, /\.journey-spotlight-ring-label\{[^}]*pointer-events:none/);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.journey-spotlight-ring::before/);
 });
+
+
+test('Game viewport uses full-size dynamic viewport sizing across browser and PWA modes', () => {
+  assert.match(index, /viewport-fit=cover/);
+  assert.match(css, /html,body\{width:100%;min-width:100%;height:100%;min-height:100%/);
+  assert.match(css, /\.game-viewport\{height:100dvh;min-height:100dvh/);
+  assert.match(css, /#game-canvas\{position:absolute;inset:0;width:100vw!important/);
+  assert.match(css, /@supports not \(height:100dvh\)/);
+  const manifest = fs.readFileSync(new URL('../public/manifest.webmanifest', import.meta.url), 'utf8');
+  assert.match(manifest, /"display": "fullscreen"/);
+  assert.match(manifest, /"display_override": \["fullscreen", "standalone"\]/);
+});
