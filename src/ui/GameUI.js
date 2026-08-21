@@ -72,7 +72,8 @@ export class GameUI {
     this._journeySaveTimer = null;
     this._journeyResizeObserver = null;
     this._journeyGuideEl = null;
-    this._journeyGuideCollapsed = false;
+    // Keep onboarding visible but unobtrusive; expand it on demand.
+    this._journeyGuideCollapsed = true;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -9444,10 +9445,12 @@ export class GameUI {
     const escape = value => this._journeyEscape(value);
     if (!active) {
       guide.innerHTML = '';
+      guide.classList.remove('is-collapsed');
       guide.hidden = true;
       return;
     }
     guide.hidden = false;
+    guide.classList.toggle('is-collapsed', this._journeyGuideCollapsed);
 
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');

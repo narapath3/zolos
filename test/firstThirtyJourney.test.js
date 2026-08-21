@@ -53,6 +53,7 @@ test('Journey UI exposes map-aware navigation and viewport-safe spotlight contra
 test('Home-screen guide is mounted outside the journal and exposes game-style controls', () => {
   assert.match(index, /id="home-journey-guide"[^>]*aria-live="polite"/);
   assert.match(gameUI, /_setupJourneyGuide\(\)/);
+  assert.match(gameUI, /this\._journeyGuideCollapsed = true/);
   assert.match(gameUI, /data-home-journey-action="next"/);
   assert.match(gameUI, /data-home-journey-action="collapse"/);
   assert.match(gameUI, /this\._renderJourneyGuide\(\)/);
@@ -65,6 +66,7 @@ test('Journey responsive styles keep touch actions, safe area and compact mobile
   assert.match(css, /\.journey-primary[^}]*touch-action:manipulation/);
   assert.match(css, /\.journey-spotlight-card[^}]*pointer-events:auto/);
   assert.match(css, /\.home-journey-guide\{[^}]*pointer-events:none/);
+  assert.match(css, /\.home-journey-guide\.is-collapsed\{[^}]*width:min\(238px/);
   assert.match(css, /\.home-journey-next\{[^}]*touch-action:manipulation/);
   assert.match(css, /@media\(max-width:700px\)/);
   assert.match(css, /\.journey-active-card\{grid-template-columns:auto minmax\(0,1fr\)/);
