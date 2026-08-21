@@ -5303,7 +5303,22 @@ export class GameUI {
       }
 
       if (bindBtn) {
+        let bindInFlight = false;
+        const safeBindError = (error) => {
+          const message = String(error?.message || error || '').toLowerCase();
+          if (message.includes('profiles_username_key') || (message.includes('duplicate key') && message.includes('username'))) {
+            return 'ชื่อผู้เล่นนี้ถูกใช้แล้ว ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ กรุณากดลองอีกครั้ง';
+          }
+          if (message.includes('already registered') || message.includes('already been registered')) {
+            return 'อีเมลนี้ถูกใช้สมัครแล้ว — ลองอีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้';
+          }
+          if (message.includes('profiles') || message.includes('database') || message.includes('constraint')) {
+            return 'ระบบสร้างโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+          }
+          return String(error?.message || error || 'ผูกบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        };
         bindBtn.addEventListener('click', async () => {
+          if (bindInFlight) return;
           const email = bindEmail?.value.trim();
           const password = bindPass?.value.trim();
 
@@ -5323,6 +5338,9 @@ export class GameUI {
             return;
           }
 
+          bindInFlight = true;
+          bindBtn.disabled = true;
+          bindBtn.setAttribute('aria-busy', 'true');
           if (bindStatus) {
             bindStatus.textContent = 'กำลังผูกบัญชี...';
             bindStatus.style.color = '#60a0ff';
@@ -5343,9 +5361,13 @@ export class GameUI {
             }, 3000);
           } catch (err) {
             if (bindStatus) {
-              bindStatus.textContent = `❌ ผิดพลาด: ${err.message}`;
+              bindStatus.textContent = `❌ ${safeBindError(err)}`;
               bindStatus.style.color = '#ff6080';
             }
+          } finally {
+            bindInFlight = false;
+            bindBtn.disabled = false;
+            bindBtn.removeAttribute('aria-busy');
           }
         });
       }

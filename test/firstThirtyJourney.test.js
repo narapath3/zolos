@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createFirstThirtyState, FIRST_THIRTY_STEPS, firstThirtyProgress, sanitizeFirstThirtyState, updateFirstThirtyState } from '../src/progression/FirstThirtyJourney.js';
 
 const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
@@ -202,6 +203,15 @@ test('Tutorial Coach separates start guidance from the real target button spotli
   assert.match(css, /\.home-journey-coach-actions\{/);
 });
 
+
+test('Guest binding resolves profile username conflicts without exposing raw database errors', () => {
+  assert.match(gameSync, /async function resolveBindableUsername\(baseUsername\)/);
+  assert.match(gameSync, /profiles_username_key/);
+  assert.match(gameSync, /const username = await resolveBindableUsername\(baseUsername\)/);
+  assert.match(gameUI, /const safeBindError = \(error\)/);
+  assert.match(gameUI, /bindInFlight = true/);
+  assert.doesNotMatch(gameUI, /ผิดพลาด: \$\{err\.message\}/);
+});
 
 test('New players receive a prominent guide CTA that dismisses after opening', () => {
   assert.match(gameUI, /_journeyNewPlayerAttentionDismissed/);

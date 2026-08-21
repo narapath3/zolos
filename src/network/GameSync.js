@@ -1144,6 +1144,37 @@ export async function loadLoginStreak(characterId) {
 }
 
 // ============ Bind Guest → Real Account (with progress migration) ============
+function makeGuestUsernameSuffix() {
+    return Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+async function resolveBindableUsername(baseUsername) {
+    const base = String(baseUsername || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
+    const check = async (candidate) => {
+        try {
+            const { data, error } = await supabase.from('profiles')
+                .select('id').eq('username', candidate).limit(1);
+            if (error) return null;
+            return Array.isArray(data) ? data.length > 0 : Boolean(data);
+        } catch {
+            return null;
+        }
+    };
+
+    // Preserve the Guest name when the database can confirm it is free. If the
+    // check is hidden by RLS or another profile already owns it, use a short
+    // readable suffix before auth.signUp so a trigger cannot hit the UNIQUE key.
+    const baseTaken = await check(base);
+    if (baseTaken === false) return base;
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const suffix = makeGuestUsernameSuffix();
+        const candidate = `${base.slice(0, Math.max(1, 24 - suffix.length - 1))}_${suffix}`;
+        const taken = await check(candidate);
+        if (taken === false || taken === null) return candidate;
+    }
+    return `${base.slice(0, 18)}_${makeGuestUsernameSuffix()}`.slice(0, 24);
+}
+
 // Anonymous Supabase sessions aren't available on this project, so every guest
 // is a LOCAL guest with no auth session — `updateUser` can't bind them ("Auth
 // session missing"). Instead we create a real account and migrate the guest's
@@ -1153,7 +1184,8 @@ export async function migrateGuestToAccount(email, password, guest) {
     if (isOfflineMode || !supabase) throw new Error('ไม่สามารถผูกบัญชีในโหมดออฟไลน์');
     if (!guest) throw new Error('ไม่พบข้อมูลตัวละคร');
 
-    const username = String(guest.name || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
+    const baseUsername = String(guest.name || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
+    const username = await resolveBindableUsername(baseUsername);
     const requestedGender = String(guest.gender || 'male').toLowerCase();
     const gender = ['male', 'female'].includes(requestedGender) ? requestedGender : 'male';
 
@@ -1165,6 +1197,9 @@ export async function migrateGuestToAccount(email, password, guest) {
         const msg = (signUpErr.message || '').toLowerCase();
         if (msg.includes('already registered') || msg.includes('already been registered')) {
             throw new Error('อีเมลนี้ถูกใช้สมัครแล้ว — ลองอีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้');
+        }
+        if (msg.includes('profiles_username_key') || (msg.includes('duplicate key') && msg.includes('username'))) {
+            throw new Error('ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณากดลองใหม่อีกครั้ง ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ');
         }
         throw signUpErr;
     }
@@ -1180,8 +1215,15 @@ export async function migrateGuestToAccount(email, password, guest) {
         sess = (await supabase.auth.getSession())?.data?.session;
     }
 
-    // 3. Profile
-    try { await supabase.from('profiles').upsert({ id: newUserId, username, gender }); } catch (e) { /* non-fatal */ }
+    // 3. Profile — surface database conflicts as a safe app error, never raw SQL.
+    const { error: profileError } = await supabase.from('profiles').upsert({ id: newUserId, username, gender });
+    if (profileError) {
+        const profileMessage = String(profileError.message || '').toLowerCase();
+        if (profileMessage.includes('profiles_username_key') || (profileMessage.includes('duplicate key') && profileMessage.includes('username'))) {
+            throw new Error('ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณากดลองใหม่อีกครั้ง ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ');
+        }
+        throw new Error('สร้างโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    }
 
     // 4. Character row — never trust local guest progression. The guest state
     // is browser-controlled and can be edited before binding; the new account
