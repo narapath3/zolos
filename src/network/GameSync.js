@@ -1185,18 +1185,18 @@ export async function migrateGuestToAccount(email, password, guest) {
     if (!guest) throw new Error('ไม่พบข้อมูลตัวละคร');
 
     const baseUsername = String(guest.name || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
-    const username = await resolveBindableUsername(baseUsername);
+    let username = await resolveBindableUsername(baseUsername);
     const requestedGender = String(guest.gender || 'male').toLowerCase();
-    const gender = ['male', 'female'].includes(requestedGender) ? requestedGender : 'male';
+    let gender = ['male', 'female'].includes(requestedGender) ? requestedGender : 'male';
 
-    // 1. Create the real account (auto-signs-in when email confirmation is off)
+    // 1. Create or recover the real account (auto-signs-in when email confirmation is off)
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
         email, password, options: { data: { username, gender } }
     });
     if (signUpErr) {
         const msg = (signUpErr.message || '').toLowerCase();
-        if (msg.includes('already registered') || msg.includes('already been registered')) {
-            throw new Error('อีเมลนี้ถูกใช้สมัครแล้ว — ลองอีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้');
+        if (msg.includes('already registered') || msg.includes('already been registered') || msg.includes('อีเมลนี้ถูกใช้แล้ว')) {
+            throw new Error('อีเมลนี้เป็นของบัญชีอื่นแล้ว กรุณาใช้อีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้');
         }
         if (msg.includes('profiles_username_key') || (msg.includes('duplicate key') && msg.includes('username'))) {
             throw new Error('ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณากดลองใหม่อีกครั้ง ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ');
@@ -1205,6 +1205,13 @@ export async function migrateGuestToAccount(email, password, guest) {
     }
     const newUser = signUpData?.user;
     if (!newUser) throw new Error('สมัครบัญชีไม่สำเร็จ');
+    // The self-host backend can recover an older partial signup and return the
+    // canonical profile. Keep those values instead of attempting a second
+    // profile write with a newly generated Guest name.
+    if (signUpData?.recovered === true) {
+        if (signUpData.username) username = String(signUpData.username).slice(0, 32);
+        if (signUpData.gender && ['male', 'female'].includes(signUpData.gender)) gender = signUpData.gender;
+    }
     const newUserId = newUser.id;
 
     // 2. Ensure an active session exists (required for RLS-protected inserts)
@@ -1239,7 +1246,7 @@ export async function migrateGuestToAccount(email, password, guest) {
     };
     const { data: newChar, error: charErr } = await supabase
         .from('characters').insert(charInsert).select().single();
-    if (charErr) throw new Error('ผูกบัญชีสำเร็จบางส่วน แต่ย้ายตัวละครไม่สำเร็จ: ' + charErr.message);
+    if (charErr) throw new Error('ผูกบัญชีสำเร็จบางส่วน แต่สร้างตัวละครไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
     const newCharId = newChar.id;
 
     // Retry helper — a single transient failure must not silently drop data.

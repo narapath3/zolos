@@ -6,6 +6,8 @@ import { createFirstThirtyState, FIRST_THIRTY_STEPS, firstThirtyProgress, saniti
 const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
 const serverAuth = fs.readFileSync(new URL('../server/api/auth.js', import.meta.url), 'utf8');
+const serverIndex = fs.readFileSync(new URL('../server/api/index.js', import.meta.url), 'utf8');
+const zolosClient = fs.readFileSync(new URL('../src/network/ZolosApiClient.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
@@ -216,10 +218,25 @@ test('Self-hosted signup atomically creates user and profile with safe conflict 
 test('Guest binding resolves profile username conflicts without exposing raw database errors', () => {
   assert.match(gameSync, /async function resolveBindableUsername\(baseUsername\)/);
   assert.match(gameSync, /profiles_username_key/);
-  assert.match(gameSync, /const username = await resolveBindableUsername\(baseUsername\)/);
+  assert.match(gameSync, /(?:let|const) username = await resolveBindableUsername\(baseUsername\)/);
   assert.match(gameUI, /const safeBindError = \(error\)/);
   assert.match(gameUI, /bindInFlight = true/);
   assert.doesNotMatch(gameUI, /ผิดพลาด: \$\{err\.message\}/);
+});
+
+test('Guest retry recovers only an authenticated partial account and never merges a completed account', () => {
+  assert.match(serverAuth, /async function recoverPartialSignup/);
+  assert.match(serverAuth, /actor\.isAnonymous === true/);
+  assert.match(serverAuth, /bcrypt\.compare/);
+  assert.match(serverAuth, /SELECT 1 FROM characters WHERE user_id = \$1 LIMIT 1/);
+  assert.match(serverAuth, /ON CONFLICT \(username\) DO NOTHING RETURNING/);
+  assert.match(serverAuth, /throw httpErr\(409, 'อีเมลนี้ถูกใช้แล้ว'\)/);
+  assert.doesNotMatch(serverAuth, /DELETE FROM users/);
+  assert.match(serverIndex, /auth\.signUp\(req\.body \|\| \{\}, auth\.authFromReq\(req\)\)/);
+  assert.match(zolosClient, /recovered: r\.recovered === true/);
+  assert.match(gameSync, /signUpData\?\.recovered === true/);
+  assert.match(gameSync, /สร้างตัวละครไม่สำเร็จ กรุณาลองใหม่อีกครั้ง/);
+  assert.match(gameUI, /อีเมลนี้เป็นของบัญชีอื่นแล้ว/);
 });
 
 test('New players receive a prominent guide CTA that dismisses after opening', () => {

@@ -47,15 +47,100 @@ function cleanUsername(name, fallback) {
     return u || fallback;
 }
 
+function uniqueRecoveryUsername(base, suffix = makeUsernameSuffix()) {
+    const clean = cleanUsername(base, 'Adventurer');
+    const safeSuffix = String(suffix || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase() || 'RECOVER';
+    return `${clean.slice(0, Math.max(1, 32 - safeSuffix.length - 1))}_${safeSuffix}`;
+}
+
+function makeUsernameSuffix() {
+    return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function signUp({ email, password, username, gender }) {
+async function recoverPartialSignup({ existing, email, password, meta, actor }) {
+    if (!actor || !existing?.encrypted_password) return null;
+    // A retry can arrive with either the original anonymous Guest JWT (old
+    // non-atomic signup) or the real JWT issued before a later character step
+    // failed. In both cases the supplied password is still required.
+    const isAnonymousGuest = actor.isAnonymous === true;
+    const isSamePartialAccount = actor.isAnonymous !== true && actor.userId === existing.id;
+    if (!isAnonymousGuest && !isSamePartialAccount) return null;
+    const passwordMatches = await bcrypt.compare(String(password), existing.encrypted_password);
+    if (!passwordMatches) return null;
+
+    const recovered = await tx(async (client) => {
+        const locked = await client.query(
+            'SELECT id, email, encrypted_password FROM users WHERE id = $1 FOR UPDATE',
+            [existing.id],
+        );
+        const account = locked.rows[0];
+        if (!account?.encrypted_password) throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+
+        const character = await client.query(
+            'SELECT 1 FROM characters WHERE user_id = $1 LIMIT 1',
+            [account.id],
+        );
+        if (character.rowCount > 0) throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+
+        const currentProfile = await client.query(
+            'SELECT username, gender FROM profiles WHERE id = $1 LIMIT 1',
+            [account.id],
+        );
+        if (currentProfile.rows[0]) {
+            return {
+                ...account,
+                username: currentProfile.rows[0].username,
+                gender: currentProfile.rows[0].gender || meta.gender,
+                recovered: true,
+            };
+        }
+
+        let username = meta.username;
+        let profileCreated = false;
+        for (let attempt = 0; attempt < 8 && !profileCreated; attempt += 1) {
+            const inserted = await client.query(
+                `INSERT INTO profiles (id, username, gender) VALUES ($1, $2, $3)
+                 ON CONFLICT (username) DO NOTHING RETURNING username, gender`,
+                [account.id, username, meta.gender],
+            );
+            profileCreated = inserted.rowCount > 0;
+            if (!profileCreated) username = uniqueRecoveryUsername(meta.username);
+        }
+        if (!profileCreated) throw httpErr(409, 'ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณาลองใหม่อีกครั้ง');
+        return { ...account, username, gender: meta.gender, recovered: true };
+    });
+
+    return {
+        token: signToken({ ...existing, encrypted_password: existing.encrypted_password }),
+        user: { id: recovered.id, email: recovered.email || email, is_anonymous: false },
+        recovered: true,
+        username: recovered.username,
+        gender: recovered.gender,
+    };
+}
+
+export async function signUp({ email, password, username, gender }, actor = null) {
     email = String(email || '').trim().toLowerCase();
     if (!EMAIL_RE.test(email)) throw httpErr(400, 'อีเมลไม่ถูกต้อง');
     if (!password || String(password).length < 6) throw httpErr(400, 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัว');
 
     const hash = await bcrypt.hash(String(password), 10);
     const meta = { username: cleanUsername(username, 'Adventurer'), gender: gender === 'female' ? 'female' : 'male' };
+
+    // Recover a user created by an older non-atomic signup. This path is only
+    // available to an authenticated anonymous Guest who proves the password;
+    // an existing account with a character is never merged or overwritten.
+    const existing = await query(
+        'SELECT id, email, encrypted_password FROM users WHERE lower(email) = $1 LIMIT 1',
+        [email],
+    );
+    if (existing.rows[0]) {
+        const recovered = await recoverPartialSignup({ existing: existing.rows[0], email, password, meta, actor });
+        if (recovered) return recovered;
+        throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+    }
 
     // User + profile must be one atomic operation. Otherwise a username
     // conflict can leave an auth user without a profile, and the next retry

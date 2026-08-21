@@ -120,7 +120,7 @@ export function createZolosClient(baseUrl) {
                 const r = await apiFetch('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, username: meta.username, gender: meta.gender }) });
                 setToken(r.token);
                 if (authChangeCb) authChangeCb('SIGNED_IN', { user: r.user });
-                return { data: { user: r.user, session: { access_token: r.token, user: r.user } }, error: null };
+                return { data: { user: r.user, session: { access_token: r.token, user: r.user }, recovered: r.recovered === true, username: r.username, gender: r.gender }, error: null };
             } catch (e) { return { data: { user: null, session: null }, error: { message: e.message } }; }
         },
         async signInWithPassword({ email, password }) {

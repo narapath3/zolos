@@ -52,7 +52,10 @@ export function createApiRouter() {
 
     // ---- auth ----
     r.post('/auth/signup', authLimiter, wrap(async (req, res) => {
-        res.json(await auth.signUp(req.body || {}));
+        // Keep the optional anonymous actor so signup can safely recover a
+        // partial account created by an older non-atomic Guest binding attempt.
+        // Normal unauthenticated signup behavior remains unchanged.
+        res.json(await auth.signUp(req.body || {}, auth.authFromReq(req)));
     }));
     r.post('/auth/login', authLimiter, wrap(async (req, res) => {
         try {

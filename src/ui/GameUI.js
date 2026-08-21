@@ -5309,8 +5309,8 @@ export class GameUI {
           if (message.includes('profiles_username_key') || (message.includes('duplicate key') && message.includes('username'))) {
             return 'ชื่อผู้เล่นนี้ถูกใช้แล้ว ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ กรุณากดลองอีกครั้ง';
           }
-          if (message.includes('already registered') || message.includes('already been registered')) {
-            return 'อีเมลนี้ถูกใช้สมัครแล้ว — ลองอีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้';
+          if (message.includes('already registered') || message.includes('already been registered') || message.includes('อีเมลนี้ถูกใช้แล้ว')) {
+            return 'อีเมลนี้เป็นของบัญชีอื่นแล้ว กรุณาใช้อีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้';
           }
           if (message.includes('profiles') || message.includes('database') || message.includes('constraint')) {
             return 'ระบบสร้างโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
