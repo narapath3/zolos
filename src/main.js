@@ -180,6 +180,66 @@ let autoPath = null;
 window.autoPath = autoPath;
 let isShiftPressed = false;
 let journeyNavigation = null;
+let journeyCombatGuidance = null;
+
+function stopJourneyCombatGuidance() {
+    journeyCombatGuidance = null;
+    const marker = document.getElementById('journey-combat-target');
+    if (marker) marker.style.display = 'none';
+}
+window.stopJourneyCombatGuidance = stopJourneyCombatGuidance;
+
+function updateJourneyCombatGuidance() {
+    if (!journeyCombatGuidance || !character || !sceneManager || !monsters) return;
+    let target = journeyCombatGuidance.target;
+    if (!target || !target.alive || target.isAmbient || target.isWaterMonster) {
+        target = monsters.findNearest?.(character.getPosition());
+        journeyCombatGuidance.target = target || null;
+    }
+    const marker = document.getElementById('journey-combat-target');
+    if (!target || !marker) {
+        if (marker) marker.style.display = 'none';
+        return;
+    }
+    const distance = character.getPosition().distanceTo(target.getPosition());
+    const screen = sceneManager.worldToScreen(target.mesh.position);
+    const margin = 36;
+    const x = Math.min(window.innerWidth - margin, Math.max(margin, screen.x));
+    const y = Math.min(window.innerHeight - margin, Math.max(margin, screen.y));
+    marker.style.display = 'grid';
+    marker.style.left = `${x}px`;
+    marker.style.top = `${y}px`;
+    const name = marker.querySelector('[data-combat-target-name]');
+    const distanceLabel = marker.querySelector('[data-combat-target-distance]');
+    if (name) name.textContent = target.data?.name || 'Monster';
+    if (distanceLabel) distanceLabel.textContent = `${Math.ceil(distance)}m · แตะเพื่อเลือก`;
+}
+
+window.startJourneyCombatGuidance = () => {
+    if (!sceneManager || !character || !monsters) return false;
+    const target = character.targetMonster?.alive
+        ? character.targetMonster
+        : monsters.findNearest?.(character.getPosition());
+    if (!target) return false;
+    stopJourneyNavigation();
+    disengageManualCombat();
+    journeyCombatGuidance = { target, stepId: 'defeat_first_monster' };
+    character.targetMonster = null;
+    autoPath = null;
+    window.autoPath = null;
+    let marker = document.getElementById('journey-combat-target');
+    if (!marker) {
+        marker = document.createElement('div');
+        marker.id = 'journey-combat-target';
+        marker.innerHTML = '<span class="journey-combat-target-ring" aria-hidden="true">⚔</span><strong data-combat-target-name>Monster</strong><small data-combat-target-distance>0m · แตะเพื่อเลือก</small>';
+        marker.style.cssText = 'position:fixed;z-index:1450;display:none;transform:translate(-50%,-50%);pointer-events:none;place-items:center;gap:3px;color:#fff3bd;font:900 11px/1 var(--font-ui,system-ui,sans-serif);text-align:center;text-shadow:0 2px 8px #000;filter:drop-shadow(0 0 10px rgba(255,90,90,.7));';
+        document.body.appendChild(marker);
+    }
+    particles?.createClickIndicator?.(target.getPosition(), 0xff6464);
+    gameUI?.addCombatLog?.('⚔️ เป้าหมายบทเรียนอยู่ตรงนั้น แตะ Monster แล้วกดโจมตีหรือใช้สกิล', 'system');
+    updateJourneyCombatGuidance();
+    return true;
+};
 
 function stopJourneyNavigation() {
     journeyNavigation = null;
@@ -612,6 +672,7 @@ async function initGame(charData) {
                 if (gameUI) gameUI.addItem(event.item);
                 break;
             case 'monsterKilled':
+                stopJourneyCombatGuidance();
                 if (gameUI) gameUI.handleMonsterKill(event.monsterName);
                 break;
             case 'playerDeath':
@@ -2070,6 +2131,7 @@ function handleMouseInteraction(event) {
 
     if (hit.type === 'monster') {
         stopJourneyNavigation();
+        if (journeyCombatGuidance) stopJourneyCombatGuidance();
         character.targetMonster = hit.object;
         autoPath = hit.point;
         // Step 11: Monster click: red indicator
@@ -3230,6 +3292,7 @@ function stepWorld(dt) {
     character.update(dt);
     updateRemotePlayers(dt); // smooth remote heroes toward their latest target
     updateJourneyNavigation();
+    updateJourneyCombatGuidance();
 
     // Fishing line follows the live rod tip (incl. the catch yank)
     if (isFishingActive && sceneManager && character.getRodTipPosition) {

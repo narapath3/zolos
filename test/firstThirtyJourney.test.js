@@ -113,3 +113,25 @@ test('Journey responsive styles keep touch actions, safe area and compact mobile
   assert.match(css, /\.journey-spotlight-card\{width:min\(330px,calc\(100vw - 20px\)\);margin:0\}/);
   assert.doesNotMatch(css, /\.journey-spotlight-card\{width:min\(330px,calc\(100vw - 20px\)\);left:10px!important;right:10px;top:auto!important;bottom:/);
 });
+
+
+test('Combat chapter uses a live Monster target instead of covering the world with Journal', () => {
+  assert.match(gameUI, /step\.id === 'defeat_first_monster'/);
+  assert.match(gameUI, /this\._closeAllMenuSurfaces\(\)/);
+  assert.match(gameUI, /window\.startJourneyCombatGuidance\?\.\(\)/);
+  assert.match(main, /window\.startJourneyCombatGuidance = \(\) =>/);
+  assert.match(main, /journey-combat-target/);
+  assert.match(main, /monsters\.findNearest/);
+  assert.match(main, /sceneManager\.worldToScreen\(target\.mesh\.position\)/);
+  assert.match(main, /if \(journeyCombatGuidance\) stopJourneyCombatGuidance\(\)/);
+});
+
+test('Combat chapter shows completion popup only after the first guided kill', () => {
+  assert.match(gameUI, /_showJourneyCombatCompletion\(monsterName\)/);
+  assert.match(gameUI, /wasFirstCombatLesson/);
+  assert.match(gameUI, /completedCombatLesson/);
+  assert.match(gameUI, /journey-combat-complete-popup/);
+  assert.match(main, /stopJourneyCombatGuidance\(\);[\s\S]*gameUI\.handleMonsterKill/);
+  assert.match(css, /#journey-combat-complete\{position:fixed;inset:0;z-index:2450;display:none;pointer-events:none/);
+  assert.match(css, /\.journey-combat-complete-card\{[^}]*pointer-events:auto/);
+});

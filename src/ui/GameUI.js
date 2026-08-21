@@ -74,6 +74,7 @@ export class GameUI {
     this._journeyGuideEl = null;
     // Keep onboarding visible but unobtrusive; expand it on demand.
     this._journeyGuideCollapsed = true;
+    this._journeyCombatCompletionTimer = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -354,6 +355,7 @@ export class GameUI {
     clearTimeout(this._chatIdleTimer);
     clearTimeout(this._journalSaveTimer);
     clearTimeout(this._journeySaveTimer);
+    clearTimeout(this._journeyCombatCompletionTimer);
     this._journeyResizeObserver?.disconnect?.();
     clearTimeout(this._cardTradeSuggestTimer);
     clearTimeout(this.tradeTimeout);
@@ -9501,6 +9503,7 @@ export class GameUI {
           if (this.combatSystem && this.combatSystem.monsters) {
             const nearest = this.combatSystem.monsters.findNearest(this.character.getPosition());
             if (nearest) {
+              window.stopJourneyCombatGuidance?.();
               this.character.targetMonster = nearest;
               this.addCombatLog(`🎯 Target selected: ${nearest.data.name}`, 'system');
             } else {
@@ -9795,6 +9798,31 @@ export class GameUI {
     }
   }
 
+  _showJourneyCombatCompletion(monsterName = 'Monster') {
+    window.stopJourneyCombatGuidance?.();
+    this._closeAllMenuSurfaces();
+    let popup = document.getElementById('journey-combat-complete');
+    if (!popup) {
+      popup = document.createElement('div');
+      popup.id = 'journey-combat-complete';
+      popup.setAttribute('role', 'dialog');
+      popup.setAttribute('aria-modal', 'false');
+      document.body.appendChild(popup);
+    }
+    const escape = value => this._journeyEscape(value);
+    popup.innerHTML = `<div class="journey-combat-complete-card" data-testid="journey-combat-complete-popup"><div class="journey-combat-complete-art" aria-hidden="true"></div><div class="journey-combat-complete-copy"><span class="journey-combat-complete-kicker">บทที่ 3 · COMBAT COMPLETE</span><h3>เก่งมาก! เอาชนะ ${escape(monsterName)} ได้แล้ว</h3><p>การต่อสู้ครั้งแรกสำเร็จ คุณเริ่มรู้จักการเลือกเป้าหมายและใช้พลังของตัวละครแล้ว</p><button type="button" class="journey-primary journey-combat-complete-next">ไปบทถัดไป <span>→</span></button></div><button type="button" class="journey-spotlight-close journey-combat-complete-close" aria-label="ปิดสรุปการต่อสู้">×</button></div>`;
+    popup.style.display = 'block';
+    const close = () => {
+      popup.style.display = 'none';
+      this._journeyGuideCollapsed = true;
+      this._renderJourneyGuide();
+    };
+    popup.querySelector('.journey-combat-complete-close')?.addEventListener('click', close, { once: true });
+    popup.querySelector('.journey-combat-complete-next')?.addEventListener('click', close, { once: true });
+    clearTimeout(this._journeyCombatCompletionTimer);
+    this._journeyCombatCompletionTimer = setTimeout(close, 9000);
+  }
+
   _navigateFirstThirtyStep() {
     const step = getFirstThirtyStep(this.firstThirtyJourney.activeStep);
     if (!step) return;
@@ -9816,6 +9844,16 @@ export class GameUI {
       return;
     }
     if (step.kind === 'world') {
+      // Combat is a live world lesson, not a waypoint. Close the Journal/Card
+      // first, keep only the compact guide, then point at a real nearby Monster.
+      if (step.id === 'defeat_first_monster') {
+        this._closeAllMenuSurfaces();
+        this._journeyGuideCollapsed = true;
+        this._renderJourneyGuide();
+        const started = window.startJourneyCombatGuidance?.();
+        if (!started) this.addCombatLog('ยังหา Monster เป้าหมายไม่เจอ ลองเดินเข้าใกล้พื้นที่ฝึกแล้วกดอีกครั้ง', 'warning');
+        return;
+      }
       const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
       if (!(currentMap === step.mapId || (step.mapId === 'prontera' && currentMap === 'prontera_field'))) return this.openWarpMap(step.mapId);
       if (typeof window.startJourneyNavigation === 'function') {
@@ -10251,12 +10289,14 @@ export class GameUI {
   }
 
   handleMonsterKill(monsterName) {
+    const wasFirstCombatLesson = this.firstThirtyJourney?.activeStep === 'defeat_first_monster';
     this.killStreak++;
     this.incrementQuestProgress('hunt', monsterName);
     const result = recordMonsterDefeat(this.adventureJournal, monsterName);
     this.adventureJournal = result.journal;
-    this._completeFirstThirtyStep('defeat_first_monster');
+    const completedCombatLesson = this._completeFirstThirtyStep('defeat_first_monster');
     this._saveAdventureJournalSoon();
+    if (wasFirstCombatLesson && completedCombatLesson) this._showJourneyCombatCompletion(monsterName);
     if (result.firstDiscovery) this.addCombatLog(`📔 Monster Codex: ค้นพบ ${monsterName}!`, 'loot');
     if (result.tierUnlocked) this.addCombatLog(`🏅 ${monsterName} ถึงระดับ ${masteryForKills(result.entry.kills).label} Mastery!`, 'levelup');
     if (this.currentWikiTab === 'journal' || this.currentWikiTab === 'monsters') this._renderWiki();
