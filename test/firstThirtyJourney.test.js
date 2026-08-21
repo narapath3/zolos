@@ -135,3 +135,23 @@ test('Combat chapter shows completion popup only after the first guided kill', (
   assert.match(css, /#journey-combat-complete\{position:fixed;inset:0;z-index:2450;display:none;pointer-events:none/);
   assert.match(css, /\.journey-combat-complete-card\{[^}]*pointer-events:auto/);
 });
+
+
+test('Journey completion offers the next chapter automatically without reopening the Journal', () => {
+  assert.match(gameUI, /_showJourneyNextPrompt\(completedStep\)/);
+  assert.match(gameUI, /_continueFirstThirtyJourney\(\)/);
+  assert.match(gameUI, /data-home-journey-action="continue-next"/);
+  assert.match(gameUI, /data-home-journey-action="later-next"/);
+  assert.match(gameUI, /journey-next-prompt/);
+  assert.match(gameUI, /_hideJourneyNextPrompt\(true\)/);
+  assert.match(css, /\.home-journey-guide\.is-next-prompt-hidden\{visibility:hidden!important/);
+  assert.match(css, /#journey-next-prompt\{position:fixed;inset:0;z-index:2380/);
+  assert.match(css, /\.journey-next-prompt-card\{[^}]*pointer-events:auto/);
+});
+
+test('Combat completion advances through the same next-chapter prompt without stacking overlays', () => {
+  assert.match(gameUI, /this\._hideJourneyNextPrompt\(\);[\s\S]*this\._closeAllMenuSurfaces\(\);/);
+  assert.match(gameUI, /ทำต่อบทถัดไป/);
+  assert.match(gameUI, /close\(\{ continueJourney: true, showNextPrompt: false \}\)/);
+  assert.match(gameUI, /this\._journeyCombatCompletionTimer = setTimeout\(\(\) => close\(\), 9000\)/);
+});

@@ -75,6 +75,7 @@ export class GameUI {
     // Keep onboarding visible but unobtrusive; expand it on demand.
     this._journeyGuideCollapsed = true;
     this._journeyCombatCompletionTimer = null;
+    this._journeyNextPromptEl = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -356,6 +357,7 @@ export class GameUI {
     clearTimeout(this._journalSaveTimer);
     clearTimeout(this._journeySaveTimer);
     clearTimeout(this._journeyCombatCompletionTimer);
+    this._hideJourneyNextPrompt();
     this._journeyResizeObserver?.disconnect?.();
     clearTimeout(this._cardTradeSuggestTimer);
     clearTimeout(this.tradeTimeout);
@@ -404,6 +406,8 @@ export class GameUI {
       event.stopPropagation();
       const action = actionButton.dataset.homeJourneyAction;
       if (action === 'navigate' || action === 'next') return this._navigateFirstThirtyStep();
+      if (action === 'continue-next') return this._continueFirstThirtyJourney();
+      if (action === 'later-next') return this._hideJourneyNextPrompt(true);
       if (action === 'skip') return this._skipFirstThirtyStep();
       if (action === 'resume') return this._resumeFirstThirtyStep();
       if (action === 'collapse') {
@@ -418,6 +422,18 @@ export class GameUI {
         const journalButton = document.getElementById('btn-wiki');
         if (journalButton) journalButton.click();
       }
+    });
+
+    // The auto-advance prompt is mounted outside the home guide so it can sit
+    // above the game without inheriting the guide's pointer-events layer.
+    this._listenGlobal(document, 'click', event => {
+      const actionButton = event.target.closest?.('#journey-next-prompt [data-home-journey-action]');
+      if (!actionButton) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const action = actionButton.dataset.homeJourneyAction;
+      if (action === 'continue-next') return this._continueFirstThirtyJourney();
+      if (action === 'later-next') return this._hideJourneyNextPrompt(true);
     });
   }
 
@@ -9742,7 +9758,49 @@ export class GameUI {
     </section>`;
   }
 
-  _completeFirstThirtyStep(stepId, { silent = false } = {}) {
+  _hideJourneyNextPrompt(renderGuide = false) {
+    const prompt = this._journeyNextPromptEl || document.getElementById('journey-next-prompt');
+    if (prompt) prompt.style.display = 'none';
+    this._journeyNextPromptEl = null;
+    const guide = this._journeyGuideEl || document.getElementById('home-journey-guide');
+    guide?.classList.remove('is-next-prompt-hidden');
+    if (renderGuide) this._renderJourneyGuide();
+  }
+
+  _showJourneyNextPrompt(completedStep = null) {
+    const active = firstThirtyProgress(this.firstThirtyJourney).active;
+    if (!active) {
+      this._hideJourneyNextPrompt(true);
+      return;
+    }
+    this._closeAllMenuSurfaces();
+    const guide = this._journeyGuideEl || document.getElementById('home-journey-guide');
+    guide?.classList.add('is-next-prompt-hidden');
+    let prompt = this._journeyNextPromptEl || document.getElementById('journey-next-prompt');
+    if (!prompt) {
+      prompt = document.createElement('aside');
+      prompt.id = 'journey-next-prompt';
+      prompt.setAttribute('role', 'status');
+      prompt.setAttribute('aria-live', 'polite');
+      document.body.appendChild(prompt);
+    }
+    this._journeyNextPromptEl = prompt;
+    const presentation = this._journeyTutorialPresentation(active);
+    const escape = value => this._journeyEscape(value);
+    const doneTitle = completedStep ? `บทที่ ${completedStep.chapter} เสร็จแล้ว` : 'พร้อมไปต่อไหม?';
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? 'นำทางไปที่นี่' : 'ดูเป้าหมายต่อไป';
+    prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">ทำต่อทันที <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
+    prompt.style.display = 'block';
+  }
+
+  _continueFirstThirtyJourney() {
+    this._hideJourneyNextPrompt();
+    this._journeyGuideCollapsed = true;
+    this._renderJourneyGuide();
+    this._navigateFirstThirtyStep();
+  }
+
+  _completeFirstThirtyStep(stepId, { silent = false, prompt = true } = {}) {
     const step = getFirstThirtyStep(stepId);
     if (!step || this.firstThirtyJourney.completed.includes(step.id)) return false;
     this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'complete', stepId: step.id }, new Date().toISOString());
@@ -9751,6 +9809,7 @@ export class GameUI {
     if (!silent) this.addCombatLog(`✅ เสร็จสิ้นบทที่ ${step.chapter}: ${step.title}`, 'levelup');
     this._renderJourneyGuide();
     if (this.currentWikiTab === 'journal') this._renderWiki();
+    if (prompt) this._showJourneyNextPrompt(step);
     return true;
   }
 
@@ -9763,6 +9822,7 @@ export class GameUI {
     this.addCombatLog(`↪️ ข้ามบทชั่วคราว: ${step.title} กลับมาเปิดสมุดเพื่อทำต่อได้`, 'system');
     this._renderJourneyGuide();
     this._renderWiki();
+    this._showJourneyNextPrompt(step);
   }
 
   _resumeFirstThirtyStep(stepId) {
@@ -9800,6 +9860,7 @@ export class GameUI {
 
   _showJourneyCombatCompletion(monsterName = 'Monster') {
     window.stopJourneyCombatGuidance?.();
+    this._hideJourneyNextPrompt();
     this._closeAllMenuSurfaces();
     let popup = document.getElementById('journey-combat-complete');
     if (!popup) {
@@ -9810,17 +9871,20 @@ export class GameUI {
       document.body.appendChild(popup);
     }
     const escape = value => this._journeyEscape(value);
-    popup.innerHTML = `<div class="journey-combat-complete-card" data-testid="journey-combat-complete-popup"><div class="journey-combat-complete-art" aria-hidden="true"></div><div class="journey-combat-complete-copy"><span class="journey-combat-complete-kicker">บทที่ 3 · COMBAT COMPLETE</span><h3>เก่งมาก! เอาชนะ ${escape(monsterName)} ได้แล้ว</h3><p>การต่อสู้ครั้งแรกสำเร็จ คุณเริ่มรู้จักการเลือกเป้าหมายและใช้พลังของตัวละครแล้ว</p><button type="button" class="journey-primary journey-combat-complete-next">ไปบทถัดไป <span>→</span></button></div><button type="button" class="journey-spotlight-close journey-combat-complete-close" aria-label="ปิดสรุปการต่อสู้">×</button></div>`;
+    popup.innerHTML = `<div class="journey-combat-complete-card" data-testid="journey-combat-complete-popup"><div class="journey-combat-complete-art" aria-hidden="true"></div><div class="journey-combat-complete-copy"><span class="journey-combat-complete-kicker">บทที่ 3 · COMBAT COMPLETE</span><h3>เก่งมาก! เอาชนะ ${escape(monsterName)} ได้แล้ว</h3><p>การต่อสู้ครั้งแรกสำเร็จ คุณเริ่มรู้จักการเลือกเป้าหมายและใช้พลังของตัวละครแล้ว</p><button type="button" class="journey-primary journey-combat-complete-next">ทำต่อบทถัดไป <span>→</span></button></div><button type="button" class="journey-spotlight-close journey-combat-complete-close" aria-label="ดูบทถัดไปภายหลัง">×</button></div>`;
     popup.style.display = 'block';
-    const close = () => {
+    const completedStep = getFirstThirtyStep('defeat_first_monster');
+    const close = ({ continueJourney = false, showNextPrompt = true } = {}) => {
       popup.style.display = 'none';
       this._journeyGuideCollapsed = true;
       this._renderJourneyGuide();
+      if (continueJourney) return this._continueFirstThirtyJourney();
+      if (showNextPrompt) this._showJourneyNextPrompt(completedStep);
     };
-    popup.querySelector('.journey-combat-complete-close')?.addEventListener('click', close, { once: true });
-    popup.querySelector('.journey-combat-complete-next')?.addEventListener('click', close, { once: true });
+    popup.querySelector('.journey-combat-complete-close')?.addEventListener('click', () => close(), { once: true });
+    popup.querySelector('.journey-combat-complete-next')?.addEventListener('click', () => close({ continueJourney: true, showNextPrompt: false }), { once: true });
     clearTimeout(this._journeyCombatCompletionTimer);
-    this._journeyCombatCompletionTimer = setTimeout(close, 9000);
+    this._journeyCombatCompletionTimer = setTimeout(() => close(), 9000);
   }
 
   _navigateFirstThirtyStep() {
