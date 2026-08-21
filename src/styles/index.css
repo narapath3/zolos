@@ -8539,3 +8539,23 @@ a,
 .home-journey-guide.is-spotlighting{display:none!important;pointer-events:none!important}
 #journey-spotlight{z-index:2400}
 @media(max-width:700px){#journey-spotlight{z-index:2600}.journey-spotlight-card{max-height:min(42dvh,260px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.journey-spotlight-card button{touch-action:manipulation}}
+
+
+/* ========== LANDSCAPE MOBILE RIGHT-CONTROL DOCK ========== */
+/* Landscape phones have wide but very short viewports. Percentage-based arc
+   positions make the large attack button collide with skill buttons, so use a
+   deterministic two-row dock with fixed touch-safe slots instead. */
+@media (min-width:769px) and (max-width:1180px) and (orientation:landscape){
+  :root{--landscape-control-size:clamp(42px,10vh,52px);--landscape-attack-size:clamp(58px,15vh,72px);--landscape-control-gap:clamp(5px,1.2vh,9px);--landscape-action-width:calc(var(--landscape-control-size) * 3 + var(--landscape-control-gap) * 2);--landscape-action-height:calc(var(--landscape-control-size) * 2 + var(--landscape-control-gap))}
+  #mobile-actions{width:var(--landscape-action-width);height:var(--landscape-action-height);right:calc(16px + var(--safe-right) + var(--zolos-auto-rail-size) + 12px);bottom:calc(var(--zolos-bottom-nav-clearance) + 4px)!important;isolation:isolate}
+  #mobile-actions .mobile-action-btn{box-sizing:border-box;inset:auto;transform:none}
+  #mobile-actions .sprint-btn,#mobile-actions #btn-mobile-skill-1,#mobile-actions #btn-mobile-skill-2,#mobile-actions #btn-mobile-skill-3{width:var(--landscape-control-size);height:var(--landscape-control-size);top:0;bottom:auto}
+  #mobile-actions .sprint-btn{left:0;right:auto}
+  #mobile-actions #btn-mobile-skill-2{left:calc(var(--landscape-control-size) + var(--landscape-control-gap));right:auto}
+  #mobile-actions #btn-mobile-skill-1{left:calc((var(--landscape-control-size) + var(--landscape-control-gap)) * 2);right:auto}
+  #mobile-actions #btn-mobile-skill-3{left:calc(var(--landscape-control-size) + var(--landscape-control-gap));top:calc(var(--landscape-control-size) + var(--landscape-control-gap));right:auto;bottom:auto}
+  #mobile-actions .attack-btn{left:calc((var(--landscape-control-size) + var(--landscape-control-gap)) * 2);top:calc(var(--landscape-control-size) + var(--landscape-control-gap) - 8px);right:auto;bottom:auto;width:var(--landscape-attack-size);height:var(--landscape-attack-size);font-size:clamp(20px,5vh,28px);z-index:5}
+  #mobile-actions .mobile-action-btn .btn-icon{font-size:clamp(16px,4vh,22px)}
+  #auto-farm-container{width:var(--zolos-auto-rail-size);right:calc(16px + var(--safe-right))!important;bottom:calc(var(--zolos-bottom-nav-clearance) + 4px)!important;top:auto!important;gap:clamp(5px,1.2vh,8px)!important;align-items:center;z-index:1600!important}
+  #auto-farm-container>.btn-auto,#auto-farm-container>.btn-fishing{width:var(--zolos-auto-rail-size);height:var(--zolos-auto-rail-size);flex:0 0 auto}
+}
