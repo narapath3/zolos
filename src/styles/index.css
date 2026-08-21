@@ -8559,3 +8559,28 @@ a,
   #auto-farm-container{width:var(--zolos-auto-rail-size);right:calc(16px + var(--safe-right))!important;bottom:calc(var(--zolos-bottom-nav-clearance) + 4px)!important;top:auto!important;gap:clamp(5px,1.2vh,8px)!important;align-items:center;z-index:1600!important}
   #auto-farm-container>.btn-auto,#auto-farm-container>.btn-fishing{width:var(--zolos-auto-rail-size);height:var(--zolos-auto-rail-size);flex:0 0 auto}
 }
+
+
+/* ========== ANIME ADVENTURER TUTORIAL PRESENTATION ========== */
+.home-journey-card--illustrated,
+.home-journey-card--tutorial{position:relative;background-image:linear-gradient(110deg,rgba(7,15,29,.97) 0%,rgba(10,21,38,.9) 45%,rgba(10,18,32,.62) 100%),var(--journey-art-image);background-size:cover;background-position:center;background-repeat:no-repeat}
+.home-journey-card--illustrated{min-height:50px;background-position:center 35%;background-size:cover}
+.home-journey-card--illustrated .home-journey-collapsed-button{background:linear-gradient(90deg,rgba(8,16,31,.9),rgba(8,16,31,.52));border-radius:13px}
+.home-journey-card--tutorial{min-height:350px;max-height:min(520px,calc(100dvh - 180px));overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,220,116,.55) transparent}
+.home-journey-card--tutorial::-webkit-scrollbar{width:5px}.home-journey-card--tutorial::-webkit-scrollbar-thumb{border-radius:9px;background:rgba(255,220,116,.55)}
+.home-journey-tutorial-shade{position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(7,14,28,.2),rgba(7,14,28,.74) 46%,rgba(7,14,28,.97) 100%)}
+.home-journey-tutorial-content{position:relative;z-index:1;display:grid;gap:0}
+.home-journey-guide-badge{display:inline-flex;align-items:center;gap:5px;width:max-content;margin:10px 14px 0;padding:5px 8px;border:1px solid rgba(255,224,139,.36);border-radius:999px;background:rgba(10,20,37,.72);color:#ffe28f;font-size:9px;font-weight:900;letter-spacing:.06em;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+.home-journey-guide-sparkle{color:#7fe7ff;font-size:13px;line-height:1;animation:journeyGuideSparkle 1.8s ease-in-out infinite}
+.home-journey-card--tutorial .home-journey-card__top{position:relative;z-index:2}
+.home-journey-card--tutorial .home-journey-chapter{padding-top:12px}.home-journey-card--tutorial .home-journey-chapter-icon{background:rgba(17,35,61,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.home-journey-speech{margin:2px 14px 0;padding:9px 11px;border:1px solid rgba(126,225,255,.28);border-radius:11px;background:rgba(7,20,38,.74);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.home-journey-speech strong{display:block;margin-bottom:3px;color:#8ce9ff;font-size:9px;font-weight:900;letter-spacing:.08em}.home-journey-speech p{margin:0;color:#e8f5ff;font-size:11px;line-height:1.5}
+.home-journey-card--tutorial .home-journey-description{color:#c7d8e8}.home-journey-card--tutorial .home-journey-route{background:rgba(12,67,75,.46);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.home-journey-card--tutorial[data-tutorial-pose="combat"]{background-position:center 42%}.home-journey-card--tutorial[data-tutorial-pose="fishing"]{background-position:center 42%}.home-journey-card--tutorial[data-tutorial-pose="map"]{background-position:center 42%}.home-journey-card--tutorial[data-tutorial-pose="codex"]{background-position:center 40%}.home-journey-card--tutorial[data-tutorial-pose="celebrate"]{background-position:center 40%}
+.home-journey-card--tutorial[data-tutorial-pose="celebrate"] .home-journey-guide-sparkle{color:#ffd76e;animation:journeyCelebrateSparkle .9s ease-in-out infinite}
+@keyframes journeyGuideSparkle{0%,100%{transform:rotate(-10deg) scale(.9);opacity:.72}50%{transform:rotate(10deg) scale(1.18);opacity:1}}@keyframes journeyCelebrateSparkle{0%,100%{transform:translateY(0) rotate(-12deg) scale(.9)}50%{transform:translateY(-3px) rotate(12deg) scale(1.25)}}
+@media(max-width:700px){.home-journey-card--tutorial{min-height:320px;max-height:calc(100dvh - 170px);border-radius:15px}.home-journey-guide-badge{margin:8px 11px 0}.home-journey-speech{margin:2px 11px 0;padding:8px 9px}.home-journey-speech p{font-size:10px}.home-journey-card--tutorial .home-journey-description{font-size:10px}.home-journey-card--tutorial .home-journey-route{font-size:9px}}
+@media(max-width:420px){.home-journey-card--tutorial{min-height:300px}.home-journey-card--tutorial .home-journey-speech{max-height:66px;overflow:hidden}}
+@media(max-height:480px){.home-journey-card--tutorial{min-height:218px;max-height:calc(100dvh - 112px);background-position:center 30%}.home-journey-card--tutorial .home-journey-guide-badge,.home-journey-card--tutorial .home-journey-speech{display:none}.home-journey-card--tutorial .home-journey-chapter{padding-top:7px}.home-journey-card--tutorial .home-journey-actions{padding-top:7px}}
+@media(prefers-reduced-motion:reduce){.home-journey-guide-sparkle{animation:none!important}}

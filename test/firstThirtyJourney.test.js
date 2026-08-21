@@ -74,6 +74,15 @@ test('Home-screen guide is mounted outside the journal and exposes game-style co
   assert.match(gameUI, /const wasOpen = !panel\.hidden/);
   assert.match(gameUI, /panel\.hidden = wasOpen/);
   assert.match(gameUI, /if \(this\._isMenuSurfaceOpen\(modal\)\)/);
+  assert.match(gameUI, /_journeyTutorialPresentation\(step\)/);
+  assert.match(gameUI, /guide-open-journal\.jpg/);
+  assert.match(gameUI, /guide-combat\.jpg/);
+  assert.match(gameUI, /guide-fishing\.jpg/);
+  assert.match(gameUI, /data-tutorial-pose/);
+  assert.match(gameUI, /home-journey-speech/);
+  assert.match(css, /home-journey-card--tutorial/);
+  assert.match(css, /journey-art-image/);
+  assert.match(css, /@media\(max-height:480px\)/);
 });
 
 test('Journey responsive styles keep touch actions, safe area and compact mobile layout', () => {

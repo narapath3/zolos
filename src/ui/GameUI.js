@@ -9617,6 +9617,44 @@ export class GameUI {
     return labels[mapId] || mapId || 'พื้นที่ปัจจุบัน';
   }
 
+  _journeyTutorialPresentation(step) {
+    const presentations = {
+      open_journal: {
+        image: '/assets/tutorial/guide-open-journal.jpg', pose: 'teach',
+        hint: 'เริ่มต้นด้วยการเปิดสมุดเล่มนี้ แล้วฉันจะพาไปรู้จักโลกของ ZOLOS ทีละขั้น'
+      },
+      reach_guide_npc: {
+        image: '/assets/tutorial/guide-map.jpg', pose: 'point',
+        hint: 'แตะนำทาง แล้วเดินตามหมุดสีทองไปยังจุดแนะนำได้เลย'
+      },
+      defeat_first_monster: {
+        image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
+        hint: 'เลือก Monster ใกล้ตัว แล้วใช้โจมตีหรือสกิลเพื่อเริ่มการต่อสู้ครั้งแรก'
+      },
+      open_inventory: {
+        image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
+        hint: 'ของที่ได้รับจะอยู่ใน BAG เปิดดูไอเทม อุปกรณ์ และของรางวัลได้ที่นี่'
+      },
+      catch_first_fish: {
+        image: '/assets/tutorial/guide-fishing.jpg', pose: 'fishing',
+        hint: 'ไปที่ริมน้ำแล้วลองตกปลา แต่ละแหล่งน้ำมีปลาพิเศษของตัวเอง'
+      },
+      visit_new_map: {
+        image: '/assets/tutorial/guide-map.jpg', pose: 'map',
+        hint: 'ใช้ Warp เพื่อออกสำรวจ Map ใหม่ ยิ่งพื้นที่อันตรายก็ยิ่งมีของหายาก'
+      },
+      read_codex: {
+        image: '/assets/tutorial/guide-codex.jpg', pose: 'codex',
+        hint: 'ทุก Monster และปลาที่ค้นพบจะถูกบันทึกไว้ใน Codex ของคุณ'
+      },
+      choose_next_goal: {
+        image: '/assets/tutorial/guide-celebrate.jpg', pose: 'celebrate',
+        hint: 'คุณพร้อมแล้ว เลือกเส้นทางที่ชอบได้เลย: Combat, Fishing หรือ Exploration'
+      }
+    };
+    return presentations[step?.id] || presentations.open_journal;
+  }
+
   _renderJourneyGuide() {
     const guide = this._journeyGuideEl || document.getElementById('home-journey-guide');
     if (!guide || !this.characterId) {
@@ -9627,6 +9665,8 @@ export class GameUI {
     const progress = firstThirtyProgress(this.firstThirtyJourney);
     const active = progress.active;
     const escape = value => this._journeyEscape(value);
+    const presentation = this._journeyTutorialPresentation(active);
+    const artStyle = `--journey-art-image:url(${presentation.image})`;
     if (!active) {
       guide.innerHTML = '';
       guide.classList.remove('is-collapsed');
@@ -9645,7 +9685,7 @@ export class GameUI {
         : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : 'เส้นทางแรกของคุณพร้อมแล้ว';
 
     if (this._journeyGuideCollapsed) {
-      guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed" data-testid="home-first-thirty-journey">
+      guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed home-journey-card--illustrated" style="${artStyle}" data-testid="home-first-thirty-journey" data-tutorial-pose="${presentation.pose}">
         <button type="button" class="home-journey-collapsed-button" data-home-journey-action="expand" aria-label="แสดง Adventurer's Notebook">
           <span class="home-journey-bookmark">📔</span><span class="home-journey-collapsed-copy"><small>FIRST 30 MINUTES · บทที่ ${active.chapter}/${progress.total}</small><b>${escape(active.title)}</b></span><strong>${progress.percent}%</strong><span class="home-journey-expand">⌄</span>
         </button>
@@ -9653,13 +9693,10 @@ export class GameUI {
       return;
     }
 
-    guide.innerHTML = `<section class="home-journey-card" data-testid="home-first-thirty-journey" data-journey-step="${escape(active.id)}">
+    guide.innerHTML = `<section class="home-journey-card home-journey-card--tutorial" style="${artStyle}" data-testid="home-first-thirty-journey" data-journey-step="${escape(active.id)}" data-tutorial-pose="${presentation.pose}">
+      <div class="home-journey-tutorial-shade" aria-hidden="true"></div>
       <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES · ADVENTURER'S NOTEBOOK</span><div class="home-journey-top-actions"><span class="home-journey-progress">${progress.completed}/${progress.total} · ${progress.percent}%</span><button type="button" class="home-journey-icon-button" data-home-journey-action="collapse" aria-label="ย่อ Adventurer's Notebook">−</button></div></div>
-      <div class="home-journey-chapter"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>บทที่ ${active.chapter} · เป้าหมายปัจจุบัน</small><h2>${escape(active.title)}</h2></div></div>
-      <p class="home-journey-description">${escape(active.description)}</p>
-      <div class="home-journey-route"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div>
-      <div class="home-journey-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">ถัดไป <span>· ${actionLabel}</span><b>→</b></button><button type="button" class="home-journey-skip" data-home-journey-action="skip">ข้ามบท</button></div>
-      <div class="home-journey-footer"><button type="button" class="home-journey-link" data-home-journey-action="open-journal">📔 เปิดสมุดเต็ม</button><span>ทำสำเร็จแล้ว ระบบจะไปบทถัดไปอัตโนมัติ</span></div>
+      <div class="home-journey-tutorial-content"><div class="home-journey-guide-badge"><span class="home-journey-guide-sparkle">✦</span><span>ผู้ช่วยของคุณ</span></div><div class="home-journey-chapter"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>บทที่ ${active.chapter} · เป้าหมายปัจจุบัน</small><h2>${escape(active.title)}</h2></div></div><div class="home-journey-speech"><strong>ไกด์แนะนำ</strong><p>${escape(presentation.hint)}</p></div><p class="home-journey-description">${escape(active.description)}</p><div class="home-journey-route"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div><div class="home-journey-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">ถัดไป <span>· ${actionLabel}</span><b>→</b></button><button type="button" class="home-journey-skip" data-home-journey-action="skip">ข้ามบท</button></div><div class="home-journey-footer"><button type="button" class="home-journey-link" data-home-journey-action="open-journal">📔 เปิดสมุดเต็ม</button><span>ทำสำเร็จแล้ว ระบบจะไปบทถัดไปอัตโนมัติ</span></div></div>
     </section>`;
   }
 
