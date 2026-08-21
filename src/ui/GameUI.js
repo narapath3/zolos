@@ -74,6 +74,7 @@ export class GameUI {
     this._journeyGuideEl = null;
     // Keep onboarding visible but unobtrusive; expand it on demand.
     this._journeyGuideCollapsed = true;
+    this._journeyNewPlayerAttentionDismissed = false;
     this._journeyCombatCompletionTimer = null;
     this._journeyNextPromptEl = null;
 
@@ -415,6 +416,7 @@ export class GameUI {
         return this._renderJourneyGuide();
       }
       if (action === 'expand') {
+        this._journeyNewPlayerAttentionDismissed = true;
         this._journeyGuideCollapsed = false;
         return this._renderJourneyGuide();
       }
@@ -9688,12 +9690,19 @@ export class GameUI {
     const artStyle = `--journey-art-image:url(${presentation.image})`;
     if (!active) {
       guide.innerHTML = '';
-      guide.classList.remove('is-collapsed');
+      guide.classList.remove('is-collapsed', 'is-new-player-guide');
+      guide.removeAttribute('data-new-player');
       guide.hidden = true;
       return;
     }
     guide.hidden = false;
+    const isNewPlayer = active.id === 'open_journal'
+      && progress.completed === 0
+      && progress.state.skipped.length === 0
+      && !this._journeyNewPlayerAttentionDismissed;
     guide.classList.toggle('is-collapsed', this._journeyGuideCollapsed);
+    guide.classList.toggle('is-new-player-guide', isNewPlayer);
+    guide.toggleAttribute('data-new-player', isNewPlayer);
 
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
@@ -9704,8 +9713,8 @@ export class GameUI {
         : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : 'เส้นทางแรกของคุณพร้อมแล้ว';
 
     if (this._journeyGuideCollapsed) {
-      guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed home-journey-card--illustrated" style="${artStyle}" data-testid="home-first-thirty-journey" data-tutorial-pose="${presentation.pose}">
-        <button type="button" class="home-journey-collapsed-button" data-home-journey-action="expand" aria-label="แสดง Adventurer's Notebook">
+      guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed home-journey-card--illustrated${isNewPlayer ? ' home-journey-card--new-player' : ''}" style="${artStyle}" data-testid="home-first-thirty-journey" data-tutorial-pose="${presentation.pose}">
+        <button type="button" class="home-journey-collapsed-button" data-home-journey-action="expand" aria-label="${isNewPlayer ? 'เริ่มแนะนำการเล่นสำหรับผู้เล่นใหม่' : 'แสดง Adventurer\'s Notebook'}">
           <span class="home-journey-bookmark">📔</span><span class="home-journey-collapsed-copy"><small>FIRST 30 MINUTES · บทที่ ${active.chapter}/${progress.total}</small><b>${escape(active.title)}</b></span><strong>${progress.percent}%</strong><span class="home-journey-expand">⌄</span>
         </button>
       </section>`;

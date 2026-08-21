@@ -201,3 +201,16 @@ test('Tutorial Coach separates start guidance from the real target button spotli
   assert.match(css, /\.home-journey-coach-speech\{/);
   assert.match(css, /\.home-journey-coach-actions\{/);
 });
+
+
+test('New players receive a prominent guide CTA that dismisses after opening', () => {
+  assert.match(gameUI, /_journeyNewPlayerAttentionDismissed/);
+  assert.match(gameUI, /active\.id === 'open_journal'/);
+  assert.match(gameUI, /guide\.classList\.toggle\('is-new-player-guide', isNewPlayer\)/);
+  assert.match(gameUI, /เริ่มแนะนำการเล่นสำหรับผู้เล่นใหม่/);
+  assert.match(css, /#home-journey-guide\.is-new-player-guide::before/);
+  assert.match(css, /content:'✨ เริ่มที่นี่'/);
+  assert.match(css, /newPlayerLightSweep/);
+  assert.match(css, /newPlayerCardPulse/);
+  assert.match(css, /prefers-reduced-motion:reduce/);
+});
