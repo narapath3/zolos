@@ -5,6 +5,7 @@ import { createFirstThirtyState, FIRST_THIRTY_STEPS, firstThirtyProgress, saniti
 
 const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
+const serverAuth = fs.readFileSync(new URL('../server/api/auth.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
@@ -203,6 +204,14 @@ test('Tutorial Coach separates start guidance from the real target button spotli
   assert.match(css, /\.home-journey-coach-actions\{/);
 });
 
+
+test('Self-hosted signup atomically creates user and profile with safe conflict handling', () => {
+  assert.match(serverAuth, /import \{ query, tx \} from '\.\/db\.js'/);
+  assert.match(serverAuth, /user = await tx\(async \(client\) =>/);
+  assert.match(serverAuth, /INSERT INTO profiles \(id, username, gender\)/);
+  assert.match(serverAuth, /profiles_username_key/);
+  assert.match(serverAuth, /อีเมลนี้ถูกใช้แล้ว/);
+});
 
 test('Guest binding resolves profile username conflicts without exposing raw database errors', () => {
   assert.match(gameSync, /async function resolveBindableUsername\(baseUsername\)/);

@@ -2,7 +2,7 @@
 // from Supabase) + JWT sessions. Replaces supabase.auth.*.
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from './db.js';
+import { query, tx } from './db.js';
 
 const DEV_JWT_SECRET = 'dev-insecure-secret-change-me';
 const configuredJwtSecret = String(process.env.JWT_SECRET || '').trim();
@@ -54,22 +54,41 @@ export async function signUp({ email, password, username, gender }) {
     if (!EMAIL_RE.test(email)) throw httpErr(400, 'อีเมลไม่ถูกต้อง');
     if (!password || String(password).length < 6) throw httpErr(400, 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัว');
 
-    const exists = await query('SELECT 1 FROM users WHERE lower(email) = $1', [email]);
-    if (exists.rowCount > 0) throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
-
     const hash = await bcrypt.hash(String(password), 10);
     const meta = { username: cleanUsername(username, 'Adventurer'), gender: gender === 'female' ? 'female' : 'male' };
-    const { rows } = await query(
-        `INSERT INTO users (id, email, encrypted_password, raw_user_meta_data, created_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, now()) RETURNING id, email, encrypted_password`,
-        [email, hash, meta]
-    );
-    const user = rows[0];
-    await query(
-        `INSERT INTO profiles (id, username) VALUES ($1, $2)
-         ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username`,
-        [user.id, meta.username]
-    );
+
+    // User + profile must be one atomic operation. Otherwise a username
+    // conflict can leave an auth user without a profile, and the next retry
+    // appears as a misleading "profile creation" failure.
+    let user;
+    try {
+        user = await tx(async (client) => {
+            const exists = await client.query('SELECT 1 FROM users WHERE lower(email) = $1 LIMIT 1', [email]);
+            if (exists.rowCount > 0) throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+
+            const { rows } = await client.query(
+                `INSERT INTO users (id, email, encrypted_password, raw_user_meta_data, created_at)
+                 VALUES (gen_random_uuid(), $1, $2, $3, now()) RETURNING id, email, encrypted_password`,
+                [email, hash, meta]
+            );
+            const created = rows[0];
+            await client.query(
+                `INSERT INTO profiles (id, username, gender) VALUES ($1, $2, $3)
+                 ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, gender = EXCLUDED.gender`,
+                [created.id, meta.username, meta.gender]
+            );
+            return created;
+        });
+    } catch (error) {
+        if (error?.status === 409) throw error;
+        if (error?.code === '23505' && String(error?.constraint || '').includes('profiles_username_key')) {
+            throw httpErr(409, 'ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณาใช้ชื่อใหม่');
+        }
+        if (error?.code === '23505' && String(error?.constraint || '').includes('users')) {
+            throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+        }
+        throw error;
+    }
     return { token: signToken(user), user: { id: user.id, email: user.email, is_anonymous: false } };
 }
 
