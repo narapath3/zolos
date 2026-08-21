@@ -9712,10 +9712,10 @@ export class GameUI {
       return;
     }
 
-    guide.innerHTML = `<section class="home-journey-card home-journey-card--tutorial" style="${artStyle}" data-testid="home-first-thirty-journey" data-journey-step="${escape(active.id)}" data-tutorial-pose="${presentation.pose}">
+    guide.innerHTML = `<section class="home-journey-card home-journey-card--tutorial home-journey-card--coach" style="${artStyle}" data-testid="home-first-thirty-journey" data-journey-step="${escape(active.id)}" data-tutorial-pose="${presentation.pose}" data-tutorial-stage="coach">
       <div class="home-journey-tutorial-shade" aria-hidden="true"></div>
-      <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES · ADVENTURER'S NOTEBOOK</span><div class="home-journey-top-actions"><span class="home-journey-progress">${progress.completed}/${progress.total} · ${progress.percent}%</span><button type="button" class="home-journey-icon-button" data-home-journey-action="collapse" aria-label="ย่อ Adventurer's Notebook">−</button></div></div>
-      <div class="home-journey-tutorial-content"><div class="home-journey-guide-badge"><span class="home-journey-guide-sparkle">✦</span><span>ผู้ช่วยของคุณ</span></div><div class="home-journey-chapter"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>บทที่ ${active.chapter} · เป้าหมายปัจจุบัน</small><h2>${escape(active.title)}</h2></div></div><div class="home-journey-speech"><strong>ไกด์แนะนำ</strong><p>${escape(presentation.hint)}</p></div><p class="home-journey-description">${escape(active.description)}</p><div class="home-journey-route"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div><div class="home-journey-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">ถัดไป <span>· ${actionLabel}</span><b>→</b></button><button type="button" class="home-journey-skip" data-home-journey-action="skip">ข้ามบท</button></div><div class="home-journey-footer"><button type="button" class="home-journey-link" data-home-journey-action="open-journal">📔 เปิดสมุดเต็ม</button><span>ทำสำเร็จแล้ว ระบบจะไปบทถัดไปอัตโนมัติ</span></div></div>
+      <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES · COACH</span><div class="home-journey-top-actions"><span class="home-journey-progress">${progress.completed}/${progress.total}</span><button type="button" class="home-journey-icon-button" data-home-journey-action="collapse" aria-label="ย่อ Tutorial Coach">−</button></div></div>
+      <div class="home-journey-coach-body"><div class="home-journey-coach-speaker"><span class="home-journey-guide-sparkle">✦</span><span>ผู้ช่วยของคุณ</span><small>บทที่ ${active.chapter}</small></div><div class="home-journey-coach-title"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>เป้าหมายตอนนี้</small><h2>${escape(active.title)}</h2></div></div><div class="home-journey-speech home-journey-coach-speech">${escape(presentation.hint)}</div><div class="home-journey-coach-hint"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div><div class="home-journey-coach-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">เริ่มบทนี้ <b>→</b></button><button type="button" class="home-journey-skip" data-home-journey-action="skip">ไว้ก่อน</button></div><p class="home-journey-coach-footnote">กดเริ่ม แล้วฉันจะชี้ปุ่มหรือจุดหมายให้ทันที</p></div>
     </section>`;
   }
 
@@ -9819,6 +9819,7 @@ export class GameUI {
   _completeFirstThirtyStep(stepId, { silent = false, prompt = true } = {}) {
     const step = getFirstThirtyStep(stepId);
     if (!step || this.firstThirtyJourney.completed.includes(step.id)) return false;
+    document.getElementById('journey-spotlight')?._journeyClose?.();
     this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'complete', stepId: step.id }, new Date().toISOString());
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._saveAdventureJournalSoon();

@@ -188,3 +188,16 @@ test('Game viewport uses full-size dynamic viewport sizing across browser and PW
   assert.match(manifest, /"display": "fullscreen"/);
   assert.match(manifest, /"display_override": \["fullscreen", "standalone"\]/);
 });
+
+
+test('Tutorial Coach separates start guidance from the real target button spotlight', () => {
+  assert.match(gameUI, /home-journey-card--coach/);
+  assert.match(gameUI, /FIRST 30 MINUTES · COACH/);
+  assert.match(gameUI, /เริ่มบทนี้/);
+  assert.match(gameUI, /กดเริ่ม แล้วฉันจะชี้ปุ่มหรือจุดหมายให้ทันที/);
+  assert.doesNotMatch(gameUI, /home-journey-speech.*ไกด์แนะนำ/);
+  assert.match(gameUI, /document\.getElementById\('journey-spotlight'\)\?\._journeyClose\?\.\(\)/);
+  assert.match(css, /\.home-journey-card--coach\{/);
+  assert.match(css, /\.home-journey-coach-speech\{/);
+  assert.match(css, /\.home-journey-coach-actions\{/);
+});
