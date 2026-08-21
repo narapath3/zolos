@@ -1,5 +1,5 @@
 import { query, tx } from './db.js';
-import { FISH_SPECIES, pickFishingCatch, getFishingMapConfig } from '../../src/engine/GameData.js';
+import { FISH_SPECIES, pickFishingCatch, getFishingMapConfig, getFishingRodConfig } from '../../src/engine/GameData.js';
 
 const REQUEST_ID_RE = /^[a-zA-Z0-9:_-]{1,160}$/;
 
@@ -10,10 +10,19 @@ export async function ensureFishingEconomy() {
     result jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await query(`CREATE TABLE IF NOT EXISTS public.shop_purchase_requests (
+    request_id text PRIMARY KEY,
+    user_id text NOT NULL,
+    character_id text NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
+    result jsonb NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`);
 }
 
-function rollFishingCatch(random = Math.random, mapId = 'prontera') {
-  const selected = pickFishingCatch(mapId, random);
+function rollFishingCatch(random = Math.random, mapId = 'prontera', rodName = 'Fishing Rod') {
+  const rod = getFishingRodConfig(rodName);
+  if (!rod) throw new Error('ไม่พบคันเบ็ดที่ติดตั้ง');
+  const selected = pickFishingCatch(mapId, random, { rodName });
   if (!selected?.name || !FISH_SPECIES[selected.name]) throw new Error('ไม่มีข้อมูลปลาสำหรับรางวัล');
   return {
     name: selected.name,
@@ -60,7 +69,20 @@ export async function claimFishingReward({ characterId, userId, requestId, mapId
     );
     if (!owner.rows[0]) throw new Error('ไม่พบตัวละครหรือไม่มีสิทธิ์');
 
-    const fish = rollFishingCatch(random, mapId);
+    // Never trust the client to choose a rod or rarity. The equipped rod is
+    // read from the owner-locked inventory row inside the same transaction.
+    const equippedRod = await client.query(
+      `SELECT item_name FROM public.inventory
+       WHERE character_id = $1 AND item_type = 'fishing_rod'
+         AND COALESCE(stats->>'equipped', 'false') = 'true'
+       ORDER BY CASE item_name WHEN 'Golden Fishing Rod' THEN 3 WHEN 'Silver Fishing Rod' THEN 2 ELSE 1 END DESC
+       LIMIT 1`,
+      [characterId],
+    );
+    const rodName = equippedRod.rows[0]?.item_name || null;
+    if (!getFishingRodConfig(rodName)) throw new Error('ต้องสวมคันเบ็ดก่อนตกปลา');
+
+    const fish = rollFishingCatch(random, mapId, rodName);
     const inventory = await client.query(
       `INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
        VALUES ($1, $2, 'fish', 1, '{}'::jsonb)
@@ -86,6 +108,9 @@ export async function claimFishingReward({ characterId, userId, requestId, mapId
       map_name: fish.mapName,
       map_tier: fish.mapTier,
       map_danger: fish.mapDanger,
+      rod_name: rodName,
+      rod_tier: getFishingRodConfig(rodName).tier,
+      rod_max_rarity: getFishingRodConfig(rodName).maxRarity,
     };
 
     await client.query(

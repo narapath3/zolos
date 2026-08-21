@@ -91,9 +91,11 @@ function assertClientWriteAllowed(table, action, values, filters = []) {
             const isSystemSnapshotWrite = input.item_type === 'system' && SYSTEM_INVENTORY_ITEMS.has(input.item_name);
             const isStarterSword = input.item_name === 'Sword' && input.item_type === 'weapon'
                 && Number(input.quantity) === 1;
+            const isStarterFishingRod = input.item_name === 'Fishing Rod' && input.item_type === 'fishing_rod'
+                && Number(input.quantity) === 1;
             const starterStats = input.stats && typeof input.stats === 'object' && !Array.isArray(input.stats)
                 ? input.stats : {};
-            const starterStatsSafe = isStarterSword
+            const starterStatsSafe = (isStarterSword || isStarterFishingRod)
                 && Object.keys(starterStats).every(key => key === 'equipped')
                 && (starterStats.equipped === undefined || typeof starterStats.equipped === 'boolean');
             if (!isSystemSnapshotWrite && !starterStatsSafe) {
@@ -103,7 +105,12 @@ function assertClientWriteAllowed(table, action, values, filters = []) {
             if (Object.hasOwn(input, 'quantity')) {
                 throw httpErr(403, 'inventory quantity is server-authoritative');
             }
-            if (Object.hasOwn(input, 'stats') && !isSystemSnapshot) {
+            const stats = input.stats && typeof input.stats === 'object' && !Array.isArray(input.stats)
+                ? input.stats : null;
+            const isEquipStateOnly = stats
+                && Object.keys(stats).every(key => key === 'equipped')
+                && (stats.equipped === undefined || typeof stats.equipped === 'boolean');
+            if (Object.hasOwn(input, 'stats') && !isSystemSnapshot && !isEquipStateOnly) {
                 throw httpErr(403, 'inventory item stats are server-authoritative');
             }
         }

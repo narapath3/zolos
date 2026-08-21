@@ -8,6 +8,7 @@ const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.me
 const serverAuth = fs.readFileSync(new URL('../server/api/auth.js', import.meta.url), 'utf8');
 const serverIndex = fs.readFileSync(new URL('../server/api/index.js', import.meta.url), 'utf8');
 const serverData = fs.readFileSync(new URL('../server/api/data.js', import.meta.url), 'utf8');
+const serverRpc = fs.readFileSync(new URL('../server/api/rpc.js', import.meta.url), 'utf8');
 const zolosClient = fs.readFileSync(new URL('../src/network/ZolosApiClient.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
@@ -15,11 +16,14 @@ const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url),
 
 test('First 30 Minutes starts with a safe, ordered journey', () => {
   const state = createFirstThirtyState();
-  assert.equal(FIRST_THIRTY_STEPS.length, 8);
+  assert.equal(FIRST_THIRTY_STEPS.length, 11);
   assert.equal(state.activeStep, 'open_journal');
   assert.equal(firstThirtyProgress(state).percent, 0);
   assert.equal(FIRST_THIRTY_STEPS[1].kind, 'world');
-  assert.equal(FIRST_THIRTY_STEPS[5].kind, 'map');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'equip_starter_rod').kind, 'ui');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'reach_fishing_spot').kind, 'world');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'start_fishing').target, '#btn-fishing');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'catch_first_fish').kind, 'fishing');
 });
 
 test('journey state completion is idempotent and advances to the next objective', () => {
@@ -42,6 +46,17 @@ test('journey sanitization rejects unknown step ids and malformed receipts', () 
   assert.deepEqual(state.completed, ['open_journal']);
   assert.deepEqual(state.skipped, ['reach_guide_npc']);
   assert.deepEqual(state.rewardReceipts, ['ok', '<script>']);
+});
+
+test('fishing onboarding explains the real rod and button flow', () => {
+  assert.match(gameUI, /equip_starter_rod/);
+  assert.match(gameUI, /reach_fishing_spot/);
+  assert.match(gameUI, /start_fishing/);
+  assert.match(gameUI, /BAG → เลือก Fishing Rod → กด/);
+  assert.match(main, /ต้องเปิด BAG แล้วสวมคันเบ็ด/);
+  assert.match(gameUI, /_completeFirstThirtyStep\('equip_starter_rod'\)/);
+  assert.match(main, /_completeFirstThirtyStep\?\.\('start_fishing'\)/);
+  assert.match(gameSync, /Fishing Rod', 'fishing_rod'/);
 });
 
 test('Journey UI exposes map-aware navigation and viewport-safe spotlight contracts', () => {
@@ -225,11 +240,26 @@ test('Guest binding resolves profile username conflicts without exposing raw dat
   assert.doesNotMatch(gameUI, /ผิดพลาด: \$\{err\.message\}/);
 });
 
+test('Fishing rod purchases use an atomic, catalog-bound self-host RPC', () => {
+  assert.match(serverRpc, /purchase_shop_item/);
+  assert.match(serverRpc, /SHOP_ITEMS\.find/);
+  assert.match(serverRpc, /WHERE id = \$1 AND user_id = \$2 FOR UPDATE/);
+  assert.match(serverRpc, /UPDATE characters SET gold = gold - \$2/);
+  assert.match(serverRpc, /ON CONFLICT \(character_id, item_name\) DO UPDATE/);
+  assert.match(serverRpc, /shop_purchase_requests/);
+  assert.match(serverRpc, /request_conflict/);
+  assert.match(gameUI, /isSelfHostMode && getFishingRodConfig\(item\.name\)/);
+  assert.match(gameUI, /supabase\.rpc\('purchase_shop_item'/);
+  assert.match(gameUI, /p_request_id: requestId/);
+});
+
 test('Self-host upsert defaults to the primary key so signup profile writes are idempotent', () => {
   assert.match(serverData, /if \(action === 'upsert'\)/);
   assert.match(serverData, /spec\.onConflict\s*\?/);
   assert.match(serverData, /cols\.has\('id'\) \? \['id'\] : \[\]/);
   assert.match(serverData, /ON CONFLICT \(\$\{cc\}\) DO UPDATE SET/);
+  assert.match(serverData, /isStarterFishingRod = input\.item_name === 'Fishing Rod'/);
+  assert.match(serverData, /starterStatsSafe = \(isStarterSword \|\| isStarterFishingRod\)/);
   assert.match(gameSync, /supabase\.from\('profiles'\)\.upsert\(\{ id: newUserId, username, gender \}\)/);
 });
 

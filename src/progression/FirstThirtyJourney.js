@@ -1,4 +1,4 @@
-export const FIRST_THIRTY_VERSION = 1;
+export const FIRST_THIRTY_VERSION = 2;
 
 export const FIRST_THIRTY_STEPS = Object.freeze([
   {
@@ -48,21 +48,53 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     rewardLabel: 'ปลดล็อกเส้นทางอุปกรณ์',
   },
   {
-    id: 'catch_first_fish',
+    id: 'equip_starter_rod',
     chapter: 5,
-    title: 'ค้นพบแหล่งน้ำและตกปลา',
-    titleEn: 'Catch your first fish',
-    description: 'ไปยังแหล่งน้ำ แล้วลองตกปลาเพื่อเริ่มสมุดสะสมพันธุ์ปลา',
+    title: 'สวมคันเบ็ดไม้เริ่มต้น',
+    titleEn: 'Equip your starter fishing rod',
+    description: 'เปิด BAG เลือก Fishing Rod แล้วกด “ใช้ไอเทม” เพื่อสวมคันเบ็ด คันเบ็ดจะอยู่ในช่องอาวุธ',
+    kind: 'ui',
+    target: '#inventory-grid',
+    icon: '🎣',
+    rewardLabel: 'พร้อมใช้อุปกรณ์ตกปลา',
+  },
+  {
+    id: 'reach_fishing_spot',
+    chapter: 6,
+    title: 'เดินไปที่ริมน้ำ',
+    titleEn: 'Reach the fishing spot',
+    description: 'กดนำทาง แล้วเดินตามหมุดสีทองไปยังขอบน้ำของ Prontera',
     kind: 'world',
     mapId: 'prontera',
     position: { x: -8, y: 0, z: 12 },
     radius: 4.5,
-    icon: '🎣',
+    icon: '📍',
+    rewardLabel: 'ค้นพบจุดตกปลาแรก',
+  },
+  {
+    id: 'start_fishing',
+    chapter: 7,
+    title: 'กดปุ่ม FISH เพื่อตกปลา',
+    titleEn: 'Press FISH to cast',
+    description: 'แตะปุ่ม FISH ที่แถบควบคุมด้านขวา ระบบจะเดินเข้าจุดยืนและเหวี่ยงเบ็ดให้อัตโนมัติ',
+    kind: 'ui',
+    target: '#btn-fishing',
+    icon: '🪝',
+    rewardLabel: 'เริ่มกิจกรรมตกปลา',
+  },
+  {
+    id: 'catch_first_fish',
+    chapter: 8,
+    title: 'รอรับปลาตัวแรก',
+    titleEn: 'Wait for your first fish',
+    description: 'เมื่อกด FISH แล้ว ให้ยืนรอจนคันเบ็ดสั่นและระบบยืนยันรางวัลปลาให้คุณ',
+    kind: 'fishing',
+    icon: '🐟',
     rewardLabel: 'ปลดล็อก Fishing Almanac',
   },
   {
     id: 'visit_new_map',
-    chapter: 6,
+    chapter: 9,
     title: 'ออกสำรวจ Map ถัดไป',
     titleEn: 'Explore a new Map',
     description: 'ใช้เมนูวาปเพื่อเดินทางไปยัง Map ที่ยังไม่เคยไป',
@@ -73,7 +105,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
   },
   {
     id: 'read_codex',
-    chapter: 7,
+    chapter: 10,
     title: 'อ่านบันทึกสิ่งที่ค้นพบ',
     titleEn: 'Read your Codex',
     description: 'กลับมาเปิดสมุดเพื่อดู Monster และปลาที่ค้นพบแล้ว',
@@ -84,7 +116,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
   },
   {
     id: 'choose_next_goal',
-    chapter: 8,
+    chapter: 11,
     title: 'เลือกเป้าหมายถัดไป',
     titleEn: 'Choose your next goal',
     description: 'เลือกว่าจะมุ่งหน้าไปทาง Combat, Fishing หรือ Exploration',

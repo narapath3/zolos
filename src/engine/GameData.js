@@ -82,7 +82,9 @@ export const ITEMS = {
     'Sword': { emoji: '🗡️', type: 'weapon', rarity: 'rare', desc: 'ดาบเหล็กกล้าคลาสสิกของ Novice เพิ่มพลังโจมตี ATK +15 หน่วยเมื่อสวมใส่', price: 200, atkBonus: 15 },
     'Bow': { emoji: '🏹', type: 'weapon', rarity: 'rare', desc: 'ธนูไม้ดัดที่มีความยืดหยุ่นสูง เพิ่มพลังโจมตี ATK +10 และฟื้นฟู SP +10 หน่วยเมื่อสวมใส่', price: 250, atkBonus: 10, spBonus: 10 },
     'Gun': { emoji: '🔫', type: 'weapon', rarity: 'rare', desc: 'ปืนสั้นกลไกสไตล์กัปตัน เพิ่มพลังโจมตี ATK +22 หน่วยเมื่อสวมใส่', price: 400, atkBonus: 22 },
-    'Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'rare', desc: 'เบ็ดตกปลาไม้ไผ่ ช่วยให้สามารถทำ Auto-Fishing บริเวณริมแม่น้ำได้ (ATK +2)', price: 150, atkBonus: 2, isFishingRod: true },
+    'Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'common', desc: 'คันเบ็ดไม้ธรรมดาสำหรับผู้เริ่มต้น ตกปลา Common ได้ และใช้ตกปลาได้ที่ริมน้ำ', price: 150, atkBonus: 2, isFishingRod: true, rodTier: 'wood', maxFishRarity: 'common' },
+    'Silver Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'epic', desc: 'คันเบ็ดเงินเนื้อแน่นสำหรับนักตกปลาจริงจัง ตกปลา Common, Uncommon และ Rare ได้', price: 15000, atkBonus: 4, isFishingRod: true, rodTier: 'silver', maxFishRarity: 'rare' },
+    'Golden Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'legendary', desc: 'คันเบ็ดทองคำระดับสูงสุด ปลดล็อกโอกาสตกปลาในตำนานจากแหล่งน้ำอันตราย', price: 75000, atkBonus: 8, isFishingRod: true, rodTier: 'gold', maxFishRarity: 'legendary' },
     'Sunglasses': { emoji: '🕶️', type: 'glasses', rarity: 'rare', desc: 'แว่นกันแดดสีดำสุดคูล ปิดบังดวงตาเสริมคาริสมาแสดงออกให้ดูเท่แบบลับๆ', price: 300 },
     'Classic Glasses': { emoji: '👓', type: 'glasses', rarity: 'rare', desc: 'แว่นตากรอบแดงสไตล์แอคเดมิค เลนส์ใสสบายตา เพิ่มสติปัญญาและรูปลักษณ์ที่ดูเชื่อถือ', price: 350 },
     'Cowboy Hat': { emoji: '🤠', type: 'hat', rarity: 'rare', desc: 'หมวกคาวบอยหนังสีน้ำตาลเข้ม ปีกกว้างกันแดดลม สไตล์ตะวันตกดุดัน', price: 400 },
@@ -263,6 +265,29 @@ export const FISH_RARITY_WEIGHTS = {
     legendary: 0.04
 };
 
+export const FISH_RARITY_ORDER = Object.freeze(['common', 'uncommon', 'rare', 'legendary']);
+
+// Fishing rods are tools, not combat weapons. The server uses this same catalog
+// to decide which fish tiers an equipped rod may actually claim.
+export const FISHING_ROD_CONFIG = Object.freeze({
+    'Fishing Rod': { tier: 'wood', label: 'คันเบ็ดไม้', maxRarity: 'common', maxRarityLabel: 'ปลาธรรมดา', price: 150 },
+    'Silver Fishing Rod': { tier: 'silver', label: 'คันเบ็ดเงิน', maxRarity: 'rare', maxRarityLabel: 'ปลาหายาก', price: 15000 },
+    'Golden Fishing Rod': { tier: 'gold', label: 'คันเบ็ดทองคำ', maxRarity: 'legendary', maxRarityLabel: 'ปลาในตำนาน', price: 75000 },
+});
+
+export function getFishingRodConfig(itemName) {
+    const name = String(itemName || '');
+    const config = FISHING_ROD_CONFIG[name];
+    return config ? { name, ...config } : null;
+}
+
+export function canFishingRodCatchRarity(itemName, rarity) {
+    const config = getFishingRodConfig(itemName);
+    const rarityIndex = FISH_RARITY_ORDER.indexOf(String(rarity || 'common'));
+    const maxIndex = FISH_RARITY_ORDER.indexOf(config?.maxRarity || 'common');
+    return Boolean(config && rarityIndex >= 0 && rarityIndex <= maxIndex);
+}
+
 // Map-aware fishing progression. The server and offline fallback both use this
 // catalog so dangerous maps can offer genuinely better fish without trusting a
 // client-supplied rarity or item name.
@@ -303,18 +328,23 @@ export function getFishingMapConfig(mapId = 'prontera') {
     return FISHING_MAP_CONFIG[String(mapId || '').toLowerCase()] || FISHING_MAP_CONFIG.prontera;
 }
 
-export function pickFishingCatch(mapId = 'prontera', random = Math.random) {
+export function pickFishingCatch(mapId = 'prontera', random = Math.random, options = {}) {
     const config = getFishingMapConfig(mapId);
-    const rarityEntries = Object.entries(config.rarityWeights);
-    const roll = Math.min(0.999999999, Math.max(0, Number(random()) || 0));
+    const rod = getFishingRodConfig(options.rodName || options.rod || 'Fishing Rod');
+    const maxRarity = options.maxRarity || rod?.maxRarity || 'common';
+    const maxIndex = Math.max(0, FISH_RARITY_ORDER.indexOf(maxRarity));
+    const rarityEntries = Object.entries(config.rarityWeights)
+        .filter(([rarity]) => FISH_RARITY_ORDER.indexOf(rarity) <= maxIndex);
+    const totalWeight = rarityEntries.reduce((sum, [, weight]) => sum + Math.max(0, Number(weight) || 0), 0) || 1;
+    const roll = Math.min(0.999999999, Math.max(0, Number(random()) || 0)) * totalWeight;
     let rarity = rarityEntries[rarityEntries.length - 1]?.[0] || 'common';
     let cumulative = 0;
     for (const [candidate, weight] of rarityEntries) {
-        cumulative += Number(weight) || 0;
+        cumulative += Math.max(0, Number(weight) || 0);
         if (roll < cumulative) { rarity = candidate; break; }
     }
     const pool = config.fish.filter(name => FISH_SPECIES[name]?.rarity === rarity);
-    const fallback = config.fish.filter(name => FISH_SPECIES[name]);
+    const fallback = config.fish.filter(name => FISH_SPECIES[name] && FISH_RARITY_ORDER.indexOf(FISH_SPECIES[name].rarity) <= maxIndex);
     const source = pool.length ? pool : fallback;
     const fishName = source[Math.min(source.length - 1, Math.floor((Number(random()) || 0) * source.length))];
     const fishData = FISH_SPECIES[fishName] || FISH_SPECIES.Tilapia;
@@ -1607,6 +1637,8 @@ export const SHOP_ITEMS = [
     { name: 'Gun', price: 400 },
     { name: 'Mage Staff', price: 600 },
     { name: 'Fishing Rod', price: 150 },
+    { name: 'Silver Fishing Rod', price: 15000 },
+    { name: 'Golden Fishing Rod', price: 75000 },
     { name: 'Silver Dagger', price: 3200 },
     { name: 'Katana', price: 3500 },
     { name: 'Crossbow', price: 4000 },

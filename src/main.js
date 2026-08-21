@@ -705,23 +705,27 @@ async function initGame(charData) {
                 break;
             case 'fishingStart':
                 gameUI?.beginFishingSession?.();
-                if (gameUI) gameUI.addCombatLog('🎣 Walking to water...', 'system');
+                gameUI?._completeFirstThirtyStep?.('start_fishing');
+                if (gameUI) gameUI.addCombatLog('🎣 กำลังเดินไปริมน้ำเพื่อเหวี่ยงเบ็ด...', 'system');
+                break;
+            case 'fishingNoRod':
+                if (gameUI) gameUI.addCombatLog('🎣 ต้องเปิด BAG แล้วสวมคันเบ็ดก่อนจึงจะตกปลาได้', 'warning');
                 break;
             case 'fishingNoWater':
-                if (gameUI) gameUI.addCombatLog('🚫 ไม่มีแหล่งน้ำใกล้เคียง!', 'warning');
+                if (gameUI) gameUI.addCombatLog('🚫 ไม่มีแหล่งน้ำใกล้เคียง ลองกดนำทางตามบทเรียนก่อน', 'warning');
                 break;
             case 'fishingCast':
                 if (sceneManager && character) sceneManager.createFishingLine(character.getPosition(), event.bobberPos);
                 // Hide the rod's short built-in line — the dynamic bezier line
                 // to the bobber replaces it while fishing
                 if (character) character.setRodLineVisible(false);
-                if (gameUI) gameUI.addCombatLog('🎣 Cast the line into the water...', 'system');
+                if (gameUI) gameUI.addCombatLog('🎣 เหวี่ยงเบ็ดลงน้ำแล้ว รอจนคันเบ็ดสั่น...', 'system');
                 break;
             case 'fishingBite':
                 if (sceneManager) sceneManager.animateFishBite();
                 // Small rod twitch as the fish tugs the line
                 if (character) character.triggerRodLift(0.35, 0.4);
-                if (gameUI) gameUI.addCombatLog('❗ Fish on the line!', 'system');
+                if (gameUI) gameUI.addCombatLog('❗ ปลากินเบ็ด! เตรียมรับรางวัล...', 'system');
                 break;
             case 'fishCaught':
                 // Full yank: lift the rod overhead to hoist the fish out,

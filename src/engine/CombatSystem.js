@@ -1,6 +1,6 @@
 // Combat System — Auto-battle logic, damage calculation, loot drops
 import * as THREE from 'three';
-import { MONSTERS, pickFishingCatch, getPetCombat } from './GameData.js';
+import { MONSTERS, pickFishingCatch, getPetCombat, getFishingRodConfig } from './GameData.js';
 import { isSocketConnected } from '../network/SocketClient.js';
 
 export function buildAutoSearchWaypoints({ halfExtent = 46, step = 11, isBlocked = () => false } = {}) {
@@ -95,6 +95,7 @@ export class CombatSystem {
         this.isFishing = false;
         this.fishingTimer = 0;
         this.fishingBiteChance = 0.05;
+        this.fishingRodName = null;
         this.currentTarget = null;
         this.attackRange = 1.8;
         this.globalCooldown = 0;
@@ -302,8 +303,14 @@ export class CombatSystem {
     }
 
     toggleFishing() {
-        this.isFishing = !this.isFishing;
-        if (this.isFishing) {
+        if (!this.isFishing) {
+            const rod = getFishingRodConfig(this.character?.equippedWeapon);
+            if (!rod) {
+                this.onEvent({ type: 'fishingNoRod' });
+                return false;
+            }
+            this.isFishing = true;
+            this.fishingRodName = rod.name;
             this.autoFarm = false;
             this.currentTarget = null;
             this.fishingTimer = 0;
@@ -334,6 +341,8 @@ export class CombatSystem {
 
             this.onEvent({ type: 'fishingStart' });
         } else {
+            this.isFishing = false;
+            this.fishingRodName = null;
             this.character.state = 'idle';
             this.onEvent({ type: 'fishingStop' });
         }
@@ -856,7 +865,11 @@ export class CombatSystem {
                     // Catch fish!
                     setTimeout(() => {
                         if (this.isFishing && this.character.state === 'fishing') {
-                            const fishData = pickFishingCatch(this.sceneManager?.currentMap || 'prontera', Math.random);
+                            const fishData = pickFishingCatch(
+                                this.sceneManager?.currentMap || 'prontera',
+                                Math.random,
+                                { rodName: this.fishingRodName },
+                            );
                             const fishItem = {
                                 name: fishData.name,
                                 emoji: fishData.emoji,

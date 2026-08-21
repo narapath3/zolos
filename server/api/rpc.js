@@ -18,6 +18,7 @@ const RPCS = {
     cancel_market_listing: ['p_listing_id'],
     open_vending_stall: ['p_character_id', 'p_shop_name', 'p_appearance', 'p_requested_slot'],
     close_vending_stall: [],
+    purchase_shop_item: ['p_character_id', 'p_item_name', 'p_quantity'],
 };
 
 async function createMarketListing(body, userId) {
@@ -133,6 +134,74 @@ async function closeVendingStall(userId) {
     });
 }
 
+const SHOP_REQUEST_ID_RE = /^[a-zA-Z0-9:_-]{1,160}$/;
+
+async function purchaseShopItem(body, userId) {
+    const characterId = String(body?.p_character_id || '');
+    const itemName = String(body?.p_item_name || '').trim().slice(0, 64);
+    const quantity = Math.floor(Number(body?.p_quantity));
+    const requestId = String(body?.p_request_id || '').trim();
+    if (!characterId || !itemName || !requestId || !SHOP_REQUEST_ID_RE.test(requestId)
+        || !Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
+        return { ok: false, reason: 'bad_request' };
+    }
+
+    // Import catalog from GameData to verify price and type
+    const { ITEMS, SHOP_ITEMS } = await import('../../src/engine/GameData.js');
+    const shopItem = SHOP_ITEMS.find(entry => entry.name === itemName);
+    const itemData = ITEMS[itemName];
+    if (!shopItem || !itemData || itemData.type !== 'fishing_rod' || itemData.price === undefined || itemData.price === null) {
+        return { ok: false, reason: 'item_not_for_sale' };
+    }
+    const unitPrice = Math.max(0, Number(shopItem.price));
+    const totalCost = unitPrice * quantity;
+
+    return tx(async (client) => {
+        const { rows: receipts } = await client.query(
+            'SELECT user_id, character_id, result FROM public.shop_purchase_requests WHERE request_id = $1 FOR UPDATE',
+            [requestId],
+        );
+        if (receipts[0]) {
+            if (String(receipts[0].user_id) !== String(userId) || String(receipts[0].character_id) !== characterId) {
+                return { ok: false, reason: 'request_conflict' };
+            }
+            return receipts[0].result;
+        }
+
+        const { rows: chars } = await client.query(
+            'SELECT id, gold FROM characters WHERE id = $1 AND user_id = $2 FOR UPDATE',
+            [characterId, userId],
+        );
+        const character = chars[0];
+        if (!character) return { ok: false, reason: 'not_owner' };
+        if (Number(character.gold) < totalCost) return { ok: false, reason: 'insufficient_gold' };
+
+        // Deduct gold
+        await client.query('UPDATE characters SET gold = gold - $2, updated_at = now() WHERE id = $1', [characterId, totalCost]);
+
+        // Add to inventory
+        await client.query(
+            `INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (character_id, item_name) DO UPDATE
+             SET quantity = public.inventory.quantity + EXCLUDED.quantity,
+                 item_type = EXCLUDED.item_type`,
+            [characterId, itemName, itemData.type || 'material', quantity, {}],
+        );
+
+        const result = {
+            ok: true, serverAuthoritative: true, requestId, item_name: itemName,
+            quantity, total_cost: totalCost, gold: Number(character.gold) - totalCost,
+        };
+        await client.query(
+            `INSERT INTO public.shop_purchase_requests (request_id, user_id, character_id, result)
+             VALUES ($1, $2, $3, $4)`,
+            [requestId, userId, characterId, result],
+        );
+        return result;
+    });
+}
+
 async function cancelMarketListing(body, userId) {
     const listingId = String(body?.p_listing_id || '');
     if (!listingId) return { ok: false, reason: 'bad_listing' };
@@ -184,6 +253,10 @@ export async function callRpc(fn, body, userId) {
     if (fn === 'close_vending_stall') {
         if (!userId) throw httpErr(401, 'auth required');
         return closeVendingStall(userId);
+    }
+    if (fn === 'purchase_shop_item') {
+        if (!userId) throw httpErr(401, 'auth required');
+        return purchaseShopItem(body, userId);
     }
     const argNames = RPCS[fn];
     if (!argNames) throw httpErr(404, `unknown rpc: ${fn}`);

@@ -26,8 +26,8 @@ const main = read('../src/main.js');
 test('map fishing pools scale rare catches into dangerous maps', async () => {
   const { rollFishingCatch, getFishingMapConfig } = await import('../server/api/fishing.js');
   const sequence = (...values) => { let index = 0; return () => values[Math.min(index++, values.length - 1)]; };
-  const safe = rollFishingCatch(sequence(0.999, 0), 'prontera');
-  const abyss = rollFishingCatch(sequence(0.999, 0), 'abyss_lake');
+  const safe = rollFishingCatch(sequence(0.999, 0), 'prontera', 'Fishing Rod');
+  const abyss = rollFishingCatch(sequence(0.999, 0), 'abyss_lake', 'Golden Fishing Rod');
   assert.equal(getFishingMapConfig('unknown_map').tier, 1);
   assert.equal(safe.mapId, 'prontera');
   assert.equal(abyss.mapId, 'abyss_lake');
@@ -36,6 +36,25 @@ test('map fishing pools scale rare catches into dangerous maps', async () => {
   assert.equal(abyss.rarity, 'legendary');
   assert.ok(abyss.price >= safe.price);
   assert.match(abyss.mapName, /Abyss Lake/);
+});
+
+test('rod tiers gate fish rarity and preserve map progression', async () => {
+  const { canFishingRodCatchRarity, getFishingRodConfig, pickFishingCatch } = await import('../src/engine/GameData.js');
+  assert.equal(getFishingRodConfig('Fishing Rod').maxRarity, 'common');
+  assert.equal(getFishingRodConfig('Silver Fishing Rod').maxRarity, 'rare');
+  assert.equal(getFishingRodConfig('Golden Fishing Rod').maxRarity, 'legendary');
+  assert.equal(canFishingRodCatchRarity('Fishing Rod', 'common'), true);
+  assert.equal(canFishingRodCatchRarity('Fishing Rod', 'rare'), false);
+  assert.equal(canFishingRodCatchRarity('Silver Fishing Rod', 'rare'), true);
+  assert.equal(canFishingRodCatchRarity('Silver Fishing Rod', 'legendary'), false);
+  assert.equal(canFishingRodCatchRarity('Golden Fishing Rod', 'legendary'), true);
+  const wood = pickFishingCatch('abyss_lake', () => 0.999, { rodName: 'Fishing Rod' });
+  const gold = pickFishingCatch('abyss_lake', () => 0.999, { rodName: 'Golden Fishing Rod' });
+  assert.notEqual(wood.rarity, 'legendary');
+  assert.equal(gold.rarity, 'legendary');
+  assert.match(fishing, /getFishingRodConfig/);
+  assert.match(fishing, /ต้องสวมคันเบ็ดก่อนตกปลา/);
+  assert.match(fishing, /rod_max_rarity/);
 });
 
 test('socket fishing claim is authenticated, state-gated, rate-limited and server-owned', () => {

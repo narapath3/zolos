@@ -527,7 +527,7 @@ export class CharacterManager {
         if (weapon === 'Crossbow') return 1.5;
         if (weapon === 'Great Bow') return 1.8;
         if (weapon === 'Gun') return 0.6;
-        if (weapon === 'Fishing Rod') return 1.2;
+        if (ITEMS[weapon]?.isFishingRod) return 1.2;
         return 1.0; // Default cooldown
     }
 
@@ -690,19 +690,43 @@ export class CharacterManager {
             group.position.set(0, -0.1, 0.12);
             this.weaponMesh = group;
             this.rightArm.add(this.weaponMesh);
-        } else if (itemName === 'Fishing Rod') {
+        } else if (ITEMS[itemName]?.isFishingRod || itemName === 'Fishing Rod') {
             const group = new THREE.Group();
+            const tier = ITEMS[itemName]?.rodTier || 'wood';
+            const style = {
+                wood: { shaft: 0xd9b38c, grip: 0x6e4427, accent: 0x9d7042, glow: 0x000000 },
+                silver: { shaft: 0xdfe8f2, grip: 0x778898, accent: 0xbfe8ff, glow: 0x80cfff },
+                gold: { shaft: 0xffd56b, grip: 0x8a5c16, accent: 0xfff0a0, glow: 0xffbd32 },
+            }[tier] || {
+                shaft: 0xd9b38c, grip: 0x6e4427, accent: 0x9d7042, glow: 0x000000,
+            };
 
             const shaftGeo = new THREE.CylinderGeometry(0.02, 0.03, 1.4, 6);
-            const rodMat = new THREE.MeshLambertMaterial({ color: 0xd9b38c });
+            const rodMat = new THREE.MeshLambertMaterial({ color: style.shaft, emissive: style.glow, emissiveIntensity: style.glow ? 0.45 : 0 });
             const shaft = new THREE.Mesh(shaftGeo, rodMat);
             shaft.position.set(0, 0.4, 0.3);
             shaft.rotation.x = -Math.PI / 4;
             shaft.castShadow = true;
             group.add(shaft);
 
+            const grip = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.035, 0.04, 0.28, 6),
+                new THREE.MeshLambertMaterial({ color: style.grip }),
+            );
+            grip.position.set(0, -0.18, 0.3);
+            grip.rotation.x = -Math.PI / 4;
+            group.add(grip);
+
+            const accent = new THREE.Mesh(
+                new THREE.TorusGeometry(0.045, 0.012, 6, 10),
+                new THREE.MeshBasicMaterial({ color: style.accent, transparent: tier === 'wood', opacity: tier === 'wood' ? 0.8 : 1 }),
+            );
+            accent.position.set(0, 0.82, -0.12);
+            accent.rotation.x = Math.PI / 2;
+            group.add(accent);
+
             const lineGeo = new THREE.CylinderGeometry(0.005, 0.005, 1.2, 4);
-            const lineMat = new THREE.MeshBasicMaterial({ color: 0xdddddd });
+            const lineMat = new THREE.MeshBasicMaterial({ color: tier === 'gold' ? 0xfff2c4 : 0xdddddd });
             const line = new THREE.Mesh(lineGeo, lineMat);
             const tipY = 0.4 + 0.7 * Math.cos(-Math.PI / 4);
             const tipZ = 0.3 + 0.7 * Math.sin(-Math.PI / 4);

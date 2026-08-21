@@ -1,4 +1,5 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig } from '../engine/GameData.js';
+import { supabase, isSelfHostMode } from '../network/SupabaseClient.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
@@ -290,13 +291,16 @@ export class GameUI {
           return;
         }
         if (this.combatSystem) {
+          const wasFishing = this.combatSystem.isFishing === true;
           const isFishing = this.combatSystem.toggleFishing();
           this.setFishingState(isFishing);
-          this.setAutoFarmState(false);
-          // Step 5: Update fishing button label
+          if (isFishing) this.setAutoFarmState(false);
+          // Keep the same button for start/stop, but do not show a misleading
+          // "stopped" message when CombatSystem rejected the request.
           const textEl = fishingBtn.querySelector('.fishing-text');
-          if (textEl) textEl.textContent = isFishing ? 'STOP' : 'FISH';
-          this.addCombatLog(isFishing ? "🎣 Fishing mode activated!" : "🎣 Fishing mode deactivated.", 'system');
+          if (textEl) textEl.textContent = isFishing ? 'หยุด' : 'ตกปลา';
+          if (isFishing) this.addCombatLog('🎣 เริ่มตกปลาแล้ว รอปลากินเบ็ด...', 'system');
+          else if (wasFishing) this.addCombatLog('🎣 หยุดตกปลาแล้ว', 'system');
         }
       });
     }
@@ -988,6 +992,31 @@ export class GameUI {
     };
   }
 
+  _isFishingRodItem(item) {
+    return Boolean(item && item.item_type === 'fishing_rod' && Number(item.quantity) > 0 && getFishingRodConfig(item.item_name));
+  }
+
+  _ensureStarterFishingRod(characterId) {
+    if (!characterId) return false;
+    const existingRod = this.inventory.find(item => getFishingRodConfig(item?.item_name));
+    if (existingRod && Number(existingRod.quantity) > 0) return false;
+
+    // Repair a stale zero-quantity/legacy row in place instead of pushing a
+    // duplicate item with the same name into the local inventory list.
+    if (existingRod) {
+      existingRod.item_type = 'fishing_rod';
+      existingRod.quantity = 1;
+      existingRod.stats = { ...(existingRod.stats || {}), equipped: false };
+    } else {
+      this.inventory.push(this._enrichItem({
+        item_name: 'Fishing Rod', item_type: 'fishing_rod', quantity: 1, stats: { equipped: false },
+      }));
+    }
+    setInventoryItemQuantity(characterId, existingRod?.item_name || 'Fishing Rod', 'fishing_rod', 1, { equipped: false })
+      .catch(error => console.warn('[GameUI] Starter fishing rod will retry on next load:', error?.message || error));
+    return true;
+  }
+
   _getItemDroppers(itemName) {
     const droppers = [];
     const allMons = getAllMonsters();
@@ -1035,6 +1064,9 @@ export class GameUI {
         }
       }
       this.inventory = migration.inventory.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
+      // Existing characters created before the fishing progression still receive
+      // the universal wooden rod once. It is deliberately not auto-equipped.
+      this._ensureStarterFishingRod(characterId);
       if (this.character) this.character.cardState = migration.cardState;
 
       // --- Self-heal for the quantity-inflation bug ---
@@ -1070,15 +1102,14 @@ export class GameUI {
         }
       }
 
-      // Auto equip equipment on load if present in inventory
+      // Auto equip equipment on load if present in inventory.
       const equippedWeapon = this.inventory.find(i => (i.item_type === 'weapon' || i.item_type === 'fishing_rod') && i.stats && i.stats.equipped === true);
       if (equippedWeapon && this.character) {
         this.character.equipWeapon(equippedWeapon.item_name);
-        if (equippedWeapon.item_type === 'fishing_rod') {
-          this.setFishingButtonVisible(true);
-        }
+        this.setFishingButtonVisible(this._isFishingRodItem(equippedWeapon));
       } else if (this.character) {
         this.character.equipWeapon(null);
+        this.setFishingButtonVisible(false);
       }
 
       // Restore every equipped armor piece into its own body-part slot. If two
@@ -3213,8 +3244,8 @@ export class GameUI {
       item.stats.equipped = false;
       if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
         this.character.equipWeapon(null);
-        // Step 5: Fishing rod unequipped
-        if (item.item_name === 'Fishing Rod') {
+        // Any fishing rod occupies the weapon slot and controls the fishing button.
+        if (this._isFishingRodItem(item)) {
           this.setFishingButtonVisible(false);
         }
       } else if (item.item_type === 'armor') {
@@ -3244,7 +3275,8 @@ export class GameUI {
         await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity || 1, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
-      this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
+        this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
+        if (this._isFishingRodItem(item) && this.combatSystem?.isFishing) this.combatSystem.toggleFishing();
       this._equipToast(`ถอด ${item.item_name}`, true);
     } else {
       // Job lock: worn items (weapon / hat / glasses) are restricted to their
@@ -3287,12 +3319,9 @@ export class GameUI {
       item.stats.equipped = true;
       if (item.item_type === 'weapon' || item.item_type === 'fishing_rod') {
         this.character.equipWeapon(item.item_name);
-        // Step 5: Fishing rod equipped
-        if (item.item_name === 'Fishing Rod') {
-          this.setFishingButtonVisible(true);
-        } else {
-          this.setFishingButtonVisible(false);
-        }
+        // Any catalogued fishing rod enables the fishing control.
+        this.setFishingButtonVisible(this._isFishingRodItem(item));
+        if (this._isFishingRodItem(item)) this._completeFirstThirtyStep('equip_starter_rod');
       } else if (item.item_type === 'armor') {
         this.character.equippedGear[getEquipSlot(item.item_name) || 'body'] = item.item_name;
       } else if (item.item_type === 'shield') {
@@ -5833,9 +5862,10 @@ export class GameUI {
       }
     }
 
-    // 3. Handle fishing rod visibility
+    // 3. Handle fishing rod visibility for wood, silver, and gold rods.
     if (slotType === 'weapon') {
-      this.setFishingButtonVisible(itemName === 'Fishing Rod');
+      this.setFishingButtonVisible(Boolean(getFishingRodConfig(itemName)));
+      if (getFishingRodConfig(itemName)) this._completeFirstThirtyStep('equip_starter_rod');
     }
   }
 
@@ -5991,7 +6021,7 @@ export class GameUI {
     if (btn) {
       btn.classList.toggle('active', active);
       const textEl = btn.querySelector('.fishing-text');
-      if (textEl) textEl.textContent = active ? 'STOP' : 'FISH';
+      if (textEl) textEl.textContent = active ? 'หยุด' : 'ตกปลา';
     }
   }
 
@@ -6070,7 +6100,7 @@ export class GameUI {
 
       if (this.currentShopTab === 'all') return itemData.type !== 'pet'; // pets have their own tab
       if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
-      if (this.currentShopTab === 'equip') return ['weapon', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
+      if (this.currentShopTab === 'equip') return ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
       if (this.currentShopTab === 'pet') return itemData.type === 'pet';
       return false;
     });
@@ -6293,10 +6323,42 @@ export class GameUI {
       return;
     }
 
-    // Deduct gold
-    this.character.stats.gold -= totalCost;
+    // Server-authoritative purchase for self-host mode (Rods only for now)
+    if (this.characterId && isSelfHostMode && getFishingRodConfig(item.name)) {
+      try {
+        const requestId = `shop:${this.characterId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+        const { data: result, error } = await supabase.rpc('purchase_shop_item', {
+          p_character_id: this.characterId,
+          p_item_name: item.name,
+          p_quantity: qty,
+          p_request_id: requestId,
+        });
+        if (error || !result || !result.ok) {
+          const purchaseReasons = {
+            insufficient_gold: 'Zeny ไม่พอ',
+            not_owner: 'ไม่พบตัวละครของคุณ',
+            item_not_for_sale: 'ไอเทมนี้ไม่ได้วางขาย',
+            bad_request: 'ข้อมูลการซื้อไม่ถูกต้อง',
+            request_conflict: 'คำขอนี้ไม่ตรงกับบัญชีปัจจุบัน',
+          };
+          const safeReason = error ? 'เซิร์ฟเวอร์ยังไม่พร้อม' : (purchaseReasons[result?.reason] || 'เซิร์ฟเวอร์ปฏิเสธการซื้อ');
+          this.addCombatLog(`❌ ซื้อไม่สำเร็จ: ${safeReason}`, 'system');
+          return;
+        }
+        // Update local state from server truth
+        this.character.stats.gold = result.gold;
+        const existing = this.inventory.find(i => i.item_name === item.name);
+        if (existing) existing.quantity = (Number(existing.quantity) || 0) + qty;
+        else this.inventory.push(this._enrichItem({ item_name: item.name, item_type: itemData.type, quantity: qty, stats: {} }));
+      } catch (e) {
+        this.addCombatLog(`❌ เกิดข้อผิดพลาดในการเชื่อมต่อ: ${e.message}`, 'system');
+        return;
+      }
+    } else {
+      // Legacy / Offline / Cloud fallback (client-driven)
+      this.character.stats.gold -= totalCost;
 
-    if (itemData.type === 'pet') {
+      if (itemData.type === 'pet') {
       // Pets don't stack — each purchased pet becomes its own nameable instance.
       let row = this.inventory.find(i => i.item_name === item.name && i.item_type === 'pet');
       if (!row) {
@@ -6343,6 +6405,7 @@ export class GameUI {
           await this.character.saveStatsToDatabase();
         }
       }
+    }
     }
 
     this.addCombatLog(`🛒 ซื้อ ${itemData.emoji} ${item.name} x${qty} สำเร็จ (-${totalCost.toLocaleString()} Zeny)`, 'system');
@@ -9678,9 +9741,21 @@ export class GameUI {
         image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
         hint: 'ของที่ได้รับจะอยู่ใน BAG เปิดดูไอเทม อุปกรณ์ และของรางวัลได้ที่นี่'
       },
+      equip_starter_rod: {
+        image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
+        hint: 'ทุกคนมี Fishing Rod คันเบ็ดไม้ติดตัวแล้ว เปิด BAG แตะไอเทม แล้วกด “ใช้ไอเทม” เพื่อสวมใส่'
+      },
+      reach_fishing_spot: {
+        image: '/assets/tutorial/guide-map.jpg', pose: 'point',
+        hint: 'กดนำทาง แล้วเดินตามหมุดสีทองไปที่ริมน้ำ เมื่อถึงจุดแล้วปุ่ม FISH จะพร้อมใช้งาน'
+      },
+      start_fishing: {
+        image: '/assets/tutorial/guide-fishing.jpg', pose: 'fishing',
+        hint: 'แตะปุ่ม FISH ทางด้านขวาของจอเพื่อเหวี่ยงเบ็ด ระบบจะเดินเข้าจุดยืนให้เอง'
+      },
       catch_first_fish: {
         image: '/assets/tutorial/guide-fishing.jpg', pose: 'fishing',
-        hint: 'ไปที่ริมน้ำแล้วลองตกปลา แต่ละแหล่งน้ำมีปลาพิเศษของตัวเอง'
+        hint: 'คันเบ็ดไม้จับปลา Common ได้ รอคันเบ็ดสั่นแล้วระบบจะยืนยันปลาเข้ากระเป๋าให้โดยอัตโนมัติ'
       },
       visit_new_map: {
         image: '/assets/tutorial/guide-map.jpg', pose: 'map',
@@ -9728,11 +9803,11 @@ export class GameUI {
 
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
-    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (sameStarterMap(active.mapId) ? 'เดินทางไปที่นี่' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : 'เลือกเป้าหมายต่อไป';
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (sameStarterMap(active.mapId) ? 'เดินทางไปที่นี่' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'เลือกเป้าหมายต่อไป';
     const routeLabel = active.kind === 'world'
       ? (sameStarterMap(active.mapId) ? `เป้าหมายอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))}`)
       : active.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
-        : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : 'เส้นทางแรกของคุณพร้อมแล้ว';
+        : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : active.kind === 'fishing' ? 'ยืนรอจนคันเบ็ดสั่น แล้วรับปลาเข้ากระเป๋า' : 'เส้นทางแรกของคุณพร้อมแล้ว';
 
     if (this._journeyGuideCollapsed) {
       guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed home-journey-card--illustrated${isNewPlayer ? ' home-journey-card--new-player' : ''}" style="${artStyle}" data-testid="home-first-thirty-journey" data-tutorial-pose="${presentation.pose}">
@@ -9757,11 +9832,11 @@ export class GameUI {
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
     const escape = value => this._journeyEscape(value);
-    const actionLabel = active?.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active?.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active?.kind === 'world' ? (sameStarterMap(active.mapId) ? 'นำทางไปยังจุดหมาย' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : 'ดูสรุปเส้นทาง';
+    const actionLabel = active?.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active?.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active?.kind === 'world' ? (sameStarterMap(active.mapId) ? 'นำทางไปยังจุดหมาย' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : active?.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูสรุปเส้นทาง';
     const routeLabel = active?.kind === 'world'
       ? (sameStarterMap(active.mapId) ? `หมุดอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))} ก่อน`)
       : active?.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
-        : active?.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้ตามขนาดหน้าจอ' : 'เส้นทางแรกของคุณพร้อมแล้ว';
+        : active?.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้ตามขนาดหน้าจอ' : active?.kind === 'fishing' ? 'ยืนรอจนคันเบ็ดสั่น แล้วรับปลาเข้ากระเป๋า' : 'เส้นทางแรกของคุณพร้อมแล้ว';
     const timeline = FIRST_THIRTY_STEPS.map(step => {
       const done = state.completed.includes(step.id);
       const skipped = state.skipped.includes(step.id);
@@ -9819,7 +9894,7 @@ export class GameUI {
     const presentation = this._journeyTutorialPresentation(active);
     const escape = value => this._journeyEscape(value);
     const doneTitle = completedStep ? `บทที่ ${completedStep.chapter} เสร็จแล้ว` : 'พร้อมไปต่อไหม?';
-    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? 'นำทางไปที่นี่' : 'ดูเป้าหมายต่อไป';
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? 'นำทางไปที่นี่' : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูเป้าหมายต่อไป';
     prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">ทำต่อทันที <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
     let lastTouchActionAt = 0;
     const handlePromptAction = event => {
@@ -9942,7 +10017,27 @@ export class GameUI {
       this._completeFirstThirtyStep(step.id);
       return;
     }
+    if (step.kind === 'fishing') {
+      this._closeAllMenuSurfaces();
+      this._journeyGuideCollapsed = true;
+      this._renderJourneyGuide();
+      this.addCombatLog('🎣 รอให้คันเบ็ดสั่น แล้วระบบจะยืนยันปลาเข้ากระเป๋าให้อัตโนมัติ', 'system');
+      return;
+    }
     if (step.kind === 'ui') {
+      // Step 5: Equip starter rod needs the BAG open and the Equip tab active.
+      if (step.id === 'equip_starter_rod') {
+        const panel = document.getElementById('inventory-panel');
+        if (!this._isMenuSurfaceOpen(panel)) {
+          const btn = document.getElementById('btn-inventory');
+          if (btn) btn.click();
+        }
+        const equipTab = document.querySelector('.inv-tab[data-tab="equip"]');
+        if (equipTab && !equipTab.classList.contains('active')) {
+          equipTab.click();
+        }
+      }
+
       const target = document.querySelector(step.target);
       if (target) {
         const menuWasOpened = this._prepareJourneyTarget(target);
@@ -10078,11 +10173,18 @@ export class GameUI {
       <div style="max-height:62vh;overflow-y:auto;padding:2px;-webkit-overflow-scrolling:touch;">
         <div style="text-align:center;margin-bottom:10px;font-size:12px;color:var(--text-dim);">คู่มือสำหรับผู้เล่นใหม่ — รวมวิธีเล่นและสูตรคำนวณทั้งหมด</div>
         ${sec('🎮', 'การควบคุม & เริ่มต้น', `
-          • <b>เดิน:</b> คลิกพื้น / ปุ่ม WASD / จอยสติ๊ก (มือถือ)<br>
-          • <b>โจมตี:</b> คลิกมอนสเตอร์เพื่อเข้าตี<br>
-          • <b>AUTO:</b> ปุ่มขวาล่าง — ฟาร์มอัตโนมัติ (หามอน + ตี + ร่ายสกิล + ฮีลเมื่อ HP ต่ำ)<br>
-          • <b>สกิล:</b> ปุ่ม 1 / 2 / 3<br>
-          • <b>วาปข้ามเมือง:</b> เดินเข้าประตูวาป (วงแหวนเรืองแสง) ที่ขอบแมป`)}
+          • <b>เดิน:</b> PC ใช้ WASD หรือคลิกพื้น · มือถือใช้จอยสติ๊กเสมือนหรือแตะพื้นเพื่อเดิน<br>
+          • <b>เลือกเป้าหมาย:</b> แตะ/คลิก Monster แล้วกดปุ่มโจมตี หรือกด AUTO เพื่อให้ระบบหาเป้าหมายให้<br>
+          • <b>สกิล:</b> PC ใช้ปุ่ม 1 / 2 / 3 · มือถือแตะปุ่มสกิลบนแถบด้านล่างขวา<br>
+          • <b>เปิด BAG:</b> แตะปุ่มกระเป๋า แล้วแตะไอเทมเพื่อดูรายละเอียดและปุ่ม “ใช้ไอเทม”<br>
+          • <b>วาป:</b> เปิดเมนู Warp แล้วเลือก Map หรือเดินเข้าวงแหวนวาปที่ขอบแผนที่<br>
+          • <b>หยุดกิจกรรม:</b> แตะปุ่มเดิมซ้ำเพื่อปิด AUTO หรือหยุด FISH`)}
+        ${sec('🧰', 'ใส่ไอเทมและใช้ไอเทมอย่างไร', `
+          1. เปิด <b>BAG</b> จากแถบเมนูหลัก แล้วเลือกแท็บ <b>อุปกรณ์</b> เพื่อดูช่อง Weapon, Armor และเครื่องมือ<br>
+          2. แตะไอเทมที่ต้องการ แล้วกด <b>ใช้ไอเทม</b> หรือแตะช่องอุปกรณ์ที่ตรงกันเพื่อสวมใส่<br>
+          3. ไอเทมที่สวมอยู่จะมีสถานะ <b>สวมใส่แล้ว</b> และจะถอดอัตโนมัติเมื่อเลือกไอเทมชิ้นใหม่ในช่องเดียวกัน<br>
+          4. โพชั่นและอาหารให้เลือกจาก BAG แล้วกด <b>ใช้ไอเทม</b> เพื่อฟื้น HP/SP ไอเทมอุปกรณ์จะไม่ถูกใช้หมด แต่จะเปลี่ยนสถานะเป็นสวมใส่<br>
+          5. คันเบ็ดเป็นอุปกรณ์ในช่อง Weapon จึงต้องถอดดาบก่อนจึงจะใช้ตกปลาได้`)}
         ${sec('⭐', 'เลเวล & EXP', `
           ฆ่ามอนสเตอร์ได้ EXP ตามค่าของมอนแต่ละตัว สะสมครบแล้วเลเวลอัป (สูงสุดเลเวล 300)
           ${F('EXP ที่ต้องใช้ต่อเลเวล = ⌊ 100 × 1.35^(เลเวล−1) ⌋')}`)}
@@ -10107,8 +10209,19 @@ export class GameUI {
           ฆ่ามอนได้ Zeny สุ่มในช่วงของมอนตัวนั้น + มีโอกาสดรอปไอเทมตามอัตราของแต่ละไอเทม<br>
           • ซื้อ/ขายไอเทมที่ NPC ในเมือง<br>
           • ตั้งแผงขายของ (Vending Stall) หรือใช้ตลาดกลางเพื่อเทรดกับผู้เล่นอื่น`)}
-        ${sec('🎣', 'ตกปลา', `
-          เข้าใกล้ริมน้ำแล้วกดปุ่ม <b>FISH</b> สะสมชนิดปลาในสมุดสะสมปลา (Almanac) เพื่อรับรางวัลโบนัสตามความหายากและครบเซ็ต`)}
+        ${sec('🎣', 'ตกปลาแบบทีละขั้นตอน', `
+          1. ผู้เล่นทุกคนจะได้รับ <b>Fishing Rod คันเบ็ดไม้ธรรมดา</b> ติดตัวตั้งแต่เริ่มเกม ใช้จับปลา Common ได้<br>
+          2. เปิด <b>BAG → เลือก Fishing Rod → กด “ใช้ไอเทม”</b> เพื่อสวมคันเบ็ด ระบบจะแสดงปุ่ม <b>FISH</b> เมื่อสวมสำเร็จ<br>
+          3. เดินไปใกล้ริมน้ำ หรือกดปุ่มนำทางจาก Adventure Notebook แล้วแตะ <b>FISH</b> ทางด้านขวาของหน้าจอ<br>
+          4. ตัวละครจะเดินเข้าจุดยืน เหวี่ยงเบ็ด และแสดงข้อความ <b>ปลากินเบ็ด</b> เมื่อมีปลาเข้ามากิน รอให้ระบบยืนยันรางวัลเข้ากระเป๋า<br>
+          5. หากต้องการหยุด ให้แตะปุ่ม <b>STOP</b> ซึ่งเป็นปุ่มเดิมกับ FISH<br>
+          <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">คันเบ็ด</th><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">ราคา</th><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">จับได้สูงสุด</th></tr></thead><tbody>
+          <tr><td style="padding:6px">🎣 ไม้</td><td style="padding:6px">150 Zeny · แจกฟรีตอนเริ่ม</td><td style="padding:6px">Common / ปลาธรรมดา</td></tr>
+          <tr><td style="padding:6px">🎣 เงิน</td><td style="padding:6px">15,000 Zeny</td><td style="padding:6px">Rare / ปลาหายาก</td></tr>
+          <tr><td style="padding:6px">🎣 ทองคำ</td><td style="padding:6px">75,000 Zeny</td><td style="padding:6px">Legendary / ปลาในตำนาน</td></tr>
+          </tbody></table></div>
+          คันเบ็ดเงินและคันเบ็ดทองคำซื้อได้ที่ <b>Kafra Shop → Equip</b> โดยใช้ Zeny ราคาจะสูงขึ้นตามระดับอุปกรณ์<br>
+          คันเบ็ดเงินจับปลา Common ถึง Rare ได้ ส่วน <b>ปลา Legendary ต้องใช้คันเบ็ดทองคำ</b> และ Map ที่อันตรายกว่าจะมีโอกาสพบปลาหายากมากขึ้น`)}
         ${sec('👹', 'บอสโลก (World Boss)', `
           บอสยักษ์เกิดกลางสนามเป็นระยะ ทุกคนแชร์เลือดก้อนเดียว ต้องร่วมกันตี:
           ${F('เลือดบอส = min( 45000 , 7000 + คนออนไลน์ × 3500 )')}

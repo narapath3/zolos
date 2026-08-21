@@ -688,8 +688,10 @@ export async function createCharacter(userId) {
         localDb.set(`char_${userId}`, charData);
         // Update local leaderboard
         updateLocalLeaderboard(charData);
-        // Give starting Sword
-        await saveInventoryItem(charData.id, 'Sword', 'weapon', 1, { equipped: true });
+        // Every adventurer starts with a weapon and an unequipped wooden fishing rod.
+        // SET keeps retries/reloads idempotent instead of inflating starter stacks.
+        await setInventoryItemQuantity(charData.id, 'Sword', 'weapon', 1, { equipped: true });
+        await setInventoryItemQuantity(charData.id, 'Fishing Rod', 'fishing_rod', 1, { equipped: false });
         return charData;
     }
 
@@ -707,8 +709,9 @@ export async function createCharacter(userId) {
 
     if (error) throw error;
 
-    // Give starting Sword
-    await saveInventoryItem(data.id, 'Sword', 'weapon', 1, { equipped: true });
+    // Every adventurer starts with a weapon and an unequipped wooden fishing rod.
+    await setInventoryItemQuantity(data.id, 'Sword', 'weapon', 1, { equipped: true });
+    await setInventoryItemQuantity(data.id, 'Fishing Rod', 'fishing_rod', 1, { equipped: false });
     return data;
 }
 
@@ -1258,13 +1261,22 @@ export async function migrateGuestToAccount(email, password, guest) {
         return false;
     };
 
-    // 5. Inventory — local guest rows are untrusted. Give only the canonical
-    // starter weapon; all forged level/gold/item stacks are intentionally reset.
+    // 5. Inventory — local guest rows are untrusted. Give only canonical
+    // starter items; all forged level/gold/item stacks are intentionally reset.
+    // SET makes the recovery path safe to retry without duplicating equipment.
     const failedItems = [];
-    const starterOk = await withRetry(() => saveInventoryItem(newCharId, 'Sword', 'weapon', 1, { equipped: true }));
-    if (!starterOk) failedItems.push('Sword');
+    const starterItems = [
+        ['Sword', 'weapon', { equipped: true }],
+        ['Fishing Rod', 'fishing_rod', { equipped: false }],
+    ];
+    for (const [itemName, itemType, stats] of starterItems) {
+        const starterOk = await withRetry(() => setInventoryItemQuantity(newCharId, itemName, itemType, 1, stats));
+        if (!starterOk) failedItems.push(itemName);
+    }
     for (const it of (guest.inventory || [])) {
-        if (it?.item_name && it.item_name !== 'Sword' && Number(it.quantity) > 0) failedItems.push(String(it.item_name));
+        if (it?.item_name && !starterItems.some(([name]) => name === it.item_name) && Number(it.quantity) > 0) {
+            failedItems.push(String(it.item_name));
+        }
     }
 
     // 6. System collections (friends / daily quests / fishing almanac / login streak)
