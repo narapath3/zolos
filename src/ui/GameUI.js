@@ -435,6 +435,7 @@ export class GameUI {
     hudTriggers.forEach(trigger => {
       trigger.addEventListener('click', event => {
         event.stopPropagation();
+        this._closeAllMenuSurfaces();
         const panel = document.querySelector(`[data-hud-panel="${trigger.dataset.hudMenu}"]`);
         if (!panel) return;
         const willOpen = panel.hidden;
@@ -557,19 +558,53 @@ export class GameUI {
     }
   }
 
+  /**
+   * Keep the game UI single-surface: opening one Card/panel/modal always closes
+   * every other menu surface first. This is intentionally centralized because
+   * several menus are created lazily and are not all `.side-panel` elements.
+   */
+  _closeAllMenuSurfaces(except = null) {
+    const exceptId = typeof except === 'string' ? except : except?.id || null;
+    const shouldKeep = element => element && exceptId && element.id === exceptId;
+    const hide = element => {
+      if (!element || shouldKeep(element)) return;
+      element.style.display = 'none';
+    };
+
+    document.querySelectorAll('.side-panel, .modal-popup').forEach(hide);
+    [
+      'almanac-modal', 'forge-modal', 'daily-modal', 'stall-modal', 'heaven-modal',
+      'job-modal', 'warp-modal', 'pet-boutique-modal', 'divine-shop-modal',
+      'fishing-summary-modal', 'journey-spotlight'
+    ].forEach(id => hide(document.getElementById(id)));
+
+    // Card detail/fusion use native dialogs inside My Card. Close them when a
+    // different surface opens so their top-layer backdrop cannot swallow taps.
+    document.querySelectorAll('dialog[open]').forEach(dialog => {
+      const ownerPanel = dialog.closest('.side-panel');
+      if (exceptId && (dialog.id === exceptId || ownerPanel?.id === exceptId)) return;
+      try { dialog.close(); } catch { dialog.removeAttribute('open'); }
+    });
+
+    document.querySelectorAll('.hud-menu-popover').forEach(panel => { panel.hidden = true; });
+    document.querySelectorAll('.hud-menu-trigger').forEach(trigger => trigger.setAttribute('aria-expanded', 'false'));
+
+    if (window.adminUI?.isOpen && exceptId !== 'admin-panel') window.adminUI.close();
+    if (!shouldKeep(document.getElementById('player-popup'))) this._stopPopupHero?.();
+    this.updateMobileControlsVisibility();
+  }
+
   _togglePanel(panelId) {
     const panel = document.getElementById(panelId);
-    // Close others
-    document.querySelectorAll('.side-panel').forEach(p => {
-      if (p.id !== panelId) p.style.display = 'none';
-    });
-    // The Fishing Almanac is a standalone overlay (not a .side-panel) — close it
-    // too so opening any other menu dismisses it.
-    const almanac = document.getElementById('almanac-modal');
-    if (almanac) almanac.style.display = 'none';
-    const petBoutique = document.getElementById('pet-boutique-modal');
-    if (petBoutique) petBoutique.style.display = 'none';
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    if (!panel) return;
+    const display = panel.style.display || window.getComputedStyle(panel).display;
+    const willOpen = display === 'none';
+    if (willOpen) {
+      this._closeAllMenuSurfaces(panelId);
+      panel.style.display = 'block';
+    } else {
+      this._closeAllMenuSurfaces();
+    }
     this.updateMobileControlsVisibility();
   }
 
@@ -1377,6 +1412,7 @@ export class GameUI {
   }
 
   openFishingSummary(session) {
+    this._closeAllMenuSurfaces();
     const existing = document.getElementById('fishing-summary-modal');
     if (existing) existing.remove();
     const rarityLabel = { common: 'ธรรมดา', uncommon: 'พบไม่บ่อย', rare: 'หายาก', legendary: 'ตำนาน' };
@@ -1559,8 +1595,8 @@ export class GameUI {
       modal.innerHTML = `<div id="almanac-card"></div>`;
       document.body.appendChild(modal);
     }
-    // Close any open side panels so the almanac doesn't stack on top of them.
-    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+    // Almanac is a standalone Card surface; make it exclusive with every menu.
+    this._closeAllMenuSurfaces(modal);
     this._renderAlmanac();
     modal.style.display = 'flex';
     this.updateMobileControlsVisibility();
@@ -1991,7 +2027,10 @@ export class GameUI {
     if (resolvedBox) resolvedBox.style.display = 'none';
 
     const modal = document.getElementById('card-trade-modal');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+      this._closeAllMenuSurfaces(modal);
+      modal.style.display = 'flex';
+    }
     this.updateMobileControlsVisibility();
   }
 
@@ -4125,6 +4164,7 @@ export class GameUI {
 
   _showPlayerPopup(player) {
     this.selectedProfilePlayer = player;
+    this._closeAllMenuSurfaces('player-popup');
 
     // Fetch full character data and show beautiful profile modal
     this._fetchAndShowPlayerProfile(player);
@@ -4489,6 +4529,7 @@ export class GameUI {
     const levelEl = document.getElementById('friend-confirm-sender-level');
     const modal = document.getElementById('friend-confirm-modal');
 
+    this._closeAllMenuSurfaces(modal);
     if (nameEl) nameEl.textContent = payload.senderName || 'Unknown';
     if (levelEl) levelEl.textContent = `Lv.${payload.senderLevel || '?'}`;
     if (modal) modal.style.display = 'flex';
@@ -5624,6 +5665,7 @@ export class GameUI {
         this._renderProfileAttributes();
       }
 
+      this._closeAllMenuSurfaces(modal);
       modal.style.display = 'flex';
       this.updateMobileControlsVisibility();
     };
@@ -6268,7 +6310,7 @@ export class GameUI {
   }
 
   openPetBoutique() {
-    document.querySelectorAll('.side-panel').forEach(panel => { panel.style.display = 'none'; });
+    this._closeAllMenuSurfaces('pet-boutique-modal');
     if (this._petBoutiqueEscapeHandler) document.removeEventListener('keydown', this._petBoutiqueEscapeHandler);
     let modal = document.getElementById('pet-boutique-modal');
     if (!modal) {
@@ -6918,7 +6960,7 @@ export class GameUI {
       modal.innerHTML = `<div id="daily-card"></div>`;
       document.body.appendChild(modal);
     }
-    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
+    this._closeAllMenuSurfaces(modal);
     this._renderDailyReward();
     modal.style.display = 'flex';
     this.updateMobileControlsVisibility();
@@ -10879,6 +10921,7 @@ export class GameUI {
 
   openTradePanel(remotePlayer) {
     if (!remotePlayer) return;
+    this._closeAllMenuSurfaces('trade-panel');
 
     this.tradeTarget = remotePlayer;
     this.tradeSelectedItem = null;
@@ -11868,9 +11911,7 @@ export class GameUI {
       document.body.appendChild(modal);
     }
 
-    // Close side panels
-    document.querySelectorAll('.side-panel').forEach(p => { p.style.display = 'none'; });
-
+    this._closeAllMenuSurfaces(modal);
     this._renderWarpMap(preselectedMapId);
     modal.style.display = 'flex';
     this.updateMobileControlsVisibility();

@@ -65,6 +65,11 @@ test('Home-screen guide is mounted outside the journal and exposes game-style co
   assert.match(gameUI, /const candidates = \[/);
   assert.match(gameUI, /!overlap\(candidate\.left, candidate\.top\)/);
   assert.match(gameUI, /target\.closest\('#home-journey-guide'\)/);
+  assert.match(gameUI, /_closeAllMenuSurfaces\(except = null\)/);
+  assert.match(gameUI, /document\.querySelectorAll\('\.side-panel, \.modal-popup'\)/);
+  assert.match(gameUI, /document\.querySelectorAll\('dialog\[open\]'\)/);
+  assert.match(gameUI, /_closeAllMenuSurfaces\(modal\)/);
+  assert.match(gameUI, /_closeAllMenuSurfaces\('pet-boutique-modal'\)/);
 });
 
 test('Journey responsive styles keep touch actions, safe area and compact mobile layout', () => {
