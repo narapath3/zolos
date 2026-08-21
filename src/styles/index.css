@@ -8611,3 +8611,9 @@ a,
 @media(max-width:420px){.journey-next-prompt-card{top:clamp(108px,15vh,156px);grid-template-columns:1fr;width:calc(100vw - 18px);right:9px}.journey-next-prompt-art{min-height:64px;background-position:center 40%}.journey-next-prompt-copy{padding:9px 10px 10px}.journey-next-prompt-copy p{display:none}.journey-next-prompt-copy h3{font-size:13px}.journey-next-prompt-actions{margin-top:2px}}
 @media(max-height:480px){.journey-next-prompt-card{top:92px;grid-template-columns:54px minmax(0,1fr);width:min(330px,calc(100vw - 20px))}.journey-next-prompt-art{min-height:116px}.journey-next-prompt-copy{padding:8px 9px}.journey-next-prompt-copy p,.journey-next-prompt-copy em{display:none}}
 @media(prefers-reduced-motion:reduce){.journey-next-prompt-card{animation:none}}
+
+/* Mobile prompt interaction guard: keep the action card above the game canvas and
+   make taps native instead of letting the world joystick interpret them. */
+#journey-next-prompt,.journey-next-prompt-card,.journey-next-prompt-card button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#journey-next-prompt{isolation:isolate}
+#journey-next-prompt .journey-next-prompt-continue,#journey-next-prompt .journey-next-prompt-later{position:relative;z-index:2;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none}

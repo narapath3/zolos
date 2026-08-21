@@ -9286,7 +9286,7 @@ export class GameUI {
         target.closest('.modal-popup') || target.closest('#boss-summary') || target.closest('#hud-top') ||
         target.closest('#minimap-container') || target.closest('#target-indicator') || target.closest('#home-journey-guide') ||
         target.closest('#fps-counter') || target.closest('#kill-counter') ||
-        target.closest('#chat-panel') || target.closest('#tutorial-tooltip') ||
+        target.closest('#chat-panel') || target.closest('#journey-next-prompt') || target.closest('#journey-combat-complete') || target.closest('#tutorial-tooltip') ||
         target.closest('.tutorial-tooltip') || target.closest('.tutorial-close') ||
         target.closest('.tutorial-btn-primary') || target.closest('.tutorial-btn-secondary') ||
         target.closest('#fishing-summary-modal') || target.closest('.fishing-summary-overlay') ||
@@ -9790,6 +9790,22 @@ export class GameUI {
     const doneTitle = completedStep ? `บทที่ ${completedStep.chapter} เสร็จแล้ว` : 'พร้อมไปต่อไหม?';
     const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? 'นำทางไปที่นี่' : 'ดูเป้าหมายต่อไป';
     prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">ทำต่อทันที <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
+    let lastTouchActionAt = 0;
+    const handlePromptAction = event => {
+      const button = event.currentTarget;
+      if (event.type === 'click' && performance.now() - lastTouchActionAt < 500) return;
+      if (event.type === 'touchend') lastTouchActionAt = performance.now();
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      const action = button.dataset.homeJourneyAction;
+      if (action === 'continue-next') this._continueFirstThirtyJourney();
+      if (action === 'later-next') this._hideJourneyNextPrompt(true);
+    };
+    prompt.querySelectorAll('[data-home-journey-action]').forEach(button => {
+      button.addEventListener('click', handlePromptAction);
+      button.addEventListener('touchend', handlePromptAction, { passive: false });
+    });
     prompt.style.display = 'block';
   }
 

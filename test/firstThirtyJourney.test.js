@@ -155,3 +155,13 @@ test('Combat completion advances through the same next-chapter prompt without st
   assert.match(gameUI, /close\(\{ continueJourney: true, showNextPrompt: false \}\)/);
   assert.match(gameUI, /this\._journeyCombatCompletionTimer = setTimeout\(\(\) => close\(\), 9000\)/);
 });
+
+
+test('Auto-advance prompt buttons are protected from world touch input on mobile', () => {
+  assert.match(gameUI, /target\.closest\('#journey-next-prompt'\)/);
+  assert.match(gameUI, /target\.closest\('#journey-combat-complete'\)/);
+  assert.match(gameUI, /button\.addEventListener\('touchend', handlePromptAction/);
+  assert.match(gameUI, /event\.stopImmediatePropagation\?\.\(\)/);
+  assert.match(css, /#journey-next-prompt,\.journey-next-prompt-card,\.journey-next-prompt-card button\{touch-action:manipulation/);
+  assert.match(css, /#journey-next-prompt \.journey-next-prompt-continue,[\s\S]*pointer-events:auto/);
+});
