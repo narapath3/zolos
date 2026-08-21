@@ -435,13 +435,13 @@ export class GameUI {
     hudTriggers.forEach(trigger => {
       trigger.addEventListener('click', event => {
         event.stopPropagation();
-        this._closeAllMenuSurfaces();
         const panel = document.querySelector(`[data-hud-panel="${trigger.dataset.hudMenu}"]`);
         if (!panel) return;
-        const willOpen = panel.hidden;
-        closeHudMenus(panel);
-        panel.hidden = !willOpen;
-        trigger.setAttribute('aria-expanded', String(willOpen));
+        const wasOpen = !panel.hidden;
+        this._closeAllMenuSurfaces();
+        closeHudMenus();
+        panel.hidden = wasOpen;
+        trigger.setAttribute('aria-expanded', String(!wasOpen));
       });
     });
     document.querySelectorAll('.hud-menu-popover .hud-btn').forEach(button => {
@@ -556,6 +556,12 @@ export class GameUI {
         this._useSelectedItem();
       });
     }
+  }
+
+  _isMenuSurfaceOpen(surface) {
+    const element = typeof surface === 'string' ? document.getElementById(surface) : surface;
+    if (!element) return false;
+    return (element.style.display || window.getComputedStyle(element).display) !== 'none' && !element.hidden;
   }
 
   /**
@@ -1595,7 +1601,11 @@ export class GameUI {
       modal.innerHTML = `<div id="almanac-card"></div>`;
       document.body.appendChild(modal);
     }
-    // Almanac is a standalone Card surface; make it exclusive with every menu.
+    // Almanac is a toggleable standalone Card surface.
+    if (this._isMenuSurfaceOpen(modal)) {
+      this._closeAllMenuSurfaces();
+      return;
+    }
     this._closeAllMenuSurfaces(modal);
     this._renderAlmanac();
     modal.style.display = 'flex';
@@ -6310,9 +6320,14 @@ export class GameUI {
   }
 
   openPetBoutique() {
+    const existing = document.getElementById('pet-boutique-modal');
+    if (this._isMenuSurfaceOpen(existing)) {
+      this._closeAllMenuSurfaces();
+      return;
+    }
     this._closeAllMenuSurfaces('pet-boutique-modal');
     if (this._petBoutiqueEscapeHandler) document.removeEventListener('keydown', this._petBoutiqueEscapeHandler);
-    let modal = document.getElementById('pet-boutique-modal');
+    let modal = existing;
     if (!modal) {
       const style = document.createElement('style');
       style.id = 'pet-boutique-style';
@@ -6959,6 +6974,10 @@ export class GameUI {
       });
       modal.innerHTML = `<div id="daily-card"></div>`;
       document.body.appendChild(modal);
+    }
+    if (this._isMenuSurfaceOpen(modal)) {
+      this._closeAllMenuSurfaces();
+      return;
     }
     this._closeAllMenuSurfaces(modal);
     this._renderDailyReward();
@@ -11911,6 +11930,10 @@ export class GameUI {
       document.body.appendChild(modal);
     }
 
+    if (this._isMenuSurfaceOpen(modal)) {
+      this._closeAllMenuSurfaces();
+      return;
+    }
     this._closeAllMenuSurfaces(modal);
     this._renderWarpMap(preselectedMapId);
     modal.style.display = 'flex';
