@@ -9038,8 +9038,9 @@ export class GameUI {
     // collision-safe two-row dock from the actual available rectangle.
     const setupAdaptiveLandscapeControls = () => {
       const actionDock = document.getElementById('mobile-actions');
+      const skillsArc = actionDock?.querySelector('.mobile-skills-arc');
       const autoRail = document.getElementById('auto-farm-container');
-      if (!actionDock || !autoRail) return;
+      if (!actionDock || !skillsArc || !autoRail) return;
       const buttons = {
         sprint: document.getElementById('btn-mobile-sprint'),
         skill1: document.getElementById('btn-mobile-skill-1'),
@@ -9059,9 +9060,10 @@ export class GameUI {
       const clearLayout = () => {
         if (actionDock.dataset.adaptiveLayout !== 'landscape') return;
         delete actionDock.dataset.adaptiveLayout;
-        clearInline(actionDock, ['width', 'height', 'right', 'bottom', 'z-index']);
+        clearInline(actionDock, ['width', 'height', 'right', 'bottom', 'z-index', 'display', 'grid-template-columns', 'grid-template-rows', 'gap', 'align-items', 'justify-items']);
+        clearInline(skillsArc, ['display', 'position', 'inset', 'width', 'height', 'pointer-events']);
         clearInline(autoRail, ['width', 'right', 'bottom', 'top', 'z-index', 'gap']);
-        Object.values(buttons).forEach(button => button && clearInline(button, ['width', 'height', 'left', 'top', 'right', 'bottom', 'inset', 'z-index']));
+        Object.values(buttons).forEach(button => button && clearInline(button, ['width', 'height', 'left', 'top', 'right', 'bottom', 'inset', 'z-index', 'position', 'grid-area']));
         railButtons.forEach(button => clearInline(button, ['width', 'height', 'margin']));
       };
       const updateLayout = () => {
@@ -9091,26 +9093,38 @@ export class GameUI {
         const dockRight = rightRail + railWidth + rightGap;
         const bottom = navClearance;
         const slots = {
-          sprint: [0, 0],
-          skill2: [1, 0],
-          skill1: [2, 0],
-          skill3: [0, 1],
-          attack: [2, 1],
+          sprint: '1 / 1',
+          skill2: '1 / 2',
+          skill1: '1 / 3',
+          skill3: '2 / 1',
+          attack: '2 / 3',
         };
 
         actionDock.dataset.adaptiveLayout = 'landscape';
+        setImportant(actionDock, 'display', 'grid');
+        setImportant(actionDock, 'grid-template-columns', `repeat(3, ${size}px)`);
+        setImportant(actionDock, 'grid-template-rows', `repeat(2, ${size}px)`);
+        setImportant(actionDock, 'gap', `${gap}px`);
+        setImportant(actionDock, 'align-items', 'center');
+        setImportant(actionDock, 'justify-items', 'center');
         setImportant(actionDock, 'width', `${actionWidth}px`);
         setImportant(actionDock, 'height', `${actionHeight}px`);
         setImportant(actionDock, 'right', `${dockRight}px`);
         setImportant(actionDock, 'bottom', `${bottom}px`);
         setImportant(actionDock, 'z-index', '1600');
-        Object.entries(slots).forEach(([key, [column, row]]) => {
+        setImportant(skillsArc, 'display', 'contents');
+        setImportant(skillsArc, 'position', 'static');
+        setImportant(skillsArc, 'inset', 'auto');
+        setImportant(skillsArc, 'pointer-events', 'contents');
+        Object.entries(slots).forEach(([key, gridArea]) => {
           const button = buttons[key];
           if (!button) return;
+          setImportant(button, 'position', 'static');
+          setImportant(button, 'grid-area', gridArea);
           setImportant(button, 'width', `${size}px`);
           setImportant(button, 'height', `${size}px`);
-          setImportant(button, 'left', `${column * (size + gap)}px`);
-          setImportant(button, 'top', `${row * (size + gap)}px`);
+          setImportant(button, 'left', 'auto');
+          setImportant(button, 'top', 'auto');
           setImportant(button, 'right', 'auto');
           setImportant(button, 'bottom', 'auto');
         });

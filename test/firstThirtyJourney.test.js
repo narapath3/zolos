@@ -87,6 +87,9 @@ test('Journey responsive styles keep touch actions, safe area and compact mobile
   assert.match(gameUI, /setupAdaptiveLandscapeControls/);
   assert.match(gameUI, /isLandscapeMobile/);
   assert.match(gameUI, /const slots = \{/);
+  assert.match(gameUI, /grid-template-columns/);
+  assert.match(gameUI, /setImportant\(skillsArc, 'display', 'contents'\)/);
+  assert.match(gameUI, /setImportant\(button, 'position', 'static'\)/);
   assert.match(gameUI, /requestAnimationFrame\(updateLayout\)/);
   assert.match(gameUI, /visualViewport/);
   assert.match(css, /\.journey-spotlight-card\{width:min\(330px,calc\(100vw - 20px\)\);margin:0\}/);
