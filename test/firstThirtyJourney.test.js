@@ -62,6 +62,8 @@ test('Home-screen guide is mounted outside the journal and exposes game-style co
   assert.match(gameUI, /_setJourneySpotlightState\(true\)/);
   assert.match(gameUI, /guide\.classList\.add\('is-spotlighting'\)/);
   assert.match(gameUI, /overlay\._journeyClose/);
+  assert.match(gameUI, /const candidates = \[/);
+  assert.match(gameUI, /!overlap\(candidate\.left, candidate\.top\)/);
   assert.match(gameUI, /target\.closest\('#home-journey-guide'\)/);
 });
 
@@ -78,4 +80,6 @@ test('Journey responsive styles keep touch actions, safe area and compact mobile
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /\.home-journey-guide\.is-spotlighting\{display:none!important/);
   assert.match(css, /@media\(max-width:700px\)\{#journey-spotlight\{z-index:2600/);
+  assert.match(css, /\.journey-spotlight-card\{width:min\(330px,calc\(100vw - 20px\)\);margin:0\}/);
+  assert.doesNotMatch(css, /\.journey-spotlight-card\{width:min\(330px,calc\(100vw - 20px\)\);left:10px!important;right:10px;top:auto!important;bottom:/);
 });

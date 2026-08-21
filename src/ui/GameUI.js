@@ -9606,7 +9606,6 @@ export class GameUI {
   }
 
   _showJourneySpotlight(target, step) {
-    this._setJourneySpotlightState(true);
     let overlay = document.getElementById('journey-spotlight');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -9614,6 +9613,7 @@ export class GameUI {
       document.body.appendChild(overlay);
     }
     overlay._journeyClose?.();
+    this._setJourneySpotlightState(true);
     const escape = value => this._journeyEscape(value);
     overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">ทำแล้ว <span>✓</span></button></div>`;
     overlay.style.display = 'block';
@@ -9627,12 +9627,23 @@ export class GameUI {
       ring.style.width = `${Math.max(20, rect.width + pad * 2)}px`;
       ring.style.height = `${Math.max(20, rect.height + pad * 2)}px`;
       const box = card.getBoundingClientRect();
-      const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - box.width - 12));
-      let top = rect.bottom + 18;
-      if (top + box.height > window.innerHeight - 12) top = rect.top - box.height - 18;
-      if (top < 12) top = Math.min(window.innerHeight - box.height - 12, Math.max(12, window.innerHeight * 0.5 - box.height * 0.5));
-      card.style.left = `${left}px`;
-      card.style.top = `${Math.max(12, top)}px`;
+      const edge = window.innerWidth <= 700 ? 10 : 12;
+      const maxLeft = Math.max(edge, window.innerWidth - box.width - edge);
+      const maxTop = Math.max(edge, window.innerHeight - box.height - edge);
+      const clamp = (value, min, max) => Math.min(Math.max(min, value), max);
+      const overlap = (left, top) => left < rect.right + 12 && left + box.width > rect.left - 12 && top < rect.bottom + 12 && top + box.height > rect.top - 12;
+      const candidates = [
+        { left: clamp(rect.left, edge, maxLeft), top: rect.bottom + 16 },
+        { left: clamp(rect.left, edge, maxLeft), top: rect.top - box.height - 16 },
+        { left: rect.right + 16, top: clamp(rect.top, edge, maxTop) },
+        { left: rect.left - box.width - 16, top: clamp(rect.top, edge, maxTop) },
+        { left: clamp((window.innerWidth - box.width) / 2, edge, maxLeft), top: clamp(window.innerHeight * 0.5 - box.height * 0.5, edge, maxTop) },
+      ];
+      const placement = candidates.find(candidate => candidate.left >= edge && candidate.left <= maxLeft && candidate.top >= edge && candidate.top <= maxTop && !overlap(candidate.left, candidate.top))
+        || candidates.find(candidate => candidate.left >= edge && candidate.left <= maxLeft && candidate.top >= edge && candidate.top <= maxTop)
+        || { left: edge, top: edge };
+      card.style.left = `${placement.left}px`;
+      card.style.top = `${placement.top}px`;
     };
     position();
     const close = () => {
