@@ -56,6 +56,7 @@ test('Home-screen guide is mounted outside the journal and exposes game-style co
   assert.match(gameUI, /data-home-journey-action="next"/);
   assert.match(gameUI, /data-home-journey-action="collapse"/);
   assert.match(gameUI, /this\._renderJourneyGuide\(\)/);
+  assert.match(gameUI, /if \(!active\)[\s\S]*guide\.hidden = true/);
   assert.match(gameUI, /_prepareJourneyTarget\(target\)/);
   assert.match(gameUI, /target\.closest\('#home-journey-guide'\)/);
 });

@@ -9442,16 +9442,12 @@ export class GameUI {
     const progress = firstThirtyProgress(this.firstThirtyJourney);
     const active = progress.active;
     const escape = value => this._journeyEscape(value);
-    guide.hidden = false;
-
     if (!active) {
-      guide.innerHTML = `<section class="home-journey-card home-journey-card--complete" data-testid="home-first-thirty-journey">
-        <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES</span><span class="home-journey-complete-badge">✓ COMPLETE</span></div>
-        <div class="home-journey-complete-copy"><span class="home-journey-complete-icon">✦</span><div><h2>เส้นทางแรกสำเร็จแล้ว</h2><p>พร้อมเลือก Combat, Fishing หรือ Exploration ต่อแล้ว</p></div></div>
-        <button type="button" class="home-journey-link" data-home-journey-action="open-journal">เปิด Adventure Journal <span>→</span></button>
-      </section>`;
+      guide.innerHTML = '';
+      guide.hidden = true;
       return;
     }
+    guide.hidden = false;
 
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
