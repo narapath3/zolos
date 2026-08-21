@@ -71,6 +71,8 @@ export class GameUI {
     this.firstThirtyJourney = createFirstThirtyState();
     this._journeySaveTimer = null;
     this._journeyResizeObserver = null;
+    this._journeyGuideEl = null;
+    this._journeyGuideCollapsed = false;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -91,6 +93,7 @@ export class GameUI {
     // Sell Shop state
     this.selectedSellShopItem = null;
 
+    this._setupJourneyGuide();
     this._setupPanels();
     this._setupROInventoryEvents();
     this._setupShopEvents();
@@ -386,6 +389,35 @@ export class GameUI {
     }
   }
 
+  _setupJourneyGuide() {
+    const guide = document.getElementById('home-journey-guide');
+    this._journeyGuideEl = guide;
+    if (!guide) return;
+
+    this._listenGlobal(guide, 'click', event => {
+      const actionButton = event.target.closest?.('[data-home-journey-action]');
+      if (!actionButton || !guide.contains(actionButton)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const action = actionButton.dataset.homeJourneyAction;
+      if (action === 'navigate' || action === 'next') return this._navigateFirstThirtyStep();
+      if (action === 'skip') return this._skipFirstThirtyStep();
+      if (action === 'resume') return this._resumeFirstThirtyStep();
+      if (action === 'collapse') {
+        this._journeyGuideCollapsed = true;
+        return this._renderJourneyGuide();
+      }
+      if (action === 'expand') {
+        this._journeyGuideCollapsed = false;
+        return this._renderJourneyGuide();
+      }
+      if (action === 'open-journal') {
+        const journalButton = document.getElementById('btn-wiki');
+        if (journalButton) journalButton.click();
+      }
+    });
+  }
+
   _setupPanels() {
     // Compact categorized bottom HUD. Existing action IDs stay on the real
     // buttons, so grouping does not change any gameplay behavior.
@@ -669,6 +701,7 @@ export class GameUI {
       if (!['prontera', 'prontera_field'].includes(mapId)) this._completeFirstThirtyStep('visit_new_map');
     }
     this._updateHUDMapAndPing();
+    this._renderJourneyGuide();
     if (mapId) {
       // Refresh online players list when map changes to filter correctly
       this._renderOnlinePlayers();
@@ -9048,7 +9081,7 @@ export class GameUI {
       if (target.closest('#mobile-actions') || target.closest('#auto-farm-container') ||
         target.closest('#hud-bottom') || target.closest('.side-panel') || target.closest('#pet-boutique-modal') ||
         target.closest('.modal-popup') || target.closest('#boss-summary') || target.closest('#hud-top') ||
-        target.closest('#minimap-container') || target.closest('#target-indicator') ||
+        target.closest('#minimap-container') || target.closest('#target-indicator') || target.closest('#home-journey-guide') ||
         target.closest('#fps-counter') || target.closest('#kill-counter') ||
         target.closest('#chat-panel') || target.closest('#tutorial-tooltip') ||
         target.closest('.tutorial-tooltip') || target.closest('.tutorial-close') ||
@@ -9378,6 +9411,7 @@ export class GameUI {
     this.adventureJournal = sanitizeAdventureJournal(remote || local);
     this.firstThirtyJourney = sanitizeFirstThirtyState(this.adventureJournal.journey);
     this.adventureJournal.journey = this.firstThirtyJourney;
+    this._renderJourneyGuide();
     this._renderWiki();
   }
 
@@ -9396,6 +9430,54 @@ export class GameUI {
   _journeyMapLabel(mapId) {
     const labels = { prontera: 'Prontera', prontera_field: 'Prontera Field', payon: 'Payon', glast_heim: 'Glast Heim', mjolnir: 'Mjolnir', abyss_lake: 'Abyss Lake' };
     return labels[mapId] || mapId || 'พื้นที่ปัจจุบัน';
+  }
+
+  _renderJourneyGuide() {
+    const guide = this._journeyGuideEl || document.getElementById('home-journey-guide');
+    if (!guide || !this.characterId) {
+      if (guide) guide.hidden = true;
+      return;
+    }
+
+    const progress = firstThirtyProgress(this.firstThirtyJourney);
+    const active = progress.active;
+    const escape = value => this._journeyEscape(value);
+    guide.hidden = false;
+
+    if (!active) {
+      guide.innerHTML = `<section class="home-journey-card home-journey-card--complete" data-testid="home-first-thirty-journey">
+        <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES</span><span class="home-journey-complete-badge">✓ COMPLETE</span></div>
+        <div class="home-journey-complete-copy"><span class="home-journey-complete-icon">✦</span><div><h2>เส้นทางแรกสำเร็จแล้ว</h2><p>พร้อมเลือก Combat, Fishing หรือ Exploration ต่อแล้ว</p></div></div>
+        <button type="button" class="home-journey-link" data-home-journey-action="open-journal">เปิด Adventure Journal <span>→</span></button>
+      </section>`;
+      return;
+    }
+
+    const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
+    const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (sameStarterMap(active.mapId) ? 'เดินทางไปที่นี่' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : 'เลือกเป้าหมายต่อไป';
+    const routeLabel = active.kind === 'world'
+      ? (sameStarterMap(active.mapId) ? `เป้าหมายอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))}`)
+      : active.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
+        : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : 'เส้นทางแรกของคุณพร้อมแล้ว';
+
+    if (this._journeyGuideCollapsed) {
+      guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed" data-testid="home-first-thirty-journey">
+        <button type="button" class="home-journey-collapsed-button" data-home-journey-action="expand" aria-label="แสดง Adventurer's Notebook">
+          <span class="home-journey-bookmark">📔</span><span class="home-journey-collapsed-copy"><small>FIRST 30 MINUTES · บทที่ ${active.chapter}/${progress.total}</small><b>${escape(active.title)}</b></span><strong>${progress.percent}%</strong><span class="home-journey-expand">⌄</span>
+        </button>
+      </section>`;
+      return;
+    }
+
+    guide.innerHTML = `<section class="home-journey-card" data-testid="home-first-thirty-journey" data-journey-step="${escape(active.id)}">
+      <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES · ADVENTURER'S NOTEBOOK</span><div class="home-journey-top-actions"><span class="home-journey-progress">${progress.completed}/${progress.total} · ${progress.percent}%</span><button type="button" class="home-journey-icon-button" data-home-journey-action="collapse" aria-label="ย่อ Adventurer's Notebook">−</button></div></div>
+      <div class="home-journey-chapter"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>บทที่ ${active.chapter} · เป้าหมายปัจจุบัน</small><h2>${escape(active.title)}</h2></div></div>
+      <p class="home-journey-description">${escape(active.description)}</p>
+      <div class="home-journey-route"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div>
+      <div class="home-journey-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">ถัดไป <span>· ${actionLabel}</span><b>→</b></button><button type="button" class="home-journey-skip" data-home-journey-action="skip">ข้ามบท</button></div>
+      <div class="home-journey-footer"><button type="button" class="home-journey-link" data-home-journey-action="open-journal">📔 เปิดสมุดเต็ม</button><span>ทำสำเร็จแล้ว ระบบจะไปบทถัดไปอัตโนมัติ</span></div>
+    </section>`;
   }
 
   _journeyHTML() {
@@ -9444,6 +9526,7 @@ export class GameUI {
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._saveAdventureJournalSoon();
     if (!silent) this.addCombatLog(`✅ เสร็จสิ้นบทที่ ${step.chapter}: ${step.title}`, 'levelup');
+    this._renderJourneyGuide();
     if (this.currentWikiTab === 'journal') this._renderWiki();
     return true;
   }
@@ -9455,6 +9538,7 @@ export class GameUI {
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._saveAdventureJournalSoon();
     this.addCombatLog(`↪️ ข้ามบทชั่วคราว: ${step.title} กลับมาเปิดสมุดเพื่อทำต่อได้`, 'system');
+    this._renderJourneyGuide();
     this._renderWiki();
   }
 
@@ -9464,7 +9548,17 @@ export class GameUI {
     this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'resume', stepId: step.id }, new Date().toISOString());
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._saveAdventureJournalSoon();
+    this._renderJourneyGuide();
     this._renderWiki();
+  }
+
+  _prepareJourneyTarget(target) {
+    const parentMenu = target?.closest?.('.hud-menu-popover');
+    if (!parentMenu || !parentMenu.hidden) return false;
+    const trigger = document.querySelector(`[data-hud-menu="${parentMenu.dataset.hudPanel}"]`);
+    if (!trigger) return false;
+    trigger.click();
+    return true;
   }
 
   _navigateFirstThirtyStep() {
@@ -9476,7 +9570,10 @@ export class GameUI {
     }
     if (step.kind === 'ui') {
       const target = document.querySelector(step.target);
-      if (target) return this._showJourneySpotlight(target, step);
+      if (target) {
+        const menuWasOpened = this._prepareJourneyTarget(target);
+        return menuWasOpened ? requestAnimationFrame(() => this._showJourneySpotlight(target, step)) : this._showJourneySpotlight(target, step);
+      }
       this.addCombatLog('ไม่พบปุ่มเป้าหมายในหน้าจอนี้ กรุณาเปิดเมนูหลักแล้วลองอีกครั้ง', 'warning');
       return;
     }

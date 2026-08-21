@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { createFirstThirtyState, FIRST_THIRTY_STEPS, firstThirtyProgress, sanitizeFirstThirtyState, updateFirstThirtyState } from '../src/progression/FirstThirtyJourney.js';
 
 const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
+const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
 
@@ -49,9 +50,21 @@ test('Journey UI exposes map-aware navigation and viewport-safe spotlight contra
   assert.match(main, /journey-world-marker/);
 });
 
+test('Home-screen guide is mounted outside the journal and exposes game-style controls', () => {
+  assert.match(index, /id="home-journey-guide"[^>]*aria-live="polite"/);
+  assert.match(gameUI, /_setupJourneyGuide\(\)/);
+  assert.match(gameUI, /data-home-journey-action="next"/);
+  assert.match(gameUI, /data-home-journey-action="collapse"/);
+  assert.match(gameUI, /this\._renderJourneyGuide\(\)/);
+  assert.match(gameUI, /_prepareJourneyTarget\(target\)/);
+  assert.match(gameUI, /target\.closest\('#home-journey-guide'\)/);
+});
+
 test('Journey responsive styles keep touch actions, safe area and compact mobile layout', () => {
   assert.match(css, /\.journey-primary[^}]*touch-action:manipulation/);
   assert.match(css, /\.journey-spotlight-card[^}]*pointer-events:auto/);
+  assert.match(css, /\.home-journey-guide\{[^}]*pointer-events:none/);
+  assert.match(css, /\.home-journey-next\{[^}]*touch-action:manipulation/);
   assert.match(css, /@media\(max-width:700px\)/);
   assert.match(css, /\.journey-active-card\{grid-template-columns:auto minmax\(0,1fr\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
