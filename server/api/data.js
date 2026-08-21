@@ -256,11 +256,21 @@ export async function runQuery(spec, userId) {
             const p2 = [];
             const ph = keys.map(k => { p2.push(row[k]); return `$${p2.length}`; });
             let sql = `INSERT INTO "${table}" (${keys.map(k => ident(k, cols)).join(',')}) VALUES (${ph.join(',')})`;
-            if (action === 'upsert' && spec.onConflict) {
-                const cc = spec.onConflict.split(',').map(c => ident(c.trim(), cols)).join(',');
-                const upd = keys.filter(k => !spec.onConflict.split(',').map(s => s.trim()).includes(k))
-                    .map(k => `${ident(k, cols)}=EXCLUDED.${ident(k, cols)}`).join(',');
-                sql += ` ON CONFLICT (${cc}) DO UPDATE SET ${upd || keys[0] + '=EXCLUDED.' + keys[0]}`;
+            if (action === 'upsert') {
+                // Supabase upsert defaults to the table primary key when the
+                // caller omits onConflict. The self-host adapter previously
+                // emitted a plain INSERT in that case, so the profile write
+                // after signup/recovery failed with a duplicate id.
+                const conflictColumns = spec.onConflict
+                    ? spec.onConflict.split(',').map(c => c.trim())
+                    : (cols.has('id') ? ['id'] : []);
+                if (conflictColumns.length) {
+                    const conflictSet = new Set(conflictColumns);
+                    const cc = conflictColumns.map(c => ident(c, cols)).join(',');
+                    const upd = keys.filter(k => !conflictSet.has(k))
+                        .map(k => `${ident(k, cols)}=EXCLUDED.${ident(k, cols)}`).join(',');
+                    sql += ` ON CONFLICT (${cc}) DO UPDATE SET ${upd || keys[0] + '=EXCLUDED.' + keys[0]}`;
+                }
             }
             sql += ' RETURNING *';
             const { rows } = await query(sql, p2);

@@ -7,6 +7,7 @@ const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 
 const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
 const serverAuth = fs.readFileSync(new URL('../server/api/auth.js', import.meta.url), 'utf8');
 const serverIndex = fs.readFileSync(new URL('../server/api/index.js', import.meta.url), 'utf8');
+const serverData = fs.readFileSync(new URL('../server/api/data.js', import.meta.url), 'utf8');
 const zolosClient = fs.readFileSync(new URL('../src/network/ZolosApiClient.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
@@ -222,6 +223,14 @@ test('Guest binding resolves profile username conflicts without exposing raw dat
   assert.match(gameUI, /const safeBindError = \(error\)/);
   assert.match(gameUI, /bindInFlight = true/);
   assert.doesNotMatch(gameUI, /ผิดพลาด: \$\{err\.message\}/);
+});
+
+test('Self-host upsert defaults to the primary key so signup profile writes are idempotent', () => {
+  assert.match(serverData, /if \(action === 'upsert'\)/);
+  assert.match(serverData, /spec\.onConflict\s*\?/);
+  assert.match(serverData, /cols\.has\('id'\) \? \['id'\] : \[\]/);
+  assert.match(serverData, /ON CONFLICT \(\$\{cc\}\) DO UPDATE SET/);
+  assert.match(gameSync, /supabase\.from\('profiles'\)\.upsert\(\{ id: newUserId, username, gender \}\)/);
 });
 
 test('Guest retry recovers only an authenticated partial account and never merges a completed account', () => {
