@@ -1,5 +1,6 @@
 import { supabase, isOfflineMode, isSelfHostMode, apiBaseUrl, localDb } from '../network/SupabaseClient.js';
 import { saveInventoryItem, saveCharacter } from '../network/GameSync.js';
+import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import '../styles/admin.css';
 
 export class AdminUI {
@@ -714,8 +715,9 @@ export class AdminUI {
                     'mythic': '#e6cc80'
                 }[item.rarity] || '#aaa';
 
+                const itemArt = itemIconMarkup(item.name, '', 'admin-item-visual');
                 tr.innerHTML = `
-                    <td style="padding: 10px; font-size: 16px;">${item.emoji}</td>
+                    <td style="padding: 10px; font-size: 16px;">${itemArt}</td>
                     <td style="padding: 10px; font-weight: 500;">${item.name}</td>
                     <td style="padding: 10px;">${item.type}</td>
                     <td style="padding: 10px; color: ${rarityColor}; font-weight: bold;">${item.rarity}</td>
@@ -728,7 +730,7 @@ export class AdminUI {
                 card.className = 'admin-card admin-item-card';
                 card.innerHTML = `
                     <div class="admin-item-heading">
-                        <span class="admin-item-icon" aria-hidden="true">${item.emoji}</span>
+                        <span class="admin-item-icon" aria-hidden="true">${itemArt}</span>
                         <div>
                             <strong>${item.name}</strong>
                             <span style="color:${rarityColor}">${item.rarity}</span>

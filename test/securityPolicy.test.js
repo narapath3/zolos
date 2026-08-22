@@ -257,3 +257,13 @@ test('server.js implements GET /admin/chat-log option and limits chat buffer', a
 
 
 
+
+
+test('marketplace escrow rows are read-only through generic DB API', async () => {
+  const source = await readFile(new URL('../server/api/data.js', import.meta.url), 'utf8');
+  const policy = source.slice(source.indexOf('    marketplace:'), source.indexOf('    vending_stalls:'));
+  assert.match(policy, /read: 'public'/);
+  assert.match(policy, /write: false/);
+  assert.match(policy, /writable: \[\]/);
+  assert.match(policy, /writes would let a seller edit quantity\/item\/stats after escrow/);
+});

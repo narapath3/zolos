@@ -43,26 +43,21 @@ test('GameUI final flush includes every delayed system adapter and cancels journ
   assert.match(gameUI, /this\._persistenceFlushPromise/);
 });
 
-test('server save path persists all system snapshots under the verified character owner', () => {
+test('server save path ignores client progression snapshots under the verified character owner', () => {
   const save = block(server, 'async function saveCharacterToSupabase', '// Periodic batch save');
   for (const field of ['dailyQuests', 'friendsList', 'fishingAlmanac', 'adventureJournal', 'loginStreak']) {
     assert.match(save, new RegExp(field));
   }
-  for (const item of ['fishing_almanac', 'adventure_journal', 'login_streak']) {
-    assert.match(save, new RegExp(`saveSystemInventorySnapshot\\(characterId, '${item}'`));
-  }
   assert.match(save, /eq\('id', characterId\)/);
   assert.match(save, /eq\('user_id', ownerUserId\)/);
+  assert.match(save, /Ignored client progression snapshot/);
+  assert.match(save, /use dedicated server RPCs/);
   assert.match(save, /Ignored client inventory backup/);
 });
 
-test('system snapshot writes remain bounded to one row per character and item', () => {
-  const helper = block(server, 'async function saveSystemInventorySnapshot', 'async function saveCharacterToSupabase');
-  assert.match(helper, /item_type.*system/);
-  assert.match(helper, /upsert\(/);
-  assert.match(helper, /onConflict: 'character_id,item_name'/);
-  assert.match(helper, /quantity: 1/);
-  assert.match(helper, /if \(error\) throw error/);
+test('system snapshot helper was removed so service-role save cannot write arbitrary progress blobs', () => {
+  assert.doesNotMatch(server, /saveSystemInventorySnapshot\(/);
+  assert.match(gameSyncSource(), /supabase\.rpc\('save_system_state'/);
 });
 
 test('inventory flush propagates explicit item-save failures to the final result', () => {
@@ -73,11 +68,14 @@ test('inventory flush propagates explicit item-save failures to the final result
   assert.match(flush, /return ok;/);
 });
 
-test('all client system adapters use atomic conflict-safe writes', () => {
-  for (const itemName of ['daily_quests', 'friends_list', 'fishing_almanac', 'adventure_journal', 'login_streak']) {
-    assert.match(gameSyncSource(), new RegExp(`item_name: '${itemName}'`));
+test('all online client system adapters use the allowlisted RPC', () => {
+  const sync = gameSyncSource();
+  assert.match(sync, /async function saveSystemState\(characterId, key, state\)/);
+  assert.match(sync, /supabase\.rpc\('save_system_state'/);
+  for (const fn of ['saveDailyQuests', 'saveFishingAlmanac', 'saveAdventureJournal', 'saveFriendsList']) {
+    assert.match(sync, new RegExp(`${fn}\\([^\\n]+\\)\\s*\\{\\s*return saveSystemState`));
   }
-  assert.equal((gameSyncSource().match(/onConflict: 'character_id,item_name'/g) || []).length >= 5, true);
+  assert.match(sync, /Online login streaks are advanced only by claim_daily_reward/);
 });
 
 function gameSyncSource() {
@@ -117,4 +115,108 @@ test('cancelled Guest logout restores the logout control for mobile retry', () =
   assert.match(gameUI, /if \(result === false\)/);
   assert.match(gameUI, /btn\.disabled = false/);
   assert.match(gameUI, /btn\.style\.pointerEvents = ''/);
+});
+
+
+test('pet persistence uses the dedicated ownership-safe state path', () => {
+  const rpc = read('../server/api/rpc.js');
+  const sync = read('../src/network/GameSync.js');
+  assert.match(sync, /export function savePetState\(characterId, itemName, stats = \{\}\)/);
+  assert.match(sync, /supabase\.rpc\('save_pet_state'/);
+  assert.match(gameUI, /item\.item_type === 'pet'\s*\n\s*\? await savePetState/);
+  assert.match(gameUI, /async _persistPetRow\(item\)/);
+  assert.match(gameUI, /const result = await savePetState\(this\.characterId, item\.item_name/);
+  assert.match(rpc, /async function savePetState\(body, userId\)/);
+  assert.match(rpc, /id = \$1 AND user_id = \$2 FOR UPDATE/);
+  assert.match(rpc, /item_type !== 'pet'/);
+  assert.match(rpc, /incomingInstances\.length !== stored\.length/);
+  assert.match(rpc, /pet_uid_not_owned/);
+  assert.match(rpc, /UPDATE inventory SET stats = \$1 WHERE id = \$2/);
+  assert.match(rpc, /quantity: row\.quantity/);
+});
+
+test('pet state cannot use generic client inventory quantity or arbitrary stats writes', () => {
+  const data = read('../server/api/data.js');
+  assert.match(data, /const isSystemSnapshot = SYSTEM_INVENTORY_ITEMS\.has/);
+  assert.match(data, /\['insert', 'upsert', 'update', 'delete'\]/);
+  assert.match(data, /\$\{category\} mutations must come from server-authoritative RPCs/);
+  assert.match(gameUI, /item\.item_type === 'pet'\n\s*\? await savePetState/);
+  assert.match(gameUI, /const \{ savePetState \} = await import\('\.\.\/network\/GameSync\.js'\)/);
+});
+
+test('pet load restores the server-selected instance instead of clearing it', () => {
+  assert.match(gameUI, /const equippedPetRow = this\.inventory\.find\(i => i\.item_type === 'pet'/);
+  assert.match(gameUI, /equippedPetRow\.stats\.equippedUid/);
+  assert.match(gameUI, /this\.character\.setPet\(petModelOf\(equippedPetRow\.item_name\), equippedInst\.level/);
+  assert.match(gameUI, /this\.character\.equippedPetUid = equippedInst\.uid/);
+});
+
+
+test('online pet progression is server-derived from committed monster kills', () => {
+  const monsterEngine = read('../server/game/monsterEngine.js');
+  assert.match(monsterEngine, /const PET_MAX_LEVEL = 40/);
+  assert.match(monsterEngine, /petXpRequired\(level\)/);
+  assert.match(monsterEngine, /UPDATE inventory SET stats = \$1 WHERE id = \$2/);
+  assert.match(monsterEngine, /pet: committed\.pet \|\| null/);
+  assert.match(main, /Never derive pet level\/XP from a client-visible reward/);
+  assert.match(main, /gameUI\.applyServerPetReward\(payload\.pet\)/);
+  assert.doesNotMatch(main, /payload\.exp \|\| 0\) \* 0\.5\)\);\n\s+if \(petLeveled\)/);
+  assert.match(gameUI, /applyServerPetReward\(receipt\)/);
+});
+
+test('pet state RPC preserves server-owned level and XP', () => {
+  const rpc = read('../server/api/rpc.js');
+  assert.match(rpc, /Level and XP are server-owned/);
+  assert.match(rpc, /level: previous\.level/);
+  assert.match(rpc, /xp: previous\.xp/);
+  assert.doesNotMatch(rpc, /level: Math\.max\(previous\.level, level\)/);
+});
+
+
+test('pet market and NPC sale mutations are server-authoritative per instance', () => {
+  const rpc = read('../server/api/rpc.js');
+  const npcSale = read('../server/api/npcSale.js');
+  const sync = gameSyncSource();
+  assert.match(rpc, /async function createPetMarketListing\(body, userId\)/);
+  assert.match(rpc, /async function cancelPetMarketListing\(body, userId\)/);
+  assert.match(rpc, /async function buyPetMarketItem\(body, userId\)/);
+  assert.match(rpc, /p_pet_uid/);
+  assert.match(rpc, /pet_uid_not_owned/);
+  assert.match(rpc, /pet-market:/);
+  assert.match(npcSale, /CREATE TABLE IF NOT EXISTS public\.npc_pet_sale_requests/);
+  assert.match(npcSale, /export async function sellPetInstanceToNpc/);
+  assert.match(npcSale, /npc_pet_sale_requests/);
+  assert.match(sync, /export async function listPetInstanceMarket/);
+  assert.match(sync, /supabase\.rpc\('create_pet_market_listing'/);
+  assert.match(sync, /supabase\.rpc\('sell_pet_instance'/);
+});
+
+test('online pet list/sell UI never persists a locally shortened instance array', () => {
+  const listBlock = block(gameUI, 'async _listPetInstanceMarket(uid, price)', '  // Level-scaled NPC sell price');
+  const sellBlock = block(gameUI, 'async _sellPetInstanceNpc(uid)', '  // ============ Leaderboard');
+  assert.match(listBlock, /listPetInstanceMarket\(/);
+  assert.doesNotMatch(listBlock, /savePetState\(/);
+  assert.match(listBlock, /listing\._serverAuthoritative/);
+  assert.match(sellBlock, /this\._isServerBackedCharacter\(\)/);
+  assert.match(sellBlock, /requestPetNpcSale\(/);
+  assert.doesNotMatch(sellBlock, /setInventoryItemQuantity\(/);
+});
+
+test('market buy/cancel routes pet listings through canonical server receipts', () => {
+  const sync = gameSyncSource();
+  assert.match(sync, /listingMeta\?\.item_type === 'pet'/);
+  assert.match(sync, /buy_pet_market_item/);
+  assert.match(sync, /cancel_pet_market_listing/);
+  assert.match(gameUI, /buyMarketItem\(listing\.id, this\.characterId, this\.character\.stats\.name, listing\)/);
+  assert.match(gameUI, /boughtResult\.pet\?\.instances/);
+  assert.match(gameUI, /canceled\.listing\?\.stats\?\.instances/);
+});
+
+
+test('pet marketplace escrow binds to the originating character in multi-character accounts', () => {
+  const rpc = read('../server/api/rpc.js');
+  const listingBlock = block(rpc, 'function petListingStats(instance, sellerCharacterId)', ' async function createMarketListing');
+  assert.match(listingBlock, /sellerCharacterId/);
+  assert.match(rpc, /SELECT id FROM characters WHERE id = \$1 AND user_id = \$2 FOR UPDATE/);
+  assert.match(rpc, /listing\.stats\?\.sellerCharacterId/);
 });

@@ -777,6 +777,9 @@ async function initGame(charData) {
                             mapName: receipt.map_name,
                             mapTier: receipt.map_tier,
                             mapDanger: receipt.map_danger,
+                            discoveryBonus: receipt.discovery_bonus,
+                            gold: receipt.gold,
+                            almanac: receipt.almanac,
                         };
                         gameUI.addItemLocal(item, receipt.quantity);
                         const rarityEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' };
@@ -903,9 +906,10 @@ async function initGame(charData) {
                 : character.stats.gold + payload.gold;
             combatSystem.onEvent({ type: 'goldGain', amount: payload.gold, targetPos: pos });
         }
-        if (character.equippedPet && character.addPetXp) {
-            const petLeveled = character.addPetXp(Math.max(1, Math.round((payload.exp || 0) * 0.5)));
-            if (petLeveled) combatSystem.onEvent({ type: 'petLevelUp', level: character.petLevel });
+        // Online pet progression is computed and committed by the server kill
+        // transaction. Never derive pet level/XP from a client-visible reward.
+        if (payload.pet && gameUI?.applyServerPetReward) {
+            gameUI.applyServerPetReward(payload.pet);
         }
         combatSystem.onEvent({ type: 'monsterKilled', monsterName: payload.name });
         if (gameUI) gameUI.updateHUD?.(character.stats);

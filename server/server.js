@@ -1960,33 +1960,6 @@ async function settleDuelMMR(winnerCharacterId, loserCharacterId) {
 }
 
 // ============ Periodic Save to Supabase ============
-async function saveSystemInventorySnapshot(characterId, itemName, stats) {
-    if (stats === undefined || stats === null) return;
-    if (typeof stats !== 'object' || Array.isArray(stats)) {
-        throw new Error(`Invalid ${itemName} system snapshot`);
-    }
-    // Keep a client-owned progress blob bounded before using the service-role
-    // saver. This prevents a modified browser from turning save_state into a
-    // large-payload/large-row write path.
-    let boundedStats;
-    try {
-        const encoded = JSON.stringify(stats);
-        if (encoded.length > 128 * 1024) throw new Error('system snapshot too large');
-        boundedStats = JSON.parse(encoded);
-    } catch (error) {
-        throw new Error(`Invalid ${itemName} system snapshot: ${error.message}`);
-    }
-
-    const { error } = await supabase.from('inventory').upsert({
-        character_id: characterId,
-        item_name: itemName,
-        item_type: 'system',
-        quantity: 1,
-        stats: boundedStats,
-    }, { onConflict: 'character_id,item_name' });
-    if (error) throw error;
-}
-
 async function saveCharacterToSupabase(saveData) {
     if (!supabase || !saveData || !saveData.characterId) return false;
 
@@ -2041,20 +2014,13 @@ async function saveCharacterToSupabase(saveData) {
             }
         }
 
-        // 2-5. Save every non-authoritative system snapshot through the same
-        // bounded, ownership-gated upsert helper. These are progress records,
-        // not item grants; inventory quantities/stats remain server-authoritative.
-        await saveSystemInventorySnapshot(characterId, 'daily_quests', dailyQuests);
-        await saveSystemInventorySnapshot(characterId, 'friends_list', friendsList ? { list: friendsList } : null);
-        await saveSystemInventorySnapshot(characterId, 'fishing_almanac', fishingAlmanac);
-        await saveSystemInventorySnapshot(characterId, 'adventure_journal', adventureJournal);
-        await saveSystemInventorySnapshot(characterId, 'login_streak', loginStreak);
-
-        // 6. Do not apply a client inventory snapshot here. Even a sanitized
-        // snapshot still lets a connected browser overwrite server-owned item
-        // stats (refine/cards/equipment) through the service-role save path.
-        // Inventory mutations now come from authoritative monster/economy RPCs;
-        // system snapshots are persisted through their explicit fields above.
+        // System progression is not accepted through save_state/keepalive. It
+        // must use its own allowlisted RPCs so a modified browser cannot replace
+        // quest, almanac, journal, friend, or login reward state via the
+        // service-role saver. Inventory snapshots are always ignored as well.
+        if (dailyQuests || friendsList || fishingAlmanac || adventureJournal || loginStreak) {
+            console.warn(`[Server] 🚫 Ignored client progression snapshot for ${characterId}; use dedicated server RPCs`);
+        }
         if (inventory && Array.isArray(inventory) && inventory.length > 0) {
             console.warn(`[Server] 🚫 Ignored client inventory backup for ${characterId}; inventory is server-authoritative`);
         }

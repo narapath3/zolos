@@ -1,7 +1,7 @@
 import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig, FIRST_REFINE_KIT, STARTER_PET, normalizeJobId } from '../engine/GameData.js';
-import { supabase, isSelfHostMode, saveGuestJobHint } from '../network/SupabaseClient.js';
+import { supabase, isSelfHostMode, isOfflineMode, saveGuestJobHint } from '../network/SupabaseClient.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestStarterPet, requestNpcSale, requestFirstRefineSupply, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, savePetState, listPetInstanceMarket, requestPetNpcSale, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, claimDailyReward, claimAlmanacReward, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestStarterPet, requestUseConsumable, requestNpcSale, requestFirstRefineSupply, requestChangeJob, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, mergeAdventureJournals, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { FIRST_THIRTY_STEPS, createFirstThirtyState, firstThirtyProgress, getFirstThirtyStep, sanitizeFirstThirtyState, updateFirstThirtyState } from '../progression/FirstThirtyJourney.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
@@ -44,6 +44,11 @@ const SKILL_GLYPHS = {
 };
 
 export class GameUI {
+  _isServerBackedCharacter(characterId = this.characterId) {
+    const id = String(characterId || '');
+    return Boolean(id && !isOfflineMode && !id.startsWith('guest_') && !id.startsWith('local_'));
+  }
+
   constructor(character = null, soundManager = null, combatSystem = null) {
     this.gameScreen = document.getElementById('game-screen');
     this.combatLogEl = document.getElementById('combat-log-messages');
@@ -1028,8 +1033,13 @@ export class GameUI {
         item_name: 'Fishing Rod', item_type: 'fishing_rod', quantity: 1, stats: { equipped: false },
       }));
     }
-    setInventoryItemQuantity(characterId, 'Fishing Rod', 'fishing_rod', 1, { equipped: false })
-      .catch(error => console.warn('[GameUI] Starter fishing rod will retry on next load:', error?.message || error));
+    if (this._isServerBackedCharacter(characterId)) {
+      import('../network/GameSync.js').then(({ requestStarterLoadout }) => requestStarterLoadout(characterId))
+        .catch(error => console.warn('[GameUI] Starter equipment will retry on next load:', error?.message || error));
+    } else {
+      setInventoryItemQuantity(characterId, 'Fishing Rod', 'fishing_rod', 1, { equipped: false })
+        .catch(error => console.warn('[GameUI] Starter fishing rod will retry on next load:', error?.message || error));
+    }
     return true;
   }
 
@@ -1070,7 +1080,7 @@ export class GameUI {
       if (m.loot) {
         const lootFound = m.loot.find(l => l.name === itemName);
         if (lootFound) {
-          droppers.push({ name: m.name, emoji: m.emoji, chance: lootFound.chance });
+          droppers.push({ key: mKey, name: m.name, color: m.color, family: m.family, isBoss: m.isBoss, isElite: m.isElite, chance: lootFound.chance });
         }
       }
     });
@@ -1296,31 +1306,48 @@ export class GameUI {
   async loadDailyQuestsFromDB(characterId) {
     if (!characterId) return;
     this.characterId = characterId;
+    this._dailyQuestsServerLocked = this._isServerBackedCharacter(characterId);
+    this._dailyQuestsLoaded = false;
     const generation = this._lifecycleGeneration;
     try {
+      const useLocalCache = !this._isServerBackedCharacter(characterId);
       const localKey = `zolos_daily_quests_${characterId}`;
       let localData = null;
-      try {
-        const stored = localStorage.getItem(localKey);
-        if (stored) localData = JSON.parse(stored);
-      } catch (e) { }
+      if (useLocalCache) {
+        try {
+          const stored = localStorage.getItem(localKey);
+          if (stored) localData = JSON.parse(stored);
+        } catch (e) { }
+      }
 
-      // Load from DB
+      // Load from DB. Online sessions use the server snapshot as the sole
+      // gameplay source; local cache is reserved for explicit offline mode.
       const dbQuests = await loadDailyQuests(characterId);
       if (!this._isCharacterLoadCurrent(characterId, generation)) return;
+      this._dailyQuestsLoaded = true;
       const today = new Date().toDateString();
 
-      const selectedState = this._mergeDailyQuestStates(dbQuests, localData);
+      const selectedState = useLocalCache
+        ? this._mergeDailyQuestStates(dbQuests, localData)
+        : dbQuests;
 
       if (selectedState && selectedState.lastDate === today) {
         this.dailyQuestsState = selectedState;
-        localStorage.setItem(localKey, JSON.stringify(selectedState));
-        localStorage.setItem('zolos_daily_quests', JSON.stringify(selectedState));
-        await saveDailyQuests(characterId, selectedState);
+        if (useLocalCache) {
+          localStorage.setItem(localKey, JSON.stringify(selectedState));
+          localStorage.setItem('zolos_daily_quests', JSON.stringify(selectedState));
+        }
+        if (useLocalCache) await saveDailyQuests(characterId, selectedState);
         if (!this._isCharacterLoadCurrent(characterId, generation)) return;
       } else {
-        // Force refresh daily quests
-        this._checkDailyQuestsReset();
+        // Online daily quests are read-only until the server owns generation,
+        // progress, and reward receipts. Never generate a client-owned quest
+        // set that could later be treated as gameplay state.
+        if (this._dailyQuestsServerLocked) {
+          this.dailyQuestsState = { lastDate: today, streak: 0, rouletteSpent: true, quests: [] };
+        } else {
+          this._checkDailyQuestsReset();
+        }
       }
 
       this._renderDailyQuests();
@@ -1332,11 +1359,13 @@ export class GameUI {
   async _saveDailyQuestsToDB() {
     const state = this.dailyQuestsState;
     if (!state) return true;
+    if (this._isServerBackedCharacter()) return false;
     try {
-      localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
+      const useLocalCache = true;
+      if (useLocalCache) localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
       if (this.characterId) {
         const localKey = `zolos_daily_quests_${this.characterId}`;
-        localStorage.setItem(localKey, JSON.stringify(state));
+        if (useLocalCache) localStorage.setItem(localKey, JSON.stringify(state));
         return (await saveDailyQuests(this.characterId, state)) !== false;
       }
       return true;
@@ -1352,12 +1381,15 @@ export class GameUI {
     this.characterId = characterId;
     const generation = this._lifecycleGeneration;
     try {
+      const useLocalCache = !this._isServerBackedCharacter(characterId);
       const localKey = `zolos_friends_${characterId}`;
       let localFriends = [];
-      try {
-        const stored = localStorage.getItem(localKey);
-        if (stored) localFriends = JSON.parse(stored);
-      } catch (e) { }
+      if (useLocalCache) {
+        try {
+          const stored = localStorage.getItem(localKey);
+          if (stored) localFriends = JSON.parse(stored);
+        } catch (e) { }
+      }
 
       const dbFriends = await loadFriendsList(characterId);
       if (!this._isCharacterLoadCurrent(characterId, generation)) return;
@@ -1366,8 +1398,10 @@ export class GameUI {
         ...(Array.isArray(localFriends) ? localFriends : []),
       ].filter(name => typeof name === 'string' && name.trim()).map(name => name.trim()))];
 
-      localStorage.setItem(localKey, JSON.stringify(this.friends));
-      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      if (useLocalCache) {
+        localStorage.setItem(localKey, JSON.stringify(this.friends));
+        localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      }
 
       if (this.onlinePlayers) this.updateOnlinePlayers(this.onlinePlayers);
     } catch (e) {
@@ -1378,9 +1412,12 @@ export class GameUI {
   async _saveFriendsListToDB() {
     if (!this.characterId) return true;
     try {
+      const useLocalCache = !this._isServerBackedCharacter();
       const localKey = `zolos_friends_${this.characterId}`;
-      localStorage.setItem(localKey, JSON.stringify(this.friends));
-      localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      if (useLocalCache) {
+        localStorage.setItem(localKey, JSON.stringify(this.friends));
+        localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
+      }
       return (await saveFriendsList(this.characterId, this.friends)) !== false;
     } catch (e) {
       console.error('[Zolos] Failed to save friends list:', e);
@@ -1433,17 +1470,20 @@ export class GameUI {
     this._syncPetItemStats();
     // Fold live card sockets into card-row stats so they're saved with the batch.
     this._syncCardItemStats();
-    const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+    const { savePetState } = await import('../network/GameSync.js');
     let ok = true;
+    const serverBacked = this._isServerBackedCharacter();
 
-    // Flush ALL items (not just equipped ones) so that items bought but never
-    // equipped still have a confirmed DB row with the right quantity.
-    // IMPORTANT: SET the absolute quantity from our in-memory truth. Using the
-    // delta-based saveInventoryItem here re-added the whole stack every flush,
-    // which inflated quantities without bound (the "หลักหมื่นหลักแสน" bug).
+    // Online inventory quantities, cards, refine stats, and equipment grants
+    // are server-owned and are already committed by their dedicated gameplay
+    // transactions. Only pet instance state has a dedicated logout-safe flush;
+    // never replay a client inventory snapshot through generic /db writes.
     for (const item of this.inventory) {
+      if (serverBacked && item.item_type !== 'pet') continue;
       try {
-        const saved = await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity, item.stats || {});
+        const saved = item.item_type === 'pet'
+          ? await savePetState(this.characterId, item.item_name, item.stats || {})
+          : true;
         if (saved === false) ok = false;
       } catch (e) {
         ok = false;
@@ -1464,24 +1504,28 @@ export class GameUI {
     const generation = this._lifecycleGeneration;
     this.almanac = { caught: [], claimed: [], counts: {} };
     try {
+      const useLocalCache = !this._isServerBackedCharacter(characterId);
       const localKey = `zolos_almanac_${characterId}`;
       let local = null;
-      try { const s = localStorage.getItem(localKey); if (s) local = JSON.parse(s); } catch (e) { }
+      if (useLocalCache) {
+        try { const s = localStorage.getItem(localKey); if (s) local = JSON.parse(s); } catch (e) { }
+      }
       const db = await loadFishingAlmanac(characterId);
       if (!this._isCharacterLoadCurrent(characterId, generation)) return;
-      // Merge DB + local so nothing is ever lost (union of caught species)
+      // Online sessions use the server snapshot as the only gameplay source;
+      // only explicit offline mode may merge a local recovery cache.
       const merged = { caught: [], claimed: [], counts: {} };
-      const caught = new Set([...(db?.caught || []), ...(local?.caught || [])]);
-      const claimed = new Set([...(db?.claimed || []), ...(local?.claimed || [])]);
+      const caught = new Set([...(db?.caught || []), ...(useLocalCache ? (local?.caught || []) : [])]);
+      const claimed = new Set([...(db?.claimed || []), ...(useLocalCache ? (local?.claimed || []) : [])]);
       merged.caught = [...caught];
       merged.claimed = [...claimed];
       for (const name of caught) {
         const dbCount = Number(db?.counts?.[name]) || 0;
-        const localCount = Number(local?.counts?.[name]) || 0;
+        const localCount = useLocalCache ? (Number(local?.counts?.[name]) || 0) : 0;
         merged.counts[name] = Math.max(1, dbCount, localCount);
       }
       this.almanac = merged;
-      localStorage.setItem(localKey, JSON.stringify(merged));
+      if (useLocalCache) localStorage.setItem(localKey, JSON.stringify(merged));
     } catch (e) {
       console.error('[Zolos] Failed to load fishing almanac:', e);
     }
@@ -1492,7 +1536,9 @@ export class GameUI {
     if (!this.almanac) return true;
     try {
       if (this.characterId) {
-        localStorage.setItem(`zolos_almanac_${this.characterId}`, JSON.stringify(this.almanac));
+        if (!this._isServerBackedCharacter()) {
+          localStorage.setItem(`zolos_almanac_${this.characterId}`, JSON.stringify(this.almanac));
+        }
         return (await saveFishingAlmanac(this.characterId, this.almanac)) !== false;
       }
       return true;
@@ -1633,8 +1679,9 @@ export class GameUI {
     return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
   }
 
-  // Called from the fishCaught flow. Records a species; grants the discovery
-  // bonus the first time it's seen and auto-refreshes the almanac if open.
+  // Called from the fishCaught flow. Online sessions accept the complete
+  // almanac/gold receipt produced by the server fishing transaction. Offline
+  // sessions retain the local fallback because they have no authoritative DB.
   recordFishCatch(item) {
     if (!item || (item.type && item.type !== 'fish')) return;
     const trustedServerReward = item.serverAuthoritative === true;
@@ -1642,6 +1689,33 @@ export class GameUI {
     const name = item.name || item.item_name;
     if (!name || !FISH_SPECIES[name]) return;
     this._recordFishingSessionCatch(item);
+
+    if (trustedServerReward) {
+      const snapshot = item.almanac;
+      if (!snapshot || !Array.isArray(snapshot.caught) || !Array.isArray(snapshot.claimed)
+        || !snapshot.counts || typeof snapshot.counts !== 'object' || Array.isArray(snapshot.counts)) {
+        this.addCombatLog('ไม่สามารถยืนยันสมุดสะสมปลาจากเซิร์ฟเวอร์ได้ จึงไม่เปลี่ยน progression ในเครื่อง', 'warning');
+        return;
+      }
+      const caught = snapshot.caught.filter(fishName => typeof fishName === 'string' && FISH_SPECIES[fishName]).slice(0, Object.keys(FISH_SPECIES).length);
+      const claimed = snapshot.claimed.filter(value => ['common', 'uncommon', 'rare', 'legendary', 'all'].includes(value)).slice(0, 5);
+      const counts = {};
+      for (const fishName of caught) counts[fishName] = Math.max(0, Math.min(2_147_483_647, Math.floor(Number(snapshot.counts[fishName]) || 0)));
+      this.almanac = { caught: [...new Set(caught)], claimed: [...new Set(claimed)], counts };
+      if (this.character?.stats && Number.isSafeInteger(item.gold) && item.gold >= 0) {
+        this.character.stats.gold = item.gold;
+        this.updateHUD(this.character.stats);
+      }
+      const bonus = Number.isSafeInteger(item.discoveryBonus) ? item.discoveryBonus : 0;
+      const modal = document.getElementById('almanac-modal');
+      if (bonus > 0) {
+        this.addCombatLog(`พบปลาชนิดใหม่! ${name} (+${bonus} Gold) — สมุดสะสม ${this._almanacTierCounts().caughtTotal}/${this._almanacTierCounts().grandTotal}`, 'loot', item);
+        this._notifyAlmanacCompletions();
+      }
+      if (modal && modal.style.display !== 'none') this._renderAlmanac();
+      return;
+    }
+
     if (!this.almanac) this.almanac = { caught: [], claimed: [], counts: {} };
     if (!this.almanac.counts) this.almanac.counts = {};
     const firstDiscovery = !this.almanac.caught.includes(name);
@@ -1652,18 +1726,15 @@ export class GameUI {
       if (modal && modal.style.display !== 'none') this._renderAlmanac();
       return;
     }
-
     this.almanac.caught.push(name);
     const rarity = FISH_SPECIES[name].rarity;
     const bonus = GameUI._ALMANAC_DISCOVERY[rarity] || 50;
-    if (this.character && this.character.stats) {
+    if (this.character?.stats) {
       this.character.stats.gold = (Number(this.character.stats.gold) || 0) + bonus;
       this.updateHUD(this.character.stats);
     }
-    const rEmoji = { common: '⚪', uncommon: '🟢', rare: '🔵', legendary: '🟡' }[rarity] || '⚪';
-    this.addCombatLog(`📖 พบปลาชนิดใหม่! ${name} ${rEmoji} (+${bonus} Gold) — สมุดสะสม ${this._almanacTierCounts().caughtTotal}/${this._almanacTierCounts().grandTotal}`, 'loot', item);
+    this.addCombatLog(`พบปลาชนิดใหม่! ${name} (+${bonus} Gold) — สมุดสะสม ${this._almanacTierCounts().caughtTotal}/${this._almanacTierCounts().grandTotal}`, 'loot', item);
     this._saveFishingAlmanac();
-    // If a tier just got completed, nudge the player
     this._notifyAlmanacCompletions();
     const modal = document.getElementById('almanac-modal');
     if (modal && modal.style.display !== 'none') this._renderAlmanac();
@@ -1684,41 +1755,58 @@ export class GameUI {
     }
   }
 
-  _claimAlmanacReward(tier) {
-    const { totals, got } = this._almanacTierCounts();
+  async _claimAlmanacReward(tier) {
     if (!this.almanac) return;
+    if (this._isServerBackedCharacter()) {
+      try {
+        const result = await claimAlmanacReward(this.characterId, tier);
+        if (!result?.ok || result.serverAuthoritative !== true || !Number.isSafeInteger(result.gold) || result.gold < 0) {
+          throw new Error(result?.reason || 'ผลรางวัลสมุดปลาจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+        }
+        this.almanac = result.state || this.almanac;
+        if (this.character?.stats) {
+          this.character.stats.gold = result.gold;
+          this.updateHUD(this.character.stats);
+        }
+        for (const item of Array.isArray(result.items) ? result.items : []) {
+          this.addItemLocal({ name: item.name, type: item.type }, Number(item.quantity) || 0);
+        }
+        const reward = GameUI._ALMANAC_TIER_REWARD[tier];
+        const label = { common: 'ธรรมดา', uncommon: 'พบบ่อย', rare: 'หายาก', legendary: 'ตำนาน', all: 'ครบทุกชนิด' }[tier] || tier;
+        this.addCombatLog(`${result.claimed ? 'รับ' : 'ตรวจสอบ'}รางวัลสะสมปลา "${label}": +${result.claimed ? (reward?.gold || 0).toLocaleString() : '0'} Gold`, 'levelup', result.items?.[0] ? { name: result.items[0].name, type: result.items[0].type } : null);
+        if (result.claimed) this.soundManager?.playLevelUpSound?.();
+        if (result.claimed && tier === 'all') {
+          this.addCombatLog('ปลดล็อกป้าย Master Angler — เปิดใช้งานได้จากกระเป๋า!', 'levelup');
+          if (this.triggerScreenShake) this.triggerScreenShake(true);
+          try { if (window.particles && this.character?.getPosition) window.particles.createExplosion(this.character.getPosition(), 0xffd24a); } catch (e) { /* non-fatal */ }
+        }
+        this._renderAlmanac(); this._renderInventory();
+      } catch (error) {
+        this.addCombatLog(`ไม่สามารถรับรางวัลสมุดปลาได้: ${error?.message || 'เซิร์ฟเวอร์ไม่พร้อม'}`, 'warning');
+      }
+      return;
+    }
+
+    // Explicit offline fallback: completion and reward are local-only because
+    // no authoritative backend exists in this mode.
+    const { totals, got } = this._almanacTierCounts();
     const claimed = new Set(this.almanac.claimed);
     if (claimed.has(tier)) return;
-
-    let complete = false;
-    if (tier === 'all') {
-      complete = ['common', 'uncommon', 'rare', 'legendary'].every(t => totals[t] && got[t] === totals[t]);
-    } else {
-      complete = totals[tier] && got[tier] === totals[tier];
-    }
+    const complete = tier === 'all'
+      ? ['common', 'uncommon', 'rare', 'legendary'].every(t => totals[t] && got[t] === totals[t])
+      : totals[tier] && got[tier] === totals[tier];
     if (!complete) return;
-
     const reward = GameUI._ALMANAC_TIER_REWARD[tier];
-    if (this.character && this.character.stats) {
+    if (this.character?.stats) {
       this.character.stats.gold = (Number(this.character.stats.gold) || 0) + (reward.gold || 0);
       this.updateHUD(this.character.stats);
     }
     if (reward.item) this.addItem(reward.item);
     this.almanac.claimed.push(tier);
     this._saveFishingAlmanac();
-
     const label = { common: 'ธรรมดา', uncommon: 'พบบ่อย', rare: 'หายาก', legendary: 'ตำนาน', all: 'ครบทุกชนิด' }[tier];
-    this.addCombatLog(`🏅 รับรางวัลสะสมปลา "${label}": +${(reward.gold || 0).toLocaleString()} Gold${reward.item ? ` + ${reward.item.emoji} ${reward.item.name}` : ''}!`, 'levelup');
-    if (this.soundManager) this.soundManager.playLevelUpSound();
-
-    // Award the title item; the player chooses when to show the nameplate.
-    if (tier === 'all' && this.character && this.character.setTitle) {
-      this.addCombatLog('👑 ปลดล็อกป้าย "🏆 Master Angler" — เปิดใช้งานได้จากกระเป๋า!', 'levelup');
-      if (this.triggerScreenShake) this.triggerScreenShake(true);
-      try {
-        if (window.particles && this.character.getPosition) window.particles.createExplosion(this.character.getPosition(), 0xffd24a);
-      } catch (e) { /* non-fatal */ }
-    }
+    this.addCombatLog(`รับรางวัลสะสมปลา "${label}": +${(reward.gold || 0).toLocaleString()} Gold`, 'levelup');
+    this.soundManager?.playLevelUpSound?.();
     this._renderAlmanac();
   }
 
@@ -2426,8 +2514,8 @@ export class GameUI {
   // ===== LOADOUT SETS (PUBG-style outfit presets) =====
   // A "เซ็ทชุด" is a saved snapshot of what's worn in every EQUIP_SLOTS slot.
   // Tapping one re-equips the whole outfit at once, so players can switch a
-  // full class/costume build in one tap. Stored per-character in localStorage
-  // (they only reference owned item names — no server state needed).
+  // full class/costume build in one tap. Online sets live in the server-backed
+  // character appearance; only explicit offline mode may use local fallback.
 
   _loadoutKey() {
     return `zolos_loadouts_${this.characterId || 'guest'}`;
@@ -2435,29 +2523,33 @@ export class GameUI {
 
   // Sets live on the character (persisted inside the appearance JSON so they
   // sync across devices). localStorage is only a local cache/fallback used
-  // before the character has loaded or when offline.
+    // before the character has loaded or when offline.
   _getLoadouts() {
     const ch = this.character;
     if (ch && Array.isArray(ch.loadouts)) return ch.loadouts;
-    try {
-      const raw = localStorage.getItem(this._loadoutKey());
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    } catch { return []; }
+    if (isOfflineMode) {
+      try {
+        const raw = localStorage.getItem(this._loadoutKey());
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch { return []; }
+    }
+    return [];
   }
 
   _saveLoadouts(arr) {
     const list = Array.isArray(arr) ? arr : [];
     if (this.character) this.character.loadouts = list;
-    // Local cache (instant, survives reload before the DB round-trip / offline).
-    try { localStorage.setItem(this._loadoutKey(), JSON.stringify(list)); }
-    catch { /* localStorage unavailable / full */ }
     // Persist to the DB so the sets follow the player to other devices. Rides
     // inside the appearance JSON via saveStatsToDatabase (online or offline).
+    if (isOfflineMode) {
+      try { localStorage.setItem(this._loadoutKey(), JSON.stringify(list)); }
+      catch { /* localStorage unavailable / full */ }
+    }
     if (this.character && this.characterId && this.character.saveStatsToDatabase) {
       Promise.resolve()
         .then(() => this.character.saveStatsToDatabase())
-        .catch(() => { /* best-effort; local cache still holds the sets */ });
+        .catch(() => { console.error('[Zolos] Failed to save loadouts to server'); });
     }
   }
 
@@ -3185,9 +3277,9 @@ export class GameUI {
     const droppers = this._getItemDroppers(item.item_name);
     let droppedByHtml = '';
     if (droppers.length > 0) {
-      droppedByHtml = `<br/><br/><strong style="color:var(--secondary)">👾 Dropped By / ได้จากมอนสเตอร์:</strong><br/>` + droppers.map(d => `${d.emoji} ${d.name} (${(d.chance * 100).toFixed(1)}%)`).join('<br/>');
+      droppedByHtml = `<br/><br/><strong style="color:var(--secondary)">Dropped By / ได้จากมอนสเตอร์:</strong><br/>` + droppers.map(d => `${this._wikiMonsterPortrait(d, false, d.key)} ${d.name} (${(d.chance * 100).toFixed(1)}%)`).join('<br/>');
     } else {
-      droppedByHtml = `<br/><br/><strong style="color:var(--text-dim)">👾 Dropped By:</strong> ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)`;
+      droppedByHtml = `<br/><br/><strong style="color:var(--text-dim)">Dropped By:</strong> ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)`;
     }
     let durHtml = '';
     if (item.item_type === 'tool' && ITEMS[item.item_name] && ITEMS[item.item_name].durability) {
@@ -3330,6 +3422,15 @@ export class GameUI {
 
     const item = this.inventory[itemIdx];
 
+    // Pet rows contain individual instances. Route the action through the
+    // instance persistence path so summon/store updates equippedUid and XP.
+    if (item.item_type === 'pet') {
+      const instances = this._ensurePetInstances(item);
+      const uid = item.stats?.equippedUid || instances[0]?.uid;
+      if (uid) await this._equipPetInstance(uid);
+      return;
+    }
+
     if (item.item_type === 'title' || ['Bug Hunter Emblem','Master Angler Trophy'].includes(item.item_name)) {
       await this._toggleTitleItem(item);
       return;
@@ -3345,8 +3446,32 @@ export class GameUI {
       return;
     }
 
-    if (item.item_type !== 'consumable' || item.quantity <= 0) return;
-
+        if (item.item_type !== 'consumable' || item.quantity <= 0) return;
+    if (this._isServerBackedCharacter()) {
+      try {
+        const result = await requestUseConsumable(this.characterId, item.item_name);
+        if (!result?.consumed) {
+          this.addCombatLog('ไม่สามารถใช้ไอเทมได้ในขณะนี้ หรือค่าพลังเต็มแล้ว', 'system');
+          return;
+        }
+        this.character.stats.hp = Number(result.hp);
+        this.character.stats.sp = Number(result.sp);
+        item.quantity = Number(result.quantity);
+        this.incrementQuestProgress('consume', item.item_name);
+        if (item.quantity <= 0) {
+          this.inventory.splice(itemIdx, 1);
+          this.selectedItemName = null;
+        }
+        this.addCombatLog(`ใช้ ${item.item_name} สำเร็จ`, 'heal');
+        this.soundManager?.playUseItemSound?.();
+        this._renderInventory();
+        this.updateHUD(this.character.stats);
+        this.updateStats(this.character.stats);
+      } catch (error) {
+        this.addCombatLog(`ไม่สามารถใช้ไอเทมได้: ${error?.message || 'เซิร์ฟเวอร์ไม่พร้อม'}`, 'warning');
+      }
+      return;
+    }
     let used = false;
     if (item.healHp > 0) {
       if (this.character.stats.hp >= this.character.stats.max_hp) {
@@ -3393,6 +3518,15 @@ export class GameUI {
 
   async _toggleEquipItem(item) {
     if (!this.character || !item) return;
+    if (item.item_type === 'pet') {
+      const instances = Array.isArray(item.stats?.instances) ? item.stats.instances : [];
+      const petUid = this.character.equippedPetUid
+        || item.stats?.equippedUid
+        || instances[0]?.uid;
+      if (petUid) return this._equipPetInstance(petUid);
+      this._equipToast('สัตว์เลี้ยงยังไม่มี instance ที่ใช้งานได้', false);
+      return;
+    }
 
     const isEquipped = item.stats && item.stats.equipped === true;
 
@@ -3425,10 +3559,12 @@ export class GameUI {
         item.stats.petLevel = this.character.petLevel;
         item.stats.petXp = Math.floor(this.character.petXp);
         this.character.setPet(null);
+        this.character.equippedPetUid = null;
+        item.stats.equippedUid = null;
       }
       if (this.characterId) {
-        // Quantity is server-authoritative; only the equip flag is client-writable.
-        await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
+        // Pet instances use the dedicated ownership-safe state writer.
+        await (item.item_type === 'pet' ? savePetState : updateInventoryItemStats)(this.characterId, item.item_name, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
         this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
@@ -3464,8 +3600,8 @@ export class GameUI {
         if (isSameSlot && otherItem.stats && otherItem.stats.equipped === true) {
           otherItem.stats.equipped = false;
           if (this.characterId) {
-            // Quantity is server-authoritative; only the equip flag is client-writable.
-            await updateInventoryItemStats(this.characterId, otherItem.item_name, otherItem.stats || {});
+            // Pet instances use the dedicated ownership-safe state writer.
+            await (otherItem.item_type === 'pet' ? savePetState : updateInventoryItemStats)(this.characterId, otherItem.item_name, otherItem.stats || {});
           }
         }
       }
@@ -3500,9 +3636,9 @@ export class GameUI {
       }
 
       if (this.characterId) {
-        // Inventory quantity is server-authoritative. Persist only the
-        // ownership-safe equipped flag so fish_claim can verify the rod.
-        await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
+        // Pet instance state uses the dedicated ownership-safe writer; other
+        // equipment keeps the restricted equipped-flag update path.
+        await (item.item_type === 'pet' ? savePetState : updateInventoryItemStats)(this.characterId, item.item_name, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
       const isPet = item.item_type === 'pet';
@@ -3671,17 +3807,54 @@ export class GameUI {
   async persistPetProgress() {
     const petItem = this._syncPetItemStats();
     if (petItem && this.characterId) {
-      const { updateInventoryItemStats } = await import('../network/GameSync.js');
-      await updateInventoryItemStats(this.characterId, petItem.item_name, petItem.stats);
+      const result = await savePetState(this.characterId, petItem.item_name, petItem.stats);
+      this._applyCanonicalPetSave(petItem, result);
+    }
+  }
+
+  // Apply a server-committed pet progression receipt after an authoritative kill.
+  applyServerPetReward(receipt) {
+    if (!receipt || typeof receipt !== 'object' || !Array.isArray(receipt.instances)) return false;
+    const item = this.inventory?.find(row => row.item_type === 'pet' && row.item_name === receipt.itemName);
+    if (!item) return false;
+    const instances = receipt.instances.filter(instance => instance && typeof instance.uid === 'string');
+    if (!instances.length) return false;
+    item.stats = { ...(item.stats || {}), instances, equipped: true, equippedUid: receipt.equippedUid || null };
+    item.quantity = instances.length;
+    const active = instances.find(instance => instance.uid === receipt.equippedUid);
+    if (active && this.character) {
+      this.character.equippedPetUid = active.uid;
+      this.character.setPet(petModelOf(item.item_name), active.level, active.xp);
+      this._completeFirstThirtyStep('grow_pet_one_level');
+    }
+    this._renderInventory();
+    this.updateHUD(this.character?.stats || {});
+    return true;
+  }
+
+  // Apply the server's canonical pet row after a save. This matters for legacy
+  // rows whose local random UID is replaced by a stable server UID.
+  _applyCanonicalPetSave(item, result) {
+    if (!item || !result?.stats || typeof result.stats !== 'object') return;
+    const previousUid = this.character?.equippedPetUid || null;
+    item.stats = result.stats;
+    if (Number.isInteger(result.quantity)) item.quantity = result.quantity;
+    const canonicalUid = item.stats.equippedUid || null;
+    if (previousUid && canonicalUid && this.character?.equippedPetUid === previousUid) {
+      this.character.equippedPetUid = canonicalUid;
     }
   }
 
   // Persist a pet row's stats (instances/equipped) to the DB.
   async _persistPetRow(item) {
-    if (item && this.characterId) {
-      const { updateInventoryItemStats } = await import('../network/GameSync.js');
-      await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
+    if (!item || !this.characterId) return false;
+    const previousUid = this.character?.equippedPetUid || null;
+    const result = await savePetState(this.characterId, item.item_name, item.stats || {});
+    this._applyCanonicalPetSave(item, result);
+    if (previousUid && item.stats?.equippedUid && this.character?.equippedPetUid === previousUid) {
+      this.character.equippedPetUid = item.stats.equippedUid;
     }
+    return result;
   }
 
   // Summon / store a specific pet instance.
@@ -3719,6 +3892,7 @@ export class GameUI {
     }
 
     for (const it of touched) await this._persistPetRow(it);
+    if (this.character?.saveStatsToDatabase) await this.character.saveStatsToDatabase();
     if (this.soundManager && this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
     this._renderInventory();
     this.updateHUD(this.character.stats);
@@ -3860,19 +4034,23 @@ export class GameUI {
       petXp: inst.xp || 0,
     };
     try {
-      const listing = await listMarketItem(
-        this.characterId, this.character.stats.name,
-        item.item_name, 'pet', 1, price, stats,
+      const listing = await listPetInstanceMarket(
+        this.characterId, item.item_name, uid, price,
       );
       if (!listing || listing._failed) throw new Error('list failed');
 
-      // Remove the sold instance from inventory.
-      const arr = item.stats.instances;
-      const idx = arr.findIndex(x => x.uid === uid);
-      if (idx >= 0) arr.splice(idx, 1);
-      item.quantity = arr.length;
-      const { setInventoryItemQuantity } = await import('../network/GameSync.js');
-      await setInventoryItemQuantity(this.characterId, item.item_name, 'pet', item.quantity, item.stats);
+      // The remote transaction already removed exactly this UID. Offline mode
+      // still applies the local projection because it has no remote authority.
+      if (listing._serverAuthoritative && listing.remaining) {
+        const remaining = Array.isArray(listing.remaining.instances) ? listing.remaining.instances : [];
+        item.stats = { ...(item.stats || {}), ...(listing.remaining.stats || {}), instances: remaining, equipped: false, equippedUid: null };
+        item.quantity = remaining.length;
+      } else {
+        const arr = Array.isArray(item.stats?.instances) ? item.stats.instances : [];
+        const idx = arr.findIndex(x => x.uid === uid);
+        if (idx >= 0) arr.splice(idx, 1);
+        item.quantity = arr.length;
+      }
       if (item.quantity <= 0) {
         const i = this.inventory.indexOf(item);
         if (i >= 0) this.inventory.splice(i, 1);
@@ -3904,26 +4082,47 @@ export class GameUI {
     const gold = this._petSellPrice(item, inst);
     const wasEquipped = this.character.equippedPetUid === uid;
 
-    // Remove the instance.
-    const arr = item.stats.instances;
-    const idx = arr.findIndex(x => x.uid === uid);
-    if (idx < 0) return;
-    arr.splice(idx, 1);
-    item.quantity = arr.length;
-
-    if (wasEquipped) { this.character.setPet(null); this.character.equippedPetUid = null; item.stats.equipped = false; item.stats.equippedUid = null; }
-
-    this.character.stats.gold = (this.character.stats.gold || 0) + gold;
-
-    // Persist: update the row (or delete it if no pets of this type remain).
-    if (this.characterId) {
-      const { setInventoryItemQuantity } = await import('../network/GameSync.js');
-      await setInventoryItemQuantity(this.characterId, item.item_name, 'pet', item.quantity, item.stats);
-      if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+    if (wasEquipped) {
+      this._equipToast('เก็บสัตว์เลี้ยงก่อนขาย', false);
+      return;
     }
-    if (item.quantity <= 0) {
-      const i = this.inventory.indexOf(item);
-      if (i >= 0) this.inventory.splice(i, 1);
+
+    if (this._isServerBackedCharacter()) {
+      try {
+        const requestId = `pet-sale:${this.characterId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+        const receipt = await requestPetNpcSale(this.characterId, item.item_name, uid, requestId);
+        if (!receipt || !Number.isSafeInteger(Number(receipt.gold)) || !Number.isSafeInteger(Number(receipt.remaining))) {
+          throw new Error('ผลการขายจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+        }
+        this.character.stats.gold = Number(receipt.gold);
+        const arr = Array.isArray(item.stats?.instances) ? item.stats.instances : [];
+        const idx = arr.findIndex(x => x.uid === uid);
+        if (idx >= 0) arr.splice(idx, 1);
+        item.stats = { ...(item.stats || {}), instances: arr, equipped: false, equippedUid: null };
+        item.quantity = Number(receipt.remaining);
+        if (item.quantity <= 0) {
+          const i = this.inventory.indexOf(item);
+          if (i >= 0) this.inventory.splice(i, 1);
+        }
+        if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
+      } catch (error) {
+        this.addCombatLog(`❌ ขายสัตว์เลี้ยงไม่สำเร็จ: ${error.message || 'server error'}`, 'system');
+        this._equipToast('ขายสัตว์เลี้ยงไม่สำเร็จ', false);
+        return;
+      }
+    } else {
+      // Offline mode is the only mode allowed to mutate the local projection.
+      const arr = Array.isArray(item.stats?.instances) ? item.stats.instances : [];
+      const idx = arr.findIndex(x => x.uid === uid);
+      if (idx < 0) return;
+      arr.splice(idx, 1);
+      item.quantity = arr.length;
+      this.character.stats.gold = (this.character.stats.gold || 0) + gold;
+      item.stats = { ...(item.stats || {}), instances: arr, equipped: false, equippedUid: null };
+      if (item.quantity <= 0) {
+        const i = this.inventory.indexOf(item);
+        if (i >= 0) this.inventory.splice(i, 1);
+      }
     }
 
     this.addCombatLog(`💰 ขาย ${this._petDisplayName(item, inst)} สำเร็จ (+${gold.toLocaleString()} Zeny)`, 'system');
@@ -4188,13 +4387,15 @@ export class GameUI {
   // ============ Friend System Logic ============
   _setupFriendSystem() {
     this.friends = [];
-    try {
-      const stored = localStorage.getItem('zolos_friends');
-      if (stored) {
-        this.friends = JSON.parse(stored);
+    // Online friends are loaded from the server after character selection;
+    // do not bootstrap gameplay state from a device-global cache.
+    if (isOfflineMode) {
+      try {
+        const stored = localStorage.getItem('zolos_friends');
+        if (stored) this.friends = JSON.parse(stored);
+      } catch (e) {
+        console.error('[Zolos] Failed to parse friends list:', e);
       }
-    } catch (e) {
-      console.error('[Zolos] Failed to parse friends list:', e);
     }
 
     const popup = document.getElementById('player-popup');
@@ -6637,8 +6838,8 @@ export class GameUI {
       return;
     }
 
-    // Server-authoritative purchase for self-host mode (Rods only for now)
-    if (this.characterId && isSelfHostMode && getFishingRodConfig(item.name)) {
+    // All authenticated online shop purchases must be server-authoritative.
+    if (this._isServerBackedCharacter()) {
       try {
         const requestId = `shop:${this.characterId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
         const { data: result, error } = await supabase.rpc('purchase_shop_item', {
@@ -6659,17 +6860,19 @@ export class GameUI {
           this.addCombatLog(`❌ ซื้อไม่สำเร็จ: ${safeReason}`, 'system');
           return;
         }
-        // Update local state from server truth
+        // Reconcile only the committed server receipt; no local inventory write
+        // is sent back to the database after this transaction.
         this.character.stats.gold = result.gold;
         const existing = this.inventory.find(i => i.item_name === item.name);
-        if (existing) existing.quantity = (Number(existing.quantity) || 0) + qty;
-        else this.inventory.push(this._enrichItem({ item_name: item.name, item_type: itemData.type, quantity: qty, stats: {} }));
+        if (existing) existing.quantity = Number(result.inventory_quantity) || ((Number(existing.quantity) || 0) + qty);
+        else this.inventory.push(this._enrichItem({ item_name: item.name, item_type: result.item_type || itemData.type, quantity: Number(result.inventory_quantity) || qty, stats: {} }));
       } catch (e) {
         this.addCombatLog(`❌ เกิดข้อผิดพลาดในการเชื่อมต่อ: ${e.message}`, 'system');
         return;
       }
     } else {
-      // Legacy / Offline / Cloud fallback (client-driven)
+      // Explicit offline fallback only. A real online character always entered
+      // the authoritative branch above and never mutates economy locally.
       this.character.stats.gold -= totalCost;
 
       if (itemData.type === 'pet') {
@@ -6689,8 +6892,8 @@ export class GameUI {
       }
       row.quantity = row.stats.instances.length;
       if (this.characterId) {
-        const { setInventoryItemQuantity } = await import('../network/GameSync.js');
-        await setInventoryItemQuantity(this.characterId, item.name, 'pet', row.quantity, row.stats);
+        const { savePetState } = await import('../network/GameSync.js');
+        await savePetState(this.characterId, item.name, row.stats);
         if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
       }
     } else {
@@ -6711,13 +6914,9 @@ export class GameUI {
           stats: itemData.stats || {}
         });
       }
-      // Save persistence
-      if (this.characterId) {
-        // Fixed argument order: (characterId, itemName, itemType, quantity)
+      // Offline only: the local adapter persists this explicit offline state.
+      if (this.characterId && !this._isServerBackedCharacter()) {
         await saveInventoryItem(this.characterId, item.name, itemData.type, qty);
-        if (this.character.saveStatsToDatabase) {
-          await this.character.saveStatsToDatabase();
-        }
       }
     }
     }
@@ -7029,6 +7228,10 @@ export class GameUI {
   async _buyPickaxe(name) {
     const meta = ITEMS[name];
     if (!meta) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ระบบซื้อพลั่วออนไลน์กำลังรอ transaction จากเซิร์ฟเวอร์ จึงยังไม่หัก Zeny หรือเพิ่มไอเทม', 'warning');
+      return;
+    }
     const s = this.character.stats;
     if ((Number(s.level) || 1) < meta.levelReq) { this.addCombatLog(`🔒 ต้องเลเวล ${meta.levelReq} ขึ้นไปจึงจะซื้อ ${name} ได้`, 'system'); return; }
     if ((Number(s.gold) || 0) < meta.price) { this.addCombatLog('❌ เงิน Zeny ไม่เพียงพอ!', 'system'); return; }
@@ -7125,6 +7328,10 @@ export class GameUI {
 
   async _buyDivineItem(name) {
     if (this._divinePurchasePending) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ร้านเทพออนไลน์ยังไม่เปิดให้เปลี่ยน ZOL จาก client จึงยังไม่ทำรายการ', 'warning');
+      return;
+    }
     const entry = DIVINE_ZOL_SHOP.find(x => x.name === name);
     const item = entry && ITEMS[name];
     if (!entry || !item || !this.character) return;
@@ -7175,6 +7382,10 @@ export class GameUI {
 
   startMining() {
     if (this.miningActive) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ระบบขุดแร่ออนไลน์กำลังรอ transaction จากเซิร์ฟเวอร์ จึงยังไม่เริ่มงาน', 'warning');
+      return;
+    }
     const pick = this.equippedPickaxe();
     if (!pick) {
       this.addCombatLog('⛏️ ต้องสวมพลั่วขุดก่อน — ซื้อจากพ่อค้าสวรรค์แล้วสวมใส่ในกระเป๋า', 'system');
@@ -7226,6 +7437,10 @@ export class GameUI {
   }
 
   _completeMineSwing(node, pick) {
+    if (this._isServerBackedCharacter()) {
+      this.stopMining('ระบบขุดแร่ออนไลน์ยังไม่พร้อม จึงไม่มอบแร่จาก client');
+      return;
+    }
     // Deplete the node + schedule respawn (~25s); the scene loop restores it.
     node.userData.mined = true;
     node.visible = false;
@@ -7321,19 +7536,23 @@ export class GameUI {
   async loadLoginStreakFromDB(characterId) {
     this.characterId = this.characterId || characterId;
     try {
+      const useLocalCache = !this._isServerBackedCharacter(characterId);
       const dbData = await loadLoginStreak(characterId);
       const localKey = `zolos_login_streak_${characterId}`;
       let localData = null;
-      try { localData = JSON.parse(localStorage.getItem(localKey) || 'null'); } catch (e) { /* ignore */ }
-      // Prefer the newest claim date; if both records refer to the same day,
-      // keep the higher streak so a delayed server write cannot roll progress back.
-      const candidates = [dbData, localData].filter(value => value && typeof value === 'object');
+      if (useLocalCache) {
+        try { localData = JSON.parse(localStorage.getItem(localKey) || 'null'); } catch (e) { /* ignore */ }
+      }
+      // Online sessions use the server record only. Offline mode may merge its
+      // local recovery copy because there is no authoritative backend there.
+      const candidates = (useLocalCache ? [dbData, localData] : [dbData])
+        .filter(value => value && typeof value === 'object');
       const newestClaim = candidates.map(value => value.lastClaim || '').sort().at(-1) || null;
       const sameDay = candidates.filter(value => (value.lastClaim || null) === newestClaim);
       this.loginStreak = sameDay.length
         ? { ...sameDay[0], streak: Math.max(...sameDay.map(value => Number(value.streak) || 0), 0) }
         : { streak: 0, lastClaim: null };
-      localStorage.setItem(localKey, JSON.stringify(this.loginStreak));
+      if (useLocalCache) localStorage.setItem(localKey, JSON.stringify(this.loginStreak));
     } catch (e) {
       this.loginStreak = { streak: 0, lastClaim: null };
     }
@@ -7346,8 +7565,10 @@ export class GameUI {
 
   async _saveLoginStreak() {
     if (!this.characterId) return true;
-    localStorage.setItem(`zolos_login_streak_${this.characterId}`, JSON.stringify(this.loginStreak));
     try {
+      if (!this._isServerBackedCharacter()) {
+        localStorage.setItem(`zolos_login_streak_${this.characterId}`, JSON.stringify(this.loginStreak));
+      }
       return (await saveLoginStreak(this.characterId, this.loginStreak)) !== false;
     } catch (e) {
       console.error('[Zolos] Failed to save login streak:', e);
@@ -7492,57 +7713,64 @@ export class GameUI {
 
   async _claimDailyReward() {
     if (!this._canClaimDaily() || !this.character) return;
+
+    if (this._isServerBackedCharacter()) {
+      const claimButton = document.getElementById('daily-claim');
+      if (claimButton) { claimButton.disabled = true; claimButton.textContent = 'กำลังยืนยันกับเซิร์ฟเวอร์...'; }
+      try {
+        const result = await claimDailyReward(this.characterId);
+        if (!result?.ok || result.serverAuthoritative !== true || !Number.isSafeInteger(result.gold) || result.gold < 0) {
+          throw new Error(result?.reason || 'ผลรางวัลรายวันไม่ถูกต้อง');
+        }
+        const pending = Number.isSafeInteger(result.streak) ? result.streak : 0;
+        const dayIdx = Number.isSafeInteger(result.day) ? result.day : (((Math.max(1, pending) - 1) % 7) + 1);
+        this.loginStreak = result.state || { streak: pending, lastClaim: this._todayStr() };
+        this.character.stats.gold = result.gold;
+        for (const item of Array.isArray(result.items) ? result.items : []) {
+          this.addItemLocal({ name: item.name, type: item.type }, Number(item.quantity) || 0);
+        }
+        const firstItem = Array.isArray(result.items) ? result.items[0] : null;
+        this.addCombatLog(`รับรางวัลวัน ${dayIdx} สำเร็จ! +${(result.claimed ? (GameUI._STREAK_REWARDS[dayIdx - 1]?.gold || 0) : 0).toLocaleString()} Gold (สตรีค ${pending} วัน)`, 'levelup', firstItem ? { name: firstItem.name, type: firstItem.type } : null);
+        if (result.claimed) {
+          if (this.triggerScreenShake) this.triggerScreenShake(true);
+          this.soundManager?.playLevelUpSound?.();
+        }
+        this._renderDailyReward();
+        this._renderInventory();
+        this.updateHUD(this.character.stats);
+        this._updateDailyRewardBadge();
+      } catch (error) {
+        this.addCombatLog(`ไม่สามารถรับรางวัลรายวันได้: ${error?.message || 'เซิร์ฟเวอร์ไม่พร้อม'}`, 'warning');
+        if (claimButton) { claimButton.disabled = false; claimButton.textContent = 'ลองรับรางวัลอีกครั้ง'; }
+        return;
+      }
+      setTimeout(() => {
+        const modal = document.getElementById('daily-modal');
+        if (modal && modal.style.display !== 'none') {
+          modal.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
+          modal.style.opacity = '0'; modal.style.transform = 'scale(0.95)';
+          setTimeout(() => { modal.style.display = 'none'; modal.style.opacity = '1'; modal.style.transform = 'scale(1)'; this.updateMobileControlsVisibility(); }, 800);
+        }
+      }, 1500);
+      return;
+    }
+
+    // Explicit offline fallback: no server exists, so local progression is the
+    // only available mode and remains clearly isolated from online sessions.
     const pending = this._pendingStreak();
     const dayIdx = ((pending - 1) % 7) + 1;
     const reward = GameUI._STREAK_REWARDS[dayIdx - 1];
-
-    // Grant gold + items
     this.character.stats.gold = (Number(this.character.stats.gold) || 0) + reward.gold;
     for (const it of reward.items) {
       const meta = ITEMS[it.name] || {};
       const existing = this.inventory.find(i => i.item_name === it.name);
       if (existing) existing.quantity += it.qty;
       else this.inventory.push({ item_name: it.name, item_type: meta.type || 'material', emoji: meta.emoji, desc: meta.desc, price: meta.price || 0, quantity: it.qty, stats: {} });
-      if (this.characterId) saveInventoryItem(this.characterId, it.name, meta.type || 'material', it.qty).catch(() => { });
     }
-
-    // Advance the streak and persist
     this.loginStreak = { streak: pending, lastClaim: this._todayStr() };
     await this._saveLoginStreak();
-    if (this.character.saveStatsToDatabase) this.character.saveStatsToDatabase().catch(() => { });
-
-    // Celebration
-    const itemTxt = reward.items.map(it => `${(ITEMS[it.name] || {}).emoji || ''} ${it.name}×${it.qty}`).join(', ');
-    this.addCombatLog(`🎁 รับรางวัลวัน ${dayIdx} สำเร็จ! +${reward.gold.toLocaleString()}g${itemTxt ? ' + ' + itemTxt : ''} (สตรีค 🔥${pending})`, 'levelup');
-    if (this.triggerScreenShake) this.triggerScreenShake(true);
-    if (this.soundManager && this.soundManager.playLevelUpSound) this.soundManager.playLevelUpSound();
-    try {
-      if (window.particles && this.character.getPosition) {
-        window.particles.createExplosion(this.character.getPosition(), dayIdx === 7 ? 0xff5a7a : 0xffcf4a);
-      }
-    } catch (e) { /* non-fatal */ }
-
-    this._renderDailyReward();
-    this._renderInventory();
-    this.updateHUD(this.character.stats);
-    this._updateDailyRewardBadge();
-
-    // Fade out and close the modal after a short delay to show the "claimed" state
-    setTimeout(() => {
-      const modal = document.getElementById('daily-modal');
-      if (modal && modal.style.display !== 'none') {
-        modal.style.transition = 'opacity 0.8s ease-out, transform 0.8s ease-out';
-        modal.style.opacity = '0';
-        modal.style.transform = 'scale(0.95)';
-
-        setTimeout(() => {
-          modal.style.display = 'none';
-          modal.style.opacity = '1';
-          modal.style.transform = 'scale(1)';
-          this.updateMobileControlsVisibility();
-        }, 800);
-      }
-    }, 1500);
+    this.addCombatLog(`รับรางวัลวัน ${dayIdx} สำเร็จ! +${reward.gold.toLocaleString()} Gold (สตรีค ${pending} วัน)`, 'levelup');
+    this._renderDailyReward(); this._renderInventory(); this.updateHUD(this.character.stats); this._updateDailyRewardBadge();
   }
 
   // ============ Vending Stalls (player shops) ============
@@ -7990,6 +8218,10 @@ export class GameUI {
 
   async _performRefine() {
     if (!this.character) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ระบบตีบวกออนไลน์กำลังรอ transaction จากเซิร์ฟเวอร์ จึงยังไม่หักแร่หรือเงิน', 'warning');
+      return;
+    }
     const item = (this.inventory || []).find(i => i.item_name === this.refineSel);
     if (!item || !REFINABLE_TYPES.includes(item.item_type)) return;
 
@@ -8070,6 +8302,10 @@ export class GameUI {
 
   _forgeItem(recipe) {
     if (!recipe || !this.character) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ระบบตีอาวุธออนไลน์ยังไม่เปิดให้แก้ไขจาก client จึงไม่ทำรายการ', 'warning');
+      return;
+    }
     const reqs = [{ name: recipe.base, qty: 1 }, ...recipe.materials];
     const gold = Number(this.character.stats.gold) || 0;
     // Re-validate — bag/gold may have changed since render
@@ -8276,7 +8512,7 @@ export class GameUI {
       }
     }
 
-    this.addCombatLog(`💰 ขาย ${item.emoji} ${item.item_name} x${sellQty} สำเร็จ (+${totalGold} Zeny)`, 'system');
+    this.addCombatLog(`ขาย ${item.item_name} x${sellQty} สำเร็จ (+${totalGold} Zeny)`, 'system', item);
 
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
@@ -8436,7 +8672,7 @@ export class GameUI {
         if (invItem.quantity <= 0) { this.inventory = this.inventory.filter(i => i !== invItem); this.selectedSellShopItem = null; }
         this.character.stats.gold = result.gold;
         this._renderSellShop(); this._renderInventory(); this.updateHUD(this.character.stats); this.updateStats(this.character.stats);
-        this.addCombatLog(`💰 ขาย ${item.emoji || '📦'} ${item.item_name} x${qty} ได้ ${result.gold_gained.toLocaleString()} Zeny`, 'gold');
+        this.addCombatLog(`ขาย ${item.item_name} x${qty} ได้ ${result.gold_gained.toLocaleString()} Zeny`, 'gold', item);
         this.soundManager?.playBuySellSound?.();
       } catch (error) { this.addCombatLog(`❌ ขายไม่สำเร็จ: ${error.message}`, 'warning'); }
       return;
@@ -8470,7 +8706,7 @@ export class GameUI {
       else if (this.character.saveStatsToDatabase) await this.character.saveStatsToDatabase();
     }
 
-    this.addCombatLog(`💰 ขาย ${item.emoji || '📦'} ${item.item_name} x${qty} ได้ ${totalGold.toLocaleString()} Zeny`, 'gold');
+    this.addCombatLog(`ขาย ${item.item_name} x${qty} ได้ ${totalGold.toLocaleString()} Zeny`, 'gold', item);
     if (this.soundManager) {
       if (this.soundManager.playBuySellSound) this.soundManager.playBuySellSound();
       else if (this.soundManager.playUseItemSound) this.soundManager.playUseItemSound();
@@ -8811,7 +9047,7 @@ export class GameUI {
           await saveInventoryItem(this.characterId, item.item_name, item.item_type, -qty, item.stats || {});
         }
 
-        this.addCombatLog(`⚖️ ตั้งขาย ${item.emoji} ${item.item_name} x${qty} ราคา ${price} Zeny แล้ว`, 'system');
+        this.addCombatLog(`ตั้งขาย ${item.item_name} x${qty} ราคา ${price} Zeny แล้ว`, 'system', item);
         if (this.soundManager) this.soundManager.playBuySellSound ? this.soundManager.playBuySellSound() : this.soundManager.playUseItemSound();
 
         // Reset selection and close form
@@ -8846,7 +9082,7 @@ export class GameUI {
 
       // Purchase service call (server-authoritative: checks gold, pays seller,
       // delivers the item, removes the listing — all in one transaction)
-      const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name);
+      const boughtResult = await buyMarketItem(listing.id, this.characterId, this.character.stats.name, listing);
 
       if (boughtResult && boughtResult.success) {
         const serverAuthoritative = boughtResult.serverAuthoritative === true;
@@ -8858,19 +9094,22 @@ export class GameUI {
         // inventory row; this is only the immediate UI projection.
         const itemRegistry = ITEMS[listing.item_name] || { emoji: '📦', type: listing.item_type, desc: 'P2P Item', price: 10 };
         if (listing.item_type === 'pet') {
-          // Receive the pet as its own named instance (keeps the seller's name).
+          // The remote transaction already appended the seller's exact UID;
+          // never mint a replacement UID in the browser. Offline mode uses the
+          // listing instance as its local projection.
           let row = this.inventory.find(i => i.item_name === listing.item_name && i.item_type === 'pet');
           if (!row) {
             row = { item_name: listing.item_name, item_type: 'pet', emoji: itemRegistry.emoji || '🐾', desc: itemRegistry.desc || '', price: itemRegistry.price || 10, rarity: itemRegistry.rarity || 'common', quantity: 0, stats: { instances: [] } };
             this.inventory.push(row);
           }
-          this._ensurePetInstances(row);
-          const s = listing.stats || {};
-          row.stats.instances.push({ uid: this._newPetUid(), name: s.petName || null, level: s.petLevel || 1, xp: s.petXp || 0 });
-          row.quantity = row.stats.instances.length;
-          if (!serverAuthoritative && this.characterId) {
-            const { setInventoryItemQuantity } = await import('../network/GameSync.js');
-            await setInventoryItemQuantity(this.characterId, listing.item_name, 'pet', row.quantity, row.stats);
+          const canonicalInstances = serverAuthoritative && Array.isArray(boughtResult.pet?.instances)
+            ? boughtResult.pet.instances
+            : (Array.isArray(listing.stats?.instances) ? listing.stats.instances : []);
+          row.stats = { ...(row.stats || {}), instances: canonicalInstances, equipped: false, equippedUid: null };
+          row.quantity = canonicalInstances.length;
+          if (!serverAuthoritative && !canonicalInstances.length) {
+            this._ensurePetInstances(row);
+            row.quantity = row.stats.instances.length;
           }
         } else {
           const existing = this.inventory.find(i => i.item_name === listing.item_name);
@@ -8927,7 +9166,7 @@ export class GameUI {
     if (!this.characterId) return;
 
     if (confirm(`คุณต้องการยกเลิกการตั้งขาย ${listing.item_name} x${listing.quantity} หรือไม่?`)) {
-      const canceled = await cancelMarketListing(listing.id, this.characterId);
+      const canceled = await cancelMarketListing(listing.id, this.characterId, listing.item_type);
       if (canceled) {
         const serverAuthoritative = canceled.serverAuthoritative === true;
         // Add back to local inventory. Remote cancel already restored the
@@ -8940,9 +9179,15 @@ export class GameUI {
             row = { item_name: listing.item_name, item_type: 'pet', emoji: itemRegistry.emoji || '🐾', desc: itemRegistry.desc || '', price: itemRegistry.price || 10, rarity: itemRegistry.rarity || 'common', quantity: 0, stats: { instances: [] } };
             this.inventory.push(row);
           }
+          const canonicalInstances = serverAuthoritative && Array.isArray(canceled.listing?.stats?.instances)
+            ? canceled.listing.stats.instances
+            : (Array.isArray(listing.stats?.instances) ? listing.stats.instances : []);
           this._ensurePetInstances(row);
-          const s = listing.stats || {};
-          row.stats.instances.push({ uid: this._newPetUid(), name: s.petName || null, level: s.petLevel || 1, xp: s.petXp || 0 });
+          if (serverAuthoritative && canonicalInstances.length === 1) {
+            row.stats = { ...(row.stats || {}), instances: [...(row.stats.instances || []), canonicalInstances[0]], equipped: false, equippedUid: null };
+          } else if (!serverAuthoritative) {
+            row.stats.instances.push({ uid: this._newPetUid(), name: listing.stats?.petName || null, level: listing.stats?.petLevel || 1, xp: listing.stats?.petXp || 0 });
+          }
           row.quantity = row.stats.instances.length;
           if (!serverAuthoritative && this.characterId) {
             const { setInventoryItemQuantity } = await import('../network/GameSync.js');
@@ -9094,12 +9339,12 @@ export class GameUI {
       : `เลือกได้ตั้งแต่เลเวล 1 · หมุนดูฮีโร่แต่ละสาย แล้วเลือกที่ใช่`;
 
     const chips = Object.values(JOBS).map(j =>
-      `<div class="job-chip" data-job="${j.id}"><div class="e">${j.emoji}</div><div class="nm">${j.name}</div></div>`
+      `<div class="job-chip" data-job="${j.id}"><div class="nm">${j.name}</div></div>`
     ).join('');
 
     card.innerHTML = `
       <div class="job-head">
-        <div><h2>🎖️ เลือกสายอาชีพ</h2><div class="sub">${headerSub}</div></div>
+        <div><h2>เลือกสายอาชีพ</h2><div class="sub">${headerSub}</div></div>
         <button class="job-x" id="job-close">✕</button>
       </div>
       <div class="job-main">
@@ -9153,7 +9398,7 @@ export class GameUI {
     const current = s.job;
 
     const titleEl = document.getElementById('job-title');
-    if (titleEl) titleEl.innerHTML = `<div class="n">${job.emoji} ${job.name}<span class="en">${job.nameEn}</span></div><div class="r">${job.role || ''}</div>`;
+    if (titleEl) titleEl.innerHTML = `<div class="n">${job.name}<span class="en">${job.nameEn}</span></div><div class="r">${job.role || ''}</div>`;
 
     const bar = (label, val, color) => `
       <div class="stat-row"><span class="lbl">${label}</span>
@@ -9166,16 +9411,16 @@ export class GameUI {
       const pct = Math.round((v - 1) * 100);
       return `<span class="mod-pill ${pct >= 0 ? 'mod-up' : 'mod-dn'}">${label} ${pct >= 0 ? '+' : ''}${pct}%</span>`;
     };
-    const skills = job.skills.map(id => { const sk = SKILLS[id]; return sk ? `<span class="skill-pill">${sk.emoji} ${sk.name}</span>` : ''; }).join('');
+    const skills = job.skills.map(id => { const sk = SKILLS[id]; return sk ? `<span class="skill-pill">${sk.name}</span>` : ''; }).join('');
 
     const info = document.getElementById('job-info');
     if (info) info.innerHTML = `
       <div class="job-desc">${job.desc}</div>
-      <div><div class="job-sec-t">📊 พลังพื้นฐาน (STR / AGI / INT)</div>
+        <div><div class="job-sec-t">พลังพื้นฐาน (STR / AGI / INT)</div>
         ${bar('STR', st.str, '#ff6a6a')}${bar('AGI', st.agi, '#7be08a')}${bar('INT', st.int, '#7fb0ff')}</div>
-      <div><div class="job-sec-t">⚖️ ค่าต่อสู้เทียบสายกลาง</div>
+      <div><div class="job-sec-t">ค่าต่อสู้เทียบสายกลาง</div>
         ${modPill('HP', mods.hp)}${modPill('DEF', mods.def)}${modPill('ATK', mods.atk)}${modPill('SP', mods.sp)}</div>
-      <div><div class="job-sec-t">✨ สกิลประจำสาย</div>${skills}</div>`;
+      <div><div class="job-sec-t">สกิลประจำสาย</div>${skills}</div>`;
 
     const btn = document.getElementById('job-select-btn');
     if (btn) {
@@ -9183,7 +9428,7 @@ export class GameUI {
       else if (isChange && gold < JOB_CHANGE_COST) { btn.textContent = `Zeny ไม่พอ (ต้องการ ${JOB_CHANGE_COST.toLocaleString()})`; btn.disabled = true; btn.onclick = null; }
       else {
         btn.disabled = false;
-        btn.textContent = isChange ? `เปลี่ยนเป็น ${job.name} · ${JOB_CHANGE_COST.toLocaleString()} Zeny` : `⚔️ เลือกเป็น ${job.name}`;
+        btn.textContent = isChange ? `เปลี่ยนเป็น ${job.name} · ${JOB_CHANGE_COST.toLocaleString()} Zeny` : `เลือกเป็น ${job.name}`;
         btn.onclick = () => this.chooseJob(canonicalJobId, isChange);
       }
     }
@@ -9203,7 +9448,34 @@ export class GameUI {
     const s = this.character.stats;
     if (s.job === canonicalJobId) return;
 
-    if (isChange) {
+    let serverJobReceipt = null;
+    if (this._isServerBackedCharacter()) {
+      try {
+        const requestId = `job:${this.characterId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+        serverJobReceipt = await requestChangeJob(this.characterId, canonicalJobId, requestId);
+        if (!serverJobReceipt) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อมยืนยันอาชีพ');
+        s.job = serverJobReceipt.job;
+        s.gold = Number(serverJobReceipt.gold);
+        const committed = serverJobReceipt.item;
+        let committedRow = this.inventory.find(item => item.item_name === committed.item_name);
+        if (!committedRow) {
+          committedRow = this._enrichItem({ item_name: committed.item_name, item_type: committed.item_type, quantity: committed.quantity, stats: committed.stats || {} });
+          this.inventory.push(committedRow);
+        } else {
+          committedRow.item_type = committed.item_type;
+          committedRow.quantity = Number(committed.quantity) || 1;
+          committedRow.stats = { ...(committedRow.stats || {}), ...(committed.stats || {}) };
+        }
+        for (const item of this.inventory) {
+          if ((item.item_type === 'weapon' || item.item_type === 'fishing_rod') && item.item_name !== committed.item_name && item.stats?.equipped === true) item.stats.equipped = false;
+        }
+      } catch (error) {
+        this.addCombatLog(`❌ เปลี่ยนอาชีพไม่สำเร็จ: ${error.message}`, 'warning');
+        return;
+      }
+    }
+
+    if (isChange && !serverJobReceipt) {
       if ((Number(s.gold) || 0) < JOB_CHANGE_COST) {
         this.addCombatLog('❌ Zeny ไม่พอสำหรับเปลี่ยนอาชีพ', 'system');
         return;
@@ -9211,7 +9483,7 @@ export class GameUI {
       s.gold -= JOB_CHANGE_COST;
     }
 
-    s.job = canonicalJobId;
+    if (!serverJobReceipt) s.job = canonicalJobId;
     // Save a local recovery hint immediately for Guest/anonymous sessions.
     // The server save still remains the source of truth; this only prevents a
     // successful first pick from reopening the picker while that save catches up.
@@ -10085,14 +10357,16 @@ export class GameUI {
     if (!characterId) return;
     this.characterId = characterId;
     const generation = this._lifecycleGeneration;
+    const useLocalCache = !this._isServerBackedCharacter(characterId);
     let local = null;
-    try { local = JSON.parse(localStorage.getItem(`zolos_adventure_journal_${characterId}`) || 'null'); } catch { /* ignore */ }
+    if (useLocalCache) {
+      try { local = JSON.parse(localStorage.getItem(`zolos_adventure_journal_${characterId}`) || 'null'); } catch { /* ignore */ }
+    }
     const remote = await loadAdventureJournal(characterId);
     if (!this._isCharacterLoadCurrent(characterId, generation)) return;
-    // Merge the browser cache with the server snapshot. A mobile pagehide can
-    // leave a newer local journal while the server still has the previous tick;
-    // choosing `remote || local` would make that progress appear to disappear.
-    this.adventureJournal = mergeAdventureJournals(remote, local);
+    // Online sessions use the server snapshot as the sole gameplay source.
+    // Explicit offline mode may merge its recovery cache.
+    this.adventureJournal = useLocalCache ? mergeAdventureJournals(remote, local) : sanitizeAdventureJournal(remote);
     this.firstThirtyJourney = sanitizeFirstThirtyState(this.adventureJournal.journey);
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._renderJourneyGuide();
@@ -10104,15 +10378,18 @@ export class GameUI {
     clearTimeout(this._journalSaveTimer);
     this._journalSaveTimer = null;
     this.adventureJournal.journey = sanitizeFirstThirtyState(this.firstThirtyJourney);
-    localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
-    await saveAdventureJournal(this.characterId, this.adventureJournal);
-    return true;
+    if (!this._isServerBackedCharacter()) {
+      localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
+    }
+    return (await saveAdventureJournal(this.characterId, this.adventureJournal)) !== false;
   }
 
   _saveAdventureJournalSoon() {
     if (!this.characterId) return;
     this.adventureJournal.journey = sanitizeFirstThirtyState(this.firstThirtyJourney);
-    localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
+    if (!this._isServerBackedCharacter()) {
+      localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
+    }
     clearTimeout(this._journalSaveTimer);
     this._journalSaveTimer = setTimeout(() => {
       this._saveAdventureJournalNow().catch(error => console.error('[Zolos] Failed to flush adventure journal:', error));
@@ -11015,22 +11292,21 @@ export class GameUI {
       // Find drop items details
       let dropHtml = '';
       if (monster.loot && monster.loot.length > 0) {
-        dropHtml = `<div class="wiki-section-title">🎁 Loot Drops / อัตราดรอป:</div><div class="wiki-drops-list">`;
+        dropHtml = `<div class="wiki-section-title">Loot Drops / อัตราดรอป:</div><div class="wiki-drops-list">`;
         monster.loot.forEach(lootInfo => {
           const itemMeta = ITEMS[lootInfo.name];
-          const emoji = itemMeta?.emoji || lootInfo.emoji || '📦';
           const rarity = itemMeta?.rarity || 'common';
           const pct = (lootInfo.chance * 100).toFixed(1);
           dropHtml += `
             <div class="wiki-drop-item">
-              <span class="color-${rarity}">${emoji} ${lootInfo.name}</span>
+              <span class="color-${rarity}">${itemIconMarkup(lootInfo.name, '', 'wiki-drop-visual')} ${lootInfo.name}</span>
               <span style="color:#20e060">${pct}%</span>
             </div>
           `;
         });
         dropHtml += `</div>`;
       } else {
-        dropHtml = `<div class="wiki-section-title">🎁 Loot Drops:</div><div style="font-size:11px;color:var(--text-dim)">No drops</div>`;
+        dropHtml = `<div class="wiki-section-title">Loot Drops:</div><div style="font-size:11px;color:var(--text-dim)">No drops</div>`;
       }
 
       // Calculate an approximate level based on stats since it's not explicitly in DB
@@ -11090,11 +11366,11 @@ export class GameUI {
       const droppers = this._getItemDroppers(key);
 
       if (droppers.length > 0) {
-        droppedByHtml = `<div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
+                droppedByHtml = `<div class="wiki-section-title">Dropped By / ได้จากมอนสเตอร์:</div><div class="wiki-drops-list">`;
         droppers.forEach(d => {
           droppedByHtml += `
             <div class="wiki-drop-item">
-              <span>${d.emoji} ${d.name}</span>
+              <span>${this._wikiMonsterPortrait(d, false, d.key)} ${d.name}</span>
               <span style="color:#60a0ff">${(d.chance * 100).toFixed(1)}%</span>
             </div>
           `;
@@ -11102,7 +11378,7 @@ export class GameUI {
         droppedByHtml += `</div>`;
       } else {
         droppedByHtml = `
-          <div class="wiki-section-title">👾 Dropped By / ได้จากมอนสเตอร์:</div>
+          <div class="wiki-section-title">Dropped By / ได้จากมอนสเตอร์:</div>
           <div style="font-size:11px;color:var(--text-dim);padding-left:4px;">ไม่ดรอปจากมอนสเตอร์ (NPC Shop หรืออื่นๆ)</div>
         `;
       }
@@ -11916,7 +12192,7 @@ export class GameUI {
       }
 
       slot.innerHTML = `
-        <span>${item.emoji || '📦'}</span>
+        ${itemIconMarkup(item, item.emoji || '', 'inv-slot-visual')}
         <span class="inv-qty">${item.quantity}</span>
       `;
       slot.title = `${item.item_name} x${item.quantity}`;
@@ -11934,7 +12210,7 @@ export class GameUI {
         const qtyInfo = document.getElementById('trade-selected-qty-info');
         const qtyInput = document.getElementById('trade-qty-input');
 
-        if (icon) icon.textContent = item.emoji || '📦';
+        if (icon) icon.innerHTML = itemIconMarkup(item, item.emoji || '', 'trade-selected-visual');
         if (name) name.textContent = item.item_name;
         if (qtyInfo) qtyInfo.textContent = `จำนวนที่มี: ${item.quantity}`;
         if (qtyInput) {
@@ -12246,7 +12522,9 @@ export class GameUI {
 
   // ============ Daily Quest System ============
   _setupDailyQuests() {
-    this._checkDailyQuestsReset();
+    // Character data is loaded after UI construction. Do not initialize a
+    // gameplay quest state from global localStorage before we know the session.
+    if (this.characterId) this._checkDailyQuestsReset();
 
     const btnDaily = document.getElementById('btn-daily-quests');
     if (btnDaily) {
@@ -12265,16 +12543,18 @@ export class GameUI {
   }
 
   _checkDailyQuestsReset() {
+    if (this._isServerBackedCharacter() && this._dailyQuestsLoaded !== true) return;
     const today = new Date().toDateString();
-    let data = null;
-    try {
-      const key = this.characterId ? `zolos_daily_quests_${this.characterId}` : 'zolos_daily_quests';
-      const stored = localStorage.getItem(key) || localStorage.getItem('zolos_daily_quests');
-      if (stored) {
-        data = JSON.parse(stored);
+    const useLocalCache = !this._isServerBackedCharacter();
+    let data = useLocalCache ? null : null;
+    if (useLocalCache) {
+      try {
+        const key = this.characterId ? `zolos_daily_quests_${this.characterId}` : 'zolos_daily_quests';
+        const stored = localStorage.getItem(key) || localStorage.getItem('zolos_daily_quests');
+        if (stored) data = JSON.parse(stored);
+      } catch (e) {
+        console.error('[Daily Quest] Failed to parse local storage:', e);
       }
-    } catch (e) {
-      console.error('[Daily Quest] Failed to parse local storage:', e);
     }
 
     if (!data || data.lastDate !== today || !data.quests || data.quests.length < 4) {
@@ -12427,8 +12707,8 @@ export class GameUI {
   _claimQuestReward(idx) {
     const state = this.dailyQuestsState;
     if (!state || !state.quests || !state.quests[idx]) return;
-    if (this._onlineSessionWithoutAuthority()) {
-      this.addCombatLog('🚫 เซิร์ฟเวอร์ยังไม่รองรับการยืนยันรางวัลเควส จึงระงับการรับรางวัลชั่วคราว', 'warning');
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('🚫 daily quest online อยู่ในโหมดอ่านอย่างเดียวจนกว่าจะมี server progression transaction', 'warning');
       return;
     }
 
@@ -12464,8 +12744,8 @@ export class GameUI {
   _spinRoulette() {
     const state = this.dailyQuestsState;
     if (!state || state.rouletteSpent) return;
-    if (this._onlineSessionWithoutAuthority()) {
-      this.addCombatLog('🚫 เซิร์ฟเวอร์ยังไม่รองรับการยืนยันรางวัลวงล้อ จึงระงับการสุ่มชั่วคราว', 'warning');
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('🚫 roulette online อยู่ในโหมดอ่านอย่างเดียวจนกว่าจะมี server transaction', 'warning');
       return;
     }
 
@@ -12509,7 +12789,7 @@ export class GameUI {
 
       const itemBox = document.createElement('div');
       itemBox.className = `roulette-item-box rarity-${item.rarity}`;
-      itemBox.innerHTML = `<span>${item.emoji}</span>`;
+      itemBox.innerHTML = itemIconMarkup(item, item.emoji || '', 'roulette-item-visual');
       itemBox.title = item.name;
       strip.appendChild(itemBox);
     }
@@ -12539,7 +12819,7 @@ export class GameUI {
         emoji: winner.emoji
       });
 
-      this.addCombatLog(`🎡 กงล้อหมุนหยุดที่: รับไอเทมดรอปแดนสวรรค์ [${winner.emoji} ${winner.name}]!`, 'loot');
+      this.addCombatLog(`กงล้อหมุนหยุดที่: รับไอเทมดรอปแดนสวรรค์ [${winner.name}]!`, 'loot', winner);
 
       if (winner.rarity === 'legendary') {
         if (this.soundManager && this.soundManager.playLevelUpSound) {
@@ -12554,7 +12834,7 @@ export class GameUI {
 
   incrementQuestProgress(type, targetName = '') {
     const state = this.dailyQuestsState;
-    if (!state || !state.quests || this._onlineSessionWithoutAuthority()) return;
+    if (!state || !state.quests || this._isServerBackedCharacter()) return;
 
     let updated = false;
     state.quests.forEach(q => {
@@ -12877,8 +13157,8 @@ export class GameUI {
       const isLocked = m.id === SKYRAIL_MAP_ID && !skyrailStatus.isOpen;
       const glowOpacity = isCurrent ? '0.62' : '0.24';
       const encounters = m.monsters.length > 0
-        ? `👾 ${m.monsters.slice(0, 3).join(' · ')}${m.monsters.length > 3 ? ' · …' : ''}`
-        : '✦ พื้นที่ปลอดภัย · ไม่มีมอนสเตอร์';
+        ? `${m.monsters.slice(0, 3).join(' · ')}${m.monsters.length > 3 ? ' · …' : ''}`
+        : 'พื้นที่ปลอดภัย · ไม่มีมอนสเตอร์';
       return `
         <article class="warp-tile ${isCurrent ? 'current' : ''} ${isLocked ? 'locked' : ''}" data-map="${m.id}"
                  style="background: ${m.bgGradient};" aria-label="${m.name}">
@@ -12889,7 +13169,6 @@ export class GameUI {
           ${isCurrent ? '<div class="tile-current-badge">● อยู่ที่นี่</div>' : ''}
           <div class="tile-content">
             <div class="tile-top">
-              <span class="tile-emoji" aria-hidden="true">${m.emoji}</span>
               <span class="tile-badge ${m.difficultyClass}">${m.difficulty}</span>
             </div>
             <div class="tile-name">${m.name}</div>
@@ -12903,7 +13182,7 @@ export class GameUI {
               ${isCurrent
           ? '<span class="tile-action-muted">ตำแหน่งปัจจุบัน</span>'
           : isLocked
-            ? '<button type="button" class="tile-warp-btn" disabled>🔒 เปิด 18:00</button>'
+            ? '<button type="button" class="tile-warp-btn" disabled>เปิด 18:00</button>'
             : `<button type="button" class="tile-warp-btn" data-warp="${m.id}" onclick="event.stopPropagation()">เดินทาง</button>`
         }
             </div>
@@ -12955,7 +13234,7 @@ export class GameUI {
 
   _currentMapLabel() {
     const m = GameUI._WARP_MAPS.find(x => x.id === this.currentMapId);
-    return m ? `${m.emoji} ${m.name}` : this.currentMapId;
+    return m ? m.name : this.currentMapId;
   }
 
   _openCardSocketPicker(cardItem) {
@@ -12975,14 +13254,14 @@ export class GameUI {
     }
 
     let html = `<div style="padding:10px;color:white">
-      <div style="margin-bottom:10px;font-weight:bold;color:var(--secondary)">เลือกอุปกรณ์ที่จะใส่การ์ด ${cardItem.emoji} ${cardItem.item_name}:</div>
+      <div style="margin-bottom:10px;font-weight:bold;color:var(--secondary)">เลือกอุปกรณ์ที่จะใส่การ์ด ${itemIconMarkup(cardItem, cardItem.emoji || '', 'card-picker-visual')} ${cardItem.item_name}:</div>
       <div style="display:grid;gap:8px">`;
 
     targets.forEach(t => {
       const slotId = this._equipmentSlotForItem(t);
       const occupied = Boolean(this.character?.equippedCards?.[slotId]);
       html += `<div class="socket-target-row" style="background:rgba(255,255,255,0.05);padding:8px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center" data-slot="${slotId}">
-        <div>${t.emoji} ${t.item_name} <span style="font-size:12px;color:var(--text-dim)">(${occupied ? 1 : 0}/1 socket)</span></div>
+        <div>${itemIconMarkup(t, t.emoji || '', 'card-picker-visual')} ${t.item_name} <span style="font-size:12px;color:var(--text-dim)">(${occupied ? 1 : 0}/1 socket)</span></div>
         <div style="width:8px;height:8px;border-radius:50%;background:${occupied ? '#ffd700' : 'rgba(255,255,255,0.2)'}"></div>
       </div>`;
     });
@@ -13017,6 +13296,10 @@ export class GameUI {
 
   async _socketCardToItem(targetItem, cardItem) {
     if (!this.characterId || !targetItem || !cardItem) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ระบบใส่การ์ดออนไลน์ต้องใช้ transaction จากเซิร์ฟเวอร์ จึงยังไม่ทำรายการ', 'warning');
+      return;
+    }
 
     if (!targetItem.stats) targetItem.stats = {};
     if (!targetItem.stats.cards) targetItem.stats.cards = [];
@@ -13072,6 +13355,10 @@ export class GameUI {
 
   async _removeCardFromItem(targetItem, cardIdx) {
     if (!this.characterId || !targetItem || !targetItem.stats || !targetItem.stats.cards) return;
+    if (this._isServerBackedCharacter()) {
+      this.addCombatLog('ระบบถอดการ์ดออนไลน์ต้องใช้ transaction จากเซิร์ฟเวอร์ จึงยังไม่ทำรายการ', 'warning');
+      return;
+    }
 
     const cardName = targetItem.stats.cards[cardIdx];
     if (!cardName) return;
@@ -13143,7 +13430,7 @@ export class GameUI {
 
     let html = `<div style="padding:12px;color:white">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-weight:800;color:var(--secondary);font-size:14px">🃏 เลือกการ์ดใส่ ${targetItem.emoji} ${itemName}</div>
+        <div style="font-weight:800;color:var(--secondary);font-size:14px">เลือกการ์ดใส่ ${itemIconMarkup(targetItem, targetItem.emoji || '', 'card-picker-visual')} ${itemName}</div>
         <div id="csp-close" style="cursor:pointer;color:#9fb0e0;font-size:18px;line-height:1;padding:2px 6px">✕</div>
       </div>
       <div style="font-size:11px;color:#8b97ba;margin-bottom:8px">การ์ดทั้งหมดในกระเป๋าของคุณ — คลิกเพื่อใส่ (${targetItem.stats.cards.length}/1 ช่องใช้แล้ว)</div>

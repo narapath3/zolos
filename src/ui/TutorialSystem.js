@@ -1,4 +1,6 @@
 // ============ ZOLOS TUTORIAL SYSTEM ============
+import { isOfflineMode } from '../network/SupabaseClient.js';
+
 // Guides new players through essential mechanics with interactive steps.
 // Tutorial completion is persisted server-side (characters.tutorial_completed)
 // so returning users never see the tutorial again, even across devices.
@@ -35,75 +37,39 @@ export class TutorialSystem {
     }
   }
 
-  // Save tutorial completion to database
+  // Save tutorial completion to the authoritative character record.
   async saveTutorialCompleted() {
     this.tutorialCompleted = true;
-
     try {
-      // Import supabase client
       const { supabase, isOfflineMode } = await import('../network/SupabaseClient.js');
+      const characterId = String(this.character?.characterId || this.character?.id || '');
+      const isLocalId = characterId.startsWith('guest_') || characterId.startsWith('local_');
 
       if (isOfflineMode || !supabase) {
-        // Fallback to localStorage for offline mode
-        console.warn('[Tutorial] Offline mode: saving tutorial_completed to localStorage');
-        try {
-          const key = `zolos_tutorial_completed_${this.character?.userId || 'guest'}`;
-          localStorage.setItem(key, 'true');
-        } catch (e) { /* localStorage unavailable */ }
-        return;
-      }
-
-      // Update the character row in Supabase
-      const userId = this.character?.userId;
-      const characterId = this.character?.characterId;
-
-      if (userId && !userId.startsWith('guest_') && !userId.startsWith('local_')) {
-        // Save by user_id
-        const { error } = await supabase
-          .from('characters')
-          .update({ tutorial_completed: true, updated_at: new Date().toISOString() })
-          .eq('user_id', userId);
-
-        if (error) {
-          console.error('[Tutorial] Failed to save tutorial_completed by user_id:', error.message);
-          // Fallback to localStorage
-          try {
-            const key = `zolos_tutorial_completed_${userId}`;
-            localStorage.setItem(key, 'true');
-          } catch (e) { /* localStorage unavailable */ }
-        } else {
-          console.log('[Tutorial] ✅ tutorial_completed saved to database for user:', userId);
-        }
-      } else if (characterId) {
-        // Save by character_id (guest / local)
-        const { error } = await supabase
-          .from('characters')
-          .update({ tutorial_completed: true, updated_at: new Date().toISOString() })
-          .eq('id', characterId);
-
-        if (error) {
-          console.error('[Tutorial] Failed to save tutorial_completed by character_id:', error.message);
-          try {
-            const key = `zolos_tutorial_completed_${characterId}`;
-            localStorage.setItem(key, 'true');
-          } catch (e) { /* localStorage unavailable */ }
-        } else {
-          console.log('[Tutorial] ✅ tutorial_completed saved to database for character:', characterId);
-        }
-      } else {
-        // Fallback to localStorage
-        try {
-          const key = `zolos_tutorial_completed_guest`;
-          localStorage.setItem(key, 'true');
-        } catch (e) { /* localStorage unavailable */ }
-      }
-    } catch (e) {
-      console.error('[Tutorial] Failed to save tutorial_completed:', e);
-      // Last resort fallback
-      try {
-        const key = `zolos_tutorial_completed_${this.character?.userId || 'guest'}`;
+        // Explicit offline mode is the only mode allowed to use local state.
+        const key = `zolos_tutorial_completed_${characterId || 'guest'}`;
         localStorage.setItem(key, 'true');
-      } catch (e2) { /* localStorage unavailable */ }
+        return true;
+      }
+      if (!characterId || isLocalId) {
+        throw new Error('ไม่พบ character server สำหรับบันทึกบทเรียน');
+      }
+
+      const { error, data } = await supabase
+        .from('characters')
+        .update({ tutorial_completed: true, updated_at: new Date().toISOString() })
+        .eq('id', characterId)
+        .select('id, tutorial_completed')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.tutorial_completed) throw new Error('server ไม่ยืนยันสถานะบทเรียน');
+      console.log('[Tutorial] ✅ tutorial_completed saved to database for character:', characterId);
+      return true;
+    } catch (e) {
+      // Online failures must remain visible; never masquerade as a local save.
+      console.error('[Tutorial] Failed to save tutorial_completed:', e);
+      this.tutorialCompleted = false;
+      return false;
     }
   }
 
@@ -418,6 +384,14 @@ export class TutorialSystem {
   // Grant reward for completing a step
   _grantReward(reward) {
     if (!this.character) return;
+    // Online progression/economy must never be mutated by tutorial JavaScript.
+    // The browser can be inspected or replayed through F12; therefore tutorial
+    // rewards are deliberately offline-only until an audited server claim RPC
+    // can verify each prerequisite and make the grant idempotent.
+    if (!isOfflineMode) {
+      this.gameUI?.addCombatLog('รางวัลบทเรียนออนไลน์จะจัดการโดยเซิร์ฟเวอร์หลังตรวจสอบเงื่อนไข', 'system');
+      return;
+    }
 
     // Add gold
     if (reward.gold) {
@@ -454,12 +428,14 @@ export class TutorialSystem {
     }
   }
 
-  // Complete tutorial — save to server so it never shows again
-  _completeTutorial() {
+  // Complete tutorial — save to server so it never shows again.
+  async _completeTutorial() {
+    const saved = await this.saveTutorialCompleted();
+    if (!saved) {
+      this.gameUI?.addCombatLog('⚠️ เซิร์ฟเวอร์ยังบันทึกบทเรียนไม่สำเร็จ กรุณาเชื่อมต่อใหม่แล้วลองอีกครั้ง', 'warning');
+      return false;
+    }
     this._clearStepHandlers();
-    // Save completion status to database (server-side persistent)
-    this.saveTutorialCompleted();
-
     if (this.stepTooltip) this.stepTooltip.remove();
     if (this.stepOverlay) this.stepOverlay.remove();
     if (this.stepBackdrop) { this.stepBackdrop.remove(); this.stepBackdrop = null; }
@@ -468,6 +444,7 @@ export class TutorialSystem {
     // Restore mobile controls via the standard visibility system
     this.gameUI?.updateMobileControlsVisibility?.();
     this.gameUI?.addCombatLog('🎉 ยินดีด้วย! คุณจบบทเรียนแล้ว! ตอนนี้คุณพร้อมที่จะเริ่มการผจญภัยของคุณ', 'levelup');
+    return true;
   }
 
   _clearStepHandlers() {

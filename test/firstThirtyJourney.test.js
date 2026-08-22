@@ -336,7 +336,7 @@ test('Fishing rod purchases use an atomic, catalog-bound self-host RPC', () => {
   assert.match(serverRpc, /ON CONFLICT \(character_id, item_name\) DO UPDATE/);
   assert.match(serverRpc, /shop_purchase_requests/);
   assert.match(serverRpc, /request_conflict/);
-  assert.match(gameUI, /isSelfHostMode && getFishingRodConfig\(item\.name\)/);
+  assert.match(gameUI, /_isServerBackedCharacter\(\)/);
   assert.match(gameUI, /supabase\.rpc\('purchase_shop_item'/);
   assert.match(gameUI, /p_request_id: requestId/);
 });
@@ -347,7 +347,8 @@ test('Self-host upsert defaults to the primary key so signup profile writes are 
   assert.match(serverData, /cols\.has\('id'\) \? \['id'\] : \[\]/);
   assert.match(serverData, /ON CONFLICT \(\$\{cc\}\) DO UPDATE SET/);
   assert.match(serverData, /isStarterFishingRod = input\.item_name === 'Fishing Rod'/);
-  assert.match(serverData, /starterStatsSafe = \(isStarterSword \|\| isStarterFishingRod\)/);
+  assert.match(serverData, /if \(\['insert', 'upsert', 'update', 'delete'\]\.includes\(action\)\)/);
+  assert.doesNotMatch(serverData, /starterStatsSafe/);
   assert.match(gameSync, /supabase\.auth\.bindAnonymousAccount\(\{ email, password \}\)/);
 });
 

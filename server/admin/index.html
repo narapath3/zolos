@@ -94,6 +94,11 @@
   .toast.good{border-color:var(--good)}.toast.bad{border-color:var(--bad)}
   .muted{color:var(--muted)}
   .mono{font-family:ui-monospace,'Cascadia Code',monospace}
+  .real-art{display:inline-block;width:30px;height:30px;object-fit:contain;vertical-align:middle;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+  .real-art.small{width:22px;height:22px;border-radius:5px}
+  .real-art.monster{width:30px;height:30px;object-fit:cover;border-radius:50%}
+  .zone-swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;background:#67d5ff;box-shadow:0 0 8px rgba(103,213,255,.45)}
+  .zone-swatch.land{background:#76d36d;box-shadow:0 0 8px rgba(118,211,109,.4)}
 </style>
 </head>
 <body>
@@ -101,7 +106,7 @@
 <!-- ============ LOGIN ============ -->
 <div id="login">
   <div class="card">
-    <h1>🛡️ ZOLOS Admin</h1>
+    <h1>ZOLOS Admin</h1>
     <p>แผงควบคุมระบบเกม — เฉพาะผู้ดูแล</p>
     <label>อีเมลผู้ดูแล</label>
     <input id="l-email" type="email" autocomplete="username" placeholder="admin@email.com">
@@ -115,16 +120,17 @@
 <!-- ============ APP ============ -->
 <div id="app" class="hidden">
   <header>
-    <span class="logo">🛡️ ZOLOS</span>
+    <span class="logo">ZOLOS</span>
     <nav>
       <button data-tab="dash" class="active">ภาพรวม</button>
       <button data-tab="players">ผู้เล่น</button>
-      <button data-tab="movement">📈 การเปลี่ยนแปลง</button>
-      <button data-tab="monsters">👹 มอนสเตอร์</button>
-      <button data-tab="cards">🃏 การ์ด</button>
+      <button data-tab="movement">การเปลี่ยนแปลง</button>
+      <button data-tab="monsters">มอนสเตอร์</button>
+      <button data-tab="cards">การ์ด</button>
       <button data-tab="economy">เศรษฐกิจ</button>
       <button data-tab="security">ความปลอดภัย</button>
       <button data-tab="events">กิจกรรม</button>
+      <button data-tab="reports">รายงานบัค</button>
     </nav>
     <span class="spacer"></span>
     <span class="who" id="who"></span>
@@ -141,8 +147,24 @@ let token=localStorage.getItem(TK)||null;
 let me=null;
 const $=(s,r=document)=>r.querySelector(s);
 const el=(h)=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstChild;};
-const fmt=(n)=>Number(n||0).toLocaleString('en-US');
-const ago=(ts)=>{if(!ts)return'-';const s=(Date.now()-ts)/1000;if(s<60)return Math.floor(s)+'วิ';if(s<3600)return Math.floor(s/60)+'น';if(s<86400)return Math.floor(s/3600)+'ชม';return Math.floor(s/86400)+'ว';};
+  const fmt=(n)=>Number(n||0).toLocaleString('en-US');
+  const slug=(name)=>String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  const petAtlasOrder=['Poring Pet','Chick Pet','Kitten Pet','Puppy Pet','Sunfox Pet','Moss Turtle Pet','Owl Pet','Cloudling Pet','Moon Hare Pet','Baby Dragon Pet','Bloom Fairy Pet','Ember Phoenix Pet'];
+  function art(name,type='',small=false){
+    const n=String(name||'');
+    const safe=esc(n);
+    if(type==='pet'){
+      const index=petAtlasOrder.indexOf(n);
+      if(index>=0){
+        const x=(index%4)*100/3, y=Math.floor(index/4)*100;
+        return `<span class="real-art${small?' small':''}" aria-label="${safe}" title="${safe}" style="background-image:url('/assets/pets/pet-sanctuary-atlas-v1.png');background-size:400% 200%;background-position:${x}% ${y}%;background-repeat:no-repeat"></span>`;
+      }
+    }
+    const src=type==='fish'?`/assets/items/fish/${slug(n)}.png`:`/assets/items/equipment/${slug(n)}.png`;
+    return `<img class="real-art${small?' small':''}" src="${src}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/assets/items/fallback/unknown-loot.png'" title="${safe}">`;
+  }
+  function monsterArt(){return `<img class="real-art monster" src="/assets/zolos_soft_mascot_emblem.png" alt="" loading="lazy">`;}
+  const ago=(ts)=>{if(!ts)return'-';const s=(Date.now()-ts)/1000;if(s<60)return Math.floor(s)+'วิ';if(s<3600)return Math.floor(s/60)+'น';if(s<86400)return Math.floor(s/3600)+'ชม';return Math.floor(s/86400)+'ว';};
 function toast(msg,ok=true){const t=el(`<div class="toast ${ok?'good':'bad'}">${msg}</div>`);document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
 
 async function api(path,opts={},base=ADMIN){
@@ -176,7 +198,7 @@ async function doLogin(){
 
 function enterApp(){
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
-  $('#who').textContent='👤 '+(me?.username||'admin');
+  $('#who').textContent='ผู้ดูแล: '+(me?.username||'admin');
   go('dash');
 }
 $('#logout').onclick=()=>{token=null;me=null;localStorage.removeItem(TK);location.reload();};
@@ -186,7 +208,7 @@ let cur='dash';
 function go(tab){
   cur=tab;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  ({dash:renderDash,players:renderPlayers,movement:renderMovement,monsters:renderMonsters,cards:renderCards,economy:renderEconomy,security:renderSecurity,events:renderEvents}[tab])();
+  ({dash:renderDash,players:renderPlayers,movement:renderMovement,monsters:renderMonsters,cards:renderCards,economy:renderEconomy,security:renderSecurity,events:renderEvents,reports:renderReports}[tab] || renderDash)();
 }
 
 // ---------- DASHBOARD ----------
@@ -278,10 +300,10 @@ window.openPlayer=async(cid)=>{
         <div><label>job</label><input data-f="job" value="${esc(c.job||'')}"></div>
       </div>
       <div class="row">
-        <button class="btn" onclick="saveChar('${c.id}')">💾 บันทึกค่าตัวละคร</button>
+        <button class="btn" onclick="saveChar('${c.id}')">บันทึกค่าตัวละคร</button>
         <button class="btn ghost sm" onclick="toggleAdmin('${c.id}',${!d.profile?.is_admin})">${d.profile?.is_admin?'ถอนสิทธิ์ Admin':'ตั้งเป็น Admin'}</button>
         <span class="spacer"></span>
-        <button class="btn bad sm" onclick="delChar('${c.id}','${esc(c.name||'')}')">🗑️ ลบตัวละคร</button>
+        <button class="btn bad sm" onclick="delChar('${c.id}','${esc(c.name||'')}')">ลบตัวละคร</button>
       </div>
 
       <div class="subhead">เพิ่ม / ลบไอเทม</div>
@@ -295,7 +317,7 @@ window.openPlayer=async(cid)=>{
 
       <div class="subhead">คลัง (${d.inventory.length})</div>
       <div class="tablewrap"><table><thead><tr><th>ไอเทม</th><th>ประเภท</th><th>จำนวน</th><th>stats</th></tr></thead>
-        <tbody>${d.inventory.map(i=>`<tr><td>${esc(i.item_name)}</td><td class="muted">${esc(i.item_type)}</td><td class="num">${fmt(i.quantity)}</td><td class="muted mono" style="font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis">${esc(JSON.stringify(i.stats||{}))}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">ว่าง</td></tr>'}</tbody>
+        <tbody>${d.inventory.map(i=>`<tr><td>${art(i.item_name,i.item_type,true)} ${esc(i.item_name)}</td><td class="muted">${esc(i.item_type)}</td><td class="num">${fmt(i.quantity)}</td><td class="muted mono" style="font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis">${esc(JSON.stringify(i.stats||{}))}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">ว่าง</td></tr>'}</tbody>
       </table></div>
 
       ${d.cards.length?`<div class="subhead">การ์ด (${d.cards.length})</div>
@@ -328,6 +350,44 @@ window.delChar=async(cid,name)=>{
   catch(e){toast(e.message,false);}
 };
 
+// ---------- BUG REPORTS ----------
+let reportStatus='pending';
+async function renderReports(){
+  const v=$('#view');
+  v.innerHTML='<div class="muted">กำลังโหลดรายงานบัค...</div>';
+  try{
+    const d=await api('/bug-reports?status='+encodeURIComponent(reportStatus));
+    const reports=Array.isArray(d.reports)?d.reports:[];
+    v.innerHTML=`<div class="panel"><div class="row"><h2 style="margin:0">รายงานบัค</h2><span class="spacer"></span><select id="report-status"><option value="pending" ${reportStatus==='pending'?'selected':''}>รอตรวจสอบ</option><option value="approved" ${reportStatus==='approved'?'selected':''}>อนุมัติแล้ว</option><option value="rejected" ${reportStatus==='rejected'?'selected':''}>ไม่อนุมัติ</option><option value="all" ${reportStatus==='all'?'selected':''}>ทั้งหมด</option></select><button class="btn ghost sm" onclick="renderReports()">รีเฟรช</button></div>
+    <div class="muted" style="font-size:12px;margin:8px 0 12px">การอนุมัติจะให้รางวัลผ่าน transaction เดียวกับการเปลี่ยนสถานะและป้องกันการให้ซ้ำ รายละเอียดจากผู้เล่นแสดงเป็นข้อความ escaped</div>
+    <div class="tablewrap"><table><thead><tr><th>สถานะ</th><th>ผู้เล่น</th><th>หัวข้อ</th><th>หมวด</th><th>ส่งเมื่อ</th><th>การจัดการ</th></tr></thead><tbody>${reports.map(r=>`<tr><td><span class="chip ${r.status==='approved'?'on':r.status==='rejected'?'off':''}">${esc(r.status)}</span></td><td><b>${esc(r.character_name||r.user_id||'-')}</b><div class="muted mono" style="font-size:10px">${esc(r.id)}</div></td><td><button class="btn ghost sm" onclick="openReport('${esc(r.id)}')">${esc(r.title||'(ไม่มีหัวข้อ)')}</button></td><td>${esc(r.category||'-')}</td><td class="muted">${r.created_at?ago(Date.parse(r.created_at)):'-'}</td><td>${r.status==='pending'?`<button class="btn sm" onclick="reviewBug('${esc(r.id)}','approve')">อนุมัติ/ให้รางวัล</button> <button class="btn bad sm" onclick="reviewBug('${esc(r.id)}','reject')">ไม่อนุมัติ</button>`:'<span class="muted">ตรวจแล้ว</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">ไม่มีรายงานในตัวกรองนี้</td></tr>'}</tbody></table></div></div>`;
+    $('#report-status').onchange=e=>{reportStatus=e.target.value;renderReports();};
+    window._zolosReports=reports;
+  }catch(e){authGuard(e);v.innerHTML=`<div class="err">${esc(e.message)}</div>`;}
+}
+window.openReport=(id)=>{
+  const r=(window._zolosReports||[]).find(x=>String(x.id)===String(id));
+  if(!r)return;
+  const m=$('#modal');m.classList.remove('hidden');
+  m.innerHTML=`<div class="box"><div class="modal-head"><h2>${esc(r.title||'รายงานบัค')}</h2><button class="close" onclick="closeModal()">×</button></div><div class="subhead">รายละเอียด</div><div style="white-space:pre-wrap;overflow-wrap:anywhere;background:var(--panel2);padding:12px;border-radius:8px">${esc(r.details||'-')}</div><div class="subhead">บริบท</div><div class="muted mono" style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(r.context||{},null,2))}</div><div class="muted" style="margin-top:12px">ภาพหน้าจอ: ${r.screenshot_data?'แนบมาด้วย (ไม่แสดง inline ในแผงควบคุม)':'ไม่มี'}</div></div>`;
+};
+window.reviewBug=async(id,action)=>{
+  const r=(window._zolosReports||[]).find(x=>String(x.id)===String(id));
+  if(!r)return;
+  let item_name='',item_quantity=0,gold=0;
+  if(action==='approve'){
+    item_name=prompt('ชื่อไอเทมรางวัล เช่น Bug Hunter Emblem','Bug Hunter Emblem');
+    if(item_name===null)return;
+    item_quantity=Math.max(1,Math.min(99,Math.floor(Number(prompt('จำนวนไอเทม','1'))||0)));
+    gold=Math.max(1,Math.min(100000000,Math.floor(Number(prompt('Zeny รางวัล','1000'))||0)));
+  }
+  const note=prompt(action==='approve'?'หมายเหตุการอนุมัติ (ไม่บังคับ)':'เหตุผลที่ไม่อนุมัติ (ไม่บังคับ)','')||'';
+  if(!confirm(action==='approve'?'ยืนยันอนุมัติและให้รางวัลรายงานนี้?':'ยืนยันไม่อนุมัติรายงานนี้?'))return;
+  try{
+    await api('/bug-reports/'+encodeURIComponent(id)+'/review',{method:'POST',body:JSON.stringify({action,note,item_name,item_quantity,gold})});
+    toast(action==='approve'?'อนุมัติและให้รางวัลแล้ว':'ปิดรายงานแล้ว');renderReports();closeModal();
+  }catch(e){toast(e.message,false);}
+};
 // ---------- MOVEMENT (daily "stock ticker") ----------
 const MOVE_META={
   gold:{label:'เงิน',cls:'gold'}, zol:{label:'ZOL',cls:'zol'},
@@ -354,7 +414,7 @@ async function renderMovement(){
   v.innerHTML=`
     <div class="panel">
       <div class="row">
-        <h2 style="margin:0">📈 การเปลี่ยนแปลงรายวัน (แบบหุ้น)</h2>
+        <h2 style="margin:0">การเปลี่ยนแปลงรายวัน (แบบหุ้น)</h2>
         <span class="spacer"></span>
         <select id="mv-metric">${Object.entries(MOVE_META).map(([k,m])=>`<option value="${k}" ${k===moveMetric?'selected':''}>${m.label}</option>`).join('')}</select>
         <select id="mv-days">${[7,14,30].map(d=>`<option value="${d}" ${d===moveDays?'selected':''}>${d} วัน</option>`).join('')}</select>
@@ -411,19 +471,19 @@ async function renderMonsters(){
     v.innerHTML=`
       <div class="panel">
         <div class="row" style="align-items:center">
-          <h2 style="margin:0">🗺️ มอนสเตอร์ประจำแผนที่</h2>
+          <h2 style="margin:0">มอนสเตอร์ประจำแผนที่</h2>
           <span class="spacer"></span>
           <select id="mon-map">${maps.map(m=>`<option value="${m.id}" ${m.id===monMap?'selected':''}>${esc(m.name)}</option>`).join('')}</select>
         </div>
         <div id="mon-map-body"><div class="muted" style="margin-top:10px">กำลังโหลด...</div></div>
       </div>
       <div class="panel" style="margin-top:16px">
-        <h2>📖 แคตตาล็อกมอนสเตอร์ (สตัท + ดรอป)</h2>
+        <h2>แคตตาล็อกมอนสเตอร์ (สตัท + ดรอป)</h2>
         <div class="tablewrap"><table>
           <thead><tr><th>มอนสเตอร์</th><th>โซน</th><th class="num">HP</th><th class="num">ATK</th><th class="num">DEF</th><th class="num">EXP</th><th>Gold</th><th></th></tr></thead>
           <tbody>${monsters.map(m=>`
             <tr>
-              <td>${m.emoji||''} <b>${esc(m.name)}</b> ${m.is_boss?'<span class="pill bad">BOSS</span>':''} <span class="muted mono">${m.type}</span></td>
+              <td>${monsterArt()} <b>${esc(m.name)}</b> ${m.is_boss?'<span class="pill bad">BOSS</span>':''} <span class="muted mono">${m.type}</span></td>
               <td>${m.environment}</td>
               <td class="num">${fmt(m.hp)}</td><td class="num">${fmt(m.atk)}</td><td class="num">${fmt(m.def)}</td><td class="num">${fmt(m.exp)}</td>
               <td class="gold">${m.gold_min}-${m.gold_max}</td>
@@ -440,7 +500,7 @@ async function loadMapSpawns(){
   box.innerHTML='<div class="muted" style="margin-top:10px">กำลังโหลด...</div>';
   try{
     const d=await api('/maps/'+monMap+'/spawns');
-    const opts=monCatalog.map(m=>`<option value="${m.type}">${m.emoji||''} ${esc(m.name)} (${m.environment})</option>`).join('');
+    const opts=monCatalog.map(m=>`<option value="${m.type}">${esc(m.name)} (${m.environment})</option>`).join('');
     box.innerHTML=`
       <div class="row" style="margin:10px 0;align-items:center;gap:8px">
         <label>จำนวนบก <input id="mon-land" type="number" min="0" max="60" value="${d.landCount}" style="width:72px"></label>
@@ -451,8 +511,8 @@ async function loadMapSpawns(){
         <thead><tr><th>มอนสเตอร์</th><th>โซน</th><th class="num">น้ำหนักสุ่ม</th><th></th></tr></thead>
         <tbody>${d.spawns.length?d.spawns.map(s=>`
           <tr>
-            <td>${s.emoji||''} <b>${esc(s.name||s.monster_type)}</b> <span class="muted mono">${s.monster_type}</span></td>
-            <td>${s.is_water?'💧 น้ำ':'🌿 บก'}</td>
+            <td>${monsterArt()} <b>${esc(s.name||s.monster_type)}</b> <span class="muted mono">${s.monster_type}</span></td>
+            <td><span class="zone-swatch${s.is_water?'':' land'}"></span>${s.is_water?'น้ำ':'บก'}</td>
             <td class="num"><input type="number" min="1" max="1000" value="${s.weight}" style="width:80px" onchange="saveWeight('${s.monster_type}',this.value,${s.is_water})"></td>
             <td><button class="btn ghost sm bad" onclick="delSpawn(${s.id})">ลบ</button></td>
           </tr>`).join(''):'<tr><td colspan="4" class="muted">ยังไม่มีมอนสเตอร์ในแผนที่นี้</td></tr>'}</tbody>
@@ -460,7 +520,7 @@ async function loadMapSpawns(){
       <div class="row" style="margin-top:12px;gap:8px;align-items:center">
         <select id="mon-add-type">${opts}</select>
         <label>น้ำหนัก <input id="mon-add-w" type="number" min="1" max="1000" value="20" style="width:80px"></label>
-        <button class="btn sm" onclick="addSpawn()">➕ เพิ่มลงแผนที่</button>
+        <button class="btn sm" onclick="addSpawn()">เพิ่มลงแผนที่</button>
       </div>`;
   }catch(e){authGuard(e);box.innerHTML=`<div class="err">${e.message}</div>`;}
 }
@@ -485,35 +545,33 @@ window.openMonster=async(type)=>{
     const {drops}=await api('/monsters/'+type+'/drops');
     const f=(label,key,val,step='1')=>`<label class="fld"><span>${label}</span><input data-mf="${key}" type="number" step="${step}" value="${val??0}"></label>`;
     m.innerHTML=`<div class="box">
-      <div class="modal-head"><h2>${def.emoji||''} ${esc(def.name||type)} <span class="muted mono">${type}</span></h2><button class="btn ghost sm" onclick="closeModal()">ปิด</button></div>
+      <div class="modal-head"><h2>${monsterArt()} ${esc(def.name||type)} <span class="muted mono">${type}</span></h2><button class="btn ghost sm" onclick="closeModal()">ปิด</button></div>
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px">
         <label class="fld"><span>ชื่อ</span><input data-mf="name" value="${esc(def.name||'')}"></label>
-        <label class="fld"><span>Emoji</span><input data-mf="emoji" value="${esc(def.emoji||'')}"></label>
         ${f('HP','hp',def.hp)}${f('ATK','atk',def.atk)}${f('DEF','def',def.def)}${f('EXP','exp',def.exp)}
         ${f('Gold min','gold_min',def.gold_min)}${f('Gold max','gold_max',def.gold_max)}
         ${f('ขนาด','size',def.size,'0.1')}${f('ความเร็ว','speed',def.speed,'0.1')}
         <label class="fld"><span>บอส</span><select data-mf="is_boss"><option value="false" ${!def.is_boss?'selected':''}>ไม่</option><option value="true" ${def.is_boss?'selected':''}>ใช่</option></select></label>
       </div>
-      <div class="row" style="margin-top:10px"><button class="btn" onclick="saveMonster('${type}')">💾 บันทึกสตัท</button></div>
-      <h2 style="margin-top:18px">🎁 ตารางดรอป</h2>
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="saveMonster('${type}')">บันทึกสตัท</button></div>
+      <h2 style="margin-top:18px">ตารางดรอป</h2>
       <div class="tablewrap"><table>
         <thead><tr><th>ไอเทม</th><th>ประเภท</th><th class="num">โอกาส</th><th class="num">จำนวน</th><th></th></tr></thead>
         <tbody id="mon-drops">${dropRows(drops)}</tbody>
       </table></div>
       <div class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap;align-items:center">
         <input id="dp-name" placeholder="ชื่อไอเทม" style="min-width:140px">
-        <input id="dp-emoji" placeholder="emoji" style="width:70px">
         <input id="dp-type" placeholder="ประเภท" value="material" style="width:100px">
         <label>% <input id="dp-chance" type="number" min="0" max="100" value="10" style="width:70px"></label>
         <label>จำนวน <input id="dp-qmin" type="number" min="1" value="1" style="width:56px"> - <input id="dp-qmax" type="number" min="1" value="1" style="width:56px"></label>
-        <button class="btn sm" onclick="addDrop('${type}')">➕ เพิ่มดรอป</button>
+        <button class="btn sm" onclick="addDrop('${type}')">เพิ่มดรอป</button>
       </div>
     </div>`;
   }catch(e){m.innerHTML=`<div class="box"><div class="err">${e.message}</div><button class="btn ghost sm" onclick="closeModal()">ปิด</button></div>`;}
 };
 function dropRows(drops){
   return drops.length?drops.map(d=>`<tr>
-    <td>${d.emoji||''} ${esc(d.item_name)}</td><td>${esc(d.item_type)}</td>
+    <td>${art(d.item_name,d.item_type,true)} ${esc(d.item_name)}</td><td>${esc(d.item_type)}</td>
     <td class="num">${(d.chance*100).toFixed(1)}%</td><td class="num">${d.qty_min===d.qty_max?d.qty_min:d.qty_min+'-'+d.qty_max}</td>
     <td><button class="btn ghost sm bad" onclick="delDrop(${d.id},'${d.monster_type}')">ลบ</button></td></tr>`).join(''):'<tr><td colspan="5" class="muted">ยังไม่มีดรอป</td></tr>';
 }
@@ -521,13 +579,13 @@ window.saveMonster=async(type)=>{
   const body={};document.querySelectorAll('#modal [data-mf]').forEach(i=>{
     let val=i.value;
     if(i.dataset.mf==='is_boss')val=(val==='true');
-    else if(!['name','emoji'].includes(i.dataset.mf))val=Number(val);
+    else if(i.dataset.mf!=='name')val=Number(val);
     body[i.dataset.mf]=val;
   });
   try{await api('/monsters/'+type,{method:'PATCH',body:JSON.stringify(body)});toast('บันทึกสตัทแล้ว');renderMonsters();closeModal();}catch(e){toast(e.message,false);}
 };
 window.addDrop=async(type)=>{
-  const body={item_name:$('#dp-name').value.trim(),emoji:$('#dp-emoji').value.trim(),item_type:$('#dp-type').value.trim()||'material',
+  const body={item_name:$('#dp-name').value.trim(),item_type:$('#dp-type').value.trim()||'material',
     chance:Number($('#dp-chance').value)/100,qty_min:Number($('#dp-qmin').value),qty_max:Number($('#dp-qmax').value)};
   if(!body.item_name){toast('ใส่ชื่อไอเทม',false);return;}
   try{await api('/monsters/'+type+'/drops',{method:'POST',body:JSON.stringify(body)});toast('เพิ่มดรอปแล้ว');openMonster(type);}catch(e){toast(e.message,false);}
@@ -614,17 +672,17 @@ async function renderEconomy(){
         ${stat('ประกาศขายในตลาด',fmt(d.market.listings))}
         ${stat('มูลค่าตลาดรวม',`<span class="gold">${fmt(d.market.value)}</span>`,'small')}
       </div>
-      <div class="panel"><h2>💰 ผู้เล่นรวยที่สุด</h2><div class="tablewrap"><table>
+      <div class="panel"><h2>ผู้เล่นรวยที่สุด</h2><div class="tablewrap"><table>
         <thead><tr><th>#</th><th>ชื่อ</th><th>Lv</th><th>เงิน</th><th>ZOL</th><th></th></tr></thead>
         <tbody>${d.richest.map((c,i)=>`<tr class="clickable" onclick="openPlayer('${c.id}')"><td>${i+1}</td><td><b>${esc(c.name)}</b></td><td class="num">${c.level}</td><td class="num gold">${fmt(c.gold)}</td><td class="num zol">${fmt(c.zol)}</td><td class="muted mono">${c.id.slice(0,8)}</td></tr>`).join('')}</tbody>
       </table></div></div>
-      <div class="panel"><h2>💎 ถือ ZOL มากสุด</h2><div class="tablewrap"><table>
+      <div class="panel"><h2>ถือ ZOL มากสุด</h2><div class="tablewrap"><table>
         <thead><tr><th>#</th><th>ชื่อ</th><th>Lv</th><th>ZOL</th></tr></thead>
         <tbody>${d.topZol.map((c,i)=>`<tr class="clickable" onclick="openPlayer('${c.id}')"><td>${i+1}</td><td><b>${esc(c.name)}</b></td><td class="num">${c.level}</td><td class="num zol">${fmt(c.zol)}</td></tr>`).join('')}</tbody>
       </table></div></div>
-      <div class="panel"><h2>🛒 ประวัติซื้อขายล่าสุด</h2><div class="tablewrap"><table>
+      <div class="panel"><h2>ประวัติซื้อขายล่าสุด</h2><div class="tablewrap"><table>
         <thead><tr><th>ไอเทม</th><th>จำนวน</th><th>ราคา</th><th>เมื่อ</th></tr></thead>
-        <tbody>${d.recentSales.map(s=>`<tr><td>${esc(s.item_name)}</td><td class="num">${fmt(s.quantity)}</td><td class="num gold">${fmt(s.price)}</td><td class="muted">${s.sold_at?ago(Date.parse(s.sold_at)):'-'}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">ยังไม่มี</td></tr>'}</tbody>
+        <tbody>${d.recentSales.map(s=>`<tr><td>${art(s.item_name,'',true)} ${esc(s.item_name)}</td><td class="num">${fmt(s.quantity)}</td><td class="num gold">${fmt(s.price)}</td><td class="muted">${s.sold_at?ago(Date.parse(s.sold_at)):'-'}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">ยังไม่มี</td></tr>'}</tbody>
       </table></div></div>`;
   }catch(e){authGuard(e);v.innerHTML=`<div class="err">${e.message}</div>`;}
 }
@@ -633,7 +691,7 @@ async function renderEconomy(){
 let secTimer=null;
 async function renderSecurity(){
   const v=$('#view');
-  v.innerHTML=`<div class="panel"><div class="row"><h2 style="margin:0">🛰️ เฝ้าระวัง IP & การโจมตี</h2><span class="spacer"></span><span class="muted" id="sec-stat"></span><button class="btn warn sm" onclick="scanCheats()">🔎 สแกนบัญชีโกงเดี๋ยวนี้</button><button class="btn ghost sm" onclick="renderSecurity()">รีเฟรช</button></div></div>
+  v.innerHTML=`<div class="panel"><div class="row"><h2 style="margin:0">เฝ้าระวัง IP & การโจมตี</h2><span class="spacer"></span><span class="muted" id="sec-stat"></span><button class="btn warn sm" onclick="scanCheats()">สแกนบัญชีโกงเดี๋ยวนี้</button><button class="btn ghost sm" onclick="renderSecurity()">รีเฟรช</button></div></div>
     <div id="sec-body"><div class="muted">กำลังโหลด...</div></div>`;
   clearTimeout(secTimer);
   const load=async()=>{
@@ -645,7 +703,7 @@ async function renderSecurity(){
         :a==='admin-reset'?'<span class="chip" style="background:rgba(74,163,255,.18);color:var(--accent)">แอดมินรีเซต</span>'
         :'<span class="chip" style="background:rgba(255,84,112,.18);color:var(--bad)">รีเซตอัตโนมัติ</span>';
       const cheatPanel=`
-        <div class="panel"><h2>🚨 บัญชีโกง / น่าสงสัย (${cg.actions.length})</h2>
+        <div class="panel"><h2>บัญชีโกง / น่าสงสัย (${cg.actions.length})</h2>
           <div class="muted" style="font-size:12px;margin-bottom:8px">
             <b style="color:var(--bad)">รีเซตอัตโนมัติ</b> = ค่าที่เป็นไปไม่ได้ (ไม่เคยเล่นแต่มีค่าสูง / เล่นนานเกินอายุบัญชี) ระบบรีเซตให้แล้ว ·
             <b style="color:var(--warn)">น่าสงสัย</b> = ขึ้นเร็วเกินกฎ/เกินเพดาน อาจเป็นแอดมินแจกเอง → ตรวจแล้วกดจัดการเอง · สแกนทุก 5 นาที · แอดมินยกเว้น
@@ -677,7 +735,7 @@ async function renderSecurity(){
           </tr>`).join('')||'<tr><td colspan="9" class="muted">ยังไม่มีข้อมูล</td></tr>'}</tbody>
         </table></div></div>
 
-        <div class="panel"><h2>🟢 ออนไลน์ตอนนี้ (${d.online.length})</h2><div class="tablewrap"><table>
+        <div class="panel"><h2>ออนไลน์ตอนนี้ (${d.online.length})</h2><div class="tablewrap"><table>
           <thead><tr><th>ชื่อ</th><th>Lv</th><th>IP</th><th>แผนที่</th><th>ping</th><th>ยืนยัน</th><th>เข้าเมื่อ</th><th></th></tr></thead>
           <tbody>${d.online.map(p=>`<tr>
             <td><b>${esc(p.username)}</b> ${p.isAdmin?'<span class="chip admin">A</span>':''}</td>
@@ -688,7 +746,7 @@ async function renderSecurity(){
           </tr>`).join('')||'<tr><td colspan="8" class="muted">ไม่มีใครออนไลน์</td></tr>'}</tbody>
         </table></div></div>
 
-        <div class="panel"><h2>📜 เหตุการณ์ล่าสุด</h2><div class="tablewrap"><table>
+        <div class="panel"><h2>เหตุการณ์ล่าสุด</h2><div class="tablewrap"><table>
           <thead><tr><th>เมื่อ</th><th>ชนิด</th><th>IP</th><th>รายละเอียด</th></tr></thead>
           <tbody>${d.events.map(e=>`<tr><td class="muted">${ago(e.ts)}</td><td><span class="chip ${e.kind==='suspicious'?'off':''}" style="${e.kind==='suspicious'?'color:var(--bad)':e.kind==='auth_fail'?'color:var(--warn)':''}">${e.kind}</span></td><td class="mono">${esc(e.ip)}</td><td class="muted">${esc(e.detail||'-')}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">ยังไม่มี</td></tr>'}</tbody>
         </table></div></div>`;
@@ -722,17 +780,17 @@ function renderEvents(){
   const v=$('#view');
   v.innerHTML=`
     <div class="panel">
-      <h2>📢 ส่งประกาศทั้งเซิร์ฟเวอร์</h2>
+      <h2>ส่งประกาศทั้งเซิร์ฟเวอร์</h2>
       <div class="row" style="margin-bottom:10px">
         <input id="ann-text" placeholder="ข้อความประกาศถึงผู้เล่นทุกคน..." style="flex:1;min-width:220px">
         <input id="ann-color" type="color" value="#ffd24a" style="width:52px;padding:2px;height:38px">
         <button class="btn" onclick="sendAnnounce()">ส่งประกาศ</button>
       </div>
       <div class="row">
-        <button class="btn ghost sm" onclick="preset('🎉 กิจกรรมพิเศษเริ่มแล้ว! ล่ามอนสเตอร์รับ EXP x2')">EXP x2</button>
+        <button class="btn ghost sm" onclick="preset('กิจกรรมพิเศษเริ่มแล้ว! ล่ามอนสเตอร์รับ EXP x2')">EXP x2</button>
         <button class="btn ghost sm" onclick="preset('⚔️ บอสโลกกำลังจะปรากฏ! เตรียมตัวให้พร้อม')">บอสโลก</button>
-        <button class="btn ghost sm" onclick="preset('🛠️ ระบบจะปิดปรับปรุงชั่วคราว กรุณาบันทึกความคืบหน้า')">แจ้งปิดปรับปรุง</button>
-        <button class="btn ghost sm" onclick="preset('🎁 แจกของรางวัลประจำวัน อย่าลืมล็อกอินรับ!')">แจกรางวัล</button>
+        <button class="btn ghost sm" onclick="preset('ระบบจะปิดปรับปรุงชั่วคราว กรุณาบันทึกความคืบหน้า')">แจ้งปิดปรับปรุง</button>
+        <button class="btn ghost sm" onclick="preset('แจกของรางวัลประจำวัน อย่าลืมล็อกอินรับ!')">แจกรางวัล</button>
       </div>
     </div>
     <div class="panel muted" style="font-size:13px">

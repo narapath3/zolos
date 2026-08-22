@@ -1,0 +1,378 @@
+{
+  "generatedAt": "2026-08-22T15:19:27.552Z",
+  "itemCatalog": {
+    "total": 298,
+    "authoredArt": 298,
+    "fallback": 0,
+    "byRenderMode": {
+      "dynamic-3d": 73,
+      "png": 146,
+      "pet-atlas": 13,
+      "card-png": 66
+    }
+  },
+  "fishCatalog": {
+    "total": 73,
+    "missing": 0
+  },
+  "pets": {
+    "atlas": "/assets/pets/pet-sanctuary-atlas-v1.png",
+    "exists": true
+  },
+  "rawEmojiVisualCalls": {
+    "src/ui/GameUI.js": [
+      {
+        "index": 40758,
+        "text": "emoji ||"
+      },
+      {
+        "index": 40767,
+        "text": "item.emoji"
+      },
+      {
+        "index": 66941,
+        "text": "item.emoji"
+      },
+      {
+        "index": 66960,
+        "text": "emoji ||"
+      },
+      {
+        "index": 68726,
+        "text": "${itemIconMarkup(item.name, item.emoji, 'fishing-summary__item-art')}"
+      },
+      {
+        "index": 70564,
+        "text": "${featured ? itemIconMarkup(featured.name, featured.emoji, 'fishing-summary__featured-art') : ''}"
+      },
+      {
+        "index": 76805,
+        "text": "${reward.item ? ` + ${reward.item.emoji}"
+      },
+      {
+        "index": 82687,
+        "text": "${itemIconMarkup(selectedName, selectedData.emoji || 'ปลา', 'item-visual--fish-detail')}"
+      },
+      {
+        "index": 87827,
+        "text": "${allRw.item.emoji}"
+      },
+      {
+        "index": 91992,
+        "text": "item.emoji"
+      },
+      {
+        "index": 92834,
+        "text": "item.emoji"
+      },
+      {
+        "index": 98382,
+        "text": "${itemIconMarkup(petItem, petItem.emoji)}"
+      },
+      {
+        "index": 99568,
+        "text": "${itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji)}"
+      },
+      {
+        "index": 133694,
+        "text": "${itemIconMarkup(i, i.emoji || slot.icon, 'item-visual--forge-cell')}"
+      },
+      {
+        "index": 143298,
+        "text": "${card.emoji || '🃏'}"
+      },
+      {
+        "index": 144007,
+        "text": "${card ? (card.emoji || '🃏') + ' ' + cardName : ''}"
+      },
+      {
+        "index": 150563,
+        "text": "emoji ||"
+      },
+      {
+        "index": 150572,
+        "text": "item.emoji"
+      },
+      {
+        "index": 152703,
+        "text": "${d.emoji}"
+      },
+      {
+        "index": 156612,
+        "text": "emoji ||"
+      },
+      {
+        "index": 163022,
+        "text": "${item.emoji}"
+      },
+      {
+        "index": 163406,
+        "text": "${item.emoji}"
+      },
+      {
+        "index": 166494,
+        "text": "${item.emoji}"
+      },
+      {
+        "index": 170598,
+        "text": "${item.emoji}"
+      },
+      {
+        "index": 185226,
+        "text": "${itemIconMarkup(item, item.emoji, 'item-visual--pet-profile')}"
+      },
+      {
+        "index": 216203,
+        "text": "emoji ||"
+      },
+      {
+        "index": 218415,
+        "text": "${item ? itemIconMarkup(item.name, item.emoji, 'item-visual--equipped') : '➖'}"
+      },
+      {
+        "index": 251614,
+        "text": "${pick.emoji || '🧪'}"
+      },
+      {
+        "index": 256238,
+        "text": "emoji ||"
+      },
+      {
+        "index": 275908,
+        "text": "emoji ||"
+      },
+      {
+        "index": 304907,
+        "text": "${itemIconMarkup(item.name, itemData.emoji, 'slot-emoji')}"
+      },
+      {
+        "index": 318917,
+        "text": "${itemData.emoji}"
+      },
+      {
+        "index": 356662,
+        "text": "${itemIconMarkup(entry.name, item.emoji, 'item-visual--detail')}"
+      },
+      {
+        "index": 359262,
+        "text": "item.emoji"
+      },
+      {
+        "index": 361510,
+        "text": "${pick.emoji || '⛏️'}"
+      },
+      {
+        "index": 364351,
+        "text": "${pick.emoji || '⛏️'}"
+      },
+      {
+        "index": 379733,
+        "text": "emoji ||"
+      },
+      {
+        "index": 398537,
+        "text": "${itemIconMarkup(req.name, md.emoji || '📦', 'item-visual--forge-material')}"
+      },
+      {
+        "index": 399387,
+        "text": "${itemIconMarkup(r.result, res.emoji || '🗡️', 'item-visual--forge-result')}"
+      },
+      {
+        "index": 403718,
+        "text": "${itemIconMarkup(i, i.emoji || '📦', 'item-visual--forge-cell')}"
+      },
+      {
+        "index": 406322,
+        "text": "${itemIconMarkup(sel, sel.emoji || '🗡️', 'item-visual--forge-stage')}"
+      },
+      {
+        "index": 407698,
+        "text": "${itemIconMarkup(ore, ITEMS[ore]?.emoji || '🔩', 'item-visual--forge-material')}"
+      },
+      {
+        "index": 410249,
+        "text": "${item.emoji || ''}"
+      },
+      {
+        "index": 413582,
+        "text": "${resData.emoji || ''}"
+      },
+      {
+        "index": 416932,
+        "text": "${itemIconMarkup(item, ITEMS[item.item_name]?.emoji || item.emoji)}"
+      },
+      {
+        "index": 417912,
+        "text": "emoji ||"
+      },
+      {
+        "index": 417921,
+        "text": "item.emoji"
+      },
+      {
+        "index": 420651,
+        "text": "${item.emoji}"
+      },
+      {
+        "index": 423578,
+        "text": "${itemIconMarkup(item, item.emoji || itemData.emoji || '📦')}"
+      },
+      {
+        "index": 425168,
+        "text": "item.emoji"
+      },
+      {
+        "index": 425191,
+        "text": "emoji ||"
+      },
+      {
+        "index": 427700,
+        "text": "${item.emoji || '📦'}"
+      },
+      {
+        "index": 429237,
+        "text": "${item.emoji || '📦'}"
+      },
+      {
+        "index": 434560,
+        "text": "emoji ||"
+      },
+      {
+        "index": 434575,
+        "text": "emoji ||"
+      },
+      {
+        "index": 436849,
+        "text": "${itemIconMarkup(listing.item_name, itemInfo.emoji, 'item-visual--market-row')}"
+      },
+      {
+        "index": 443215,
+        "text": "${item.emoji}"
+      },
+      {
+        "index": 445845,
+        "text": "emoji ||"
+      },
+      {
+        "index": 446990,
+        "text": "emoji ||"
+      },
+      {
+        "index": 449837,
+        "text": "emoji ||"
+      },
+      {
+        "index": 451471,
+        "text": "emoji ||"
+      },
+      {
+        "index": 459534,
+        "text": "${j.emoji}"
+      },
+      {
+        "index": 461944,
+        "text": "${job.emoji}"
+      },
+      {
+        "index": 462755,
+        "text": "${sk.emoji}"
+      },
+      {
+        "index": 466987,
+        "text": "${ITEMS[sig].emoji || '🗡️'}"
+      },
+      {
+        "index": 468070,
+        "text": "${job.emoji}"
+      },
+      {
+        "index": 473345,
+        "text": "${SKILLS[id].emoji}"
+      },
+      {
+        "index": 545518,
+        "text": "${itemIconMarkup(itemName, item.emoji || '', large ? 'item-visual--detail' : '')}"
+      },
+      {
+        "index": 560733,
+        "text": "emoji ||"
+      },
+      {
+        "index": 560751,
+        "text": "emoji ||"
+      },
+      {
+        "index": 564558,
+        "text": "${d.emoji}"
+      },
+      {
+        "index": 597685,
+        "text": "${itemIconMarkup(item, item.emoji || '', 'inv-slot-visual')}"
+      },
+      {
+        "index": 598483,
+        "text": "item.emoji"
+      },
+      {
+        "index": 602109,
+        "text": "emoji ||"
+      },
+      {
+        "index": 619904,
+        "text": "item.emoji"
+      },
+      {
+        "index": 620900,
+        "text": "${winner.emoji}"
+      },
+      {
+        "index": 636293,
+        "text": "${m.emoji}"
+      },
+      {
+        "index": 639123,
+        "text": "${m.emoji}"
+      },
+      {
+        "index": 639924,
+        "text": "${itemIconMarkup(cardItem, cardItem.emoji || '', 'card-picker-visual')}"
+      },
+      {
+        "index": 640452,
+        "text": "${itemIconMarkup(t, t.emoji || '', 'card-picker-visual')}"
+      },
+      {
+        "index": 647179,
+        "text": "${itemIconMarkup(targetItem, targetItem.emoji || '', 'card-picker-visual')}"
+      },
+      {
+        "index": 648141,
+        "text": "emoji ||"
+      }
+    ],
+    "src/ui/AdminUI.js": [
+      {
+        "index": 5601,
+        "text": "emoji ||"
+      }
+    ],
+    "server/admin/index.html": [],
+    "src/ui/PlayerProfileModal.js": [
+      {
+        "index": 20292,
+        "text": "${jobInfo.emoji}"
+      },
+      {
+        "index": 33907,
+        "text": "${jobInfo.emoji}"
+      },
+      {
+        "index": 38968,
+        "text": "emoji ||"
+      }
+    ],
+    "src/ui/LoadingOverlay.js": [],
+    "src/ui/GlobalAnnouncements.js": []
+  },
+  "fallbackItems": []
+}

@@ -19,7 +19,8 @@ test('server-owned monster death commits one kill and returns the authoritative 
 test('monster rewards freeze the defeated life across slow database work and respawn', () => {
   const killBlock = engine.match(/async function killMonster[\s\S]*?async function awardMonsterCards/)?.[0] || '';
   assert.match(killBlock, /const defeated = \{[\s\S]*type: m\.type[\s\S]*contributors: \[\.\.\.m\.dmgByChar\.entries\(\)\][\s\S]*killNonce:/);
-  const firstAwait = killBlock.indexOf('await query(');
+  const firstAwait = killBlock.search(/\bawait (?:query|tx)\(/);
+  assert.ok(firstAwait >= 0);
   assert.ok(killBlock.indexOf('const defeated = {') < firstAwait);
   assert.match(killBlock, /cfg\.dropsByType\.get\(defeated\.type\)/);
   assert.match(killBlock, /awardMonsterCards\(cid, defeated\.type, mapId, defeated\.id, defeated\.killNonce\)/);

@@ -67,8 +67,8 @@ test('local guest fallback keeps fishing on the local reward path', () => {
   assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)\) break/);
   assert.match(main, /rawMessage\.startsWith\('บันทึกรางวัลปลาไม่สำเร็จ'\)/);
   assert.match(main, /rawMessage \|\| 'กรุณาลองใหม่'/);
-  assert.match(gameUI, /await updateInventoryItemStats\(this\.characterId, item\.item_name, item\.stats \|\| \{\}\)/);
-  assert.match(gameUI, /await updateInventoryItemStats\(this\.characterId, otherItem\.item_name, otherItem\.stats \|\| \{\}\)/);
+  assert.match(gameUI, /item\.item_type === 'pet' \? savePetState : updateInventoryItemStats/);
+  assert.match(gameUI, /otherItem\.item_type === 'pet' \? savePetState : updateInventoryItemStats/);
 });
 
 test('socket fishing claim is authenticated, state-gated, rate-limited and server-owned', () => {

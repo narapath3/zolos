@@ -106,17 +106,20 @@ test('character card collection is read-only through the generic data API', () =
 });
 
 test('generic inventory writes cannot grant items or forge quantity/stats', () => {
-  assert.match(data, /inventory grants must come from server-authoritative rewards/);
-  assert.match(data, /inventory quantity is server-authoritative/);
-  assert.match(data, /inventory item stats are server-authoritative/);
+  assert.match(data, /const category = isSystemSnapshot/);
+  assert.match(data, /\['insert', 'upsert', 'update', 'delete'\]/);
+  assert.match(data, /\$\{category\} mutations must come from server-authoritative RPCs/);
   assert.match(data, /SYSTEM_INVENTORY_ITEMS/);
   assert.match(data, /isStarterSword/);
 });
 
-test('system inventory snapshots carry an explicit item identity on atomic upserts', () => {
-  assert.match(gameSync, /item_name: 'daily_quests'[\s\S]*item_type: 'system'[\s\S]*stats: questData/);
-  assert.match(gameSync, /item_name: 'friends_list'[\s\S]*item_type: 'system'[\s\S]*stats: \{ list: friendsList \}/);
-  assert.match(gameSync, /onConflict: 'character_id,item_name'/);
+test('system progression writes use an allowlisted server RPC', () => {
+  assert.match(gameSync, /supabase\.rpc\('save_system_state'/);
+  assert.match(gameSync, /p_character_id: characterId/);
+  assert.match(gameSync, /p_key: key/);
+  assert.match(gameSync, /p_state: state/);
+  assert.match(gameSync, /claim_daily_reward/);
+  assert.match(gameSync, /claim_almanac_reward/);
 });
 
 const serverSource = read('../server/server.js');
@@ -158,9 +161,11 @@ test('market purchases lock the buyer balance before settlement', () => {
   assert.match(marketBuyMigration, /FROM public\.characters[\s\S]*LIMIT 1 FOR UPDATE/);
 });
 
-test('starter Sword inventory exception cannot carry forged combat stats', () => {
-  assert.match(data, /starterStatsSafe/);
-  assert.match(data, /Object\.keys\(starterStats\)\.every\(key => key === 'equipped'\)/);
+test('starter Sword inventory initialization is RPC-only and cannot carry forged stats', () => {
+  assert.match(data, /const isStarterSword = input\.item_name === 'Sword'/);
+  assert.match(data, /const isStarterFishingRod = input\.item_name === 'Fishing Rod'/);
+  assert.match(gameSync, /claim_starter_loadout/);
+  assert.match(gameSync, /save_equipped_item/);
 });
 
 test('public leaderboard redacts auth user ids and profile lookup uses character ids', () => {
@@ -175,8 +180,8 @@ test('public leaderboard redacts auth user ids and profile lookup uses character
 
 test('connected sessions fail closed for client-only reward paths', () => {
   assert.match(gameUI, /isSocketConnected\(\) && window\.__serverRewards !== true/);
-  assert.match(gameUI, /_claimQuestReward\(idx\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
-  assert.match(gameUI, /_spinRoulette\(\)[\s\S]*_onlineSessionWithoutAuthority\(\)/);
+  assert.match(gameUI, /_claimQuestReward\(idx\)[\s\S]*_isServerBackedCharacter\(\)/);
+  assert.match(gameUI, /_spinRoulette\(\)[\s\S]*_isServerBackedCharacter\(\)/);
   assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)/);
   assert.match(main, /case 'fishCaught':[\s\S]*requestFishingReward/);
   assert.match(main, /addItemLocal\(item, receipt\.quantity\)/);

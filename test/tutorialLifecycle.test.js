@@ -18,3 +18,13 @@ test('tutorial owns a complete destroy lifecycle across character reloads', () =
   assert.match(source, /this\.stepTooltip\?\.remove\(\)/);
   assert.match(main, /window\.tutorialSystem\?\.destroy\?\.\(\)/);
 });
+
+
+test('online tutorial rewards fail closed against client replay and F12 tampering', () => {
+  assert.match(source, /import \{ isOfflineMode \} from '\.\.\/network\/SupabaseClient\.js'/);
+  assert.match(source, /if \(!isOfflineMode\)/);
+  const rewardBlock = source.slice(source.indexOf('  _grantReward(reward)'), source.indexOf('  // Advance to next step'));
+  assert.match(rewardBlock, /rewards are deliberately offline-only/);
+  assert.match(rewardBlock, /this\.gameUI\?\.addCombatLog/);
+  assert.match(rewardBlock, /if \(reward\.gold\)/);
+});

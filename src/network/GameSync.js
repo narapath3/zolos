@@ -58,6 +58,12 @@ function isCommittedFishingReward(result) {
         && result.item_type === 'fish'
         && Number.isInteger(result.quantity) && result.quantity === 1
         && Number.isInteger(result.inventory_quantity) && result.inventory_quantity >= 1
+        && Number.isSafeInteger(result.gold) && result.gold >= 0
+        && Number.isSafeInteger(result.discovery_bonus) && result.discovery_bonus >= 0
+        && result.almanac && Array.isArray(result.almanac.caught)
+        && Array.isArray(result.almanac.claimed)
+        && result.almanac.counts && typeof result.almanac.counts === 'object'
+        && !Array.isArray(result.almanac.counts)
         && typeof result.rarity === 'string');
 }
 
@@ -464,6 +470,53 @@ export async function requestStarterPet(characterId) {
         pendingStarterPetClaims.set(requestId, { resolve, reject, timeout, requestId });
         socket.emit('starter_pet_claim', { requestId });
     });
+}
+
+export async function requestStarterLoadout(characterId) {
+    const cleanCharacterId = String(characterId || '');
+    if (!cleanCharacterId) throw new Error('ไม่พบตัวละคร');
+    if (isOfflineMode || !supabase || /^(guest_|local_)/i.test(cleanCharacterId)) {
+        await setInventoryItemQuantity(cleanCharacterId, 'Sword', 'weapon', 1, { equipped: true });
+        await setInventoryItemQuantity(cleanCharacterId, 'Fishing Rod', 'fishing_rod', 1, { equipped: false });
+        return { ok: true, serverAuthoritative: false, items: localDb.get(`inventory_${cleanCharacterId}`) || [] };
+    }
+    const { data, error } = await supabase.rpc('claim_starter_loadout', { p_character_id: cleanCharacterId });
+    if (error || !data?.ok || data.serverAuthoritative !== true || !Array.isArray(data.items)) {
+        throw new Error(error?.message || data?.reason || 'ไม่สามารถยืนยันอุปกรณ์เริ่มต้นได้');
+    }
+    return data;
+}
+
+export async function requestUseConsumable(characterId, itemName, requestId = `consume:${characterId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`) {
+    const cleanCharacterId = String(characterId || '');
+    const cleanItemName = String(itemName || '').trim();
+    if (!cleanCharacterId || !cleanItemName) throw new Error('ข้อมูลการใช้ไอเทมไม่ถูกต้อง');
+    if (isOfflineMode || !supabase || /^(guest_|local_)/i.test(cleanCharacterId)) return null;
+    const { data, error } = await supabase.rpc('use_consumable', {
+        p_character_id: cleanCharacterId, p_item_name: cleanItemName, p_request_id: String(requestId),
+    });
+    if (error || !data?.ok || data.serverAuthoritative !== true
+        || typeof data.consumed !== 'boolean' || !Number.isSafeInteger(Number(data.hp))
+        || !Number.isSafeInteger(Number(data.sp)) || !Number.isSafeInteger(Number(data.quantity))) {
+        throw new Error(error?.message || data?.reason || 'ใช้ไอเทมไม่สำเร็จ');
+    }
+    return data;
+}
+
+export async function requestChangeJob(characterId, jobId, requestId = `job:${characterId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`) {
+    const cleanCharacterId = String(characterId || '').trim();
+    const cleanJobId = String(jobId || '').trim().toLowerCase();
+    if (!cleanCharacterId || !/^[a-z]{3,16}$/.test(cleanJobId)) throw new Error('ข้อมูลอาชีพไม่ถูกต้อง');
+    if (isOfflineMode || !supabase || /^(guest_|local_)/i.test(cleanCharacterId)) return null;
+    const { data, error } = await supabase.rpc('change_job', {
+        p_character_id: cleanCharacterId, p_job_id: cleanJobId, p_request_id: String(requestId),
+    });
+    if (error || !data?.ok || data.serverAuthoritative !== true || data.job !== cleanJobId
+        || !Number.isSafeInteger(Number(data.gold)) || !data.item?.item_name || data.item.item_type !== 'weapon'
+        || Number(data.item.quantity) < 1 || data.item.stats?.equipped !== true) {
+        throw new Error(error?.message || data?.reason || 'เปลี่ยนอาชีพไม่สำเร็จ');
+    }
+    return data;
 }
 
 export function requestStarterCard(characterId) {
@@ -986,9 +1039,8 @@ export async function createCharacter(userId) {
 
     if (error) throw error;
 
-    // Every adventurer starts with a weapon and an unequipped wooden fishing rod.
-    await setInventoryItemQuantity(data.id, 'Sword', 'weapon', 1, { equipped: true });
-    await setInventoryItemQuantity(data.id, 'Fishing Rod', 'fishing_rod', 1, { equipped: false });
+    // Starter equipment is granted by an ownership-checked server transaction.
+    await requestStarterLoadout(data.id);
     return data;
 }
 
@@ -1217,27 +1269,26 @@ export async function saveCharacterByUserId(userId, updates) {
     }
 }
 
-// ============ Daily Quests DB Sync (System Inventory Fallback) ============
-export async function saveDailyQuests(characterId, questData) {
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
-        localDb.set(`daily_quests_${characterId}`, questData);
+// ============ Server-authoritative system progress ============
+async function saveSystemState(characterId, key, state) {
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
+        localDb.set(`${key}_${characterId}`, state);
         return true;
     }
-
     try {
-        const { error } = await supabase.from('inventory').upsert({
-            character_id: characterId,
-            item_name: 'daily_quests',
-            item_type: 'system',
-            quantity: 1,
-            stats: questData,
-        }, { onConflict: 'character_id,item_name' });
-        if (error) throw error;
+        const { data, error } = await supabase.rpc('save_system_state', {
+            p_character_id: characterId, p_key: key, p_state: state,
+        });
+        if (error || !data?.ok) throw new Error(error?.message || data?.reason || 'system state rejected');
+        return data.serverAuthoritative === true;
     } catch (e) {
-        console.error('[GameSync] Failed to save daily quests to DB:', e);
+        console.error(`[GameSync] Failed to save ${key}:`, e?.message || e);
         return false;
     }
-    return true;
+}
+
+export async function saveDailyQuests(characterId, questData) {
+    return saveSystemState(characterId, 'daily_quests', questData);
 }
 
 export async function loadDailyQuests(characterId) {
@@ -1264,24 +1315,7 @@ export async function loadDailyQuests(characterId) {
 
 // ============ Fishing Almanac DB Sync (System Inventory Fallback) ============
 export async function saveFishingAlmanac(characterId, almanacData) {
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
-        localDb.set(`fishing_almanac_${characterId}`, almanacData);
-        return true;
-    }
-    try {
-        const { error } = await supabase.from('inventory').upsert({
-            character_id: characterId,
-            item_name: 'fishing_almanac',
-            item_type: 'system',
-            quantity: 1,
-            stats: almanacData,
-        }, { onConflict: 'character_id,item_name' });
-        if (error) throw error;
-    } catch (e) {
-        console.error('[GameSync] Failed to save fishing almanac to DB:', e);
-        return false;
-    }
-    return true;
+    return saveSystemState(characterId, 'fishing_almanac', almanacData);
 }
 
 export async function loadFishingAlmanac(characterId) {
@@ -1308,24 +1342,7 @@ export async function loadFishingAlmanac(characterId) {
 // Kept in the existing system-inventory channel so this feature works without
 // a schema migration and follows the character across devices.
 export async function saveAdventureJournal(characterId, journalData) {
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
-        localDb.set(`adventure_journal_${characterId}`, journalData);
-        return true;
-    }
-    try {
-        const { error } = await supabase.from('inventory').upsert({
-            character_id: characterId,
-            item_name: 'adventure_journal',
-            item_type: 'system',
-            quantity: 1,
-            stats: journalData,
-        }, { onConflict: 'character_id,item_name' });
-        if (error) throw error;
-    } catch (e) {
-        console.error('[GameSync] Failed to save adventure journal:', e);
-        return false;
-    }
-    return true;
+    return saveSystemState(characterId, 'adventure_journal', journalData);
 }
 
 export async function loadAdventureJournal(characterId) {
@@ -1348,24 +1365,46 @@ export async function loadAdventureJournal(characterId) {
 // Stored as a system inventory item, same pattern as the fishing almanac.
 // Shape: { streak: number, lastClaim: 'YYYY-MM-DD' }
 export async function saveLoginStreak(characterId, streakData) {
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
         localDb.set(`login_streak_${characterId}`, streakData);
         return true;
     }
-    try {
-        const { error } = await supabase.from('inventory').upsert({
-            character_id: characterId,
-            item_name: 'login_streak',
-            item_type: 'system',
-            quantity: 1,
-            stats: streakData,
-        }, { onConflict: 'character_id,item_name' });
-        if (error) throw error;
-    } catch (e) {
-        console.error('[GameSync] Failed to save login streak to DB:', e);
-        return false;
+    // Online login streaks are advanced only by claim_daily_reward, which
+    // computes the date/streak and grants rewards in one server transaction.
+    return false;
+}
+
+export async function claimDailyReward(characterId) {
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
+        return { ok: false, serverAuthoritative: false, reason: 'offline' };
     }
-    return true;
+    try {
+        const { data, error } = await supabase.rpc('claim_daily_reward', { p_character_id: characterId });
+        if (error || !data?.ok || data.serverAuthoritative !== true || !Number.isSafeInteger(data.gold) || data.gold < 0) {
+            throw new Error(error?.message || data?.reason || 'daily reward rejected');
+        }
+        return data;
+    } catch (e) {
+        console.error('[GameSync] Failed to claim daily reward:', e?.message || e);
+        throw e;
+    }
+}
+
+export async function claimAlmanacReward(characterId, tier) {
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
+        return { ok: false, serverAuthoritative: false, reason: 'offline' };
+    }
+    if (!['common', 'uncommon', 'rare', 'legendary', 'all'].includes(tier)) throw new Error('invalid almanac tier');
+    try {
+        const { data, error } = await supabase.rpc('claim_almanac_reward', { p_character_id: characterId, p_tier: tier });
+        if (error || !data?.ok || data.serverAuthoritative !== true || !Number.isSafeInteger(data.gold) || data.gold < 0) {
+            throw new Error(error?.message || data?.reason || 'almanac reward rejected');
+        }
+        return data;
+    } catch (e) {
+        console.error('[GameSync] Failed to claim almanac reward:', e?.message || e);
+        throw e;
+    }
 }
 
 export async function loadLoginStreak(characterId) {
@@ -1428,24 +1467,7 @@ export async function migrateGuestToAccount(email, password, guest) {
 
 // ============ Friends List DB Sync (System Inventory Fallback) ============
 export async function saveFriendsList(characterId, friendsList) {
-        if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
-        localDb.set(`friends_${characterId}`, friendsList);
-        return true;
-    }
-    try {
-        const { error } = await supabase.from('inventory').upsert({
-            character_id: characterId,
-            item_name: 'friends_list',
-            item_type: 'system',
-            quantity: 1,
-            stats: { list: friendsList },
-        }, { onConflict: 'character_id,item_name' });
-        if (error) throw error;
-    } catch (e) {
-        console.error('[GameSync] Failed to save friends list to DB:', e);
-        return false;
-    }
-    return true;
+    return saveSystemState(characterId, 'friends_list', { list: friendsList });
 }
 
 export async function loadFriendsList(characterId) {
@@ -1705,42 +1727,101 @@ export function setInventoryItemQuantity(characterId, itemName, itemType, quanti
         () => setInventoryItemQuantityNow(characterId, itemName, itemType, quantity, stats));
 }
 
-async function updateInventoryItemStatsNow(characterId, itemName, stats) {
-    console.log(`[Zolos] 🔄 updateInventoryItemStats called: characterId=${characterId}, itemName=${itemName}, stats=${JSON.stringify(stats)}`);
-
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+async function saveEquippedItemNow(characterId, itemName, equipped) {
+    const enabled = equipped === true;
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
         const inv = localDb.get(`inventory_${characterId}`) || [];
         const existing = inv.find(i => i.item_name === itemName);
-        if (existing) {
-            existing.stats = stats;
-            localDb.set(`inventory_${characterId}`, inv);
-        }
-        console.log(`[Zolos] 🔄 [offline] updateInventoryItemStats completed for ${itemName}`);
+        if (!existing) return false;
+        existing.stats = { ...(existing.stats || {}), equipped: enabled };
+        localDb.set(`inventory_${characterId}`, inv);
         return true;
     }
-
     try {
-        const { error } = await supabase
-            .from('inventory')
-            .update({ stats })
-            .eq('character_id', characterId)
-            .eq('item_name', itemName);
-
-        if (error) {
-            console.error(`[Zolos] ❌ updateInventoryItemStats FAILED for characterId=${characterId}, itemName=${itemName}:`, error.message);
-            throw error;
-        }
-        console.log(`[Zolos] 🔄 updateInventoryItemStats succeeded for ${itemName} on characterId ${characterId}`);
-    } catch (e) {
-        console.error(`[Zolos] ❌ updateInventoryItemStats threw for characterId=${characterId}, itemName=${itemName}:`, e.message);
+        const { data, error } = await supabase.rpc('save_equipped_item', {
+            p_character_id: characterId, p_item_name: itemName, p_equipped: enabled,
+        });
+        if (error || !data?.ok || data.serverAuthoritative !== true) return false;
+        return data;
+    } catch (error) {
+        console.error(`[Zolos] ❌ saveEquippedItem failed for ${itemName}:`, error?.message || error);
         return false;
     }
-    return true;
+}
+
+export function saveEquippedItem(characterId, itemName, equipped) {
+    return enqueueInventoryMutation(characterId, itemName, () => saveEquippedItemNow(characterId, itemName, equipped));
+}
+
+async function updateInventoryItemStatsNow(characterId, itemName, stats) {
+    console.log(`[Zolos] 🔄 updateInventoryItemStats called: characterId=${characterId}, itemName=${itemName}, stats=${JSON.stringify(stats)}`);
+    const offline = isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_');
+    const safeEquipIntent = stats && typeof stats === 'object' && !Array.isArray(stats)
+        && Object.hasOwn(stats, 'equipped') && typeof stats.equipped === 'boolean';
+    if (offline) {
+        const inv = localDb.get(`inventory_${characterId}`) || [];
+        const existing = inv.find(i => i.item_name === itemName);
+        if (existing) { existing.stats = stats; localDb.set(`inventory_${characterId}`, inv); }
+        return true;
+    }
+    // Refine/card/pet stats are server-owned and must use their dedicated
+    // transaction. Generic /db stats updates are never a persistence fallback.
+    if (!safeEquipIntent) return false;
+    return saveEquippedItemNow(characterId, itemName, stats.equipped === true);
 }
 
 export function updateInventoryItemStats(characterId, itemName, stats) {
     return enqueueInventoryMutation(characterId, itemName,
         () => updateInventoryItemStatsNow(characterId, itemName, stats));
+}
+
+// Pet instance state is not allowed through generic /db inventory writes because
+// quantity and item stats are server-authoritative. The self-host RPC verifies
+// ownership, keeps the server-owned instance count/UIDs, and merges progress.
+async function savePetStateNow(characterId, itemName, stats = {}) {
+    const instances = Array.isArray(stats?.instances) ? stats.instances : [];
+    const equippedUid = stats?.equipped === true && typeof stats?.equippedUid === 'string'
+        ? stats.equippedUid : null;
+
+    if (isOfflineMode || !supabase || String(characterId).startsWith('guest_') || String(characterId).startsWith('local_')) {
+        const inventory = localDb.get(`inventory_${characterId}`) || [];
+        const row = inventory.find(item => item.item_name === itemName && item.item_type === 'pet');
+        if (!row) return false;
+        row.stats = { ...(row.stats || {}), ...stats, instances };
+        row.quantity = Array.isArray(row.stats.instances) ? row.stats.instances.length : row.quantity;
+        localDb.set(`inventory_${characterId}`, inventory);
+        return true;
+    }
+
+    try {
+        if (supabase) {
+            const { data, error } = await supabase.rpc('save_pet_state', {
+                p_character_id: characterId,
+                p_item_name: itemName,
+                p_equipped_uid: equippedUid,
+                p_instances: instances,
+            });
+            if (error || !data?.ok) {
+                console.error(`[Zolos] ❌ savePetState FAILED for ${itemName}:`, error?.message || data?.reason || 'server rejected');
+                return false;
+            }
+            return data;
+        }
+
+        // Do not fall back to direct browser writes in any authenticated online
+        // mode. If the hosted function has not been deployed, fail closed rather
+        // than allowing a client to attempt arbitrary pet-stat updates.
+        console.error(`[Zolos] ❌ savePetState unavailable for online backend: ${itemName}`);
+        return false;
+    } catch (error) {
+        console.error(`[Zolos] ❌ savePetState threw for ${itemName}:`, error?.message || error);
+        return false;
+    }
+}
+
+export function savePetState(characterId, itemName, stats = {}) {
+    return enqueueInventoryMutation(characterId, itemName,
+        () => savePetStateNow(characterId, itemName, stats));
 }
 
 function isCommittedFusionResult(result) {
@@ -2606,6 +2687,34 @@ export async function fetchMarketListings() {
 
 
 
+export async function listPetInstanceMarket(sellerCharId, itemName, petUid, price) {
+    const listingData = { item_name: itemName, item_type: 'pet', quantity: 1, price, stats: {} };
+    if (isOfflineMode || !supabase || sellerCharId.startsWith('guest_') || sellerCharId.startsWith('local_')) {
+        const row = localDb.get(`inventory_${sellerCharId}`)?.find(item => item.item_name === itemName && item.item_type === 'pet');
+        const instance = row?.stats?.instances?.find(item => item.uid === petUid);
+        if (!instance) return { ...listingData, _failed: true };
+        const listings = initLocalMarketplace();
+        const listing = { ...listingData, id: 'listing_' + Math.random().toString(36).substring(2, 10), item_id: 'item_' + Math.random().toString(36).substring(2, 12), seller_id: sellerCharId, created_at: new Date().toISOString(), stats: petListingStatsForClient(instance) };
+        listings.unshift(listing);
+        localDb.set('marketplace_listings', listings);
+        return listing;
+    }
+    try {
+        const { data, error } = await supabase.rpc('create_pet_market_listing', {
+            p_character_id: sellerCharId, p_item_name: itemName, p_pet_uid: petUid, p_price: price,
+        });
+        if (error || !data?.ok || !data.listing) return { ...listingData, _failed: true };
+        return { ...data.listing, _serverAuthoritative: true };
+    } catch (error) {
+        console.error('[Zolos] ❌ Pet market listing failed:', error?.message || error);
+        return { ...listingData, _failed: true };
+    }
+}
+
+function petListingStatsForClient(instance) {
+    return { instances: [instance], petName: instance?.name || null, petLevel: instance?.level || 1, petXp: instance?.xp || 0, equipped: false, equippedUid: null };
+}
+
 export async function listMarketItem(sellerCharId, sellerName, itemName, itemType, quantity, price, stats = {}) {
     const listingId = 'listing_' + Math.random().toString(36).substring(2, 10);
     const itemId = 'item_' + Math.random().toString(36).substring(2, 12);
@@ -2667,19 +2776,19 @@ export async function listMarketItem(sellerCharId, sellerName, itemName, itemTyp
     }
 }
 
-export async function cancelMarketListing(listingId, characterId) {
+export async function cancelMarketListing(listingId, characterId, itemType = '') {
     const isRemoteListing = !isOfflineMode && supabase
         && !characterId.startsWith('guest_') && !characterId.startsWith('local_')
         && !String(listingId).startsWith('mock_') && !String(listingId).startsWith('listing_');
     if (isRemoteListing) {
-        const { data, error } = await supabase.rpc('cancel_market_listing', {
-            p_listing_id: listingId,
-        });
+        const { data, error } = itemType === 'pet'
+            ? await supabase.rpc('cancel_pet_market_listing', { p_listing_id: listingId })
+            : await supabase.rpc('cancel_market_listing', { p_listing_id: listingId });
         if (error || !data?.ok) {
             console.warn('[Zolos] Atomic marketplace cancel failed:', error?.message || data?.reason);
             return false;
         }
-        return { ok: true, serverAuthoritative: true };
+        return { ok: true, serverAuthoritative: true, listing: data.listing || null };
     }
 
     let listing = null;
@@ -2818,7 +2927,7 @@ export async function fetchStallListings(ownerUserId) {
     }
 }
 
-export async function buyMarketItem(listingId, buyerCharId, buyerName) {
+export async function buyMarketItem(listingId, buyerCharId, buyerName, listingMeta = null) {
     let listing = null;
     // A listing is "local" only when it actually lives in local storage (offline
     // mode, or a mock/local id). It must NOT be decided by the buyer being a
@@ -2847,7 +2956,11 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
         // buyer's gold, moves gold to the seller, delivers the item and removes
         // the listing in one transaction. The client can't skip payment.
         try {
-            const { data, error } = await supabase.rpc('buy_market_item', { p_listing_id: listingId });
+            const rpcName = listingMeta?.item_type === 'pet' ? 'buy_pet_market_item' : 'buy_market_item';
+            const rpcArgs = listingMeta?.item_type === 'pet'
+                ? { p_listing_id: listingId, p_character_id: buyerCharId }
+                : { p_listing_id: listingId };
+            const { data, error } = await supabase.rpc(rpcName, rpcArgs);
             if (error) return { success: false, reason: 'error', detail: error.message };
             if (!data || !data.ok) return { success: false, reason: data?.reason || 'unknown' };
             // Announce + hand back the authoritative buyer gold
@@ -2858,7 +2971,7 @@ export async function buyMarketItem(listingId, buyerCharId, buyerName) {
                     message: `ผู้เล่น [${buyerName}] ได้สั่งซื้อ [${data.item_name}] x${data.quantity} จาก [${data.seller_name}] ในราคา ${data.price} Zeny!`
                 });
             }
-            return { success: true, serverAuthoritative: true, buyerGold: data.buyer_gold };
+            return { success: true, serverAuthoritative: true, buyerGold: data.buyer_gold, pet: data.pet || null, listing: data.listing || null };
         } catch (err) {
             return { success: false, reason: 'error', detail: err.message };
         }
@@ -3405,4 +3518,39 @@ function _startOfflineMockPresence(userId, username, level, onPlayersUpdate, onP
             }
         }
     }, 12000 + Math.random() * 8000);
+}
+
+
+export async function requestPetNpcSale(characterId, itemName, petUid, requestId) {
+    const cleanCharacterId = String(characterId || '');
+    const cleanItemName = String(itemName || '').trim();
+    const cleanUid = String(petUid || '').trim();
+    const cleanRequestId = String(requestId || '').trim();
+    if (!cleanCharacterId || !cleanItemName || !cleanUid || !cleanRequestId) throw new Error('คำสั่งขายสัตว์เลี้ยงไม่ถูกต้อง');
+    if (isOfflineMode || !supabase || cleanCharacterId.startsWith('guest_') || cleanCharacterId.startsWith('local_')) {
+        const inventory = localDb.get(`inventory_${cleanCharacterId}`) || [];
+        const row = inventory.find(item => item.item_name === cleanItemName && item.item_type === 'pet');
+        const instances = Array.isArray(row?.stats?.instances) ? row.stats.instances : [];
+        const index = instances.findIndex(instance => instance?.uid === cleanUid);
+        if (!row || index < 0) throw new Error('ไม่พบสัตว์เลี้ยงตัวนี้ในกระเป๋า');
+        const instance = instances[index];
+        if (row.stats?.equippedUid === cleanUid) throw new Error('ต้องเก็บสัตว์เลี้ยงก่อนขาย');
+        instances.splice(index, 1);
+        row.stats = { ...(row.stats || {}), instances, equipped: false, equippedUid: null };
+        row.quantity = instances.length;
+        if (!instances.length) inventory.splice(inventory.indexOf(row), 1);
+        localDb.set(`inventory_${cleanCharacterId}`, inventory);
+        const character = localDb.get(`char_${cleanCharacterId}`);
+        const level = Math.max(1, Number(instance.level) || 1);
+        const unitPrice = Math.max(1, Math.floor((Number(row.price) || 0) * 0.8 * (1 + (level - 1) * 0.12)));
+        if (character) { character.gold = (Number(character.gold) || 0) + unitPrice; localDb.set(`char_${cleanCharacterId}`, character); }
+        return { requestId: cleanRequestId, item_name: cleanItemName, sold_uid: cleanUid, remaining: instances.length, unit_price: unitPrice, gold_gained: unitPrice, gold: Number(character?.gold || 0) };
+    }
+    const { data, error } = await supabase.rpc('sell_pet_instance', {
+        p_character_id: cleanCharacterId, p_item_name: cleanItemName, p_pet_uid: cleanUid, p_request_id: cleanRequestId,
+    });
+    if (error || !data || !Number.isSafeInteger(Number(data.gold)) || !Number.isSafeInteger(Number(data.remaining)) || data.remaining < 0) {
+        throw new Error(error?.message || 'ขายสัตว์เลี้ยงไม่สำเร็จ');
+    }
+    return data;
 }

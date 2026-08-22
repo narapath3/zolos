@@ -36,3 +36,17 @@ test('loading tips, weather, profile pets and announcements no longer render emo
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /id="pet-hud-emoji" aria-hidden="true"><\/span>/);
 });
+
+
+test('admin item and monster/drop surfaces use committed real-art markup', () => {
+  const admin = fs.readFileSync(new URL('../server/admin/index.html', import.meta.url), 'utf8');
+  const inGameAdmin = fs.readFileSync(new URL('../src/ui/AdminUI.js', import.meta.url), 'utf8');
+  assert.match(admin, /function art\(name,type=''/);
+  assert.match(admin, /pet-sanctuary-atlas-v1\.png/);
+  assert.match(admin, /function monsterArt\(\)/);
+  assert.doesNotMatch(admin, /\$\{m\.emoji\|\|' '\}/);
+  assert.doesNotMatch(admin, /\$\{d\.emoji\|\|' '\}/);
+  assert.doesNotMatch(admin, /id="dp-emoji"/);
+  assert.match(inGameAdmin, /import \{ itemIconMarkup \}/);
+  assert.match(inGameAdmin, /const itemArt = itemIconMarkup/);
+});

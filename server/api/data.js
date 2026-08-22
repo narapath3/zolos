@@ -52,8 +52,12 @@ const POLICIES = {
     },
     marketplace: {
         read: 'public',
-        write: 'own', ownerCol: 'seller_id', // seller_id is the seller's user_id (uuid)
-        writable: ['seller_name', 'item_id', 'item_name', 'item_type', 'emoji', 'quantity', 'price', 'stats'],
+        // Marketplace rows are escrow records. Creation, cancellation and
+        // purchase must go through checked atomic RPCs; allowing generic /db
+        // writes would let a seller edit quantity/item/stats after escrow and
+        // mint value when another player buys the listing.
+        write: false,
+        writable: [],
     },
     vending_stalls: {
         read: 'public',
@@ -88,32 +92,14 @@ function assertClientWriteAllowed(table, action, values, filters = []) {
         const itemNameFilter = (filters || []).find(f => f?.col === 'item_name' && f?.op === 'eq')?.val;
         const isSystemSnapshot = SYSTEM_INVENTORY_ITEMS.has(input.item_name)
             || SYSTEM_INVENTORY_ITEMS.has(itemNameFilter);
-        if (['insert', 'upsert'].includes(action)) {
-            const isSystemSnapshotWrite = input.item_type === 'system' && SYSTEM_INVENTORY_ITEMS.has(input.item_name);
-            const isStarterSword = input.item_name === 'Sword' && input.item_type === 'weapon'
-                && Number(input.quantity) === 1;
-            const isStarterFishingRod = input.item_name === 'Fishing Rod' && input.item_type === 'fishing_rod'
-                && Number(input.quantity) === 1;
-            const starterStats = input.stats && typeof input.stats === 'object' && !Array.isArray(input.stats)
-                ? input.stats : {};
-            const starterStatsSafe = (isStarterSword || isStarterFishingRod)
-                && Object.keys(starterStats).every(key => key === 'equipped')
-                && (starterStats.equipped === undefined || typeof starterStats.equipped === 'boolean');
-            if (!isSystemSnapshotWrite && !starterStatsSafe) {
-                throw httpErr(403, 'inventory grants must come from server-authoritative rewards');
-            }
-        } else if (action === 'update') {
-            if (Object.hasOwn(input, 'quantity')) {
-                throw httpErr(403, 'inventory quantity is server-authoritative');
-            }
-            const stats = input.stats && typeof input.stats === 'object' && !Array.isArray(input.stats)
-                ? input.stats : null;
-            const isEquipStateOnly = stats
-                && Object.keys(stats).every(key => key === 'equipped')
-                && (stats.equipped === undefined || typeof stats.equipped === 'boolean');
-            if (Object.hasOwn(input, 'stats') && !isSystemSnapshot && !isEquipStateOnly) {
-                throw httpErr(403, 'inventory item stats are server-authoritative');
-            }
+        const isStarterSword = input.item_name === 'Sword' && input.item_type === 'weapon';
+        const isStarterFishingRod = input.item_name === 'Fishing Rod' && input.item_type === 'fishing_rod';
+        // These flags intentionally identify legacy attempts only; no generic
+        // browser mutation is accepted, including starter/system exceptions.
+        if (['insert', 'upsert', 'update', 'delete'].includes(action)) {
+            const category = isSystemSnapshot ? 'system snapshot'
+                : (isStarterSword || isStarterFishingRod ? 'starter item' : 'inventory');
+            throw httpErr(403, `${category} mutations must come from server-authoritative RPCs`);
         }
         return;
     }

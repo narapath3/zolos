@@ -48,6 +48,29 @@ const SPECIAL_BY_FAMILY = Object.freeze({
 const MAX_PLAYER_HIT_RANGE = 12;
 const HIT_WINDOW_MS = 500;
 const MAX_HITS_PER_MONSTER_WINDOW = 2;
+const PET_MAX_LEVEL = 40;
+
+function petXpRequired(level) {
+    return Math.floor(60 * Math.pow(Math.max(1, level), 1.5));
+}
+
+function sanitizeServerPetName(value, fallback = null) {
+    if (typeof value !== 'string') return fallback;
+    const name = value.replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 24);
+    return name || null;
+}
+
+function normalizeServerPetInstances(stats) {
+    if (!Array.isArray(stats?.instances)) return [];
+    return stats.instances.slice(0, 200).filter(instance => (
+        instance && typeof instance === 'object' && typeof instance.uid === 'string' && /^[A-Za-z0-9:_-]{1,40}$/.test(instance.uid)
+    )).map(instance => ({
+        uid: instance.uid,
+        name: sanitizeServerPetName(instance.name),
+        level: Number.isInteger(Number(instance.level)) ? Math.max(1, Math.min(PET_MAX_LEVEL, Number(instance.level))) : 1,
+        xp: Number.isInteger(Number(instance.xp)) ? Math.max(0, Math.min(100_000_000, Number(instance.xp))) : 0,
+    }));
+}
 
 let io = null;
 let onlinePlayers = null;          // Map<socketId, playerInfo>
@@ -649,15 +672,60 @@ async function killMonster(world, m, mapId) {
         // it before notifying the client and return the authoritative total so
         // delayed/replayed socket packets can never double-count on the HUD.
         try {
-            const { rows } = await query(
-                `UPDATE public.characters
-                 SET gold = LEAST(COALESCE(gold, 0) + $2, 500000000),
-                     total_kills = COALESCE(total_kills, 0) + 1
-                 WHERE id = $1
-                 RETURNING gold, total_kills`,
-                [cid, gold],
-            );
-            const committed = rows[0];
+            const committed = await tx(async (client) => {
+                const { rows } = await client.query(
+                    `UPDATE public.characters
+                     SET gold = LEAST(COALESCE(gold, 0) + $2, 500000000),
+                         total_kills = COALESCE(total_kills, 0) + 1
+                     WHERE id = $1
+                     RETURNING gold, total_kills`,
+                    [cid, gold],
+                );
+                const character = rows[0];
+                if (!character) return null;
+
+                // Pet XP is derived only from this committed server kill. The
+                // client can request summon/name changes, but cannot grant its
+                // own level or XP through save_pet_state.
+                const { rows: petRows } = await client.query(
+                    `SELECT id, item_name, quantity, stats
+                     FROM inventory
+                     WHERE character_id = $1 AND item_type = 'pet'
+                     ORDER BY id LIMIT 200 FOR UPDATE`,
+                    [cid],
+                );
+                let pet = null;
+                for (const row of petRows) {
+                    const stats = row.stats && typeof row.stats === 'object' && !Array.isArray(row.stats) ? row.stats : {};
+                    let instances = normalizeServerPetInstances(stats);
+                    const quantity = Math.max(0, Math.min(200, Number.isInteger(Number(row.quantity)) ? Number(row.quantity) : 0));
+                    if (!instances.length && quantity > 0) {
+                        const base = String(row.id || `${cid}_${row.item_name}`).replace(/[^A-Za-z0-9]/g, '').slice(-28) || 'legacy';
+                        instances = Array.from({ length: quantity }, (_, index) => ({
+                            uid: `legacy_${base}_${index}`.slice(0, 40),
+                            name: sanitizeServerPetName(stats.petName), level: 1, xp: 0,
+                        }));
+                    }
+                    const equippedUid = typeof stats.equippedUid === 'string' && stats.equippedUid
+                        ? stats.equippedUid : (stats.equipped === true ? instances[0]?.uid : null);
+                    const activeIndex = instances.findIndex(instance => instance.uid === equippedUid);
+                    if (activeIndex < 0) continue;
+
+                    const active = instances[activeIndex];
+                    let xp = active.xp + Math.max(1, Math.round((def.exp || 0) * 0.5));
+                    let level = active.level;
+                    while (level < PET_MAX_LEVEL && xp >= petXpRequired(level)) {
+                        xp -= petXpRequired(level);
+                        level += 1;
+                    }
+                    instances[activeIndex] = { ...active, level, xp };
+                    const nextStats = { ...stats, instances, equipped: true, equippedUid: active.uid };
+                    await client.query('UPDATE inventory SET stats = $1 WHERE id = $2', [nextStats, row.id]);
+                    pet = { itemName: row.item_name, equippedUid: active.uid, level, xp, instances };
+                    break;
+                }
+                return { ...character, pet };
+            });
             if (sock && committed) {
                 sock.emit('mon_reward', {
                     id: defeated.id,
@@ -667,6 +735,7 @@ async function killMonster(world, m, mapId) {
                     gold,
                     gold_total: Number(committed.gold) || 0,
                     total_kills: Number(committed.total_kills) || 0,
+                    pet: committed.pet || null,
                 });
             }
         } catch (error) {

@@ -123,6 +123,47 @@ export async function claimFishingReward({ characterId, userId, requestId, mapId
       );
       quantity = Number(insertedFish.rows[0]?.quantity) || 1;
     }
+    const almanacRow = await client.query(
+      `SELECT id, stats FROM public.inventory
+       WHERE character_id = $1 AND item_name = 'fishing_almanac' AND item_type = 'system'
+       ORDER BY id LIMIT 1 FOR UPDATE`,
+      [characterId],
+    );
+    const priorAlmanac = almanacRow.rows[0]?.stats && typeof almanacRow.rows[0].stats === 'object'
+      ? almanacRow.rows[0].stats : {};
+    const caught = Array.isArray(priorAlmanac.caught) ? priorAlmanac.caught.filter(name => typeof name === 'string' && FISH_SPECIES[name]) : [];
+    const counts = priorAlmanac.counts && typeof priorAlmanac.counts === 'object' && !Array.isArray(priorAlmanac.counts)
+      ? { ...priorAlmanac.counts } : {};
+    const claimed = Array.isArray(priorAlmanac.claimed) ? priorAlmanac.claimed.filter(name => typeof name === 'string') : [];
+    const firstDiscovery = !caught.includes(fish.name);
+    if (firstDiscovery) caught.push(fish.name);
+    counts[fish.name] = Math.min(2_147_483_647, Math.max(0, Math.floor(Number(counts[fish.name]) || 0)) + 1);
+    const discoveryBonus = firstDiscovery
+      ? ({ common: 50, uncommon: 150, rare: 500, legendary: 2000 }[fish.rarity] || 50)
+      : 0;
+    let gold = null;
+    if (discoveryBonus > 0) {
+      const goldResult = await client.query(
+        `UPDATE public.characters SET gold = LEAST(COALESCE(gold, 0) + $2, 500000000), updated_at = now()
+         WHERE id = $1 RETURNING gold`,
+        [characterId, discoveryBonus],
+      );
+      gold = Number(goldResult.rows[0]?.gold) || 0;
+    } else {
+      const currentGold = await client.query('SELECT gold FROM public.characters WHERE id = $1 LIMIT 1', [characterId]);
+      gold = Number(currentGold.rows[0]?.gold) || 0;
+    }
+    const almanac = { caught, claimed, counts };
+    if (almanacRow.rows[0]) {
+      await client.query('UPDATE public.inventory SET stats = $2 WHERE id = $1', [almanacRow.rows[0].id, almanac]);
+    } else {
+      await client.query(
+        `INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
+         VALUES ($1, 'fishing_almanac', 'system', 1, $2)`,
+        [characterId, almanac],
+      );
+    }
+
     const result = {
       ok: true,
       serverAuthoritative: true,
@@ -139,6 +180,9 @@ export async function claimFishingReward({ characterId, userId, requestId, mapId
       map_name: fish.mapName,
       map_tier: fish.mapTier,
       map_danger: fish.mapDanger,
+      discovery_bonus: discoveryBonus,
+      gold,
+      almanac,
       rod_name: rodName,
       rod_tier: getFishingRodConfig(rodName).tier,
       rod_max_rarity: getFishingRodConfig(rodName).maxRarity,

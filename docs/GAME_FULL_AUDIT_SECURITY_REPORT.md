@@ -1,133 +1,188 @@
-# ZOLOS Full Game Audit & Security Review
+# ZOLOS Full Production Audit & Security Report
 
-**ผู้จัดทำ:** Manus AI  
-**วันที่ตรวจ:** 18 สิงหาคม 2026  
-**ขอบเขต:** local build/runtime ของ ZOLOS, frontend, Node.js Socket.IO server, self-host API, auth, persistence และ static security review
+**ผู้จัดทำ:** Manus AI
+
+**วันที่ตรวจ:** 22 สิงหาคม 2026
+
+**ภาษา:** Thai พร้อม technical identifiers ภาษาอังกฤษ
+
+**Repository:** `narapath3/zolos`
+
+**Branch:** `main`
+
+**Source baseline ก่อนรวม audit bundle:** `3070a696b314095a584df5b0b7f6a3165f063421`
+
+**สถานะขณะจัดทำรายงาน:** source changes ผ่าน local validation แล้ว แต่ยังไม่ได้ apply migration หรือยืนยัน production DB/VPS แบบ live และยังต้อง commit/push หลังตรวจ final diff
 
 ## 1. Executive Summary
 
-การตรวจครั้งนี้ครอบคลุมเส้นทาง Login, Register/Guest entry, loading, character/job selection, daily reward, HUD, game initialization, inventory entry point, profile/settings state, combat architecture, persistence flow, Socket.IO authority, generic data API, admin authorization และ dependency security โดยใช้การเล่นจริงใน local app ร่วมกับ source audit และ regression tests
+การตรวจรอบนี้เป็น **Full Production Audit** ของเกม ZOLOS Idle MMORPG ครอบคลุม login, guest/register, character/job selection, tutorial, inventory, pet, shop, fishing, almanac, daily reward, combat, monster rewards, market, NPC sale, card/equipment flows, socket/Socket.IO, generic data API, admin console, asset presentation, persistence lifecycle และ deployment safety โดยเน้นประเด็นที่มีผลต่อความน่าเชื่อถือของ economy และประวัติการเล่นมากกว่าการแก้ visual เพียงอย่างเดียว
 
-ผลลัพธ์หลักคือพบประเด็นสำคัญด้าน **server authority** และ **deployment hardening** ซึ่งมีผลต่อความน่าเชื่อถือของเกมมากกว่าปัญหา visual ทั่วไป โดยเฉพาะ legacy monster mode ที่ client สามารถคำนวณ EXP, gold และ loot เองได้เมื่อ authoritative engine ปิดอยู่ การแก้ไขครั้งนี้ได้ทำให้ local Postgres ใช้ server-authoritative monster mode เป็นค่าเริ่มต้น และอนุญาตให้ปิดได้เฉพาะด้วย `WORLD_MONSTERS=false` สำหรับ rollback ที่ตั้งใจเท่านั้น
+ผลลัพธ์สำคัญคือแก้ root cause ของ **pet persistence** และเปลี่ยนเส้นทาง progression/economy ที่เกี่ยวข้องให้ใช้ server-authoritative receipts มากขึ้น การเรียก pet, rename, XP/level จาก monster kill, การขาย pet เป็น instance, pet market listing/cancel/buy และ NPC pet sale ไม่ควรสร้าง UID ลด quantity หรือเพิ่ม XP จาก client เองอีกต่อไป นอกจากนี้ generic inventory mutation ถูกปิดสำหรับ online self-host API และมี hosted Supabase migration สำหรับ revoke direct DML และเปิดเฉพาะ RPC ที่ allowlist ไว้
 
-นอกจากนี้ได้ปิด default JWT secret ใน production, ปิดการอ่าน `profiles.is_admin` ผ่าน public generic data API, เปลี่ยน offline fallback ไม่ให้สร้าง record รหัสผ่านแบบ plaintext, แก้ HP/SP เกิน max หลังเปลี่ยนอาชีพ และเพิ่ม server runtime dependencies ที่ขาดจาก package manifest
+> ผลการตรวจนี้เป็น **repository/staging-readiness result** ไม่ใช่คำรับรองว่า production database หรือ Windows VPS ปัจจุบัน deploy และทำงานถูกต้องแล้ว เพราะยังไม่ได้รับอนุญาตให้ apply migration, ทำ live write, แก้ environment ของ VPS หรือทำ destructive/two-account E2E บนบริการจริง
 
-> การตรวจนี้ยังไม่ใช่การรับรองความปลอดภัยของ VPS production แบบสมบูรณ์ เพราะยังไม่ได้ทำ destructive test, ไม่ได้ลอง credential จริง, และไม่ได้แก้ environment variables บนเครื่อง VPS ของผู้ใช้
+| หมวด | ผลตรวจล่าสุด | ความหมาย |
+|---|---:|---|
+| Full regression | **643/643 ผ่าน** | ทุก automated regression ใน repository ผ่านหลังการแก้ล่าสุด |
+| Frontend build | **ผ่าน** | `npm run build` สำเร็จ; เหลือคำเตือน chunk size/ineffective dynamic import ที่ไม่ใช่ build failure |
+| Production dependency audit | **0 vulnerabilities** | `npm audit --omit=dev` ไม่พบช่องโหว่ dependency ตามฐานข้อมูลที่ npm ตรวจในรอบนี้ |
+| Asset catalog | **298/298 มี authored art, fallback 0** | item/fish/pet catalog มี visual asset หรือ procedural/dynamic art ตาม audit script |
+| Fish catalog | **73/73, missing 0** | ไม่มี fish catalog entry ที่ขาดการตรวจ asset mapping |
+| Hosted migration | **เขียนและ static-reviewed; ยังไม่ apply** | ต้องให้ผู้มีสิทธิ์รันกับ database ที่ตรง schema ก่อนเปิด hosted authority parity |
+| Production DB/VPS E2E | **ยังไม่ได้ทำ** | ไม่ได้อ้างว่า live persistence, deploy workflow หรือ migration production ผ่าน |
 
-## 2. วิธีการตรวจ
+## 2. วิธีการตรวจและขอบเขตหลักฐาน
 
-| วิธี | ขอบเขต | ผล |
+การตรวจใช้ source review, deterministic asset audit, Node regression tests, syntax checks, Vite production build, dependency audit และการตรวจเส้นทาง persistence ที่เกี่ยวข้องกับ Supabase-compatible self-host API โดยรักษา working tree เดิมและไม่ discard uncommitted changes ระหว่างงาน หลักฐานหลักอยู่ใน source paths และ test paths ที่ระบุไว้ในส่วน References
+
+| วิธีตรวจ | Command/ขอบเขต | ผลที่บันทึก |
 |---|---|---|
-| Browser runtime | เปิด local app ที่ `127.0.0.1:3001`, เปิด auth, Guest, loading, job, daily reward และ game HUD | ทำงานถึงหน้าเกมจริง; พบ resource state mismatch และ navigation anomaly |
-| Static source audit | Auth, generic `/api/db`, Socket.IO handlers, save pipeline, combat, admin API, profile rendering | พบและแก้จุดเสี่ยงที่ยืนยันได้หลายรายการ |
-| Regression tests | `npm test` | ผ่าน 456/456 |
-| Production build | `npm run build` | ผ่าน; เหลือเฉพาะคำเตือน chunk size และ ineffective dynamic import |
-| Dependency audit | `npm audit --omit=dev` | 0 vulnerabilities หลังอัปเดต Socket.IO parser |
-| Production safety | ไม่ทำ mutation หรือ exploit บน VPS/บริการจริง | ไม่มีการเปลี่ยนแปลง production ระหว่าง audit |
+| Static source/security review | `server/api/*`, `server/server.js`, `server/game/*`, `src/network/*`, `src/ui/*`, admin console | พบและแก้ authority, ownership, idempotency, stale optimistic mutation และ visual fallback paths หลายกลุ่ม |
+| Regression suite | `npm test` | 643 tests ผ่าน, 0 fail, 0 cancelled, 0 skipped |
+| Syntax checks | `node --check server/api/rpc.js`, `src/network/GameSync.js`, `src/ui/GameUI.js` | ผ่านหลังการแก้ล่าสุด |
+| Production build | `npm run build` | ผ่าน; warning เป็นเรื่อง chunk/dynamic import และไม่ทำให้ build fail |
+| Dependency security | `npm audit --omit=dev` | พบ 0 vulnerabilities |
+| Asset audit | `node scripts/audit-assets.mjs` | เขียน `audit-assets.json`; item art 298/298, fish 73/73, pet atlas มีอยู่ |
+| Diff hygiene | `git diff --check` | ผ่าน ไม่มี whitespace error |
+| Live production mutation | ไม่ทำ | ไม่มีการแก้ player, DB, VPS หรือ apply migration จริง |
 
-## 3. ผลการทดสอบเส้นทางผู้เล่น
+## 3. สิ่งที่แก้ไขในรอบนี้
 
-### 3.1 Login และ Loading
+### 3.1 Pet persistence และ pet economy
 
-หน้า Login โหลดได้และแสดงธีม mascot/soft MMORPG พร้อม wordmark ZOLOS.ONLINE, BGM toggle, Start Game, Login, Register, Forgot Password และ Guest action ใน viewport ที่ทดสอบโดยไม่ต้อง scroll หน้า auth หลัก การเปิด auth จาก splash ไม่ได้ทำ page navigation ในรอบแรก และ loading overlay เข้าธีมเดียวกับ Login
+`save_pet_state` ถูกใช้เป็น boundary เฉพาะสำหรับ pet state แทน generic inventory quantity/stats writer ฝั่ง client จะส่งได้เฉพาะ state ที่จำเป็นต่อการ reconcile ส่วน server ตรวจ ownership, character binding, UID ที่มีอยู่จริง, instance count และ merge progression แบบ monotonic การ summon/rename/unequip จึงไม่ควรสร้าง instance หรือ level จากข้อมูลที่ผู้เล่นแก้ใน DevTools ได้เอง [1] [2]
 
-### 3.2 Guest และ Character Creation
+Monster kill transaction ย้ายการคำนวณ pet XP และ level ไป server และส่ง canonical `payload.pet` กลับมา ส่วน client แสดงผลจาก receipt เท่านั้น การซื้อ pet, ขาย pet รายตัว, cancel/buy pet listing และ NPC sale ใช้ transaction ที่ bind กับ owner/character และมี request correlation หรือ idempotency ตาม path ที่รองรับแล้ว การซื้อ remote pet จึงไม่ควร mint UID ใหม่บน browser หรือหั่น instance array แล้วพยายามเขียนกลับเอง
 
-Guest login เข้าสู่เกมจริง สร้างตัวละครชั่วคราว และโหลด Prontera พร้อม HUD, minimap, skill bar, daily reward modal และ job selection modal การเลือก Swordsman ทำงานและเปลี่ยน skill bar เป็น Bash, Magnum Break และ Endure รวมถึงได้รับ starter weapon และ auto-equip
+### 3.2 Inventory และ server-authoritative economy
 
-พบ state bug ที่ยืนยันได้ระหว่างเปลี่ยนอาชีพ: หลังเลือก Swordsman HUD ชั่วขณะแสดง `100/130 HP` และ `50/35 SP` ซึ่ง current SP มากกว่า max SP จึงเพิ่มการ clamp current HP/SP ตาม max ใหม่ใน `chooseJob()` แล้ว
+generic `/api/db` inventory writes ถูกปิดสำหรับ `insert`, `upsert`, `update` และ `delete` รวมถึง legacy starter/system exceptions เพื่อไม่ให้ browser เพิ่ม quantity, เปลี่ยน stats, forge item, ลบ escrow หรือแก้ progression row ด้วย request ทั่วไป การอ่านยังคงถูกจำกัดด้วย policy/ownership ตาม resource [3]
 
-### 3.3 Inventory, Profile และ Settings
+Shop purchase online ใช้ catalog-bound price/type และ server receipt โดย quantity, price, type, gold และ inventory result ไม่ได้มาจากค่าที่ผู้เล่นส่งมาแบบเชื่อถือได้ transaction จะ lock character balance, ตรวจ item อยู่ใน `SHOP_ITEMS`, ป้องกัน request replay/cross-user request conflict และส่ง `inventory_quantity` กับ `gold` ที่ commit แล้วกลับให้ UI
 
-การเปิด Inventory ใน browser audit รอบหนึ่งเกิด session/view anomaly ทำให้ browser กลับ `about:blank` และการกด Start Game ซ้ำจาก splash แสดงอาการเดียวกันอีกครั้ง ขณะเดียวกัน Guest session เดิมยังคงอยู่ใน local storage จึงยังไม่สามารถสรุปได้ว่าเป็น runtime exception ของเกมหรือ timing artifact ของ sandbox browser ประเด็นนี้ควรทดสอบซ้ำใน Chrome ปกติพร้อม Console และ Network log บนเครื่องจริง
+เพิ่มหรือปรับ dedicated authority paths สำหรับ starter loadout, equipped item, consumable use, daily reward, almanac reward, system state และ job change ใน self-host RPC รวมถึง hosted SQL migration โดย starter loadout สามารถ repair แถว Sword/Fishing Rod ที่ quantity เป็นศูนย์ให้กลับมาอย่าง idempotent โดยไม่เพิ่มซ้ำทุกครั้งที่ login
 
-จาก code review พบว่า Profile combat summary มี realtime refresh แล้วจากงานก่อนหน้า และ audit ครั้งนี้ไม่พบการแก้ไขที่ทำให้ flow ดังกล่าวถอยหลัง
+### 3.3 Equipment และ job selection
 
-### 3.4 Guest Semantics
+`save_equipped_item` ไม่รับ slot จาก client แต่คำนวณ canonical slot จาก catalog/server mapping อาวุธกับ fishing rod ใช้ weapon slot เดียวกัน ขณะที่ armor ใช้ paper-doll subslot เช่น `head`, `body`, `garment`, `ring`, `wrist`, `pants`, `feet` และ `accessory` การเปลี่ยน rod จึงไม่ถอด armor ทั้งหมด และการเปลี่ยน armor คนละส่วนไม่ถอดกันเอง
 
-ปุ่มจาก splash ที่มี guest session อยู่แล้วสร้าง guest identity ใหม่และเริ่ม progress ใหม่แทนการ resume identity เดิม พฤติกรรมนี้ยังคงเป็น “เริ่ม Guest ใหม่” ตาม implementation แต่แก้ข้อความเป็น `Guest ใหม่` พร้อม aria-label/title ที่ระบุว่า `START GAME` ใช้สำหรับกลับเข้า session เดิม จึงลดความกำกวมด้าน account expectation แล้ว
+ก่อนหน้านี้ job selection online สามารถเปลี่ยน job และหัก gold ใน local UI โดยไม่ได้มี transaction ที่ทำให้ signature weapon ถูกบันทึกเป็นชุดเดียวกัน รอบนี้เพิ่ม `change_job` ให้ server คำนวณว่าเป็น first selection ที่ฟรีหรือ re-spec ที่มีค่าใช้จ่าย 50,000 Zeny, update job/gold, equip signature weapon และปิดอาวุธ slot เดิมใน transaction เดียว พร้อม request idempotency และ canonical receipt ฝั่ง UI [2] [4]
 
-## 4. Security Findings และการแก้ไข
+### 3.4 Consumable, fishing และ progression receipts
 
-| ระดับ | ประเด็น | สถานะ | หลักฐาน/ผลกระทบ |
+`use_consumable` ตรวจ catalog และตรวจ `item_type === 'consumable'` จาก row จริงก่อนลด quantity ใช้ character row lock, คำนวณผลจาก `healHp`/`restoreSp` ที่ trusted จาก GameData, clamp กับ max HP/SP และไม่ลด item เมื่อใช้แล้วไม่มีผล การ replay request เดิมจะคืน receipt เดิม และ request id เดิมที่ถูกใช้โดย user/character อื่นจะถูกปฏิเสธ
+
+Fishing reward transaction atomically บันทึก fish inventory, canonical almanac caught/counts และ discovery gold bonus แล้วส่ง receipt ให้ `main.js`/`GameUI` reconcile การตกปลาซ้ำจึงไม่ควรได้ discovery bonus จาก local prediction หรือเขียน almanac เอง [5]
+
+Daily reward และ almanac reward online ใช้ server RPC และ canonical receipts ส่วน daily quests/roulette ที่ยังไม่มี server-generated lifecycle และ server progression event pipeline ถูกเปลี่ยนเป็น **read-only online**: ไม่ generate client-owned quest set ในกรณีไม่มี server state, ไม่ increment progress, ไม่ claim reward, ไม่ spin roulette และไม่บันทึก client JSON กลับ server จนกว่าจะมี authoritative progression RPC ครบ นี่เป็นการลด feature ชั่วคราวเพื่อป้องกันการ mint gold/EXP/item ไม่ใช่การอ้างว่าระบบ quest secure แล้ว
+
+### 3.5 Legacy mutation paths ที่ fail-closed
+
+ระบบ refine, forge, card socket/unsocket, celestial mining/pickaxe purchase และ divine ZOL shop บางส่วนเดิมยังมี client-side mutation ที่ไม่มี dedicated server transaction ครบถ้วน รอบนี้จึง fail-closed สำหรับ server-backed character แทนการหัก resource หรือเพิ่ม item ใน local UI แล้วปล่อยให้ generic write ถูกปฏิเสธเงียบ ๆ ผู้เล่น online จะเห็นข้อความแจ้งว่า feature รอ server transaction ส่วน offline mode ยังคงใช้ local fallback ที่ประกาศไว้อย่างชัดเจน
+
+แนวทางนี้ป้องกัน economy corruption ได้จริงกว่าการคง optimistic behavior แต่หมายความว่า feature ดังกล่าว **ยังไม่ควรประกาศว่า online production-ready** จนกว่าจะเพิ่ม RPC ที่ lock ownership, validate catalog, ใช้ server randomness, มี idempotency และคืน canonical receipt ครบทุก path
+
+### 3.6 Tutorial, guest identity และ lifecycle persistence
+
+Tutorial online ไม่ grant gold/item จาก client completion อีกต่อไป การผูก email ของ Guest ใช้ identity เดิมใน transaction แทนการสร้าง user ใหม่ และ guest splash แยก resume/new semantics ให้ชัดขึ้น lifecycle save/keepalive ไม่รับ client inventory หรือ progression snapshot ไปเป็น source of truth [6] [7]
+
+Local storage ยังคงอนุญาตเฉพาะสิ่งที่จัดเป็น device/session concern ตามที่ implementation รองรับ เช่น JWT/session hint, audio/graphics preference หรือ explicit offline fallback การยืนยัน account และ gameplay progression ของ server-backed character ไม่ควรพึ่ง localStorage เป็นฐานข้อมูลหลัก
+
+### 3.7 UI asset และ admin console
+
+เพิ่ม `scripts/audit-assets.mjs` และสร้าง `audit-assets.json` เพื่อให้ตรวจซ้ำได้ว่า item catalog 298 รายการมี authored art ครบทั้งหมด โดยแยก `146 png`, `73 dynamic-3d`, `13 pet-atlas` และ `66 card-png`; fish 73 รายการไม่มี missing mapping และ pet sanctuary atlas มีอยู่จริง ตัวเลขนี้เป็น deterministic catalog coverage ไม่ใช่การรับรองว่าทุก viewport สวยเท่ากันในทุก device
+
+เส้นทาง item/fish/pet/admin ที่เป็น visual surface ถูกเปลี่ยนไปใช้ `itemIconMarkup`, item assets, fish art, pet atlas หรือ model renderer มากขึ้น Standalone Admin console มี asset helper สำหรับ item/fish/pet, ลด raw emoji visual path และเพิ่ม Bug Reports tab ที่ list/filter/detail/review/reward confirmation พร้อม escaped report rendering [8] การ scan raw emoji ยังคงรายงาน callsites จำนวนมาก เพราะ emoji ยังถูกใช้ในข้อความ status, rarity, job/skill label, fallback metadata และ log; จึงไม่ควรตีความ raw scan เป็นหลักฐานว่าทุก visual surface เป็น placeholder
+
+## 4. Security findings และสถานะ
+
+| ระดับ | Finding | สถานะหลังแก้ | หมายเหตุการยืนยัน |
 |---|---|---|---|
-| **Critical/P0** | Legacy monster mode ให้ client คุม damage, death, EXP, gold, loot และ kill count | **แก้ secure default แล้ว; ต้อง verify production mode** | หาก `WORLD_MONSTERS` ปิด ผู้เล่นสามารถแก้ client/runtime แล้วส่ง hit หรือเร่ง local kill เพื่อสร้าง progression และ loot เอง |
-| **High/P1** | JWT fallback ใช้ secret ที่เดาได้ หาก production ไม่ตั้ง `JWT_SECRET` | **แก้แล้ว** | Production/self-host จะ fail-closed หาก secret หายหรือสั้นกว่า 32 ตัวอักษร |
-| **High/P1** | Generic public profile query เปิดโอกาสอ่าน `profiles.is_admin` | **แก้แล้ว** | เพิ่ม public column allowlist และปฏิเสธการขอคอลัมน์ sensitive; AdminUI self-host ใช้ authenticated `/auth/me` |
-| **Medium/P2** | Offline fallback เก็บ password plaintext ใน localStorage | **แก้แล้วบางส่วน** | บัญชีใหม่เก็บ SHA-256 digest และบัญชี legacy จะ migrate เมื่อ login; สำหรับระบบ production ควรหลีกเลี่ยง offline password auth หรือใช้ PBKDF2/Argon2 พร้อม salt |
-| **Medium/P2** | Server runtime dependencies ไม่อยู่ใน package manifest ครบ | **แก้แล้ว** | เพิ่ม `express`, `socket.io`, `jsonwebtoken`, `bcryptjs`, `cors`, `express-rate-limit` และตรวจ `npm audit` จนเป็น 0 |
-| **Medium/P2** | Generic public `characters` response ยังมีข้อมูล gameplay หลายฟิลด์ | **Leaderboard path แก้แล้ว; generic DTO ยังต้องลดต่อ** | Leaderboard ไม่ส่ง `user_id` แล้วและใช้ public character `id` สำหรับ profile lookup; generic authenticated character reads ยังต้องทบทวน economy fields และ internal state |
-| **Medium/P2** | Economy หลายส่วนยังมี client fallback | **ลดความเสี่ยงแล้ว; RPC migration ยัง pending** | Fishing loot, quest claim และ roulette ถูก fail-closed เมื่อ socket connected แต่ยังไม่มี `__serverRewards`; NPC sale ใช้ server request สำหรับ account path ส่วน Supabase/VPS RPC migration และ staging receipts ยังต้อง verify |
-| **Low/P3** | Guest action สร้าง identity ใหม่โดยไม่มีข้อความชัด | **แก้แล้ว** | ปุ่มแสดง `Guest ใหม่`; `START GAME` คือ resume path และมี aria-label/title อธิบายความแตกต่าง |
-| **Low/P3** | Browser กลับ `about:blank` หลัง Start Game ซ้ำ | **ยังไม่สรุป root cause** | ต้อง reproduce ใน browser ปกติและเก็บ console stack/network trace ก่อนแก้ |
+| P0 | Client-controlled monster reward/progression | **Secure default ใน local self-host** | `WORLD_MONSTERS` เปิดเมื่อ `USE_LOCAL_DB=true` เว้นแต่ตั้ง `WORLD_MONSTERS=false` อย่างชัดเจน; ต้องตรวจ env production จริงก่อนเปิด traffic |
+| P0 | Generic inventory mutation สร้าง item/quantity/stats | **Blocked ใน self-host policy; hosted ต้อง apply migration** | Dedicated RPC paths ใช้ ownership/locks/receipts; hosted DDL ยังไม่ apply |
+| P0 | Pet instance UID/XP/level มาจาก client | **ลดและย้ายหลักไป server transaction** | client reconcile canonical pet receipt; ต้องทำ live two-account verification หลัง deploy |
+| P1 | Shop price/type/gold manipulation | **Self-host + hosted function implemented** | catalog-bound allowlist, balance lock, request conflict; hosted functionต้องตรง schema/constraint จริง |
+| P1 | NPC/market/pet escrow race และ cross-character ownership | **Dedicated transaction paths** | มี owner/character binding และ row locks ใน paths ที่แก้แล้ว |
+| P1 | JWT predictable fallback secret | **Fail-closed ใน production self-host** | secret ต้องมีจริงและยาวอย่างน้อย 32 ตัวอักษร [9] |
+| P1 | Public/admin sensitive field exposure | **Allowlist และ authenticated admin path** | public profile ไม่ควรขอ `is_admin`; admin actions ยังต้องใช้ server authorization |
+| P1 | Socket client identity/progression spoof | **ตรวจ identity, map, ownership และ rate limits ตาม path** | ไม่ได้ทำ hostile live load test; ต้องทดสอบ staging แบบได้รับอนุญาต |
+| P2 | Client daily quest JSON กำหนด current/reward | **Feature online read-only** | ยังไม่มี authoritative quest event lifecycle; ห้ามประกาศ online quest economy ว่าพร้อม |
+| P2 | Refine/forge/card/mining/divine legacy writes | **Fail-closed online** | ปลอดภัยกว่า optimistic mutation แต่ feature online ยัง pending dedicated RPC |
+| P2 | Hosted Supabase direct DML | **Migration เขียนแล้ว ยังไม่ apply** | ต้อง review schema, grants, function conflicts และรันโดยผู้มีสิทธิ์ |
+| P3 | Raw emoji callsites | **Visual placeholder coverage ดีขึ้น; metadata remains** | ต้อง reviewเพิ่มเฉพาะ visual surface ที่ audit พบว่า fallback ถูก render จริง |
 
-## 5. จุดแก้ไขที่ทำใน repository
+การ harden F12 ทำได้ในเชิง architecture ไม่ใช่การปิด DevTools ทาง browser ผู้เล่นยังสามารถเปิด F12, แก้ JavaScript, ส่ง request หรือปลอม socket payload ได้เสมอ เป้าหมายที่ถูกต้องคือทำให้ server ไม่เชื่อค่าที่ client ควบคุมและไม่ให้ request ปลอมสร้าง economy ผลงานส่วนใหญ่ในรอบนี้จึงเน้น server validation, ownership, locks, allowlists, idempotency และ fail-closed แทนการพยายามซ่อน client code
 
-### 5.1 Server-authoritative monster mode
+## 5. Hosted migration และ deployment caveats
 
-`server/server.js` เปลี่ยนจากการเปิด authoritative engine เฉพาะเมื่อกำหนด `WORLD_MONSTERS=true` เป็นการเปิดอัตโนมัติเมื่อ `USE_LOCAL_DB=true` และปิดได้เฉพาะเมื่อระบุ `WORLD_MONSTERS=false` อย่างชัดเจน การตั้งค่าบน VPS ที่แนะนำคือ `USE_LOCAL_DB=true`, ไม่ต้องตั้ง `WORLD_MONSTERS` หรือกำหนดเป็น `true`, และไม่ควรใช้ `WORLD_MONSTERS=false` บน production
+ไฟล์ [`migrations/20260822_server_authority.sql`](../migrations/20260822_server_authority.sql) มี revoke direct `inventory`/`marketplace` DML และฟังก์ชัน hosted สำหรับ equipment, starter loadout, consumable, shop purchase, job change, system state, daily reward และ almanac reward รวมถึง request tables ที่ใช้ replay protection การตรวจ static รอบนี้พบ dollar-quote blocks 7 คู่และจำนวนวงเล็บเปิด/ปิดสมดุล แต่ไม่มี PostgreSQL server/`psql` ใน sandbox จึงยังไม่ใช่ SQL execution proof
 
-### 5.2 JWT production hardening
+Migration นี้ **ยังไม่ได้รันกับ Supabase production** และต้องตรวจให้ตรงกับ schema จริงโดยเฉพาะชนิด `auth.uid()`, column type ของ `inventory.user_id`/`characters.user_id`, unique constraint ของ `(character_id, item_name)`, existing function signatures และ fish catalog ในฐานข้อมูล Hosted migration ชุดนี้ยังไม่ใช่การเติม hosted equivalents ของ pet-specific market/NPC-sale flows ทุกตัวที่ self-host มีอยู่แล้ว จึงต้องตรวจ migration chain เดิมและเพิ่ม parity ก่อนเปิด hosted mode เต็มรูปแบบ
 
-`server/api/auth.js` ไม่อนุญาตให้ production/self-host ใช้ development fallback secret อีกต่อไป หาก `JWT_SECRET` หายหรือสั้นกว่า 32 ตัวอักษร auth module จะหยุดทำงานแทนการเปิดช่องให้ token ถูกปลอมได้
+Self-host production ยังต้องตรวจว่า `server/api/rpc.js`, `server/api/data.js`, `server/api/fishing.js`, `server/api/npcSale.js` และ `server/game/monsterEngine.js` ถูก deploy พร้อม frontend ที่ตรงกัน การ deploy backend ผ่าน remote workflow ไม่ได้แปลว่า migration จะถูก apply อัตโนมัติ และการ deploy Vercel frontend เพียงอย่างเดียวไม่ทำให้ Windows VPS backend เปลี่ยนตาม
 
-### 5.3 Public profile data allowlist
-
-`server/api/data.js` เพิ่ม allowlist สำหรับ public profile columns เป็น `id`, `username`, `gender` และ `created_at` เท่านั้น การขอ `is_admin` ผ่าน generic data API จะถูกปฏิเสธ ส่วน `AdminUI` ใน self-host mode เปลี่ยนไปอ่านสิทธิ์จาก authenticated `/auth/me`
-
-### 5.4 Offline credential storage
-
-`src/network/SupabaseClient.js` ไม่สร้าง user record ใหม่ด้วย plaintext password อีกต่อไป แต่สร้าง one-way digest และจะ migrate legacy record เมื่อผู้ใช้ login สำเร็จ ทั้งนี้ localStorage ยังไม่ใช่พื้นที่ที่เหมาะสมสำหรับระบบบัญชี production เนื่องจาก script ที่รันได้บน origin เดียวกันยังสามารถอ่านข้อมูลได้
-
-### 5.5 Runtime dependency และ resource consistency
-
-เพิ่ม dependencies ของ Node server ลง manifest และแก้ `GameUI.chooseJob()` ให้ clamp HP/SP หลัง job modifier เปลี่ยน max resource เพื่อไม่ให้ HUD และ combat state ขัดแย้งกัน
-
-## 6. สิ่งที่ควรทำต่อบน VPS ก่อนเปิดให้ผู้เล่นจริง
-
-1. ตรวจ environment variables บน VPS โดยเฉพาะ `JWT_SECRET` ที่ต้องเป็น random secret ยาวอย่างน้อย 32 ตัวอักษร, `USE_LOCAL_DB=true`, `CORS_ORIGINS` เป็น exact allowlist และ `CORS_ALLOW_ALL` ต้องไม่เป็น `true`
-
-2. ตรวจ startup log ให้พบข้อความ server-authoritative monster engine ทำงานจริง และทดสอบ `world_mode.serverMonsters === true` จาก client อย่างน้อยหนึ่งครั้งใน production staging ก่อนเปิด public traffic
-
-3. ตรวจให้ Caddy หรือ firewall ไม่เปิด PostgreSQL, admin API และ Node port ตรงสู่ internet โดยไม่จำเป็น ควรเปิด public เฉพาะ HTTPS reverse proxy และจำกัด `/admin` ด้วย authentication, IP policy หรือ VPN เพิ่มอีกชั้น
-
-4. ทำ two-account staging test สำหรับ market, vending, card mail, duel, matchmaking, reconnect, duplicate request และ simultaneous claim โดยตรวจยอดเงินจริงใน database หลังทุก transaction ไม่ควรใช้เพียงผลลัพธ์จาก UI
-
-5. ย้าย reward ที่ยังใช้ client fallback ไปเป็น server-authoritative atomic RPC ได้แก่ fishing rewards, quest claim, daily reward และ roulette; ใน interim release นี้ fishing/quest/roulette จะ fail-closed ใน connected sessions และ NPC sale account path ใช้ server request แล้ว ส่วน pet purchase/card refine/fusion ต้องตรวจ receipt/idempotency บน production staging ต่อ
-
-6. แยก public DTO ออกจาก database row โดยเฉพาะ characters, profiles, marketplace และ vending stalls เพื่อลดการรั่วของ user IDs, internal state, economy values และ configuration fields
-
-7. ทดสอบ rate limits ด้วย load test ที่ได้รับอนุญาตบน staging พร้อมตรวจ memory growth ของ Socket.IO, chat, announcements และ monster snapshots รวมถึงตรวจ log rotation และการไม่บันทึก token/password ลง log
-
-## 7. Acceptance Criteria สำหรับรอบถัดไป
-
-| หมวด | เงื่อนไขผ่าน |
+| ก่อน production rollout | Required action |
 |---|---|
-| Auth | ไม่มี default secret, login/register/guest ทำงาน, token expiry และ logout ถูกบังคับจริง |
-| PvE | client แก้ damage/kill/reward ไม่ได้, EXP/gold/drop มาจาก server receipt เท่านั้น |
-| Economy | buy/sell/mail/claim/refine/fusion ใช้ transaction/idempotency และยอดไม่ติดลบ |
-| Ownership | user A อ่าน/แก้/ลบข้อมูลของ user B ไม่ได้ทุก endpoint รวม generic data และ RPC |
-| Client security | user-controlled text ถูก escape ทุกจุด, ไม่มี secret ใน bundle, no plaintext password |
-| Reliability | reconnect, duplicate click, reload, mobile viewport และ navigation ไม่ทำให้ session/game state สูญหาย |
-| Deployment | `npm ci`, `npm test`, `npm run build`, `npm audit --omit=dev` ผ่านบน clean environment |
+| Self-host auth | ตั้ง random `JWT_SECRET` ยาวอย่างน้อย 32 ตัวอักษร, exact `CORS_ORIGINS`, ไม่ใช้ `CORS_ALLOW_ALL` |
+| World mode | ตรวจ `USE_LOCAL_DB=true` และไม่ตั้ง `WORLD_MONSTERS=false` ใน production เว้นแต่เป็น rollback ที่ได้รับอนุญาต |
+| Hosted mode | Review และ apply migration โดยเจ้าของ DB; ตรวจ grants/RLS/function signatures และ migration chain |
+| Backend deploy | Deploy source ที่รวม RPC/monster/fishing/npc/admin changes แล้ว monitor remote workflow แบบ passive |
+| Admin exposure | จำกัด `/admin` ด้วย authentication และควรมี reverse-proxy/IP/VPN policy เพิ่ม; ห้าม expose database port ตรง |
+| Observability | ตรวจ log ไม่บันทึก JWT/password, ตั้ง log rotation, monitor socket memory/rate-limit/error rate |
 
-## 8. Verification Result
+## 6. Validation results แบบ reproducible
 
-การตรวจรอบนี้เพิ่ม regression tests สำหรับ security hardening และได้ผลดังนี้:
+ผลด้านล่างเป็นผลจาก command ที่รันใน working tree หลังการแก้ล่าสุด รวม authoritative job change, hosted shop/consumable functions, daily read-only gate และ UI fail-closed paths
 
-- `npm test`: **456/456 ผ่าน**
-- `npm run build`: **ผ่าน**
-- `npm audit --omit=dev`: **0 vulnerabilities**
-- `node --check`: ไฟล์ที่แก้ใน frontend และ server ผ่าน syntax check
-- Production/VPS mutation: **ไม่ได้ทำ**
+```text
+node --check server/api/rpc.js       PASS
+node --check src/network/GameSync.js PASS
+node --check src/ui/GameUI.js        PASS
+npm test                              PASS — 643/643
+npm run build                         PASS — Vite build completed
+npm audit --omit=dev                  PASS — 0 vulnerabilities
+node scripts/audit-assets.mjs         PASS — 298/298 art, 73/73 fish, pet atlas exists
+git diff --check                     PASS
+```
+
+`npm run build` ยังแสดง warning เรื่อง chunk ที่ใหญ่กว่า 500 kB และ `INEFFECTIVE_DYNAMIC_IMPORT` บาง module เนื่องจาก module เดียวกันถูก static import ด้วย Warning เหล่านี้ไม่ทำให้ build fail แต่ควรเป็น performance backlog แยกจาก security release
+
+## 7. Acceptance checklist หลัง authorized deployment
+
+การตรวจต่อไปควรทำใน staging หรือ production ที่ได้รับอนุญาต โดยใช้ account/player ที่ไม่สำคัญและไม่ทำ destructive grant หากข้อใด fail ให้หยุด rollout และตรวจ server receipt/database row โดยตรง ไม่ใช้เฉพาะข้อความบน UI เป็นหลักฐาน
+
+| Flow | Expected acceptance |
+|---|---|
+| Guest resume/bind | เข้า Guest เดิม, ทำ tutorial, bind email แล้ว logout/login กลับมาใช้ user/character เดิมและประวัติยังอยู่ |
+| Pet summon/rename | เรียก pet, rename, reload/reopen แล้ว instance UID, name, equipped state ยังตรงกับ server |
+| Pet XP | ฆ่า monster ที่มีสิทธิ์รับ XP, เห็น server pet receipt, reload แล้ว level/xp ไม่หายและไม่เพิ่มสองครั้งจาก duplicate event |
+| Pet sale/market | ขายหรือ list ด้วย instance UID เดียว, duplicate click ไม่ขายซ้ำ, buyer/seller character binding ถูกต้อง |
+| Fishing | ตกปลา first discovery, inventory/almanac/gold ตรง receipt, replay request ไม่ได้ bonus discovery ซ้ำ |
+| Daily reward | claim สำเร็จหนึ่งครั้ง, click ครั้งที่สองถูกปฏิเสธและ gold/item ไม่เพิ่ม |
+| Shop | ซื้อ item หลาย quantity, ตรวจ gold/inventory ใน DB, forged price/type/quantity และ request conflict ถูกปฏิเสธ |
+| Consumable | ใช้เมื่อ HP/SP ไม่เต็มแล้วลด quantity หนึ่ง, ใช้เมื่อเต็มไม่ควรลด item, replay ไม่ลดซ้ำ |
+| Job | first pick ฟรีตาม server, re-spec หัก 50,000 Zeny ตาม server, signature weapon/equip persist หลัง reopen |
+| Mobile lifecycle | logout/reopen บน iPhone/iPad/Android แล้ว server-backed inventory, pet, job, fish history ไม่พึ่ง local cache และไม่หาย |
+| Admin | เปิด bug reports, filter/detail/review/reward confirmation; ตรวจว่า unauthorized user เรียก admin API ไม่ได้ |
+
+## 8. Unresolved items and release decision
+
+**Release decision: HOLD สำหรับการประกาศว่า production-ready แบบเต็มรูปแบบ จนกว่าจะทำ deployment verification ตามข้อ 5 และ 7** การตรวจใน repository พร้อมระดับที่เหมาะสมต่อการ commit/push source bundle แล้ว แต่ยังไม่ควรบอกผู้เล่นว่า hosted Supabase authority parity, Windows VPS deploy, migration application, daily quests, refine/forge/card/mining/divine online economy หรือ live pet persistence ผ่านทั้งหมดแล้ว
+
+รายการที่เหลือไม่ใช่ข้ออ้างให้เปิดช่อง client mutation: daily quest/roulette และ legacy refine/forge/card/mining/divine ถูกปิดหรือ read-only online อย่างตั้งใจ ส่วนงานต่อไปที่ควรทำตามลำดับคือเพิ่ม authoritative transactions ให้ feature เหล่านั้น, เพิ่ม hosted pet/market parity, รัน migration ใน staging, ทำ two-account concurrency tests และทำ passive health/workflow verification หลัง deploy โดยไม่ใช้ secret หรือทำ player modification ที่ไม่ได้รับอนุญาต
 
 ## References
 
-[1]: ../server/server.js "ZOLOS Socket.IO server and world-mode configuration"
-[2]: ../server/game/monsterEngine.js "ZOLOS server-authoritative monster engine"
-[3]: ../src/engine/CombatSystem.js "ZOLOS client combat authority split"
-[4]: ../server/api/auth.js "ZOLOS self-host authentication and JWT handling"
-[5]: ../server/api/data.js "ZOLOS policy-based generic data access"
-[6]: ../src/network/SupabaseClient.js "ZOLOS Supabase and offline fallback client"
-[7]: ../src/ui/GameUI.js "ZOLOS game UI and job selection flow"
-[8]: ../test/securityHardening.test.js "ZOLOS security hardening regression tests"
+[1]: ../server/api/rpc.js "ZOLOS self-host authoritative RPC dispatcher, pet, shop, job, consumable and equipment transactions"
+[2]: ../server/game/monsterEngine.js "ZOLOS server-authoritative monster kill and pet progression transaction"
+[3]: ../server/api/data.js "ZOLOS generic data API policy and inventory mutation lockdown"
+[4]: ../src/network/GameSync.js "ZOLOS client/server synchronization adapters and canonical receipt reconciliation"
+[5]: ../server/api/fishing.js "ZOLOS atomic fishing reward and almanac transaction"
+[6]: ../src/ui/TutorialSystem.js "ZOLOS tutorial completion and online reward boundary"
+[7]: ../server/server.js "ZOLOS Socket.IO identity, save-state and server authority boundary"
+[8]: ../server/admin/index.html "ZOLOS standalone admin console and bug-report moderation UI"
+[9]: ../server/api/auth.js "ZOLOS production JWT secret validation and authentication boundary"
+[10]: ../scripts/audit-assets.mjs "ZOLOS deterministic item/fish/pet art coverage audit"
+[11]: ../test/serverAuthorityProgression.test.js "ZOLOS server-authority progression regression contracts"
+[12]: ../test/adminConsole.test.js "ZOLOS admin console and visual asset regression contracts"
