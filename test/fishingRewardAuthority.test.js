@@ -18,7 +18,9 @@ const main = read('../src/main.js');
     assert.equal(Number.isInteger(fish.price), true);
   }
   assert.match(fishing, /CREATE TABLE IF NOT EXISTS public\.fishing_catch_requests/);
-  assert.match(fishing, /ON CONFLICT \(character_id, item_name\) DO UPDATE/);
+  assert.match(fishing, /export function ensureFishingEconomy\(\)/);
+  assert.match(fishing, /await ensureFishingEconomy\(\)/);
+  assert.doesNotMatch(fishing, /ON CONFLICT \(character_id, item_name\) DO UPDATE/);
   assert.match(fishing, /INSERT INTO public\.fishing_catch_requests/);
   assert.match(fishing, /SELECT pg_advisory_xact_lock/);
 });

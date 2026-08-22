@@ -2,9 +2,12 @@ import { query, tx } from './db.js';
 import { FISH_SPECIES, pickFishingCatch, getFishingMapConfig, getFishingRodConfig } from '../../src/engine/GameData.js';
 
 const REQUEST_ID_RE = /^[a-zA-Z0-9:_-]{1,160}$/;
+let fishingEconomyPromise = null;
 
-export async function ensureFishingEconomy() {
-  await query(`CREATE TABLE IF NOT EXISTS public.fishing_catch_requests (
+export function ensureFishingEconomy() {
+  if (fishingEconomyPromise) return fishingEconomyPromise;
+  fishingEconomyPromise = (async () => {
+    await query(`CREATE TABLE IF NOT EXISTS public.fishing_catch_requests (
     request_id text PRIMARY KEY,
     character_id text NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
     result jsonb NOT NULL,
@@ -16,7 +19,12 @@ export async function ensureFishingEconomy() {
     character_id text NOT NULL REFERENCES public.characters(id) ON DELETE CASCADE,
     result jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
-  )`);
+    )`);
+  })().catch(error => {
+    fishingEconomyPromise = null;
+    throw error;
+  });
+  return fishingEconomyPromise;
 }
 
 function rollFishingCatch(random = Math.random, mapId = 'prontera', rodName = 'Fishing Rod') {
@@ -46,6 +54,9 @@ export async function claimFishingReward({ characterId, userId, requestId, mapId
     throw new Error('คำขอตกปลาไม่ถูกต้อง');
   }
 
+  // Server startup initializes this asynchronously; await it here as well so a
+  // player who catches immediately after connecting never races the CREATE TABLE.
+  await ensureFishingEconomy();
   return tx(async (client) => {
     await client.query(
       "SELECT pg_advisory_xact_lock(hashtextextended('fishing:' || $1, 0))",
@@ -83,15 +94,35 @@ export async function claimFishingReward({ characterId, userId, requestId, mapId
     if (!getFishingRodConfig(rodName)) throw new Error('ต้องสวมคันเบ็ดก่อนตกปลา');
 
     const fish = rollFishingCatch(random, mapId, rodName);
-    const inventory = await client.query(
-      `INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
-       VALUES ($1, $2, 'fish', 1, '{}'::jsonb)
-       ON CONFLICT (character_id, item_name) DO UPDATE
-         SET item_type = 'fish', quantity = GREATEST(0, public.inventory.quantity) + 1
-       RETURNING quantity`,
+    // Do not rely on the optional inventory unique constraint here. Some older
+    // VPS databases predate the integrity migration, while the character
+    // advisory lock already serializes claims for this character.
+    const existingFish = await client.query(
+      `SELECT id, quantity FROM public.inventory
+       WHERE character_id = $1 AND item_name = $2
+       ORDER BY id LIMIT 1 FOR UPDATE`,
       [characterId, fish.name],
     );
-    const quantity = Number(inventory.rows[0]?.quantity) || 1;
+    let quantity = 1;
+    if (existingFish.rows[0]) {
+      const nextQuantity = Math.max(0, Math.floor(Number(existingFish.rows[0].quantity) || 0)) + 1;
+      const updatedFish = await client.query(
+        `UPDATE public.inventory
+         SET item_type = 'fish', quantity = $2
+         WHERE id = $1
+         RETURNING quantity`,
+        [existingFish.rows[0].id, nextQuantity],
+      );
+      quantity = Number(updatedFish.rows[0]?.quantity) || nextQuantity;
+    } else {
+      const insertedFish = await client.query(
+        `INSERT INTO public.inventory (character_id, item_name, item_type, quantity, stats)
+         VALUES ($1, $2, 'fish', 1, '{}'::jsonb)
+         RETURNING quantity`,
+        [characterId, fish.name],
+      );
+      quantity = Number(insertedFish.rows[0]?.quantity) || 1;
+    }
     const result = {
       ok: true,
       serverAuthoritative: true,
