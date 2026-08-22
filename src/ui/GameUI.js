@@ -10108,6 +10108,31 @@ export class GameUI {
     this._journeyCombatCompletionTimer = setTimeout(() => close(), 9000);
   }
 
+  _scrollJourneyTargetIntoView(target, { behavior = 'smooth', block = 'center' } = {}) {
+    if (!target || typeof target.getBoundingClientRect !== 'function') return false;
+    // Inventory has a nested scroll area (#inventory-grid) inside the panel body.
+    // Native scrollIntoView handles both that grid and the outer iOS panel, while
+    // the two-frame fallback gives Safari a layout pass after a tab is opened.
+    try {
+      target.scrollIntoView({ behavior, block, inline: 'nearest' });
+    } catch {
+      try { target.scrollIntoView(); } catch { return false; }
+    }
+    return true;
+  }
+
+  _showJourneyTargetAfterReveal(target, step, { wait = 280 } = {}) {
+    if (!target) return;
+    const show = () => {
+      if (target.isConnected === false) return;
+      this._showJourneySpotlight(target, step);
+    };
+    const reducedMotion = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion || wait <= 0) return requestAnimationFrame(show);
+    window.setTimeout(() => requestAnimationFrame(show), wait);
+  }
+
   _navigateFirstThirtyStep() {
     const step = getFirstThirtyStep(this.firstThirtyJourney.activeStep);
     if (!step) return;
@@ -10166,7 +10191,16 @@ export class GameUI {
           : document.querySelector(step.target);
       if (target) {
         const menuWasOpened = this._prepareJourneyTarget(target);
-        return menuWasOpened ? requestAnimationFrame(() => this._showJourneySpotlight(target, step)) : this._showJourneySpotlight(target, step);
+        const reveal = () => {
+          this._scrollJourneyTargetIntoView(target, {
+            behavior: 'smooth',
+            block: step.id === 'equip_starter_rod' ? 'center' : 'nearest',
+          });
+          this._showJourneyTargetAfterReveal(target, step, {
+            wait: step.id === 'equip_starter_rod' ? 320 : 120,
+          });
+        };
+        return menuWasOpened ? requestAnimationFrame(reveal) : reveal();
       }
       this.addCombatLog('ไม่พบปุ่มเป้าหมายในหน้าจอนี้ กรุณาเปิดเมนูหลักแล้วลองอีกครั้ง', 'warning');
       return;

@@ -78,6 +78,14 @@ test('starter rod lesson cannot be completed or skipped before the real equip ac
   assert.match(gameUI, /equip_starter_rod: 'ยืนยันการสวมใส่'/);
 });
 
+test('starter rod navigation scrolls the real item into view before spotlighting it', () => {
+  assert.match(gameUI, /_scrollJourneyTargetIntoView\(target/);
+  assert.match(gameUI, /target\.scrollIntoView\(\{ behavior, block, inline: 'nearest' \}\)/);
+  assert.match(gameUI, /step\.id === 'equip_starter_rod' \? 'center' : 'nearest'/);
+  assert.match(gameUI, /step\.id === 'equip_starter_rod' \? 320 : 120/);
+  assert.match(gameUI, /#inventory-grid \.inv-slot\[data-item-name="Fishing Rod"\]/);
+});
+
 test('extended onboarding is wired to real Card, refine, and pet outcomes', () => {
   assert.match(gameUI, /_completeFirstThirtyStep\('open_card_album'\)/);
   assert.match(gameUI, /_completeFirstThirtyStep\('socket_first_card'\)/);
