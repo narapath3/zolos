@@ -3283,9 +3283,8 @@ export class GameUI {
         this.character.setPet(null);
       }
       if (this.characterId) {
-        // SET (not add) the row's quantity + stats so equipping never inflates
-        // the stack. The full stats object keeps a tool's durability, etc.
-        await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity || 1, item.stats || {});
+        // Quantity is server-authoritative; only the equip flag is client-writable.
+        await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
         this.addCombatLog(`🛡️ ถอด ${item.emoji} ${item.item_name} ออกแล้ว`, 'system');
@@ -3321,8 +3320,8 @@ export class GameUI {
         if (isSameSlot && otherItem.stats && otherItem.stats.equipped === true) {
           otherItem.stats.equipped = false;
           if (this.characterId) {
-            // SET (not add) quantity + stats so swapping gear never inflates it.
-            await setInventoryItemQuantity(this.characterId, otherItem.item_name, otherItem.item_type, otherItem.quantity || 1, otherItem.stats || {});
+            // Quantity is server-authoritative; only the equip flag is client-writable.
+            await updateInventoryItemStats(this.characterId, otherItem.item_name, otherItem.stats || {});
           }
         }
       }
@@ -3357,9 +3356,9 @@ export class GameUI {
       }
 
       if (this.characterId) {
-        // SET (not add) the row's quantity + stats. Also creates the row if a
-        // buy save was interrupted. Never inflates the stack on equip.
-        await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity || 1, item.stats || {});
+        // Inventory quantity is server-authoritative. Persist only the
+        // ownership-safe equipped flag so fish_claim can verify the rod.
+        await updateInventoryItemStats(this.characterId, item.item_name, item.stats || {});
         this.addCombatLog(`✅ บันทึกไอเทม [${item.item_name}] สำเร็จ`, 'system');
       }
       const isPet = item.item_type === 'pet';
