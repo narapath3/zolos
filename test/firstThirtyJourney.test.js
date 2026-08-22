@@ -17,7 +17,7 @@ const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url),
 
 test('First 30 Minutes starts with a safe, ordered journey', () => {
   const state = createFirstThirtyState();
-  assert.equal(FIRST_THIRTY_STEPS.length, 11);
+  assert.equal(FIRST_THIRTY_STEPS.length, 18);
   assert.equal(state.activeStep, 'open_journal');
   assert.equal(firstThirtyProgress(state).percent, 0);
   assert.equal(FIRST_THIRTY_STEPS[1].kind, 'world');
@@ -25,6 +25,13 @@ test('First 30 Minutes starts with a safe, ordered journey', () => {
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'reach_fishing_spot').kind, 'world');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'start_fishing').target, '#btn-fishing');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'catch_first_fish').kind, 'fishing');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'open_card_album').target, '#btn-mycard');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'socket_first_card').target, '#mycard-grid');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'open_weapon_forge').kind, 'world');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'refine_first_weapon').target, '#refine-go');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'open_pet_sanctuary').kind, 'world');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'summon_first_pet').target, '#btn-inventory');
+  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'grow_pet_one_level').target, '#pet-hud');
 });
 
 test('journey state completion is idempotent and advances to the next objective', () => {
@@ -62,13 +69,28 @@ test('fishing onboarding explains the real rod and button flow', () => {
 
 test('starter rod lesson cannot be completed or skipped before the real equip action', () => {
   assert.match(gameUI, /_isStarterFishingRodEquipped\(\)/);
-  assert.match(gameUI, /step\.id === 'equip_starter_rod' && !this\._isStarterFishingRodEquipped\(\)/);
+  assert.match(gameUI, /equip_starter_rod: \[this\._isStarterFishingRodEquipped\(\)/);
   assert.match(gameUI, /ต้องเปิด BAG แล้วกดใช้ไอเทม Fishing Rod เพื่อสวมใส่ก่อน/);
   assert.match(gameUI, /ต้องสวมคันเบ็ดไม้จริงก่อน/);
   assert.match(gameUI, /#inventory-grid \.inv-slot\[data-item-name="Fishing Rod"\]/);
   assert.match(gameUI, /slot\.dataset\.itemName = item\.item_name/);
   assert.match(gameUI, /active\.id === 'equip_starter_rod'\s*\?\s*'<span class="home-journey-locked-step">/);
-  assert.match(gameUI, /step\.id === 'equip_starter_rod' \? 'ยืนยันการสวมใส่'/);
+  assert.match(gameUI, /equip_starter_rod: 'ยืนยันการสวมใส่'/);
+});
+
+test('extended onboarding is wired to real Card, refine, and pet outcomes', () => {
+  assert.match(gameUI, /_completeFirstThirtyStep\('open_card_album'\)/);
+  assert.match(gameUI, /_completeFirstThirtyStep\('socket_first_card'\)/);
+  assert.match(gameUI, /_completeFirstThirtyStep\('open_weapon_forge', \{ prompt: false \}\)/);
+  assert.match(gameUI, /if \(success\) this\._completeFirstThirtyStep\('refine_first_weapon'\)/);
+  assert.match(gameUI, /_completeFirstThirtyStep\('open_pet_sanctuary', \{ prompt: false \}\)/);
+  assert.match(gameUI, /_completeFirstThirtyStep\('summon_first_pet'\)/);
+  assert.match(main, /_completeFirstThirtyStep\('grow_pet_one_level'\)/);
+  assert.match(gameUI, /socket_first_card: \[this\._isFirstCardSocketed\(\)/);
+  assert.match(gameUI, /refine_first_weapon: \[this\._hasRefinedWeapon\(\)/);
+  assert.match(gameUI, /summon_first_pet: \[this\._isPetSummoned\(\)/);
+  assert.match(gameUI, /grow_pet_one_level: \[this\._hasPetLevelled\(\)/);
+  assert.match(main, /needsNpcInteraction = stepId === 'open_weapon_forge' \|\| stepId === 'open_pet_sanctuary'/);
 });
 
 test('Journey UI exposes map-aware navigation and viewport-safe spotlight contracts', () => {

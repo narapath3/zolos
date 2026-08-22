@@ -257,8 +257,15 @@ function updateJourneyNavigation() {
         stopJourneyNavigation();
         autoPath = null;
         window.autoPath = null;
-        gameUI?._completeFirstThirtyStep?.(stepId, { silent: true });
-        gameUI?.addCombatLog?.('📍 ถึงจุดหมายของบทเรียนแล้ว', 'levelup');
+        // NPC lessons require a second intentional action: reaching the marker
+        // only proves that the player found the shop, not that they opened it.
+        const needsNpcInteraction = stepId === 'open_weapon_forge' || stepId === 'open_pet_sanctuary';
+        if (!needsNpcInteraction) {
+            gameUI?._completeFirstThirtyStep?.(stepId, { silent: true });
+        }
+        gameUI?.addCombatLog?.(needsNpcInteraction
+            ? '📍 ถึงแล้ว แตะ NPC ตรงหน้าเพื่อเปิดระบบตามบทเรียน'
+            : '📍 ถึงจุดหมายของบทเรียนแล้ว', 'levelup');
         return;
     }
     if (!marker) return;
@@ -656,6 +663,11 @@ async function initGame(charData) {
                 if (soundManager && soundManager.playLevelUpSound) soundManager.playLevelUpSound();
                 if (gameUI) gameUI.addCombatLog(`🐾 สัตว์เลี้ยงเลเวลอัพ! ตอนนี้เลเวล ${event.level} ✨`, 'levelup');
                 if (gameUI && gameUI.flashPetHud) gameUI.flashPetHud();
+                // The growth lesson completes only from the authoritative pet
+                // level-up event, never from a kill or opening the pet panel.
+                if (gameUI && gameUI._completeFirstThirtyStep) {
+                    gameUI._completeFirstThirtyStep('grow_pet_one_level');
+                }
                 if (particles && character && particles.spawnLevelUpEffect) {
                     particles.spawnLevelUpEffect(character.getPosition());
                 }

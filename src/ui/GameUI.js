@@ -647,6 +647,7 @@ export class GameUI {
       const grid = document.getElementById('mycard-grid');
       if (grid) this._mountCardAlbum(grid);
       this.refreshMailbox();
+      this._completeFirstThirtyStep('open_card_album');
     }
   }
 
@@ -2828,6 +2829,7 @@ export class GameUI {
 
     await this._persistCardStats(changed);
     this._afterCardChange(`ใส่การ์ด ${card.emoji || '🃏'} ${cardName}`);
+    this._completeFirstThirtyStep('socket_first_card');
     // Fix Issue 2: Refresh the profile paper-doll instantly.
     this._renderProfileEquipDoll();
   }
@@ -3338,7 +3340,14 @@ export class GameUI {
       } else if (item.item_type === 'tool') {
         this.character.equippedPickaxe = item.item_name;
       } else if (item.item_type === 'pet') {
+        const instances = this._ensurePetInstances(item);
+        const inst = instances[0];
         this.character.setPet(petModelOf(item.item_name), item.stats.petLevel || 1, item.stats.petXp || 0);
+        if (inst) {
+          this.character.equippedPetUid = inst.uid;
+          item.stats.equippedUid = inst.uid;
+        }
+        this._completeFirstThirtyStep('summon_first_pet');
       }
 
       if (this.characterId) {
@@ -3554,6 +3563,7 @@ export class GameUI {
       c.setPet(petModelOf(item.item_name), inst.level || 1, inst.xp || 0, inst.name || null);
       c.equippedPetUid = uid;
       item.stats.equipped = true;
+      this._completeFirstThirtyStep('summon_first_pet');
       item.stats.equippedUid = uid;
       touched.add(item);
       this._equipToast(`เรียก ${this._petDisplayName(item, inst)} ออกมา!`, true);
@@ -6459,6 +6469,7 @@ export class GameUI {
     };
     modal.innerHTML = `<section class="pet-boutique" role="dialog" aria-modal="true" aria-label="Pet Sanctuary"><header class="pet-boutique__hero"><h2>✦ Pet Sanctuary</h2><p>เลือกเพื่อนคู่ใจ ดูพลัง และรับเลี้ยงจากลาน sanctuary</p><div class="pet-boutique__wallet">Zeny ${gold.toLocaleString()}</div><div class="pet-boutique__summary"><span>สะสม <strong>${ownedPetCount}</strong> ตัว</span><span>${this.character?.equippedPetUid ? 'มีเพื่อนออกเดินทางแล้ว' : 'ยังไม่มีเพื่อนที่เรียกใช้งาน'}</span></div><button class="pet-boutique__close" aria-label="ปิด">×</button></header><div class="pet-boutique__tools" role="toolbar" aria-label="ตัวกรองสัตว์เลี้ยง"><button class="pet-boutique__filter is-active" type="button" data-pet-filter="all">ทั้งหมด</button><button class="pet-boutique__filter" type="button" data-pet-filter="owned">มีแล้ว</button><button class="pet-boutique__filter" type="button" data-pet-filter="available">ยังไม่มี</button><button class="pet-boutique__filter" type="button" data-pet-filter="common">ธรรมดา</button><button class="pet-boutique__filter" type="button" data-pet-filter="rare">หายาก</button><button class="pet-boutique__filter" type="button" data-pet-filter="epic">มหากาพย์</button><button class="pet-boutique__filter" type="button" data-pet-filter="legendary">ตำนาน</button><button class="pet-boutique__filter" type="button" data-pet-filter="mythic">มหาเทพ</button><select class="pet-boutique__sort" aria-label="เรียงรายการ"><option value="featured">แนะนำ</option><option value="price-asc">ราคาต่ำไปสูง</option><option value="price-desc">ราคาสูงไปต่ำ</option><option value="rarity">ตามความหายาก</option></select></div><div class="pet-boutique__body"><div class="pet-boutique__grid" aria-live="polite">${PET_SHOP.map(entry=>{const data=ITEMS[entry.name];const state=getPetState(entry);const stateLabel=state.equipped?'ใช้งานอยู่':state.ownedCount?`มีแล้ว ${state.ownedCount}`:'';return `<article class="pet-card${state.equipped?' is-equipped':''}" tabindex="0" data-pet="${entry.name}" data-rarity="${String(data.rarity).toLowerCase()}" data-price="${entry.price}" data-owned="${state.ownedCount?'1':'0'}"><span class="pet-card__rarity">${data.rarity}</span>${stateLabel?`<span class="pet-card__state">${stateLabel}</span>`:''}<div class="pet-card__art">${petModelMarkup(data.pet,320)||petPortraitMarkup(data.pet)}</div><h3>${entry.name.replace(' Pet','')}</h3><div class="pet-card__foot"><span class="pet-card__price">${entry.price.toLocaleString()} z</span><button class="pet-card__buy${state.ownedCount?' is-owned':''}" ${gold<entry.price?'disabled':''}>${state.equipped?'รับเลี้ยงเพิ่ม':state.ownedCount?'รับเลี้ยงเพิ่ม':'รับเลี้ยง'}</button></div></article>`}).join('')}</div><aside class="pet-boutique__detail" aria-live="polite"></aside></div></section>`;
     modal.style.display = 'flex'; this.updateMobileControlsVisibility();
+    this._completeFirstThirtyStep('open_pet_sanctuary', { prompt: false });
     const close=()=>{modal.style.display='none';document.removeEventListener('keydown', onEscape);this._petBoutiqueEscapeHandler=null;if(this._petViewer)this._petViewer.pause();this.updateMobileControlsVisibility();};
     const onEscape=e=>{if(e.key==='Escape')close();};
     this._petBoutiqueEscapeHandler=onEscape;
@@ -7466,6 +7477,7 @@ export class GameUI {
     this._renderForge();
     modal.style.display = 'flex';
     this.updateMobileControlsVisibility();
+    this._completeFirstThirtyStep('open_weapon_forge', { prompt: false });
   }
 
   _renderForge() {
@@ -7676,6 +7688,7 @@ export class GameUI {
 
     this._renderForge();
     this._renderInventory();
+    if (success) this._completeFirstThirtyStep('refine_first_weapon');
   }
 
   // Quick success/fail flash over the refine stage.
@@ -9773,9 +9786,37 @@ export class GameUI {
         image: '/assets/tutorial/guide-codex.jpg', pose: 'codex',
         hint: 'ทุก Monster และปลาที่ค้นพบจะถูกบันทึกไว้ใน Codex ของคุณ'
       },
+      open_card_album: {
+        image: '/assets/tutorial/guide-codex.jpg', pose: 'codex',
+        hint: 'เปิด My Card เพื่อดูคอลเลกชัน เลือกการ์ดเพื่ออ่านความสามารถ และดูว่าการ์ดใส่กับช่องใดได้'
+      },
+      socket_first_card: {
+        image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
+        hint: 'เมื่อมีการ์ดแล้ว ให้เลือกอุปกรณ์ที่มีช่อง Card แล้วกด Socket card การ์ดต้องอยู่ในช่องจริงจึงจะผ่าน'
+      },
+      open_weapon_forge: {
+        image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
+        hint: 'เดินไปหา Weapon Smith ทางตะวันออกเฉียงใต้ของ Prontera แล้วแตะ NPC เพื่อเปิดโรงตีเหล็ก'
+      },
+      refine_first_weapon: {
+        image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
+        hint: 'เลือกแท็บ ✨ ตีบวก เลือกอาวุธ ตรวจ Zeny กับแร่ แล้วกดตีบวก ระบบจะบันทึกระดับอาวุธให้คุณ'
+      },
+      open_pet_sanctuary: {
+        image: '/assets/tutorial/guide-celebrate.jpg', pose: 'celebrate',
+        hint: 'เดินไปยัง Pet Sanctuary ทางทิศใต้ของ Prontera แตะผู้ดูแลเพื่อดูเพื่อนคู่ใจแต่ละระดับ'
+      },
+      summon_first_pet: {
+        image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
+        hint: 'รับเลี้ยงสัตว์เลี้ยงก่อน แล้วเปิด BAG → แท็บ Pet → แตะสัตว์เลี้ยงเพื่อเรียกออกมาเดินทางด้วยกัน'
+      },
+      grow_pet_one_level: {
+        image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
+        hint: 'สัตว์เลี้ยงได้รับ Pet EXP จากการกำจัด Monster ขณะถูกเรียกใช้งาน เมื่อเลเวลเพิ่มจริง บทนี้จะสำเร็จ'
+      },
       choose_next_goal: {
         image: '/assets/tutorial/guide-celebrate.jpg', pose: 'celebrate',
-        hint: 'คุณพร้อมแล้ว เลือกเส้นทางที่ชอบได้เลย: Combat, Fishing หรือ Exploration'
+        hint: 'คุณพร้อมแล้ว เลือกเส้นทางที่ชอบได้เลย: Combat, Fishing, Card, Forge หรือ Pet'
       }
     };
     return presentations[step?.id] || presentations.open_journal;
@@ -9943,11 +9984,37 @@ export class GameUI {
     );
   }
 
+  _isFirstCardSocketed() {
+    return Boolean(Object.values(this.character?.equippedCards || {}).some(Boolean));
+  }
+
+  _hasRefinedWeapon() {
+    return Boolean((this.inventory || []).some(item =>
+      REFINABLE_TYPES.includes(item?.item_type) && Number(item?.stats?.refine || 0) > 0
+    ));
+  }
+
+  _isPetSummoned() {
+    return Boolean(this.character?.equippedPet && this.character?.equippedPetUid);
+  }
+
+  _hasPetLevelled() {
+    return Boolean(this._isPetSummoned() && Number(this.character?.petLevel || 1) > 1);
+  }
+
   _completeFirstThirtyStep(stepId, { silent = false, prompt = true } = {}) {
     const step = getFirstThirtyStep(stepId);
     if (!step || this.firstThirtyJourney.completed.includes(step.id)) return false;
-    if (step.id === 'equip_starter_rod' && !this._isStarterFishingRodEquipped()) {
-      this.addCombatLog('🎣 ต้องเปิด BAG แล้วกดใช้ไอเทม Fishing Rod เพื่อสวมใส่ก่อน จึงจะผ่านบทนี้ได้', 'warning');
+    const guards = {
+      equip_starter_rod: [this._isStarterFishingRodEquipped(), '🎣 ต้องเปิด BAG แล้วกดใช้ไอเทม Fishing Rod เพื่อสวมใส่ก่อน จึงจะผ่านบทนี้ได้'],
+      socket_first_card: [this._isFirstCardSocketed(), '🃏 ต้องเลือกการ์ดแล้วใส่ลงช่อง Card ของอุปกรณ์จริงก่อน จึงจะผ่านบทนี้ได้'],
+      refine_first_weapon: [this._hasRefinedWeapon(), '✨ ต้องกดตีบวกและมีอาวุธที่ได้ระดับ +1 ขึ้นไปก่อน จึงจะผ่านบทนี้ได้'],
+      summon_first_pet: [this._isPetSummoned(), '🐾 ต้องเรียกสัตว์เลี้ยงออกมาใช้งานจากแท็บ Pet ก่อน จึงจะผ่านบทนี้ได้'],
+      grow_pet_one_level: [this._hasPetLevelled(), '🌟 ต้องเรียกสัตว์เลี้ยงไว้แล้วกำจัด Monster จนเลเวลเพิ่มขึ้นจริงก่อน จึงจะผ่านบทนี้ได้'],
+    };
+    const guard = guards[step.id];
+    if (guard && !guard[0]) {
+      this.addCombatLog(guard[1], 'warning');
       this._renderJourneyGuide();
       return false;
     }
@@ -10056,22 +10123,47 @@ export class GameUI {
       return;
     }
     if (step.kind === 'ui') {
-      // Step 5: Equip starter rod needs the BAG open and the Equip tab active.
-      if (step.id === 'equip_starter_rod') {
-        const panel = document.getElementById('inventory-panel');
-        if (!this._isMenuSurfaceOpen(panel)) {
-          const btn = document.getElementById('btn-inventory');
-          if (btn) btn.click();
+      const panel = document.getElementById('inventory-panel');
+      const openInventoryTab = tabName => {
+        if (!this._isMenuSurfaceOpen(panel)) document.getElementById('btn-inventory')?.click();
+        const tab = document.querySelector(`.inv-tab[data-tab="${tabName}"]`);
+        if (tab && !tab.classList.contains('active')) tab.click();
+      };
+
+      // Equip starter rod needs the BAG open and the Equip tab active.
+      if (step.id === 'equip_starter_rod') openInventoryTab('equip');
+      if (step.id === 'summon_first_pet') openInventoryTab('pet');
+
+      // Socketing happens inside the Card Album. Open the panel first so the
+      // spotlight lands on the real album surface instead of a hidden button.
+      if (step.id === 'socket_first_card') {
+        const cardPanel = document.getElementById('mycard-panel');
+        if (!this._isMenuSurfaceOpen(cardPanel)) this._openMyCard();
+        const target = document.querySelector('#mycard-grid') || cardPanel;
+        if (target) return this._showJourneySpotlight(target, step);
+      }
+
+      // The pet growth lesson points at the live HUD badge after summoning; on
+      // a reload before the pet exists, open the Pet tab as a useful fallback.
+      if (step.id === 'grow_pet_one_level' && !this.character?.equippedPet) openInventoryTab('pet');
+
+      if (step.id === 'refine_first_weapon') {
+        const forge = document.getElementById('forge-modal');
+        if (forge && this._isMenuSurfaceOpen(forge)) {
+          this.forgeTab = 'refine';
+          this._renderForge();
+          const refineButton = document.querySelector('#refine-go') || document.getElementById('forge-card');
+          if (refineButton) return this._showJourneySpotlight(refineButton, step);
         }
-        const equipTab = document.querySelector('.inv-tab[data-tab="equip"]');
-        if (equipTab && !equipTab.classList.contains('active')) {
-          equipTab.click();
-        }
+        this.addCombatLog('⚒️ กรุณาเปิดโรงตีเหล็กที่ Weapon Smith ก่อน แล้วเลือกแท็บตีบวก', 'warning');
+        return;
       }
 
       const target = step.id === 'equip_starter_rod'
         ? (document.querySelector('#inventory-grid .inv-slot[data-item-name="Fishing Rod"]') || document.querySelector(step.target))
-        : document.querySelector(step.target);
+        : step.id === 'summon_first_pet'
+          ? (document.querySelector('#inventory-grid .inv-slot') || document.querySelector(step.target))
+          : document.querySelector(step.target);
       if (target) {
         const menuWasOpened = this._prepareJourneyTarget(target);
         return menuWasOpened ? requestAnimationFrame(() => this._showJourneySpotlight(target, step)) : this._showJourneySpotlight(target, step);
@@ -10114,7 +10206,13 @@ export class GameUI {
     overlay._journeyClose?.();
     this._setJourneySpotlightState(true);
     const escape = value => this._journeyEscape(value);
-    const completionLabel = step.id === 'equip_starter_rod' ? 'ยืนยันการสวมใส่' : 'ทำแล้ว';
+    const completionLabel = {
+      equip_starter_rod: 'ยืนยันการสวมใส่',
+      socket_first_card: 'ตรวจการ์ดที่สวม',
+      refine_first_weapon: 'ตรวจผลตีบวก',
+      summon_first_pet: 'ตรวจการเรียก',
+      grow_pet_one_level: 'ตรวจเลเวลสัตว์เลี้ยง',
+    }[step.id] || 'ทำแล้ว';
     overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"><span class="journey-spotlight-ring-label">แตะตรงนี้</span></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">${completionLabel} <span>✓</span></button></div>`;
     overlay.style.display = 'block';
     const ring = overlay.querySelector('.journey-spotlight-ring');
@@ -10259,6 +10357,21 @@ export class GameUI {
           </tbody></table></div>
           คันเบ็ดเงินและคันเบ็ดทองคำซื้อได้ที่ <b>Kafra Shop → Equip</b> โดยใช้ Zeny ราคาจะสูงขึ้นตามระดับอุปกรณ์<br>
           คันเบ็ดเงินจับปลา Common ถึง Rare ได้ ส่วน <b>ปลา Legendary ต้องใช้คันเบ็ดทองคำ</b> และ Map ที่อันตรายกว่าจะมีโอกาสพบปลาหายากมากขึ้น`)}
+        ${sec('🃏', 'Card — ดู ใส่ และพัฒนาการ์ด', `
+          1. เปิด <b>MY CARD</b> เพื่อดู Card Album และอ่านความสามารถ/ช่องที่รองรับของการ์ดแต่ละใบ<br>
+          2. เปิด <b>BAG → Equip</b> เลือกอุปกรณ์ที่มีช่อง Card แล้วแตะช่อง Card เพื่อเลือกการ์ดที่ตรงประเภท<br>
+          3. กด <b>Socket card</b> เพื่อใส่การ์ดลงช่องจริง ตรวจตราสัญลักษณ์ <b>E</b> หรือช่องที่แสดงชื่อการ์ดเพื่อยืนยันผล<br>
+          4. การ์ดซ้ำใช้สำหรับ <b>Fusion</b> เพื่อเพิ่มระดับดาว หรือถลุงเป็น Stardust ตามกติกาของ Card Album การกดเปิด Album อย่างเดียวจะยังไม่ถือว่าใส่การ์ดสำเร็จ`)}
+        ${sec('⚒️', 'ตีบวกอาวุธ — Weapon Smith', `
+          1. เดินไปหา <b>Weapon Smith</b> ที่ Prontera แล้วแตะ NPC เพื่อเปิดโรงตีเหล็ก<br>
+          2. เลือกแท็บ <b>✨ ตีบวก</b> เลือกอาวุธที่ต้องการ ตรวจเลเวลอาวุธ Zeny และแร่ที่ต้องใช้<br>
+          3. กดปุ่ม <b>ตีบวก</b> แล้วรอผลจากระบบ หากสำเร็จอาวุธจะเปลี่ยนเป็น <b>+1, +2, …</b> พร้อมโบนัสพลังที่อัปเดตในตัวละคร<br>
+          4. การเปิด Forge หรือกดเลือกอาวุธยังไม่ทำให้บทเรียนผ่าน ต้องมีผลตีบวกจริงเท่านั้น และหากล้มเหลวให้ลองใหม่เมื่อมีทรัพยากรพร้อม`)}
+        ${sec('🐾', 'สัตว์เลี้ยง — รับเลี้ยง เรียกใช้ และเลเวลอัป', `
+          1. เดินไปยัง <b>Pet Sanctuary</b> แล้วแตะผู้ดูแลเพื่อเปิดร้านสัตว์เลี้ยง เลือกตามราคาและระดับความหายาก<br>
+          2. กด <b>รับเลี้ยง</b> แล้วเปิด <b>BAG → Pet</b> แตะสัตว์เลี้ยงเพื่อ <b>เรียกออกมา</b> สถานะจะขึ้นที่ Pet HUD<br>
+          3. ขณะสัตว์เลี้ยงถูกเรียกใช้งาน ให้กำจัด Monster เพื่อรับ <b>Pet EXP</b> เมื่อ EXP เต็ม สัตว์เลี้ยงจะเลเวลอัปและพลังโจมตีเพิ่ม<br>
+          4. การเปิด Pet Sanctuary หรือซื้อสัตว์เลี้ยงยังไม่ใช่การเรียกใช้ และการกำจัด Monster โดยไม่มีสัตว์เลี้ยงก็ไม่ทำให้บทเติบโตผ่าน ต้องเกิด <b>Pet Level Up</b> จริง`)}
         ${sec('👹', 'บอสโลก (World Boss)', `
           บอสยักษ์เกิดกลางสนามเป็นระยะ ทุกคนแชร์เลือดก้อนเดียว ต้องร่วมกันตี:
           ${F('เลือดบอส = min( 45000 , 7000 + คนออนไลน์ × 3500 )')}
