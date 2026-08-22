@@ -199,7 +199,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     chapter: 18,
     title: 'พาสัตว์เลี้ยงเติบโตหนึ่งระดับ',
     titleEn: 'Grow your pet by one level',
-    description: 'ขณะเรียกสัตว์เลี้ยงอยู่ ให้กำจัด Monster เพื่อรับ Pet EXP เมื่อเลเวลเพิ่มขึ้นจริง บทนี้จึงจะสำเร็จ',
+    description: 'เรียกสัตว์เลี้ยงไว้ แล้วกำจัด Monster ต่อจน Pet เลเวลอัป ดู Lv./EXP ได้ที่กล่องสัตว์เลี้ยงมุมซ้ายบน เมื่อเลเวลเพิ่มขึ้น บทนี้จะสำเร็จอัตโนมัติ ไม่ต้องแตะกล่อง Pet',
     kind: 'ui',
     target: '#pet-hud',
     icon: '🌟',

@@ -9958,7 +9958,7 @@ export class GameUI {
       },
       grow_pet_one_level: {
         image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
-        hint: 'สัตว์เลี้ยงได้รับ Pet EXP จากการกำจัด Monster ขณะถูกเรียกใช้งาน เมื่อเลเวลเพิ่มจริง บทนี้จะสำเร็จ'
+        hint: 'เรียกสัตว์เลี้ยงไว้ แล้วกำจัด Monster ต่อไป ดู Lv./EXP ได้ที่กล่อง Pet มุมซ้ายบน กล่องนี้มีไว้ดูสถานะ ไม่ต้องแตะ เมื่อ Pet เลเวลอัป บทนี้จะสำเร็จอัตโนมัติ'
       },
       choose_next_goal: {
         image: '/assets/tutorial/guide-celebrate.jpg', pose: 'celebrate',
@@ -10169,7 +10169,7 @@ export class GameUI {
       socket_first_card: [this._isFirstCardSocketed(), '🃏 ต้องเลือกการ์ดแล้วใส่ลงช่อง Card ของอุปกรณ์จริงก่อน จึงจะผ่านบทนี้ได้'],
       refine_first_weapon: [this._hasRefinedWeapon(), '✨ ต้องกดตีบวกและมีอาวุธที่ได้ระดับ +1 ขึ้นไปก่อน จึงจะผ่านบทนี้ได้'],
       summon_first_pet: [this._isPetSummoned(), '🐾 ต้องเรียกสัตว์เลี้ยงออกมาใช้งานจากแท็บ Pet ก่อน จึงจะผ่านบทนี้ได้'],
-      grow_pet_one_level: [this._hasPetLevelled(), '🌟 ต้องเรียกสัตว์เลี้ยงไว้แล้วกำจัด Monster จนเลเวลเพิ่มขึ้นจริงก่อน จึงจะผ่านบทนี้ได้'],
+      grow_pet_one_level: [this._hasPetLevelled(), '🌟 เรียกสัตว์เลี้ยงไว้ แล้วกำจัด Monster ต่อจน Pet เลเวลอัป บทนี้จะผ่านอัตโนมัติ ไม่ต้องแตะกล่อง Pet'],
     };
     const guard = guards[step.id];
     if (guard && !guard[0]) {
@@ -10404,9 +10404,10 @@ export class GameUI {
       socket_first_card: 'ตรวจการ์ดที่สวม',
       refine_first_weapon: 'ตรวจผลตีบวก',
       summon_first_pet: 'ตรวจการเรียก',
-      grow_pet_one_level: 'ตรวจเลเวลสัตว์เลี้ยง',
+      grow_pet_one_level: 'เข้าใจแล้ว ไปกำจัด Monster',
     }[step.id] || 'ทำแล้ว';
-    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"><span class="journey-spotlight-ring-label">แตะตรงนี้</span></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">${completionLabel} <span>✓</span></button></div>`;
+    const spotlightLabel = step.id === 'grow_pet_one_level' ? 'ดูสถานะตรงนี้' : 'แตะตรงนี้';
+    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"><span class="journey-spotlight-ring-label">${spotlightLabel}</span></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">${completionLabel} <span>✓</span></button></div>`;
     overlay.style.display = 'block';
     const ring = overlay.querySelector('.journey-spotlight-ring');
     const card = overlay.querySelector('.journey-spotlight-card');
@@ -10449,6 +10450,11 @@ export class GameUI {
     overlay._journeyClose = close;
     overlay.querySelector('.journey-spotlight-close').onclick = close;
     overlay.querySelector('.journey-spotlight-done').onclick = () => {
+      if (step.id === 'grow_pet_one_level') {
+        close();
+        this.addCombatLog('🐾 ไปกำจัด Monster ต่อได้เลย ระบบจะผ่านบทนี้ให้อัตโนมัติเมื่อ Pet เลเวลอัป', 'system');
+        return;
+      }
       const completed = this._completeFirstThirtyStep(step.id);
       if (completed) close();
     };

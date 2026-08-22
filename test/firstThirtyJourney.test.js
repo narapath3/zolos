@@ -33,7 +33,10 @@ test('First 30 Minutes starts with a safe, ordered journey', () => {
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'refine_first_weapon').target, '#refine-go');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'open_pet_sanctuary').kind, 'world');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'summon_first_pet').target, '#btn-inventory');
-  assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'grow_pet_one_level').target, '#pet-hud');
+  const petGrowthStep = FIRST_THIRTY_STEPS.find(step => step.id === 'grow_pet_one_level');
+  assert.equal(petGrowthStep.target, '#pet-hud');
+  assert.match(petGrowthStep.description, /กล่องสัตว์เลี้ยงมุมซ้ายบน/);
+  assert.match(petGrowthStep.description, /สำเร็จอัตโนมัติ/);
 });
 
 test('journey state completion is idempotent and advances to the next objective', () => {
@@ -100,6 +103,9 @@ test('extended onboarding is wired to real Card, refine, and pet outcomes', () =
   assert.match(gameUI, /refine_first_weapon: \[this\._hasRefinedWeapon\(\)/);
   assert.match(gameUI, /summon_first_pet: \[this\._isPetSummoned\(\)/);
   assert.match(gameUI, /grow_pet_one_level: \[this\._hasPetLevelled\(\)/);
+  assert.match(gameUI, /grow_pet_one_level: 'เข้าใจแล้ว ไปกำจัด Monster'/);
+  assert.match(gameUI, /spotlightLabel = step\.id === 'grow_pet_one_level' \? 'ดูสถานะตรงนี้' : 'แตะตรงนี้'/);
+  assert.match(gameUI, /ไปกำจัด Monster ต่อได้เลย ระบบจะผ่านบทนี้ให้อัตโนมัติเมื่อ Pet เลเวลอัป/);
   assert.match(main, /needsNpcInteraction = stepId === 'open_weapon_forge' \|\| stepId === 'open_pet_sanctuary'/);
 });
 
