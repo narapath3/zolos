@@ -233,9 +233,18 @@ test('Auto-advance prompt buttons are protected from world touch input on mobile
   assert.match(gameUI, /target\.closest\('#journey-next-prompt'\)/);
   assert.match(gameUI, /target\.closest\('#journey-combat-complete'\)/);
   assert.match(gameUI, /button\.addEventListener\('touchend', handlePromptAction/);
+  assert.match(gameUI, /button\.addEventListener\('pointerup', handlePromptAction/);
+  assert.match(gameUI, /this\._journeyPromptActionLock/);
+  assert.match(gameUI, /requestAnimationFrame\(navigate\)/);
   assert.match(gameUI, /event\.stopImmediatePropagation\?\.\(\)/);
   assert.match(css, /#journey-next-prompt,\.journey-next-prompt-card,\.journey-next-prompt-card button\{touch-action:manipulation/);
   assert.match(css, /#journey-next-prompt \.journey-next-prompt-continue,[\s\S]*pointer-events:auto/);
+});
+
+test('Next-chapter prompt names world destinations so the Forge route is explicit', () => {
+  assert.match(gameUI, /active\.id === 'open_weapon_forge' \? 'ไปโรงตีเหล็ก'/);
+  assert.match(gameUI, /active\.id === 'open_pet_sanctuary' \? 'ไป Pet Sanctuary'/);
+  assert.match(gameUI, /data-home-journey-action="continue-next">\$\{actionLabel\}/);
 });
 
 

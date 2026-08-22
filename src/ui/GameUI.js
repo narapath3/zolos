@@ -78,6 +78,7 @@ export class GameUI {
     this._journeyNewPlayerAttentionDismissed = false;
     this._journeyCombatCompletionTimer = null;
     this._journeyNextPromptEl = null;
+    this._journeyPromptActionLock = false;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -9980,16 +9981,18 @@ export class GameUI {
       document.body.appendChild(prompt);
     }
     this._journeyNextPromptEl = prompt;
+    this._journeyPromptActionLock = false;
     const presentation = this._journeyTutorialPresentation(active);
     const escape = value => this._journeyEscape(value);
     const doneTitle = completedStep ? `บทที่ ${completedStep.chapter} เสร็จแล้ว` : 'พร้อมไปต่อไหม?';
-    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? 'นำทางไปที่นี่' : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูเป้าหมายต่อไป';
-    prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">ทำต่อทันที <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (active.id === 'open_weapon_forge' ? 'ไปโรงตีเหล็ก' : active.id === 'open_pet_sanctuary' ? 'ไป Pet Sanctuary' : 'นำทางไปที่นี่') : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูเป้าหมายต่อไป';
+    prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">${actionLabel} <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
     let lastTouchActionAt = 0;
     const handlePromptAction = event => {
       const button = event.currentTarget;
-      if (event.type === 'click' && performance.now() - lastTouchActionAt < 500) return;
-      if (event.type === 'touchend') lastTouchActionAt = performance.now();
+      const now = performance.now();
+      if (event.type === 'click' && (now - lastTouchActionAt < 700 || this._journeyPromptActionLock)) return;
+      if (event.type === 'touchend' || event.type === 'pointerup') lastTouchActionAt = now;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
@@ -9999,16 +10002,27 @@ export class GameUI {
     };
     prompt.querySelectorAll('[data-home-journey-action]').forEach(button => {
       button.addEventListener('click', handlePromptAction);
+      button.addEventListener('pointerup', handlePromptAction, { passive: false });
       button.addEventListener('touchend', handlePromptAction, { passive: false });
     });
     prompt.style.display = 'block';
   }
 
   _continueFirstThirtyJourney() {
+    if (this._journeyPromptActionLock) return false;
+    this._journeyPromptActionLock = true;
+    const activeId = firstThirtyProgress(this.firstThirtyJourney).active?.id;
     this._hideJourneyNextPrompt();
     this._journeyGuideCollapsed = true;
     this._renderJourneyGuide();
-    this._navigateFirstThirtyStep();
+    const navigate = () => {
+      const active = firstThirtyProgress(this.firstThirtyJourney).active;
+      if (!active || active.id !== activeId) return;
+      this._navigateFirstThirtyStep();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(navigate);
+    else setTimeout(navigate, 0);
+    return true;
   }
 
   _isStarterFishingRodEquipped() {
