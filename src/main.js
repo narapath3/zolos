@@ -1167,7 +1167,7 @@ async function initGame(charData) {
     // same server-backed user in place, preserving its character and progress,
     // then reloads with a fresh account JWT. Only explicit offline mode uses
     // local-only Guest data.
-    gameUI.setupBindAccountCallback(async (email, password) => {
+    gameUI.setupBindAccountCallback(async (email, password, options = {}) => {
         const { migrateGuestToAccount } = await import('./network/GameSync.js');
         const saveData = character.getSaveData();
         const guest = {
@@ -1189,9 +1189,11 @@ async function initGame(charData) {
         if (result && result.failedItems && result.failedItems.length && gameUI) {
             gameUI.addCombatLog(`⚠️ บางไอเทมย้ายไม่สำเร็จ: ${result.failedItems.join(', ')} (ลองผูกบัญชีซ้ำได้)`, 'warning');
         }
-        // Reload into the freshly-created real account (its Supabase session now
-        // wins over the old local-guest fallback), with all progress migrated.
-        setTimeout(() => window.location.reload(), 2200);
+        // Normal Settings binding reloads into the fresh account JWT. The exit
+        // warning passes reload:false so the awaited logout save can continue
+        // in the same page after the existing Guest user was converted in place.
+        if (options.reload !== false) setTimeout(() => window.location.reload(), 2200);
+        return result;
     });
 
     // Setup skill clicks
@@ -1672,6 +1674,14 @@ async function initGame(charData) {
 
     // Setup Logout Button
     gameUI.setupLogoutButton(async () => {
+        // A Guest must get one clear chance to bind before leaving. The player
+        // may cancel to continue playing, or explicitly choose the risky
+        // unbound exit after acknowledging the warning.
+        if (gameUI.isGuest) {
+            const exitDecision = await gameUI.showGuestExitWarning();
+            if (exitDecision?.action === 'cancel') return false;
+        }
+
         // Safety net: force-reload after 5s no matter what, in case any await
         // below hangs (e.g. Supabase signOut on flaky connections).
         const reloadTimer = setTimeout(() => { window.location.reload(); }, 5000);

@@ -95,3 +95,21 @@ test('mobile lifecycle fallback sends an inventory-free keepalive snapshot throu
   assert.match(server, /Buffer\.byteLength\(encoded, 'utf8'\) > 256 \* 1024/);
   assert.match(server, /_ownerUserId: actor\.userId/);
 });
+
+test('Guest logout requires an explicit bind, continue, or risky unbound exit choice', () => {
+  assert.match(gameUI, /showGuestExitWarning\(\)/);
+  assert.match(gameUI, /บัญชีของคุณยังเป็น Guest และยังไม่ได้ผูกอีเมล/);
+  assert.match(gameUI, /ประวัติการเล่นอาจสูญหายได้/);
+  assert.match(gameUI, /data-guest-exit-action="bind"/);
+  assert.match(gameUI, /data-guest-exit-action="cancel"/);
+  assert.match(gameUI, /ออกโดยไม่ผูกบัญชี \(เสี่ยงข้อมูลหาย\)/);
+  assert.match(gameUI, /reload: false, source: 'exit-warning'/);
+  assert.match(main, /if \(gameUI\.isGuest\)/);
+  assert.match(main, /exitDecision\?\.action === 'cancel'/);
+});
+
+test('cancelled Guest logout restores the logout control for mobile retry', () => {
+  assert.match(gameUI, /if \(result === false\)/);
+  assert.match(gameUI, /btn\.disabled = false/);
+  assert.match(gameUI, /btn\.style\.pointerEvents = ''/);
+});

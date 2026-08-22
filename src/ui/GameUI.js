@@ -6123,6 +6123,117 @@ export class GameUI {
     }
   }
 
+  showGuestExitWarning() {
+    if (!this.isGuest) return Promise.resolve({ action: 'continue' });
+
+    const existing = document.getElementById('guest-exit-warning-modal');
+    if (existing) existing.remove();
+
+    if (!document.getElementById('guest-exit-warning-style')) {
+      const style = document.createElement('style');
+      style.id = 'guest-exit-warning-style';
+      style.textContent = `
+        #guest-exit-warning-modal { position: fixed; inset: 0; z-index: 120000; display: flex; align-items: center; justify-content: center; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); box-sizing: border-box; background: rgba(3, 8, 20, .82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .guest-exit-warning-card { width: min(460px, 100%); max-height: min(720px, calc(100dvh - 28px)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; box-sizing: border-box; padding: clamp(18px, 4vw, 28px); border: 1px solid rgba(255, 196, 74, .42); border-radius: 22px; background: linear-gradient(160deg, rgba(27, 31, 55, .99), rgba(9, 15, 31, .99)); box-shadow: 0 24px 90px rgba(0,0,0,.72), 0 0 0 1px rgba(255,255,255,.04) inset; color: #f5f7ff; }
+        .guest-exit-warning-kicker { color: #ffd86a; font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+        .guest-exit-warning-card h2 { margin: 7px 0 8px; color: #fff; font-size: clamp(19px, 5vw, 25px); line-height: 1.2; }
+        .guest-exit-warning-copy { margin: 0; color: #c7d1e8; font-size: 13px; line-height: 1.6; }
+        .guest-exit-warning-danger { display: flex; gap: 10px; align-items: flex-start; margin: 16px 0; padding: 12px 13px; border: 1px solid rgba(255, 110, 120, .34); border-radius: 13px; background: rgba(124, 28, 53, .2); color: #ffd7dc; font-size: 12px; line-height: 1.55; }
+        .guest-exit-warning-danger strong { display: block; margin-bottom: 2px; color: #ff9ea8; }
+        .guest-exit-warning-form { display: grid; gap: 9px; }
+        .guest-exit-warning-form label { color: #aebbd2; font-size: 11px; font-weight: 800; }
+        .guest-exit-warning-form input { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid rgba(154, 183, 232, .27); border-radius: 11px; outline: none; background: rgba(3, 8, 20, .68); color: #fff; font: inherit; }
+        .guest-exit-warning-form input:focus { border-color: #ffd15c; box-shadow: 0 0 0 3px rgba(255, 209, 92, .16); }
+        .guest-exit-warning-actions { display: grid; gap: 8px; margin-top: 14px; }
+        .guest-exit-warning-actions button { width: 100%; min-height: 44px; padding: 10px 13px; border-radius: 11px; font: inherit; font-size: 12px; font-weight: 900; cursor: pointer; touch-action: manipulation; }
+        .guest-exit-warning-bind { border: 1px solid #ffe99b; background: linear-gradient(135deg, #fff2b9, #f1c64e); color: #2d2100; }
+        .guest-exit-warning-cancel { border: 1px solid rgba(126, 190, 255, .42); background: rgba(48, 85, 140, .24); color: #e3efff; }
+        .guest-exit-warning-leave { border: 1px solid rgba(255, 126, 139, .35); background: transparent; color: #ffb7be; font-size: 11px !important; }
+        .guest-exit-warning-actions button:disabled { cursor: wait; opacity: .58; }
+        .guest-exit-warning-status { min-height: 18px; margin-top: 9px; color: #ff9ea8; font-size: 11px; line-height: 1.45; }
+        @media (max-width: 520px) { #guest-exit-warning-modal { align-items: flex-end; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); } .guest-exit-warning-card { border-radius: 20px; max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - max(16px, env(safe-area-inset-bottom))); } }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'guest-exit-warning-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'guest-exit-warning-title');
+    modal.innerHTML = `
+      <section class="guest-exit-warning-card">
+        <div class="guest-exit-warning-kicker">SAVE YOUR ADVENTURE</div>
+        <h2 id="guest-exit-warning-title">ก่อนออกจากเกม</h2>
+        <p class="guest-exit-warning-copy">บัญชีของคุณยังเป็น Guest และยังไม่ได้ผูกอีเมล หากเปลี่ยนเครื่อง ล้างข้อมูลเบราว์เซอร์ หรือเซสชัน Guest หาย อาจไม่สามารถกู้คืนความคืบหน้าได้</p>
+        <div class="guest-exit-warning-danger" role="alert"><span aria-hidden="true">⚠️</span><div><strong>คำเตือนสำคัญ</strong>หากไม่ใส่ Email และ Password ตอนนี้ ประวัติการเล่นอาจสูญหายได้</div></div>
+        <div class="guest-exit-warning-form">
+          <label for="guest-exit-email">Email</label>
+          <input id="guest-exit-email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" />
+          <label for="guest-exit-password">Password</label>
+          <input id="guest-exit-password" type="password" autocomplete="new-password" minlength="6" placeholder="อย่างน้อย 6 ตัวอักษร" />
+        </div>
+        <div id="guest-exit-warning-status" class="guest-exit-warning-status" role="status" aria-live="polite"></div>
+        <div class="guest-exit-warning-actions">
+          <button type="button" class="guest-exit-warning-bind" data-guest-exit-action="bind">🔒 ผูกบัญชีแล้วออกจากเกม</button>
+          <button type="button" class="guest-exit-warning-cancel" data-guest-exit-action="cancel">กลับไปเล่นต่อ</button>
+          <button type="button" class="guest-exit-warning-leave" data-guest-exit-action="leave">ออกโดยไม่ผูกบัญชี (เสี่ยงข้อมูลหาย)</button>
+        </div>
+      </section>`;
+    document.body.appendChild(modal);
+    this.updateMobileControlsVisibility();
+
+    return new Promise(resolve => {
+      let settled = false;
+      let bindInFlight = false;
+      const emailInput = modal.querySelector('#guest-exit-email');
+      const passwordInput = modal.querySelector('#guest-exit-password');
+      const status = modal.querySelector('#guest-exit-warning-status');
+      const bindButton = modal.querySelector('[data-guest-exit-action="bind"]');
+      const cancelButton = modal.querySelector('[data-guest-exit-action="cancel"]');
+      const leaveButton = modal.querySelector('[data-guest-exit-action="leave"]');
+      const finish = action => {
+        if (settled) return;
+        settled = true;
+        modal.remove();
+        this.updateMobileControlsVisibility();
+        resolve({ action });
+      };
+      cancelButton?.addEventListener('click', () => finish('cancel'));
+      leaveButton?.addEventListener('click', () => finish('leave'));
+      bindButton?.addEventListener('click', async () => {
+        if (bindInFlight) return;
+        const email = emailInput?.value.trim() || '';
+        const password = passwordInput?.value || '';
+        if (!email || !password) {
+          if (status) status.textContent = 'กรุณากรอก Email และ Password ก่อนผูกบัญชี';
+          return;
+        }
+        if (password.length < 6) {
+          if (status) status.textContent = 'Password ต้องมีอย่างน้อย 6 ตัวอักษร';
+          return;
+        }
+        if (!this.bindAccountCallback) {
+          if (status) status.textContent = 'ระบบผูกบัญชียังไม่พร้อม กรุณาโหลดเกมใหม่แล้วลองอีกครั้ง';
+          return;
+        }
+        bindInFlight = true;
+        [bindButton, cancelButton, leaveButton].forEach(button => { if (button) button.disabled = true; });
+        if (status) { status.style.color = '#ffe59a'; status.textContent = 'กำลังบันทึกและผูกบัญชี...'; }
+        try {
+          await this.bindAccountCallback(email, password, { reload: false, source: 'exit-warning' });
+          this.setGuestMode(false);
+          finish('bound');
+        } catch (error) {
+          bindInFlight = false;
+          [bindButton, cancelButton, leaveButton].forEach(button => { if (button) button.disabled = false; });
+          if (status) { status.style.color = '#ff9ea8'; status.textContent = String(error?.message || 'ผูกบัญชีไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); }
+        }
+      });
+      requestAnimationFrame(() => emailInput?.focus());
+    });
+  }
+
   setupLogoutButton(callback) {
     const btn = document.getElementById('btn-logout');
     if (btn) {
@@ -6132,7 +6243,15 @@ export class GameUI {
         btn.style.opacity = '0.5';
         btn.style.pointerEvents = 'none';
         // Direct logout without confirm() to avoid blocking on mobile WebViews
-        Promise.resolve(callback()).catch(err => {
+        Promise.resolve(callback()).then(result => {
+          // A cancelled Guest exit returns false so the player can continue
+          // playing and the logout control becomes available again.
+          if (result === false) {
+            btn.disabled = false;
+            btn.style.opacity = '';
+            btn.style.pointerEvents = '';
+          }
+        }).catch(err => {
           console.error('Logout callback error:', err);
           // Force reload as last resort
           window.location.reload();
