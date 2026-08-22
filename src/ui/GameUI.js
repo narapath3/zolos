@@ -6134,7 +6134,8 @@ export class GameUI {
       style.id = 'guest-exit-warning-style';
       style.textContent = `
         #guest-exit-warning-modal { position: fixed; inset: 0; z-index: 120000 !important; display: flex; align-items: center; justify-content: center; padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); box-sizing: border-box; background: rgba(3, 8, 20, .82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); -webkit-tap-highlight-color: transparent; pointer-events: auto !important; touch-action: manipulation; }
-        .guest-exit-warning-card { position: relative; z-index: 1; pointer-events: auto !important; touch-action: manipulation; width: min(460px, 100%); max-height: min(720px, calc(100dvh - 28px)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; box-sizing: border-box; padding: clamp(18px, 4vw, 28px); border: 1px solid rgba(255, 196, 74, .42); border-radius: 22px; background: linear-gradient(160deg, rgba(27, 31, 55, .99), rgba(9, 15, 31, .99)); box-shadow: 0 24px 90px rgba(0,0,0,.72), 0 0 0 1px rgba(255,255,255,.04) inset; color: #f5f7ff; }
+        .guest-exit-warning-card, .guest-exit-warning-card * { pointer-events: auto !important; }
+        .guest-exit-warning-card { position: relative; z-index: 1; touch-action: manipulation; width: min(460px, 100%); max-height: min(720px, calc(100dvh - 28px)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; box-sizing: border-box; padding: clamp(18px, 4vw, 28px); border: 1px solid rgba(255, 196, 74, .42); border-radius: 22px; background: linear-gradient(160deg, rgba(27, 31, 55, .99), rgba(9, 15, 31, .99)); box-shadow: 0 24px 90px rgba(0,0,0,.72), 0 0 0 1px rgba(255,255,255,.04) inset; color: #f5f7ff; }
         .guest-exit-warning-kicker { color: #ffd86a; font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
         .guest-exit-warning-card h2 { margin: 7px 0 8px; color: #fff; font-size: clamp(19px, 5vw, 25px); line-height: 1.2; }
         .guest-exit-warning-copy { margin: 0; color: #c7d1e8; font-size: 13px; line-height: 1.6; }
@@ -6159,6 +6160,8 @@ export class GameUI {
     const modal = document.createElement('div');
     modal.id = 'guest-exit-warning-modal';
     modal.className = 'modal-popup guest-exit-warning-modal';
+    modal.style.pointerEvents = 'auto';
+    modal.style.isolation = 'isolate';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'guest-exit-warning-title');
@@ -6182,6 +6185,9 @@ export class GameUI {
         </div>
       </section>`;
     document.body.appendChild(modal);
+    modal.addEventListener('pointerdown', event => event.stopPropagation(), { capture: true });
+    modal.addEventListener('touchstart', event => event.stopPropagation(), { capture: true, passive: true });
+    modal.addEventListener('click', event => event.stopPropagation());
     this.updateMobileControlsVisibility();
 
     return new Promise(resolve => {
@@ -6209,6 +6215,12 @@ export class GameUI {
             event.preventDefault();
             handler(event);
           }
+        }, { passive: false });
+        element.addEventListener('touchend', event => {
+          if (Date.now() - lastTouchAt < 700) return;
+          lastTouchAt = Date.now();
+          event.preventDefault();
+          handler(event);
         }, { passive: false });
         element.addEventListener('click', event => {
           if (Date.now() - lastTouchAt < 700) return;
