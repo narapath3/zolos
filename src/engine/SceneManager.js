@@ -204,15 +204,26 @@ const isNearPetBoutique = (x, z, extra = 0) => {
     const radius = PET_BOUTIQUE_CLEAR_RADIUS + extra;
     return dx * dx + dz * dz < radius * radius;
 };
-// Weapon smith sits on the south-east dry field, well outside the river cut.
+// Weapon smith sits on the eastern dry field, with a clear approach away
+// from both the sanctuary and the general item-buying stall.
 // Keep this as the single placement source so terrain, props, and interaction
 // all agree on the same grounded footprint.
-export const WEAPON_SMITH_POSITION = Object.freeze({ x: 10, z: -8 });
+export const WEAPON_SMITH_POSITION = Object.freeze({ x: 14, z: -8 });
 const WEAPON_SMITH_CLEAR_RADIUS = 4.8;
 const isNearWeaponSmith = (x, z, extra = 0) => {
     const dx = x - WEAPON_SMITH_POSITION.x;
     const dz = z - WEAPON_SMITH_POSITION.z;
     const radius = WEAPON_SMITH_CLEAR_RADIUS + extra;
+    return dx * dx + dz * dz < radius * radius;
+};
+// The general item-buying NPC uses a large canopy and needs its own quiet
+// zone so the smith and pet sanctuary keep readable entrances and signs.
+export const SELL_NPC_POSITION = Object.freeze({ x: -5, z: -14 });
+const SELL_NPC_CLEAR_RADIUS = 4.2;
+const isNearSellNpc = (x, z, extra = 0) => {
+    const dx = x - SELL_NPC_POSITION.x;
+    const dz = z - SELL_NPC_POSITION.z;
+    const radius = SELL_NPC_CLEAR_RADIUS + extra;
     return dx * dx + dz * dz < radius * radius;
 };
 
@@ -2380,7 +2391,7 @@ export class SceneManager {
         const okSpot = (x, z) => {
             const riverZ = Math.sin(x * 0.08) * 10 - 2;
             if (Math.abs(z - riverZ) < 8.5) return false;      // river + banks
-            if (isNearPetBoutique(x, z) || isNearWeaponSmith(x, z)) return false;
+            if (isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) return false;
             if (this.isInArena && this.isInArena(x, z, 1)) return false;
             if (Math.abs(x) < 2.2 || Math.abs(z) < 2.2) return false; // paths
             // The expanded mountain and cave highlands are walkable meadows;
@@ -2929,7 +2940,7 @@ export class SceneManager {
         const canPlace = (x, z) => {
             if (this.currentMap === 'prontera' && !this._isOnLand(x, z)) return false;
             if (this.isInArena?.(x, z, 2.2)) return false;
-            if (isNearPetBoutique(x, z, 3.0) || isNearWeaponSmith(x, z, 2.8)) return false;
+            if (isNearPetBoutique(x, z, 3.0) || isNearWeaponSmith(x, z, 2.8) || isNearSellNpc(x, z, 2.6)) return false;
             if (portalBlocked(x, z) || npcBlocked(x, z)) return false;
             return true;
         };
@@ -3387,7 +3398,7 @@ export class SceneManager {
         ];
 
         treePositions.forEach(([x, z], idx) => {
-            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8) && !isNearWeaponSmith(x, z, 0.8)) {
+            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8) && !isNearWeaponSmith(x, z, 0.8) && !isNearSellNpc(x, z, 0.8)) {
                 const typeIdx = idx % config.treeTypes.length;
                 const type = config.treeTypes[typeIdx];
                 this._createTree(x, z, type);
@@ -3402,7 +3413,7 @@ export class SceneManager {
             [14, -3], [-2, -11], [7, 12], [-13, 14], [3, 14],
         ];
         rockPosMain.forEach(([x, z]) => {
-            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8) && !isNearWeaponSmith(x, z, 0.8)) this._createRock(x, z);
+            if (this._isOnLand(x, z) && !isNearPetBoutique(x, z, 0.8) && !isNearWeaponSmith(x, z, 0.8) && !isNearSellNpc(x, z, 0.8)) this._createRock(x, z);
         });
 
         const density = config.decorDensity;
@@ -3416,7 +3427,7 @@ export class SceneManager {
             if (!this._isOnLand(x, z)) continue;
             if (x < -6 && z < -6) continue; // Skip Cave
             if (x > 6 && z > 6) continue; // Skip Mountain
-            if (isNearPetBoutique(x, z) || isNearWeaponSmith(x, z)) continue;
+            if (isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) continue;
             this._createFlower(x, z);
         }
 
@@ -3424,7 +3435,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(100 * density); i++) {
             const x = (Math.random() - 0.5) * 48;
             const z = (Math.random() - 0.5) * 48;
-            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) continue;
             this._createGrassTuft(x, z);
         }
 
@@ -3433,7 +3444,7 @@ export class SceneManager {
             const x = (Math.random() - 0.5) * 34;
             const z = (Math.random() - 0.5) * 34;
             if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
-            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) continue;
             this._createMushroom(x, z);
         }
 
@@ -3441,7 +3452,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(50 * density); i++) {
             const x = (Math.random() - 0.5) * 46;
             const z = (Math.random() - 0.5) * 46;
-            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) continue;
             this._createPebble(x, z);
         }
 
@@ -3450,7 +3461,7 @@ export class SceneManager {
             const x = (Math.random() - 0.5) * 40;
             const z = (Math.random() - 0.5) * 40;
             if (Math.abs(x) < 2 && Math.abs(z) < 2) continue;
-            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) continue;
             this._createCloverPatch(x, z);
         }
 
@@ -3458,7 +3469,7 @@ export class SceneManager {
         for (let i = 0; i < Math.floor(15 * density); i++) {
             const x = (Math.random() - 0.5) * 38;
             const z = (Math.random() - 0.5) * 38;
-            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z)) continue;
+            if (!this._isOnLand(x, z) || isNearPetBoutique(x, z) || isNearWeaponSmith(x, z) || isNearSellNpc(x, z)) continue;
             this._createFallenLeaves(x, z);
         }
 
@@ -6185,6 +6196,7 @@ export class SceneManager {
         group.name = "npcSell";
         group.userData.isNPC = true;
         group.userData.npcType = 'sell';
+        group.userData.collisionRadius = 2.6;
 
         // ---- Wooden floor/deck ----
         const floorGeo = new THREE.BoxGeometry(3.6, 0.12, 2.6);
@@ -6349,8 +6361,13 @@ export class SceneManager {
         group.add(nameTag);
         group.userData.shopLabel = nameTag;
 
-        // Position on dry land - slightly higher elevation and shifted
-        group.position.set(9.5, 0.45, -4.5);
+        // Position on the western southern meadow, separated from the smith
+        // and sanctuary so the canopy, sign and interaction radius do not overlap.
+        group.position.set(
+            SELL_NPC_POSITION.x,
+            this.getTerrainHeight(SELL_NPC_POSITION.x, SELL_NPC_POSITION.z),
+            SELL_NPC_POSITION.z
+        );
         this.scene.add(group);
         this.envObjects.push(group);
         group.userData.isNPC = true;

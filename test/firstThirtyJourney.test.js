@@ -26,6 +26,7 @@ test('First 30 Minutes starts with a safe, ordered journey', () => {
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'reach_fishing_spot').kind, 'world');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'start_fishing').target, '#btn-fishing');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'catch_first_fish').kind, 'fishing');
+  assert.deepEqual(FIRST_THIRTY_STEPS.find(step => step.id === 'open_weapon_forge').position, { x: 14, y: 0, z: -8 });
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'open_card_album').target, '#btn-mycard');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'socket_first_card').target, '#mycard-grid');
   assert.equal(FIRST_THIRTY_STEPS.find(step => step.id === 'open_weapon_forge').kind, 'world');

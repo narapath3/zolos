@@ -154,7 +154,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     description: 'เดินไปหา Weapon Smith ที่ Prontera แล้วแตะ NPC เพื่อเปิดเมนูโรงตีเหล็กและดูแท็บ ✨ ตีบวก',
     kind: 'world',
     mapId: 'prontera',
-    position: { x: 10, y: 0, z: -8 },
+    position: { x: 14, y: 0, z: -8 },
     radius: 4.8,
     icon: '⚒️',
     rewardLabel: 'ค้นพบระบบตีบวกอาวุธ',
