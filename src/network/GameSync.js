@@ -1388,149 +1388,42 @@ export async function loadLoginStreak(characterId) {
     }
 }
 
-// ============ Bind Guest → Real Account (with progress migration) ============
-function makeGuestUsernameSuffix() {
-    return Math.random().toString(36).slice(2, 6).toUpperCase();
-}
-
-async function resolveBindableUsername(baseUsername) {
-    const base = String(baseUsername || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
-    const check = async (candidate) => {
-        try {
-            const { data, error } = await supabase.from('profiles')
-                .select('id').eq('username', candidate).limit(1);
-            if (error) return null;
-            return Array.isArray(data) ? data.length > 0 : Boolean(data);
-        } catch {
-            return null;
-        }
-    };
-
-    // Preserve the Guest name when the database can confirm it is free. If the
-    // check is hidden by RLS or another profile already owns it, use a short
-    // readable suffix before auth.signUp so a trigger cannot hit the UNIQUE key.
-    const baseTaken = await check(base);
-    if (baseTaken === false) return base;
-    for (let attempt = 0; attempt < 5; attempt++) {
-        const suffix = makeGuestUsernameSuffix();
-        const candidate = `${base.slice(0, Math.max(1, 24 - suffix.length - 1))}_${suffix}`;
-        const taken = await check(candidate);
-        if (taken === false || taken === null) return candidate;
-    }
-    return `${base.slice(0, 18)}_${makeGuestUsernameSuffix()}`.slice(0, 24);
-}
-
-// Anonymous Supabase sessions aren't available on this project, so every guest
-// is a LOCAL guest with no auth session — `updateUser` can't bind them ("Auth
-// session missing"). Instead we create a real account and migrate the guest's
-// progress (character stats, inventory, friends, quests, almanac) to it, then
-// switch the active session so a reload lands in the new account.
+// ============ Bind Guest → Real Account ============
+// Convert the authenticated anonymous user in place. The previous flow created
+// a second user + fresh character and intentionally reset untrusted local state;
+// for online Guests that were already saved server-side, that looked like lost
+// history after binding. In-place binding preserves the existing UUID, character
+// rows, inventory and system-progress rows without accepting client-side grants.
 export async function migrateGuestToAccount(email, password, guest) {
     if (isOfflineMode || !supabase) throw new Error('ไม่สามารถผูกบัญชีในโหมดออฟไลน์');
     if (!guest) throw new Error('ไม่พบข้อมูลตัวละคร');
 
-    const baseUsername = String(guest.name || 'Adventurer').trim().slice(0, 24) || 'Adventurer';
-    let username = await resolveBindableUsername(baseUsername);
-    const requestedGender = String(guest.gender || 'male').toLowerCase();
-    let gender = ['male', 'female'].includes(requestedGender) ? requestedGender : 'male';
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    const currentUser = sessionData?.session?.user;
+    if (!currentUser?.id || currentUser.is_anonymous !== true) {
+        throw new Error('เซสชัน Guest ไม่พร้อม กรุณาเข้า Guest เดิมแล้วลองใหม่');
+    }
 
-    // 1. Create or recover the real account (auto-signs-in when email confirmation is off)
-    const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-        email, password, options: { data: { username, gender } }
-    });
-    if (signUpErr) {
-        const msg = (signUpErr.message || '').toLowerCase();
-        if (msg.includes('already registered') || msg.includes('already been registered') || msg.includes('อีเมลนี้ถูกใช้แล้ว')) {
-            throw new Error('อีเมลนี้เป็นของบัญชีอื่นแล้ว กรุณาใช้อีเมลอื่น หรือเข้าสู่ระบบด้วยบัญชีนี้');
+    // The self-host backend changes the existing anonymous users row inside a
+    // transaction and returns a fresh non-anonymous JWT. Hosted Supabase uses
+    // its native updateUser path, which also keeps the same auth UUID.
+    if (isSelfHostMode && typeof supabase.auth.bindAnonymousAccount === 'function') {
+        const { data, error } = await supabase.auth.bindAnonymousAccount({ email, password });
+        if (error) throw error;
+        if (!data?.user?.id || data.preserved !== true) {
+            throw new Error('ผูกบัญชีไม่สำเร็จ ระบบไม่สามารถยืนยันการรักษาประวัติเดิมได้');
         }
-        if (msg.includes('profiles_username_key') || (msg.includes('duplicate key') && msg.includes('username'))) {
-            throw new Error('ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณากดลองใหม่อีกครั้ง ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ');
-        }
-        throw signUpErr;
-    }
-    const newUser = signUpData?.user;
-    if (!newUser) throw new Error('สมัครบัญชีไม่สำเร็จ');
-    // The self-host backend can recover an older partial signup and return the
-    // canonical profile. Keep those values instead of attempting a second
-    // profile write with a newly generated Guest name.
-    if (signUpData?.recovered === true) {
-        if (signUpData.username) username = String(signUpData.username).slice(0, 32);
-        if (signUpData.gender && ['male', 'female'].includes(signUpData.gender)) gender = signUpData.gender;
-    }
-    const newUserId = newUser.id;
-
-    // 2. Ensure an active session exists (required for RLS-protected inserts)
-    let sess = (await supabase.auth.getSession())?.data?.session;
-    if (!sess) {
-        const { error: siErr } = await supabase.auth.signInWithPassword({ email, password });
-        if (siErr) throw new Error('บัญชีถูกสร้างแล้ว แต่ต้องยืนยันอีเมลก่อนใช้งาน โปรดตรวจสอบกล่องอีเมล');
-        sess = (await supabase.auth.getSession())?.data?.session;
+        saveActiveSession(data.user.id);
+        return { userId: data.user.id, characterId: guest.characterId || null, failedItems: [] };
     }
 
-    // 3. Profile — surface database conflicts as a safe app error, never raw SQL.
-    const { error: profileError } = await supabase.from('profiles').upsert({ id: newUserId, username, gender });
-    if (profileError) {
-        const profileMessage = String(profileError.message || '').toLowerCase();
-        if (profileMessage.includes('profiles_username_key') || (profileMessage.includes('duplicate key') && profileMessage.includes('username'))) {
-            throw new Error('ชื่อผู้เล่นนี้ถูกใช้แล้ว กรุณากดลองใหม่อีกครั้ง ระบบจะตั้งชื่อใหม่ให้อัตโนมัติ');
-        }
-        throw new Error('สร้างโปรไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-    }
-
-    // 4. Character row — never trust local guest progression. The guest state
-    // is browser-controlled and can be edited before binding; the new account
-    // starts from server defaults instead of importing level/gold/exp/equipment.
-    const charInsert = {
-        id: 'char_' + Math.random().toString(36).substring(2, 10),
-        user_id: newUserId,
-        name: username,
-        gender,
-        last_map: 'prontera_field',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-    };
-    const { data: newChar, error: charErr } = await supabase
-        .from('characters').insert(charInsert).select().single();
-    if (charErr) throw new Error('ผูกบัญชีสำเร็จบางส่วน แต่สร้างตัวละครไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-    const newCharId = newChar.id;
-
-    // Retry helper — a single transient failure must not silently drop data.
-    const withRetry = async (fn) => {
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try { await fn(); return true; }
-            catch (e) { if (attempt === 2) return false; await new Promise(r => setTimeout(r, 250)); }
-        }
-        return false;
-    };
-
-    // 5. Inventory — local guest rows are untrusted. Give only canonical
-    // starter items; all forged level/gold/item stacks are intentionally reset.
-    // SET makes the recovery path safe to retry without duplicating equipment.
-    const failedItems = [];
-    const starterItems = [
-        ['Sword', 'weapon', { equipped: true }],
-        ['Fishing Rod', 'fishing_rod', { equipped: false }],
-    ];
-    for (const [itemName, itemType, stats] of starterItems) {
-        const starterOk = await withRetry(() => setInventoryItemQuantity(newCharId, itemName, itemType, 1, stats));
-        if (!starterOk) failedItems.push(itemName);
-    }
-    for (const it of (guest.inventory || [])) {
-        if (it?.item_name && !starterItems.some(([name]) => name === it.item_name) && Number(it.quantity) > 0) {
-            failedItems.push(String(it.item_name));
-        }
-    }
-
-    // 6. System collections (friends / daily quests / fishing almanac / login streak)
-    if (guest.friends) await withRetry(() => saveFriendsList(newCharId, guest.friends));
-    if (guest.dailyQuests) await withRetry(() => saveDailyQuests(newCharId, guest.dailyQuests));
-    if (guest.almanac) await withRetry(() => saveFishingAlmanac(newCharId, guest.almanac));
-    if (guest.loginStreak) await withRetry(() => saveLoginStreak(newCharId, guest.loginStreak));
-
-    // 7. Switch the active session to the new real account
-    saveActiveSession(newUserId);
-    if (failedItems.length) console.warn('[Migrate] items that failed to transfer:', failedItems);
-    return { userId: newUserId, characterId: newCharId, failedItems };
+    const { data, error } = await supabase.auth.updateUser({ email, password });
+    if (error) throw error;
+    const boundUser = data?.user || currentUser;
+    if (!boundUser?.id) throw new Error('ผูกบัญชีไม่สำเร็จ');
+    saveActiveSession(boundUser.id);
+    return { userId: boundUser.id, characterId: guest.characterId || null, failedItems: [] };
 }
 
 // ============ Friends List DB Sync (System Inventory Fallback) ============

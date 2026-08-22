@@ -1163,13 +1163,15 @@ async function initGame(charData) {
     gameUI.setGuestMode(charData.isGuest === true);
 
     // Setup bind account callback.
-    // Online Guests use a real anonymous server identity. Binding creates a
-    // real account and migrates that server-backed progress to it, then reloads
-    // into the new account. Only explicit offline mode uses local-only Guest data.
+    // Online Guests use a real anonymous server identity. Binding converts that
+    // same server-backed user in place, preserving its character and progress,
+    // then reloads with a fresh account JWT. Only explicit offline mode uses
+    // local-only Guest data.
     gameUI.setupBindAccountCallback(async (email, password) => {
         const { migrateGuestToAccount } = await import('./network/GameSync.js');
         const saveData = character.getSaveData();
         const guest = {
+            characterId: charData.id,
             name: character.stats.name,
             gender: character.gender || charData.gender || 'male',
             stats: { ...saveData.updates },

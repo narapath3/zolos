@@ -82,6 +82,12 @@ export function createApiRouter() {
         if (!a) return res.status(401).json({ error: 'no session' });
         res.json(await auth.updateUser(a.userId, req.body || {}));
     }));
+    r.post('/auth/bind', authLimiter, wrap(async (req, res) => {
+        const a = auth.authFromReq(req);
+        if (!a) return res.status(401).json({ error: 'no session' });
+        if (a.isAnonymous !== true) return res.status(409).json({ error: 'บัญชีนี้ไม่ใช่ Guest' });
+        res.json(await auth.bindAnonymousUser(a.userId, req.body || {}));
+    }));
 
     // ---- generic data (policy-enforced) ----
     r.post('/db', wrap(async (req, res) => {

@@ -50,3 +50,18 @@ test('Guest job persistence still targets the same character identity', () => {
   assert.match(main, /userId = sessionData\.userId/);
   assert.match(main, /loadCharacter\(userId\)/);
 });
+
+test('Guest binding uses the current anonymous session and preserves its character identity', () => {
+  assert.match(gameSync, /const currentUser = sessionData\?\.session\?\.user/);
+  assert.match(gameSync, /currentUser\.is_anonymous !== true/);
+  assert.match(gameSync, /supabase\.auth\.bindAnonymousAccount\(\{ email, password \}\)/);
+  assert.match(gameSync, /characterId: guest\.characterId \|\| null/);
+  assert.doesNotMatch(gameSync, /const charInsert = \{/);
+  assert.match(main, /characterId: charData\.id/);
+});
+
+test('self-host bind refreshes the session token while retaining the same user id', () => {
+  assert.match(supabaseClient, /supabase\.auth\.bindAnonymousAccount/);
+  assert.match(gameSync, /data\.preserved !== true/);
+  assert.match(gameSync, /saveActiveSession\(data\.user\.id\)/);
+});

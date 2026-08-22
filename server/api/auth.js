@@ -214,6 +214,59 @@ export async function getMe(userId) {
     return rows[0] || null;
 }
 
+export async function bindAnonymousUser(userId, { email, password }) {
+    email = String(email || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) throw httpErr(400, 'อีเมลไม่ถูกต้อง');
+    if (!password || String(password).length < 6) throw httpErr(400, 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัว');
+    const hash = await bcrypt.hash(String(password), 10);
+
+    // Convert the authenticated anonymous row in place. This preserves the
+    // user UUID, every character row, inventory and system-progress row. A
+    // separate sign-up + new-character migration would intentionally discard
+    // untrusted client state and was the cause of Guest history disappearing.
+    let user;
+    try {
+        user = await tx(async (client) => {
+            const current = await client.query(
+                'SELECT id, email, encrypted_password, raw_user_meta_data FROM users WHERE id = $1 FOR UPDATE',
+                [userId],
+            );
+            const existing = current.rows[0];
+            if (!existing) throw httpErr(404, 'ไม่พบ Guest session นี้');
+            if (existing.encrypted_password || existing.email) {
+                throw httpErr(409, 'Guest นี้ถูกผูกบัญชีไว้แล้ว กรุณาเข้าสู่ระบบด้วยบัญชีเดิม');
+            }
+
+            const conflict = await client.query(
+                'SELECT id FROM users WHERE lower(email) = $1 AND id <> $2 LIMIT 1',
+                [email, userId],
+            );
+            if (conflict.rowCount > 0) throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+
+            const updated = await client.query(
+                `UPDATE users
+                 SET email = $2,
+                     encrypted_password = $3,
+                     raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || '{"guest":false}'::jsonb
+                 WHERE id = $1
+                 RETURNING id, email, encrypted_password`,
+                [userId, email, hash],
+            );
+            return updated.rows[0];
+        });
+    } catch (error) {
+        if (error?.status === 404 || error?.status === 409) throw error;
+        if (error?.code === '23505') throw httpErr(409, 'อีเมลนี้ถูกใช้แล้ว');
+        throw error;
+    }
+
+    return {
+        token: signToken(user),
+        user: { id: user.id, email: user.email, is_anonymous: false },
+        preserved: true,
+    };
+}
+
 export async function updateUser(userId, { password }) {
     if (password) {
         if (String(password).length < 6) throw httpErr(400, 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัว');

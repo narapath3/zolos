@@ -270,11 +270,14 @@ export async function bindAccount(email, password) {
     throw new Error('Cannot bind account in Offline Mode');
   }
 
-  const { data, error } = await supabase.auth.updateUser({
-    email,
-    password
-  });
+  if (isSelfHostMode && typeof supabase.auth.bindAnonymousAccount === 'function') {
+    const { data, error } = await supabase.auth.bindAnonymousAccount({ email, password });
+    if (error) throw error;
+    if (!data?.preserved) throw new Error('Account binding did not preserve the existing Guest progress');
+    return data;
+  }
 
+  const { data, error } = await supabase.auth.updateUser({ email, password });
   if (error) throw error;
   return data;
 }

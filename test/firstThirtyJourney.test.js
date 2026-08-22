@@ -309,10 +309,9 @@ test('Self-hosted signup atomically creates user and profile with safe conflict 
   assert.match(serverAuth, /อีเมลนี้ถูกใช้แล้ว/);
 });
 
-test('Guest binding resolves profile username conflicts without exposing raw database errors', () => {
-  assert.match(gameSync, /async function resolveBindableUsername\(baseUsername\)/);
-  assert.match(gameSync, /profiles_username_key/);
-  assert.match(gameSync, /(?:let|const) username = await resolveBindableUsername\(baseUsername\)/);
+test('Guest binding preserves the existing profile and exposes safe errors', () => {
+  assert.match(gameSync, /supabase\.auth\.bindAnonymousAccount\(\{ email, password \}\)/);
+  assert.match(serverAuth, /if \(error\?\.code === '23505'\) throw httpErr\(409, 'อีเมลนี้ถูกใช้แล้ว'\)/);
   assert.match(gameUI, /const safeBindError = \(error\)/);
   assert.match(gameUI, /bindInFlight = true/);
   assert.doesNotMatch(gameUI, /ผิดพลาด: \$\{err\.message\}/);
@@ -349,7 +348,7 @@ test('Self-host upsert defaults to the primary key so signup profile writes are 
   assert.match(serverData, /ON CONFLICT \(\$\{cc\}\) DO UPDATE SET/);
   assert.match(serverData, /isStarterFishingRod = input\.item_name === 'Fishing Rod'/);
   assert.match(serverData, /starterStatsSafe = \(isStarterSword \|\| isStarterFishingRod\)/);
-  assert.match(gameSync, /supabase\.from\('profiles'\)\.upsert\(\{ id: newUserId, username, gender \}\)/);
+  assert.match(gameSync, /supabase\.auth\.bindAnonymousAccount\(\{ email, password \}\)/);
 });
 
 test('Guest retry recovers only an authenticated partial account and never merges a completed account', () => {
@@ -362,9 +361,17 @@ test('Guest retry recovers only an authenticated partial account and never merge
   assert.doesNotMatch(serverAuth, /DELETE FROM users/);
   assert.match(serverIndex, /auth\.signUp\(req\.body \|\| \{\}, auth\.authFromReq\(req\)\)/);
   assert.match(zolosClient, /recovered: r\.recovered === true/);
-  assert.match(gameSync, /signUpData\?\.recovered === true/);
-  assert.match(gameSync, /สร้างตัวละครไม่สำเร็จ กรุณาลองใหม่อีกครั้ง/);
   assert.match(gameUI, /อีเมลนี้เป็นของบัญชีอื่นแล้ว/);
+});
+
+test('Guest bind converts the current anonymous user in place and keeps its history', () => {
+  assert.match(serverAuth, /export async function bindAnonymousUser\(userId, \{ email, password \}\)/);
+  assert.match(serverAuth, /FROM users WHERE id = \$1 FOR UPDATE/);
+  assert.match(serverAuth, /UPDATE users[\s\S]*SET email = \$2[\s\S]*encrypted_password = \$3/);
+  assert.match(serverIndex, /r\.post\('\/auth\/bind'/);
+  assert.match(zolosClient, /async bindAnonymousAccount/);
+  assert.match(gameSync, /supabase\.auth\.bindAnonymousAccount\(\{ email, password \}\)/);
+  assert.doesNotMatch(gameSync, /const charInsert = \{/);
 });
 
 test('New players receive a prominent guide CTA that dismisses after opening', () => {

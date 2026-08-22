@@ -191,3 +191,20 @@ test('guest splash resumes the active session instead of creating a new characte
   assert.match(authUI, /กลับเข้า Guest เดิมที่บันทึกไว้/);
   assert.match(authUI, /signInAnonymously\(\{ forceNew \}\)/);
 });
+
+test('Guest email binding preserves the existing identity in a transaction', () => {
+  assert.match(auth, /export async function bindAnonymousUser\(userId, \{ email, password \}\)/);
+  assert.match(auth, /FROM users WHERE id = \$1 FOR UPDATE/);
+  assert.match(auth, /if \(existing\.encrypted_password \|\| existing\.email\)/);
+  assert.match(auth, /SELECT id FROM users WHERE lower\(email\) = \$1 AND id <> \$2 LIMIT 1/);
+  assert.match(auth, /UPDATE users[\s\S]*SET email = \$2[\s\S]*encrypted_password = \$3/);
+  assert.match(auth, /preserved: true/);
+});
+
+test('bind endpoint requires the authenticated anonymous actor', () => {
+  const api = read('../server/api/index.js');
+  assert.match(api, /r\.post\('\/auth\/bind'/);
+  assert.match(api, /const a = auth\.authFromReq\(req\)/);
+  assert.match(api, /a\.isAnonymous !== true/);
+  assert.match(api, /auth\.bindAnonymousUser\(a\.userId/);
+});

@@ -157,6 +157,16 @@ export function createZolosClient(baseUrl) {
         // Page lifecycle handlers need a synchronous token read: awaiting
         // getSession() during pagehide can be suspended by mobile browsers.
         getAccessToken() { return getToken(); },
+        async bindAnonymousAccount({ email, password }) {
+            try {
+                const r = await apiFetch('/auth/bind', { method: 'POST', body: JSON.stringify({ email, password }) });
+                setToken(r.token);
+                if (authChangeCb) authChangeCb('SIGNED_IN', { user: r.user });
+                return { data: { user: r.user, session: { access_token: r.token, user: r.user }, preserved: r.preserved === true }, error: null };
+            } catch (e) {
+                return { data: { user: null, session: null }, error: { message: e.message, status: e.status } };
+            }
+        },
         async updateUser({ password }) {
             try { await apiFetch('/auth/update', { method: 'POST', body: JSON.stringify({ password }) }); return { data: { user: userFromToken(getToken()) }, error: null }; }
             catch (e) { return { data: { user: null }, error: { message: e.message } }; }
