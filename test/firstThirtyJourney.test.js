@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createFirstThirtyState, FIRST_THIRTY_STEPS, firstThirtyProgress, sanitizeFirstThirtyState, updateFirstThirtyState } from '../src/progression/FirstThirtyJourney.js';
 
+const firstThirty = fs.readFileSync(new URL('../src/progression/FirstThirtyJourney.js', import.meta.url), 'utf8');
 const gameData = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
 const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
@@ -126,6 +127,16 @@ test('Journey UI exposes map-aware navigation and viewport-safe spotlight contra
   assert.match(main, /window\.startJourneyNavigation/);
   assert.match(main, /sceneManager\.worldToScreen\(target\)/);
   assert.match(main, /journey-world-marker/);
+});
+
+test('chapter 14 cross-map CTA warps directly and resumes the real smith route', () => {
+  assert.match(firstThirty, /description: 'กดวาร์ปไป Prontera หากอยู่อีกเมือง/);
+  assert.match(gameUI, /const canAutoTravel = step\.id === 'open_weapon_forge' \|\| step\.id === 'open_pet_sanctuary'/);
+  assert.match(gameUI, /const warped = this\._doWarp\(step\.mapId\)/);
+  assert.match(gameUI, /requestAnimationFrame\(\(\) => requestAnimationFrame\(continueRoute\)\)/);
+  assert.match(gameUI, /window\.startJourneyNavigation\(step\.position, step\.radius, step\.id\)/);
+  assert.match(gameUI, /needsCrossMapTravel \? `วาร์ปไป/);
+  assert.match(gameUI, /return false;[\s\S]*?return true;/);
 });
 
 test('Home-screen guide is mounted outside the journal and exposes game-style controls', () => {

@@ -151,7 +151,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     chapter: 14,
     title: 'รู้จักโรงตีเหล็ก',
     titleEn: 'Visit the Weapon Smith',
-    description: 'เดินไปหา Weapon Smith ที่ Prontera แล้วแตะ NPC เพื่อเปิดเมนูโรงตีเหล็กและดูแท็บ ✨ ตีบวก',
+    description: 'กดวาร์ปไป Prontera หากอยู่อีกเมือง ระบบจะนำทางต่อไปหา Weapon Smith แล้วแตะ NPC เพื่อเปิดเมนูโรงตีเหล็กและดูแท็บ ✨ ตีบวก',
     kind: 'world',
     mapId: 'prontera',
     position: { x: 14, y: 0, z: -8 },

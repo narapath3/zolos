@@ -10033,7 +10033,7 @@ export class GameUI {
       },
       open_weapon_forge: {
         image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
-        hint: 'เดินไปหา Weapon Smith ทางตะวันออกเฉียงใต้ของ Prontera แล้วแตะ NPC เพื่อเปิดโรงตีเหล็ก'
+        hint: 'ถ้าอยู่อีกเมือง ให้กด “วาร์ปไป Prontera” ระบบจะพาไปจุด Weapon Smith ต่อ แล้วแตะ NPC เพื่อเปิดโรงตีเหล็ก'
       },
       refine_first_weapon: {
         image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
@@ -10089,9 +10089,10 @@ export class GameUI {
 
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
-    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (sameStarterMap(active.mapId) ? 'เดินทางไปที่นี่' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'เลือกเป้าหมายต่อไป';
+    const needsCrossMapTravel = active.kind === 'world' && !sameStarterMap(active.mapId);
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (needsCrossMapTravel ? `วาร์ปไป ${escape(this._journeyMapLabel(active.mapId))}` : 'เดินทางไปที่นี่') : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'เลือกเป้าหมายต่อไป';
     const routeLabel = active.kind === 'world'
-      ? (sameStarterMap(active.mapId) ? `เป้าหมายอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))}`)
+      ? (needsCrossMapTravel ? `กดปุ่มเพื่อวาร์ปไป ${escape(this._journeyMapLabel(active.mapId))} แล้วนำทางต่อ` : `เป้าหมายอยู่บน ${escape(this._journeyMapLabel(currentMap))}`)
       : active.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
         : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : active.kind === 'fishing' ? 'ยืนรอจนคันเบ็ดสั่น แล้วรับปลาเข้ากระเป๋า' : 'เส้นทางแรกของคุณพร้อมแล้ว';
     const coachSkip = active.id === 'equip_starter_rod'
@@ -10121,9 +10122,10 @@ export class GameUI {
     const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
     const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
     const escape = value => this._journeyEscape(value);
-    const actionLabel = active?.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active?.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active?.kind === 'world' ? (sameStarterMap(active.mapId) ? 'นำทางไปยังจุดหมาย' : `ไปที่ ${escape(this._journeyMapLabel(active.mapId))}`) : active?.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูสรุปเส้นทาง';
+    const needsCrossMapTravel = active?.kind === 'world' && !sameStarterMap(active.mapId);
+    const actionLabel = active?.kind === 'ui' ? 'ชี้ปุ่มที่ต้องกด' : active?.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active?.kind === 'world' ? (needsCrossMapTravel ? `วาร์ปไป ${escape(this._journeyMapLabel(active.mapId))}` : 'นำทางไปยังจุดหมาย') : active?.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูสรุปเส้นทาง';
     const routeLabel = active?.kind === 'world'
-      ? (sameStarterMap(active.mapId) ? `หมุดอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))} ก่อน`)
+      ? (needsCrossMapTravel ? `กดปุ่มเพื่อวาร์ปไป ${escape(this._journeyMapLabel(active.mapId))} แล้วนำทางต่อ` : `หมุดอยู่บน ${escape(this._journeyMapLabel(currentMap))}`)
       : active?.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
         : active?.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้ตามขนาดหน้าจอ' : active?.kind === 'fishing' ? 'ยืนรอจนคันเบ็ดสั่น แล้วรับปลาเข้ากระเป๋า' : 'เส้นทางแรกของคุณพร้อมแล้ว';
     const timeline = FIRST_THIRTY_STEPS.map(step => {
@@ -10184,7 +10186,10 @@ export class GameUI {
     const presentation = this._journeyTutorialPresentation(active);
     const escape = value => this._journeyEscape(value);
     const doneTitle = completedStep ? `บทที่ ${completedStep.chapter} เสร็จแล้ว` : 'พร้อมไปต่อไหม?';
-    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (active.id === 'open_weapon_forge' ? 'ไปโรงตีเหล็ก' : active.id === 'open_pet_sanctuary' ? 'ไป Pet Sanctuary' : 'นำทางไปที่นี่') : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูเป้าหมายต่อไป';
+    const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
+    const sameStarterMap = mapId => mapId === currentMap || (mapId === 'prontera' && currentMap === 'prontera_field');
+    const needsCrossMapTravel = active.kind === 'world' && !sameStarterMap(active.mapId);
+    const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (needsCrossMapTravel ? `วาร์ปไป ${escape(this._journeyMapLabel(active.mapId))}` : active.id === 'open_weapon_forge' ? 'ไปโรงตีเหล็ก' : active.id === 'open_pet_sanctuary' ? 'ไป Pet Sanctuary' : 'นำทางไปที่นี่') : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูเป้าหมายต่อไป';
     prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">${actionLabel} <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
     let lastTouchActionAt = 0;
     const handlePromptAction = event => {
@@ -10471,7 +10476,34 @@ export class GameUI {
         return;
       }
       const currentMap = this.currentMapId || window.sceneManager?.currentMap || 'prontera';
-      if (!(currentMap === step.mapId || (step.mapId === 'prontera' && currentMap === 'prontera_field'))) return this.openWarpMap(step.mapId);
+      const onTargetMap = currentMap === step.mapId || (step.mapId === 'prontera' && currentMap === 'prontera_field');
+      if (!onTargetMap) {
+        // Tutorial world destinations are actionable in one tap. Do not strand
+        // the player inside the generic warp picker: warp to the required map,
+        // wait two frames for the new scene/NPCs to exist, then start the real
+        // waypoint route to the Weapon Smith or Pet Sanctuary.
+        const canAutoTravel = step.id === 'open_weapon_forge' || step.id === 'open_pet_sanctuary';
+        if (!canAutoTravel) return this.openWarpMap(step.mapId);
+        this._closeAllMenuSurfaces();
+        this._journeyGuideCollapsed = true;
+        this._renderJourneyGuide();
+        const warped = this._doWarp(step.mapId);
+        if (!warped) {
+          this.addCombatLog('ยังวาร์ปไปแผนที่บทเรียนไม่ได้ กรุณาลองอีกครั้ง', 'warning');
+          return;
+        }
+        const continueRoute = () => {
+          const mapNow = window.sceneManager?.currentMap;
+          if (mapNow !== step.mapId || typeof window.startJourneyNavigation !== 'function') {
+            this.addCombatLog('แผนที่ยังโหลดไม่เสร็จ กรุณากดนำทางอีกครั้ง', 'warning');
+            return;
+          }
+          window.startJourneyNavigation(step.position, step.radius, step.id);
+        };
+        if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(continueRoute));
+        else setTimeout(continueRoute, 80);
+        return;
+      }
       if (typeof window.startJourneyNavigation === 'function') {
         window.startJourneyNavigation(step.position, step.radius, step.id);
       } else {
@@ -13047,15 +13079,15 @@ export class GameUI {
 
   _doWarp(targetMap) {
     console.log('[GameUI] _doWarp called with', targetMap);
-    if (!window.sceneManager || !window.character) return;
+    if (!window.sceneManager || !window.character) return false;
     if (targetMap === SKYRAIL_MAP_ID && !getSkyrailStatus().isOpen) {
       this.addCombatLog('🚉 Skyrail Bazaar เปิดทุกวันเวลา 18:00–23:59 น. (เวลาไทย)', 'warning');
       this._renderWarpMap();
-      return;
+      return false;
     }
     if (targetMap === window.sceneManager.currentMap) {
       this.addCombatLog('คุณอยู่ที่นี่แล้ว', 'system');
-      return;
+      return true;
     }
     // Close modal
     const modal = document.getElementById('warp-modal');
@@ -13088,6 +13120,7 @@ export class GameUI {
     if (window.stallManager) window.stallManager.refresh();
     if (window.particles && typeof window.particles.spawnWarpEffect === 'function') window.particles.spawnWarpEffect(window.character.getPosition());
     this.addCombatLog('วาร์ปไป ' + targetMap + ' สำเร็จ!', 'levelup');
+    return true;
   }
 }
 
