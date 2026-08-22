@@ -60,6 +60,17 @@ test('fishing onboarding explains the real rod and button flow', () => {
   assert.match(gameSync, /Fishing Rod', 'fishing_rod'/);
 });
 
+test('starter rod lesson cannot be completed or skipped before the real equip action', () => {
+  assert.match(gameUI, /_isStarterFishingRodEquipped\(\)/);
+  assert.match(gameUI, /step\.id === 'equip_starter_rod' && !this\._isStarterFishingRodEquipped\(\)/);
+  assert.match(gameUI, /ต้องเปิด BAG แล้วกดใช้ไอเทม Fishing Rod เพื่อสวมใส่ก่อน/);
+  assert.match(gameUI, /ต้องสวมคันเบ็ดไม้จริงก่อน/);
+  assert.match(gameUI, /#inventory-grid \.inv-slot\[data-item-name="Fishing Rod"\]/);
+  assert.match(gameUI, /slot\.dataset\.itemName = item\.item_name/);
+  assert.match(gameUI, /active\.id === 'equip_starter_rod'\s*\?\s*'<span class="home-journey-locked-step">/);
+  assert.match(gameUI, /step\.id === 'equip_starter_rod' \? 'ยืนยันการสวมใส่'/);
+});
+
 test('Journey UI exposes map-aware navigation and viewport-safe spotlight contracts', () => {
   assert.match(gameUI, /data-testid="first-thirty-journey"/);
   assert.match(gameUI, /window\.startJourneyNavigation\(step\.position, step\.radius, step\.id\)/);

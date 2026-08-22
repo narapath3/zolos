@@ -996,9 +996,13 @@ export class GameUI {
     return Boolean(item && item.item_type === 'fishing_rod' && Number(item.quantity) > 0 && getFishingRodConfig(item.item_name));
   }
 
+  _isStarterFishingRodItem(item) {
+    return Boolean(this._isFishingRodItem(item) && item.item_name === 'Fishing Rod');
+  }
+
   _ensureStarterFishingRod(characterId) {
     if (!characterId) return false;
-    const existingRod = this.inventory.find(item => getFishingRodConfig(item?.item_name));
+    const existingRod = this.inventory.find(item => item?.item_name === 'Fishing Rod');
     if (existingRod && Number(existingRod.quantity) > 0) return false;
 
     // Repair a stale zero-quantity/legacy row in place instead of pushing a
@@ -1012,7 +1016,7 @@ export class GameUI {
         item_name: 'Fishing Rod', item_type: 'fishing_rod', quantity: 1, stats: { equipped: false },
       }));
     }
-    setInventoryItemQuantity(characterId, existingRod?.item_name || 'Fishing Rod', 'fishing_rod', 1, { equipped: false })
+    setInventoryItemQuantity(characterId, 'Fishing Rod', 'fishing_rod', 1, { equipped: false })
       .catch(error => console.warn('[GameUI] Starter fishing rod will retry on next load:', error?.message || error));
     return true;
   }
@@ -1925,6 +1929,7 @@ export class GameUI {
 
       if (i < filtered.length) {
         const item = filtered[i];
+        slot.dataset.itemName = item.item_name;
 
         // Pet instance slot: one per owned pet, shows its custom name.
         if (item.__pet) {
@@ -3321,7 +3326,7 @@ export class GameUI {
         this.character.equipWeapon(item.item_name);
         // Any catalogued fishing rod enables the fishing control.
         this.setFishingButtonVisible(this._isFishingRodItem(item));
-        if (this._isFishingRodItem(item)) this._completeFirstThirtyStep('equip_starter_rod');
+        if (this._isStarterFishingRodItem(item)) this._completeFirstThirtyStep('equip_starter_rod');
       } else if (item.item_type === 'armor') {
         this.character.equippedGear[getEquipSlot(item.item_name) || 'body'] = item.item_name;
       } else if (item.item_type === 'shield') {
@@ -9811,6 +9816,9 @@ export class GameUI {
       ? (sameStarterMap(active.mapId) ? `เป้าหมายอยู่บน ${escape(this._journeyMapLabel(currentMap))}` : `ต้องเดินทางไป ${escape(this._journeyMapLabel(active.mapId))}`)
       : active.kind === 'map' ? `ปลายทาง: ${escape(this._journeyMapLabel(active.targetMap))}`
         : active.kind === 'ui' ? 'ระบบจะชี้ตำแหน่งปุ่มให้พอดีกับหน้าจอ' : active.kind === 'fishing' ? 'ยืนรอจนคันเบ็ดสั่น แล้วรับปลาเข้ากระเป๋า' : 'เส้นทางแรกของคุณพร้อมแล้ว';
+    const coachSkip = active.id === 'equip_starter_rod'
+      ? '<span class="home-journey-locked-step">🔒 ต้องสวมคันเบ็ดก่อน</span>'
+      : '<button type="button" class="home-journey-skip" data-home-journey-action="skip">ไว้ก่อน</button>';
 
     if (this._journeyGuideCollapsed) {
       guide.innerHTML = `<section class="home-journey-card home-journey-card--collapsed home-journey-card--illustrated${isNewPlayer ? ' home-journey-card--new-player' : ''}" style="${artStyle}" data-testid="home-first-thirty-journey" data-tutorial-pose="${presentation.pose}">
@@ -9824,7 +9832,7 @@ export class GameUI {
     guide.innerHTML = `<section class="home-journey-card home-journey-card--tutorial home-journey-card--coach" style="${artStyle}" data-testid="home-first-thirty-journey" data-journey-step="${escape(active.id)}" data-tutorial-pose="${presentation.pose}" data-tutorial-stage="coach">
       <div class="home-journey-tutorial-shade" aria-hidden="true"></div>
       <div class="home-journey-card__top"><span class="home-journey-kicker">FIRST 30 MINUTES · COACH</span><div class="home-journey-top-actions"><span class="home-journey-progress">${progress.completed}/${progress.total}</span><button type="button" class="home-journey-icon-button" data-home-journey-action="collapse" aria-label="ย่อ Tutorial Coach">−</button></div></div>
-      <div class="home-journey-coach-body"><div class="home-journey-coach-speaker"><span class="home-journey-guide-sparkle">✦</span><span>ผู้ช่วยของคุณ</span><small>บทที่ ${active.chapter}</small></div><div class="home-journey-coach-title"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>เป้าหมายตอนนี้</small><h2>${escape(active.title)}</h2></div></div><div class="home-journey-speech home-journey-coach-speech">${escape(presentation.hint)}</div><div class="home-journey-coach-hint"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div><div class="home-journey-coach-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">เริ่มบทนี้ <b>→</b></button><button type="button" class="home-journey-skip" data-home-journey-action="skip">ไว้ก่อน</button></div><p class="home-journey-coach-footnote">กดเริ่ม แล้วฉันจะชี้ปุ่มหรือจุดหมายให้ทันที</p></div>
+      <div class="home-journey-coach-body"><div class="home-journey-coach-speaker"><span class="home-journey-guide-sparkle">✦</span><span>ผู้ช่วยของคุณ</span><small>บทที่ ${active.chapter}</small></div><div class="home-journey-coach-title"><span class="home-journey-chapter-icon" aria-hidden="true">${active.icon}</span><div><small>เป้าหมายตอนนี้</small><h2>${escape(active.title)}</h2></div></div><div class="home-journey-speech home-journey-coach-speech">${escape(presentation.hint)}</div><div class="home-journey-coach-hint"><span aria-hidden="true">⌖</span><span>${routeLabel}</span></div><div class="home-journey-coach-actions"><button type="button" class="home-journey-next" data-home-journey-action="next">เริ่มบทนี้ <b>→</b></button>${coachSkip}</div><p class="home-journey-coach-footnote">กดเริ่ม แล้วฉันจะชี้ปุ่มหรือจุดหมายให้ทันที</p></div>
     </section>`;
   }
 
@@ -9860,7 +9868,7 @@ export class GameUI {
       <div class="journey-hero"><div><small>FIRST 30 MINUTES · ADVENTURER'S NOTEBOOK</small><h2 id="journey-title">เส้นทางเริ่มต้นของคุณ</h2><p>ทำทีละขั้น ระบบจะชี้ปุ่มหรือหมุดบนแผนที่ให้พอดีกับหน้าจอของคุณ</p></div><div class="journey-progress-ring" style="--journey-progress:${progress.percent}%"><b>${progress.percent}%</b><span>${progress.completed}/${progress.total}</span></div></div>
       <article class="journey-active-card" data-journey-step="${active.id}">
         <div class="journey-active-icon" aria-hidden="true">${active.icon}</div><div class="journey-active-copy"><small>บทที่ ${active.chapter} · กำลังทำอยู่</small><h3>${escape(active.title)}</h3><p>${escape(active.description)}</p><span class="journey-route-hint">${active.kind === 'world' ? '⌖' : active.kind === 'map' ? '✦' : '◉'} ${routeLabel}</span></div>
-        <div class="journey-active-actions"><button type="button" class="journey-primary" data-journey-action="navigate">${actionLabel} <span>→</span></button><button type="button" class="journey-secondary" data-journey-action="skip" data-journey-step="${active.id}">ข้ามชั่วคราว</button></div>
+        <div class="journey-active-actions"><button type="button" class="journey-primary" data-journey-action="navigate">${actionLabel} <span>→</span></button>${active.id === 'equip_starter_rod' ? '<span class="journey-locked-note">🔒 ต้องสวมคันเบ็ดไม้ก่อน</span>' : `<button type="button" class="journey-secondary" data-journey-action="skip" data-journey-step="${active.id}">ข้ามชั่วคราว</button>`}</div>
       </article>
       <div class="journey-timeline-head"><span>YOUR JOURNEY</span><small>Map ปัจจุบัน: ${escape(this._journeyMapLabel(currentMap))}</small></div>
       <ol class="journey-timeline" aria-label="ลำดับ First 30 Minutes">${timeline}</ol>
@@ -9925,9 +9933,24 @@ export class GameUI {
     this._navigateFirstThirtyStep();
   }
 
+  _isStarterFishingRodEquipped() {
+    const rod = this.inventory?.find(item => item?.item_name === 'Fishing Rod');
+    return Boolean(
+      rod
+      && this._isStarterFishingRodItem(rod)
+      && rod.stats?.equipped === true
+      && this.character?.equippedWeapon === 'Fishing Rod'
+    );
+  }
+
   _completeFirstThirtyStep(stepId, { silent = false, prompt = true } = {}) {
     const step = getFirstThirtyStep(stepId);
     if (!step || this.firstThirtyJourney.completed.includes(step.id)) return false;
+    if (step.id === 'equip_starter_rod' && !this._isStarterFishingRodEquipped()) {
+      this.addCombatLog('🎣 ต้องเปิด BAG แล้วกดใช้ไอเทม Fishing Rod เพื่อสวมใส่ก่อน จึงจะผ่านบทนี้ได้', 'warning');
+      this._renderJourneyGuide();
+      return false;
+    }
     document.getElementById('journey-spotlight')?._journeyClose?.();
     this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'complete', stepId: step.id }, new Date().toISOString());
     this.adventureJournal.journey = this.firstThirtyJourney;
@@ -9942,6 +9965,11 @@ export class GameUI {
   _skipFirstThirtyStep(stepId) {
     const step = getFirstThirtyStep(stepId || this.firstThirtyJourney.activeStep);
     if (!step) return;
+    if (step.id === 'equip_starter_rod') {
+      this.addCombatLog('🔒 บทนี้ต้องสวมคันเบ็ดไม้จริงก่อน จึงจะไปบทถัดไปได้', 'warning');
+      this._renderJourneyGuide();
+      return;
+    }
     this.firstThirtyJourney = updateFirstThirtyState(this.firstThirtyJourney, { type: 'skip', stepId: step.id }, new Date().toISOString());
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._saveAdventureJournalSoon();
@@ -10041,7 +10069,9 @@ export class GameUI {
         }
       }
 
-      const target = document.querySelector(step.target);
+      const target = step.id === 'equip_starter_rod'
+        ? (document.querySelector('#inventory-grid .inv-slot[data-item-name="Fishing Rod"]') || document.querySelector(step.target))
+        : document.querySelector(step.target);
       if (target) {
         const menuWasOpened = this._prepareJourneyTarget(target);
         return menuWasOpened ? requestAnimationFrame(() => this._showJourneySpotlight(target, step)) : this._showJourneySpotlight(target, step);
@@ -10084,7 +10114,8 @@ export class GameUI {
     overlay._journeyClose?.();
     this._setJourneySpotlightState(true);
     const escape = value => this._journeyEscape(value);
-    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"><span class="journey-spotlight-ring-label">แตะตรงนี้</span></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">ทำแล้ว <span>✓</span></button></div>`;
+    const completionLabel = step.id === 'equip_starter_rod' ? 'ยืนยันการสวมใส่' : 'ทำแล้ว';
+    overlay.innerHTML = `<div class="journey-spotlight-ring" aria-hidden="true"><span class="journey-spotlight-ring-label">แตะตรงนี้</span></div><div class="journey-spotlight-card"><button type="button" class="journey-spotlight-close" aria-label="ปิดคำแนะนำ">×</button><span class="journey-spotlight-kicker">บทที่ ${step.chapter} · ${escape(step.titleEn)}</span><h3>${step.icon} ${escape(step.title)}</h3><p>${escape(step.description)}</p><button type="button" class="journey-primary journey-spotlight-done">${completionLabel} <span>✓</span></button></div>`;
     overlay.style.display = 'block';
     const ring = overlay.querySelector('.journey-spotlight-ring');
     const card = overlay.querySelector('.journey-spotlight-card');
@@ -10126,7 +10157,10 @@ export class GameUI {
     };
     overlay._journeyClose = close;
     overlay.querySelector('.journey-spotlight-close').onclick = close;
-    overlay.querySelector('.journey-spotlight-done').onclick = () => { this._completeFirstThirtyStep(step.id); close(); };
+    overlay.querySelector('.journey-spotlight-done').onclick = () => {
+      const completed = this._completeFirstThirtyStep(step.id);
+      if (completed) close();
+    };
     window.addEventListener('resize', position, { passive: true });
     window.addEventListener('scroll', position, { passive: true, capture: true });
   }

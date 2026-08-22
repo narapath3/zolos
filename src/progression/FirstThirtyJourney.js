@@ -52,7 +52,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     chapter: 5,
     title: 'สวมคันเบ็ดไม้เริ่มต้น',
     titleEn: 'Equip your starter fishing rod',
-    description: 'เปิด BAG เลือก Fishing Rod แล้วกด “ใช้ไอเทม” เพื่อสวมคันเบ็ด คันเบ็ดจะอยู่ในช่องอาวุธ',
+    description: 'เปิด BAG → แท็บ Equip → แตะ Fishing Rod แล้วกด “ใช้ไอเทม/สวมใส่” ให้คันเบ็ดขึ้นสถานะสวมใส่ก่อน จึงจะผ่านบทนี้ได้',
     kind: 'ui',
     target: '#inventory-grid',
     icon: '🎣',
