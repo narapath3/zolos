@@ -66,7 +66,7 @@ import {
 // login screen does. Same deal as the engine modules: bindings now, module on
 // the way into the world. Call sites (including the per-frame broadcasts) stay
 // synchronous.
-let loadCharacter, saveCharacter, loadCharacterCards, saveInventoryItem;
+let loadCharacter, saveCharacter, loadCharacterCards, saveInventoryItem, requestStarterCard;
 let joinPresence, leavePresence, startAutoSave, stopAutoSave, sendSaveState;
 let broadcastPosition, broadcastMonsterHit, reportMonsterHit, broadcastAttackHit;
 let broadcastChat, broadcastSkillCast, updatePresence;
@@ -108,7 +108,7 @@ function loadGameModules() {
         GlobalAnnouncements = announce.GlobalAnnouncements;
 
         ({
-            loadCharacter, saveCharacter, loadCharacterCards, saveInventoryItem,
+            loadCharacter, saveCharacter, loadCharacterCards, saveInventoryItem, requestStarterCard,
             joinPresence, leavePresence, startAutoSave, stopAutoSave, sendSaveState,
             broadcastPosition, broadcastMonsterHit, reportMonsterHit, broadcastAttackHit,
             broadcastChat, broadcastSkillCast, updatePresence,
@@ -1574,6 +1574,20 @@ async function initGame(charData) {
     // Load Inventory, Daily Quests, and Friends List from DB
     loadingOverlay.setProgress(65, '🎒 Loading Inventory, Quests & Friends...');
     await gameUI.loadInventoryFromDB(charData.id);
+    if (requestStarterCard && !/^(guest_|local_)/i.test(String(charData.id || ''))) {
+        try {
+            const starterCard = await requestStarterCard(charData.id);
+            if (starterCard?.serverAuthoritative) {
+                applyTrustedCardReward({
+                    ...starterCard,
+                    source: { kind: 'starter', id: 'new_player', label: 'ของขวัญเริ่มต้น' },
+                }, { character, gameUI });
+            }
+        } catch (error) {
+            // Retry on the next login; never fabricate an online card locally.
+            console.warn('[Zolos] Starter card claim will retry on next login:', error?.message || error);
+        }
+    }
     await loadAndMergeAuthoritativeCards(
         () => loadCharacterCards(charData.id),
         { character, gameUI },

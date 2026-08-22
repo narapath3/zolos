@@ -23,6 +23,7 @@ const pendingOreConversions = new Map();
 const pendingPetPurchases = new Map();
 const pendingNpcSales = new Map();
 const pendingFishingClaims = new Map();
+const pendingStarterCardClaims = new Map();
 let clientMeasuredPing = null;
 const inventoryMutationQueues = new Map();
 
@@ -57,6 +58,17 @@ function isCommittedFishingReward(result) {
         && typeof result.rarity === 'string');
 }
 
+function isCommittedStarterCard(result) {
+    return Boolean(result
+        && result.ok === true
+        && result.serverAuthoritative === true
+        && typeof result.requestId === 'string'
+        && result.cardId === 'willow'
+        && Number.isInteger(result.owned) && result.owned >= 1
+        && Number.isInteger(result.stars) && result.stars >= 1 && result.stars <= 5
+        && Number.isInteger(result.pity) && result.pity >= 0);
+}
+
 function enqueueInventoryMutation(characterId, itemName, mutation) {
     const key = `${characterId}\u0000${itemName}`;
     const previous = inventoryMutationQueues.get(key) || Promise.resolve();
@@ -81,6 +93,7 @@ function rejectPendingSocketRequests() {
     rejectPendingMap(pendingPetPurchases, message);
     rejectPendingMap(pendingNpcSales, message);
     rejectPendingMap(pendingFishingClaims, message);
+    rejectPendingMap(pendingStarterCardClaims, message);
     rejectPendingMap(pendingCardFusions, message);
     rejectPendingMap(pendingCardRefines, message);
 }
@@ -208,6 +221,48 @@ export function requestFishingReward(requestId) {
         }, 12000);
         pendingFishingClaims.set(requestId, { resolve, reject, timeout });
         socket.emit('fish_claim', { requestId });
+    });
+}
+
+function attachStarterCardListeners(socket) {
+    if (socket._zolosStarterCardListeners) return;
+    socket._zolosStarterCardListeners = true;
+    socket.on('starter_card_result', result => {
+        const pending = pendingStarterCardClaims.get(result?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingStarterCardClaims.delete(result.requestId);
+        if (!isCommittedStarterCard(result)) {
+            pending.reject(new Error('ผลการรับการ์ดเริ่มต้นไม่ถูกต้อง'));
+            return;
+        }
+        pending.resolve(result);
+    });
+    socket.on('starter_card_error', error => {
+        const pending = pendingStarterCardClaims.get(error?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingStarterCardClaims.delete(error.requestId);
+        pending.reject(new Error(error?.message || 'รับการ์ดเริ่มต้นไม่สำเร็จ'));
+    });
+}
+
+export function requestStarterCard(characterId) {
+    const cleanCharacterId = String(characterId || '');
+    if (!cleanCharacterId || /^(guest_|local_)/i.test(cleanCharacterId)) return Promise.resolve(null);
+    if (!isSocketMode()) throw new Error('การรับการ์ดเริ่มต้นต้องใช้โหมดออนไลน์');
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณาลองใหม่');
+    const requestId = `starter-card:${cleanCharacterId}:willow`;
+    if (pendingStarterCardClaims.has(requestId)) throw new Error('กำลังรับการ์ดเริ่มต้นอยู่');
+    attachStarterCardListeners(socket);
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingStarterCardClaims.delete(requestId);
+            reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า การ์ดเริ่มต้นจะลองใหม่ครั้งถัดไป'));
+        }, 12000);
+        pendingStarterCardClaims.set(requestId, { resolve, reject, timeout });
+        socket.emit('starter_card_claim', { requestId });
     });
 }
 
@@ -692,6 +747,9 @@ export async function createCharacter(userId) {
         // SET keeps retries/reloads idempotent instead of inflating starter stacks.
         await setInventoryItemQuantity(charData.id, 'Sword', 'weapon', 1, { equipped: true });
         await setInventoryItemQuantity(charData.id, 'Fishing Rod', 'fishing_rod', 1, { equipped: false });
+        await setInventoryItemQuantity(charData.id, 'Willow Card', 'card', 1, {
+            card_id: 'willow', card_stars: 1, card_pity: 0,
+        });
         return charData;
     }
 

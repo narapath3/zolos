@@ -167,3 +167,19 @@ test('online login reloads authoritative card rows after legacy inventory migrat
   assert.match(main, /\(\)\s*=>\s*loadCharacterCards\(charData\.id\)/);
   assert.match(sync, /if \(error\)\s*throw error/);
 });
+
+test('new players receive a canonical starter card before authoritative merge', async () => {
+  const sync = await readFile(new URL('../../src/network/GameSync.js', import.meta.url), 'utf8');
+  const main = await readFile(new URL('../../src/main.js', import.meta.url), 'utf8');
+  const ui = await readFile(new URL('../../src/ui/GameUI.js', import.meta.url), 'utf8');
+  assert.match(sync, /export function requestStarterCard\(characterId\)/);
+  assert.match(sync, /socket\.emit\('starter_card_claim', \{ requestId \}\)/);
+  assert.match(main, /await requestStarterCard\(charData\.id\)/);
+  assert.ok(
+    main.indexOf('await requestStarterCard(charData.id)')
+      < main.indexOf('await loadAndMergeAuthoritativeCards('),
+  );
+  assert.match(ui, /_ensureStarterCard\(characterId\)/);
+  assert.match(ui, /item_name: card\.itemName/);
+  assert.match(ui, /card_id: card\.id, card_stars: 1, card_pity: 0/);
+});

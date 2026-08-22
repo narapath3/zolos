@@ -887,6 +887,93 @@ io.on('connection', (socket) => {
         }
     });
 
+    // New players receive one common Willow Card. The browser supplies only a
+    // correlation id; the card id, character id, ownership and award state are
+    // all resolved from the trusted socket/player record and card catalog.
+    socket.on('starter_card_claim', async (payload) => {
+        const player = trustedSender(socket);
+        const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+        const reject = (message) => socket.emit('starter_card_error', { requestId, message });
+        if (!player?.verified || !player.characterId || !supabase) {
+            reject('ไม่สามารถยืนยันตัวละครเพื่อรับการ์ดเริ่มต้นได้');
+            return;
+        }
+        if (!/^[a-zA-Z0-9:_-]{1,160}$/.test(requestId)) {
+            reject('รหัสคำขอรับการ์ดไม่ถูกต้อง');
+            return;
+        }
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'starter_card_claim', 2, 10000)) {
+            reject('กดรับการ์ดเร็วเกินไป กรุณารอสักครู่');
+            return;
+        }
+
+        const card = getCard('willow');
+        if (!card || card.id !== 'willow') {
+            reject('ไม่พบการ์ดเริ่มต้นในระบบ');
+            return;
+        }
+
+        try {
+            const { data: existing, error: existingError } = await supabase
+                .from('character_cards')
+                .select('owned, stars, pity')
+                .eq('character_id', player.characterId)
+                .eq('card_id', card.id)
+                .maybeSingle();
+            if (existingError) throw existingError;
+
+            const existingOwned = Number(existing?.owned) || 0;
+            if (existingOwned >= 1) {
+                socket.emit('starter_card_result', {
+                    ok: true,
+                    serverAuthoritative: true,
+                    requestId,
+                    cardId: card.id,
+                    owned: existingOwned,
+                    stars: Math.max(1, Math.min(5, Number(existing?.stars) || 1)),
+                    pity: Math.max(0, Number(existing?.pity) || 0),
+                    isNew: false,
+                });
+                return;
+            }
+
+            const expectedPity = Math.max(0, Number(existing?.pity) || 0);
+            const { data: awarded, error: awardError } = await supabase.rpc('award_card_drop', {
+                p_character_id: player.characterId,
+                p_card_id: card.id,
+                p_expected_pity: expectedPity,
+                p_new_pity: 0,
+                p_won: true,
+                p_idempotency_key: `starter-card:${player.characterId}:willow`,
+            });
+            if (awardError) throw awardError;
+            const result = Array.isArray(awarded) ? awarded[0] : awarded;
+            const owned = Number(result?.owned);
+            const stars = Number(result?.stars);
+            const pity = Number(result?.pity);
+            if (!result || result.card_id !== card.id
+                || !Number.isInteger(owned) || owned < 1
+                || !Number.isInteger(stars) || stars < 1 || stars > 5
+                || !Number.isInteger(pity) || pity < 0) {
+                throw new Error('invalid starter card award result');
+            }
+            socket.emit('starter_card_result', {
+                ok: true,
+                serverAuthoritative: true,
+                requestId,
+                cardId: result.card_id,
+                owned,
+                stars,
+                pity,
+                isNew: result.is_new === true,
+            });
+        } catch (error) {
+            console.error('[Server] starter card claim failed:', error?.message || error);
+            reject('รับการ์ดเริ่มต้นไม่สำเร็จ กรุณาลองใหม่');
+        }
+    });
+
     // Fusion is a server-authoritative transaction. The browser supplies only
     // a canonical card id and an idempotency key; owner, character, stars and
     // duplicate cost are all resolved from server-trusted state.

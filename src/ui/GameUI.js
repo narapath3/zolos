@@ -1028,6 +1028,35 @@ export class GameUI {
     return true;
   }
 
+  _ensureStarterCard(characterId) {
+    // Local/offline guests have no server-owned character_cards row. Seed the
+    // same tutorial card locally, while real online characters use the
+    // server-authoritative starter_card_claim flow in main.js.
+    if (!characterId || !/^(guest_|local_)/i.test(String(characterId))) return false;
+    const existingCard = this.inventory.find(item => (
+      item?.item_type === 'card'
+      && Number(item.quantity) > 0
+      && getCard(item.item_name)
+    ));
+    if (existingCard) return false;
+
+    const card = getCard('willow');
+    if (!card) return false;
+    const state = { owned: 1, stars: 1, pity: 0 };
+    this.inventory.push(this._enrichItem({
+      item_name: card.itemName,
+      item_type: 'card',
+      quantity: 1,
+      stats: { card_id: card.id, card_stars: 1, card_pity: 0 },
+    }));
+    this.character.cardState ??= {};
+    this.character.cardState[card.id] = state;
+    setInventoryItemQuantity(characterId, card.itemName, 'card', 1, {
+      card_id: card.id, card_stars: 1, card_pity: 0,
+    }).catch(error => console.warn('[GameUI] Starter card will retry on next load:', error?.message || error));
+    return true;
+  }
+
   _getItemDroppers(itemName) {
     const droppers = [];
     const allMons = getAllMonsters();
@@ -1075,10 +1104,13 @@ export class GameUI {
         }
       }
       this.inventory = migration.inventory.filter(i => i.item_type !== 'system').map(i => this._enrichItem(i));
+      if (this.character) this.character.cardState = migration.cardState;
+      // Existing local guests created before the card tutorial still receive
+      // one common tutorial card; online characters request it authoritatively.
+      this._ensureStarterCard(characterId);
       // Existing characters created before the fishing progression still receive
       // the universal wooden rod once. It is deliberately not auto-equipped.
       this._ensureStarterFishingRod(characterId);
-      if (this.character) this.character.cardState = migration.cardState;
 
       // --- Self-heal for the quantity-inflation bug ---
       // A prior bug re-added the whole stack on every save/equip, ballooning
@@ -9793,11 +9825,11 @@ export class GameUI {
       },
       open_card_album: {
         image: '/assets/tutorial/guide-codex.jpg', pose: 'codex',
-        hint: 'เปิด My Card เพื่อดูคอลเลกชัน เลือกการ์ดเพื่ออ่านความสามารถ และดูว่าการ์ดใส่กับช่องใดได้'
+        hint: 'เปิด My Card เพื่อรับชมคอลเลกชัน ระบบจะมอบ Willow Card ใบเริ่มต้นให้ผู้เล่นใหม่ แล้วดูว่าการ์ดใส่กับช่องใดได้'
       },
       socket_first_card: {
         image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
-        hint: 'เมื่อมีการ์ดแล้ว ให้เลือกอุปกรณ์ที่มีช่อง Card แล้วกด Socket card การ์ดต้องอยู่ในช่องจริงจึงจะผ่าน'
+        hint: 'ผู้เล่นใหม่จะได้รับ Willow Card ระดับ Common แล้ว ให้เปิดการ์ด เลือก Sword ที่มีช่อง Card และกด Socket card การ์ดต้องอยู่ในช่องจริงจึงจะผ่าน'
       },
       open_weapon_forge: {
         image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',

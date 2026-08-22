@@ -371,3 +371,18 @@ test('world boss hits require a finite trusted position within encounter range',
   assert.match(hit, /bossDx \* bossDx \+ bossDz \* bossDz > BOSS_MAX_HIT_RANGE \* BOSS_MAX_HIT_RANGE/);
   assert.ok(hit.indexOf('BOSS_MAX_HIT_RANGE * BOSS_MAX_HIT_RANGE') < hit.indexOf('socket._bossWin'));
 });
+
+
+test('starter card claim is trusted, fixed to Willow, and idempotent through the award RPC', async () => {
+  const source = await readFile(new URL('../../server/server.js', import.meta.url), 'utf8');
+  const start = source.indexOf("socket.on('starter_card_claim'");
+  const end = source.indexOf("socket.on('card_fuse'", start);
+  assert.ok(start >= 0 && end > start);
+  const handler = source.slice(start, end);
+  assert.match(handler, /const player = trustedSender\(socket\)/);
+  assert.match(handler, /const card = getCard\('willow'\)/);
+  assert.match(handler, /supabase\.rpc\('award_card_drop'/);
+  assert.match(handler, /starter-card:\$\{player\.characterId\}:willow/);
+  assert.doesNotMatch(handler, /payload\.cardId/);
+  assert.doesNotMatch(handler, /payload\.characterId/);
+});
