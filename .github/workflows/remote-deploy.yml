@@ -29,6 +29,7 @@ on:
       - '*.sql'
       
       - 'supabase_*.sql'
+      - '.github/workflows/remote-deploy.yml'
       
   workflow_dispatch:
   
