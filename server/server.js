@@ -22,6 +22,7 @@ import { ensureOreEconomy } from './api/oreEconomy.js';
 import { ensurePetEconomy, PET_CATALOG } from './api/petEconomy.js';
 import { ensureNpcSaleEconomy, sellItemToNpc } from './api/npcSale.js';
 import { ensureFishingEconomy, claimFishingReward, isFishingRequestId } from './api/fishing.js';
+import { ensureFirstRefineEconomy, claimFirstRefineSupply, REQUEST_ID_RE as FIRST_REFINE_REQUEST_ID_RE } from './api/firstRefine.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -890,6 +891,48 @@ io.on('connection', (socket) => {
     // New players receive one common Willow Card. The browser supplies only a
     // correlation id; the card id, character id, ownership and award state are
     // all resolved from the trusted socket/player record and card catalog.
+    socket.on('first_refine_supply_claim', async (payload) => {
+        const player = trustedSender(socket);
+        const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+        const stableRequestId = player?.characterId ? `first-refine:${player.characterId}:v1` : requestId;
+        const reject = message => socket.emit('first_refine_supply_error', { requestId, message });
+        if (!player || player.verified !== true || !player.characterId || !supabase) {
+            reject('ไม่สามารถยืนยันตัวละครเพื่อรับชุดตีบวกเริ่มต้นได้');
+            return;
+        }
+        if (!FIRST_REFINE_REQUEST_ID_RE.test(requestId) || requestId !== stableRequestId) {
+            reject('รหัสคำขอชุดตีบวกไม่ถูกต้อง');
+            return;
+        }
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'first_refine_supply_claim', 2, 10000)) {
+            reject('กดรับชุดตีบวกเร็วเกินไป กรุณารอสักครู่');
+            return;
+        }
+        try {
+            const result = USE_LOCAL_DB
+                ? await claimFirstRefineSupply({ characterId: player.characterId, userId: player.userId, requestId: stableRequestId })
+                : await (async () => {
+                    const { data, error } = await supabase.rpc('claim_first_refine_supply', {
+                        p_character_id: player.characterId,
+                        p_user_id: player.userId,
+                        p_idempotency_key: stableRequestId,
+                    });
+                    if (error || !data) throw error || new Error('empty first refine supply result');
+                    return data;
+                })();
+            if (!result || result.ok !== true || result.serverAuthoritative !== true
+                || result.receiptId !== 'first-refine-kit:v1'
+                || result.item_name !== 'Oridecon' || !Number.isSafeInteger(Number(result.gold))) {
+                throw new Error('invalid first refine supply result');
+            }
+            socket.emit('first_refine_supply_result', { ...result, requestId });
+        } catch (error) {
+            console.error('[Server] first refine supply claim failed:', error?.message || error);
+            reject('รับชุดตีบวกเริ่มต้นไม่สำเร็จ กรุณาลองใหม่');
+        }
+    });
+
     socket.on('starter_card_claim', async (payload) => {
         const player = trustedSender(socket);
         const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
@@ -1983,6 +2026,7 @@ httpServer.listen(PORT, HOST, () => {
                 await ensurePetEconomy();
                 await ensureNpcSaleEconomy();
                 await ensureFishingEconomy();
+                await ensureFirstRefineEconomy();
                 await ensureBugReportTables();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }

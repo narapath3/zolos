@@ -1398,6 +1398,16 @@ export function getJobMods(jobId) {
 // per inventory item in item.stats.refine, so no schema change is needed.
 export const REFINABLE_TYPES = ['weapon', 'armor', 'shield'];
 
+// One-time onboarding supply for the mandatory first weapon refine. The kit
+// exactly covers the +0 → +1 Sword cost and is never used for later refines.
+export const FIRST_REFINE_KIT = Object.freeze({
+    version: 1,
+    gold: 620,
+    oreName: 'Oridecon',
+    oreQuantity: 1,
+    receiptId: 'first-refine-kit:v1',
+});
+
 // Each refine level adds 12% of the item's base bonus (atk/def/hp/sp).
 export function getRefineMult(level) {
     return 1 + Math.max(0, level | 0) * 0.12;

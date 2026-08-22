@@ -164,7 +164,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     chapter: 15,
     title: 'ตีบวกอาวุธครั้งแรก',
     titleEn: 'Refine your first weapon',
-    description: 'ในโรงตีเหล็กเลือกแท็บ ✨ ตีบวก เลือกอาวุธ ตรวจ Zeny และแร่ที่ต้องใช้ แล้วกดตีบวก การตีบวกจะผ่านเมื่อระบบดำเนินการจริงเท่านั้น',
+    description: 'ในโรงตีเหล็กเลือกแท็บ ✨ ตีบวก ช่างจะมอบ Apprentice Forge Kit ครั้งเดียวหากทรัพยากรยังไม่พอ จากนั้นเลือก Sword ตรวจ Zeny และ Oridecon แล้วกดตีบวก การตีบวกจะผ่านเมื่อระบบดำเนินการจริงเท่านั้น',
     kind: 'ui',
     target: '#refine-go',
     icon: '✨',

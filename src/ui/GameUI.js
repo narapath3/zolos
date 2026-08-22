@@ -1,7 +1,7 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig, FIRST_REFINE_KIT } from '../engine/GameData.js';
 import { supabase, isSelfHostMode } from '../network/SupabaseClient.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, requestFirstRefineSupply, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { FIRST_THIRTY_STEPS, createFirstThirtyState, firstThirtyProgress, getFirstThirtyStep, sanitizeFirstThirtyState, updateFirstThirtyState } from '../progression/FirstThirtyJourney.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
@@ -79,6 +79,7 @@ export class GameUI {
     this._journeyCombatCompletionTimer = null;
     this._journeyNextPromptEl = null;
     this._journeyPromptActionLock = false;
+    this._firstRefineSupplyPromise = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -7516,6 +7517,54 @@ export class GameUI {
     modal.style.display = 'flex';
     this.updateMobileControlsVisibility();
     this._completeFirstThirtyStep('open_weapon_forge', { prompt: false });
+    if (this.firstThirtyJourney.activeStep === 'refine_first_weapon') this._ensureFirstRefineSupply();
+  }
+
+  async _ensureFirstRefineSupply() {
+    if (this.firstThirtyJourney.activeStep !== 'refine_first_weapon' || !this.characterId || !this.character) return;
+    const selected = (this.inventory || []).find(item => item.item_name === 'Sword' && item.item_type === 'weapon')
+      || (this.inventory || []).find(item => item.item_type === 'weapon');
+    if (!selected || Number(selected.stats?.refine || 0) > 0) return;
+    const gold = Math.max(0, Number(this.character.stats?.gold) || 0);
+    const oreHave = this._invCount(FIRST_REFINE_KIT.oreName);
+    if (gold >= FIRST_REFINE_KIT.gold && oreHave >= FIRST_REFINE_KIT.oreQuantity) return;
+    if (this._firstRefineSupplyPromise) return this._firstRefineSupplyPromise;
+
+    this._firstRefineSupplyPromise = requestFirstRefineSupply(this.characterId)
+      .then(result => {
+        if (!result || result.ok !== true) throw new Error('ผลชุดตีบวกเริ่มต้นไม่ถูกต้อง');
+        this.character.stats.gold = result.gold;
+        let ore = (this.inventory || []).find(item => item.item_name === FIRST_REFINE_KIT.oreName);
+        if (result.inventory_quantity > 0) {
+          if (!ore) {
+            const meta = ITEMS[FIRST_REFINE_KIT.oreName] || {};
+            ore = {
+              item_name: FIRST_REFINE_KIT.oreName,
+              item_type: 'material',
+              quantity: result.inventory_quantity,
+              stats: {},
+              emoji: meta.emoji,
+              price: meta.price || 0,
+            };
+            this.inventory.push(ore);
+          } else {
+            ore.quantity = result.inventory_quantity;
+          }
+        }
+        this.updateHUD(this.character.stats);
+        this._renderForge();
+        if (result.granted) {
+          this.addCombatLog(`🧰 ช่างมอบ Apprentice Forge Kit ให้แล้ว: +${FIRST_REFINE_KIT.gold.toLocaleString()} Zeny และ ${FIRST_REFINE_KIT.oreName} ×${FIRST_REFINE_KIT.oreQuantity} — ใช้ได้เฉพาะตีบวกครั้งแรก`, 'levelup');
+        }
+        return result;
+      })
+      .catch(error => {
+        this.addCombatLog(error?.message || 'รับชุดตีบวกเริ่มต้นไม่สำเร็จ กรุณาลองเปิดโรงตีเหล็กอีกครั้ง', 'warning');
+        this._renderForge();
+        return null;
+      })
+      .finally(() => { this._firstRefineSupplyPromise = null; });
+    return this._firstRefineSupplyPromise;
   }
 
   _renderForge() {
@@ -7637,8 +7686,14 @@ export class GameUI {
     const chanceCol = info.chance >= 0.8 ? '#7fe0a0' : info.chance >= 0.5 ? '#ffcf6a' : '#ff8f7a';
     const goldOk = gold >= info.gold, oreOk = oreHave >= info.ore;
     const canDo = goldOk && oreOk;
+    const firstRefineActive = this.firstThirtyJourney?.activeStep === 'refine_first_weapon'
+      && sel.item_type === 'weapon' && L === 0;
+    const firstRefineHint = firstRefineActive ? `<div style="background:linear-gradient(135deg,rgba(255,207,106,.16),rgba(255,125,42,.1));border:1px solid rgba(255,207,106,.5);border-radius:12px;padding:9px 10px;margin-bottom:10px;color:#ffe4a6;font-size:11px;line-height:1.45;">
+      🧰 <strong>Apprentice Forge Kit</strong><br>${this._firstRefineSupplyPromise ? 'ช่างกำลังส่งชุดฝึกหัดให้คุณ…' : (canDo ? 'ชุดฝึกหัดพร้อมแล้ว กดตีบวกได้เลย' : 'ช่างจะมอบ Zeny และ Oridecon ให้ครั้งเดียว เพื่อให้ผ่านบทเรียนนี้ได้จริง')}
+    </div>` : '';
 
     return `
+      ${firstRefineHint}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin-bottom:12px;max-height:120px;overflow-y:auto;">${cells}</div>
       <div id="refine-stage" style="text-align:center;margin:4px 0 10px;">
         <div style="line-height:1;filter:drop-shadow(0 0 10px ${col});">${itemIconMarkup(sel, sel.emoji || '🗡️', 'item-visual--forge-stage')}</div>
@@ -9838,7 +9893,7 @@ export class GameUI {
       },
       refine_first_weapon: {
         image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
-        hint: 'เลือกแท็บ ✨ ตีบวก เลือกอาวุธ ตรวจ Zeny กับแร่ แล้วกดตีบวก ระบบจะบันทึกระดับอาวุธให้คุณ'
+        hint: 'เลือกแท็บ ✨ ตีบวก ช่างจะมอบ Apprentice Forge Kit ครั้งเดียวหาก Zeny หรือ Oridecon ไม่พอ จากนั้นกดตี Sword +0 → +1 จริง ระบบจึงจะบันทึกระดับอาวุธให้คุณ'
       },
       open_pet_sanctuary: {
         image: '/assets/tutorial/guide-celebrate.jpg', pose: 'celebrate',

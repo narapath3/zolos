@@ -2,6 +2,7 @@
 import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName, saveActiveSession } from './SupabaseClient.js';
 import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
 import { getCard } from '../cards/CardCatalog.js';
+import { FIRST_REFINE_KIT, ITEMS } from '../engine/GameData.js';
 import { fuseCard } from '../cards/CardProgression.js';
 export { getDeterministicGuestName, isPlaceholderName };
 
@@ -24,6 +25,7 @@ const pendingPetPurchases = new Map();
 const pendingNpcSales = new Map();
 const pendingFishingClaims = new Map();
 const pendingStarterCardClaims = new Map();
+const pendingFirstRefineSupplyClaims = new Map();
 let clientMeasuredPing = null;
 const inventoryMutationQueues = new Map();
 
@@ -69,6 +71,22 @@ function isCommittedStarterCard(result) {
         && Number.isInteger(result.pity) && result.pity >= 0);
 }
 
+function isCommittedFirstRefineSupply(result, expectedRequestId) {
+    return Boolean(result
+        && result.ok === true
+        && typeof expectedRequestId === 'string'
+        && result.requestId === expectedRequestId
+        && result.receiptId === FIRST_REFINE_KIT.receiptId
+        && (result.serverAuthoritative === true || result.serverAuthoritative === false)
+        && (result.granted === true || result.granted === false)
+        && Number.isSafeInteger(result.goldGranted) && result.goldGranted >= 0 && result.goldGranted <= FIRST_REFINE_KIT.gold
+        && Number.isSafeInteger(result.oreGranted) && result.oreGranted >= 0 && result.oreGranted <= FIRST_REFINE_KIT.oreQuantity
+        && result.item_name === FIRST_REFINE_KIT.oreName
+        && result.item_type === 'material'
+        && Number.isSafeInteger(result.gold) && result.gold >= 0
+        && Number.isSafeInteger(result.inventory_quantity) && result.inventory_quantity >= 0);
+}
+
 function enqueueInventoryMutation(characterId, itemName, mutation) {
     const key = `${characterId}\u0000${itemName}`;
     const previous = inventoryMutationQueues.get(key) || Promise.resolve();
@@ -94,6 +112,7 @@ function rejectPendingSocketRequests() {
     rejectPendingMap(pendingNpcSales, message);
     rejectPendingMap(pendingFishingClaims, message);
     rejectPendingMap(pendingStarterCardClaims, message);
+    rejectPendingMap(pendingFirstRefineSupplyClaims, message);
     rejectPendingMap(pendingCardFusions, message);
     rejectPendingMap(pendingCardRefines, message);
 }
@@ -244,6 +263,97 @@ function attachStarterCardListeners(socket) {
         clearTimeout(pending.timeout);
         pendingStarterCardClaims.delete(error.requestId);
         pending.reject(new Error(error?.message || 'รับการ์ดเริ่มต้นไม่สำเร็จ'));
+    });
+}
+
+function attachFirstRefineSupplyListeners(socket) {
+    if (socket._zolosFirstRefineSupplyListeners) return;
+    socket._zolosFirstRefineSupplyListeners = true;
+    socket.on('first_refine_supply_result', result => {
+        const pending = pendingFirstRefineSupplyClaims.get(result?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingFirstRefineSupplyClaims.delete(result.requestId);
+        if (!isCommittedFirstRefineSupply(result, pending.requestId)) {
+            pending.reject(new Error('ผลชุดตีบวกเริ่มต้นไม่ถูกต้อง'));
+            return;
+        }
+        pending.resolve(result);
+    });
+    socket.on('first_refine_supply_error', error => {
+        const pending = pendingFirstRefineSupplyClaims.get(error?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingFirstRefineSupplyClaims.delete(error.requestId);
+        pending.reject(new Error(error?.message || 'รับชุดตีบวกเริ่มต้นไม่สำเร็จ'));
+    });
+}
+
+export async function requestFirstRefineSupply(characterId) {
+    const cleanCharacterId = String(characterId || '');
+    const requestId = `first-refine:${cleanCharacterId}:v1`;
+    if (!cleanCharacterId) throw new Error('ไม่พบตัวละคร');
+
+    if (isOfflineMode || !supabase || /^(guest_|local_)/i.test(cleanCharacterId)) {
+        const receiptKey = `first_refine_supply_${cleanCharacterId}_v1`;
+        const previous = localDb.get(receiptKey);
+        if (previous) return previous;
+        const character = localDb.get(`char_${cleanCharacterId}`);
+        if (!character) throw new Error('ไม่พบข้อมูลตัวละคร');
+        const inventoryKey = `inventory_${cleanCharacterId}`;
+        const inventory = localDb.get(inventoryKey) || [];
+        const existingOre = inventory.find(item => item.item_name === FIRST_REFINE_KIT.oreName);
+        const oreQuantity = inventory.reduce((sum, item) => sum + (item.item_name === FIRST_REFINE_KIT.oreName ? Math.max(0, Number(item.quantity) || 0) : 0), 0);
+        const gold = Math.max(0, Number(character.gold) || 0);
+        if (gold >= FIRST_REFINE_KIT.gold && oreQuantity >= FIRST_REFINE_KIT.oreQuantity) {
+            const result = {
+                ok: true, serverAuthoritative: false, requestId,
+                receiptId: FIRST_REFINE_KIT.receiptId, granted: false,
+                goldGranted: 0, oreGranted: 0, gold,
+                item_name: FIRST_REFINE_KIT.oreName, item_type: 'material',
+                inventory_quantity: oreQuantity,
+                reason: 'not_needed',
+            };
+            localDb.set(receiptKey, result);
+            return result;
+        }
+        character.gold = Math.min(2147483647, gold + FIRST_REFINE_KIT.gold);
+        if (existingOre) existingOre.quantity = Math.max(0, Number(existingOre.quantity) || 0) + FIRST_REFINE_KIT.oreQuantity;
+        else inventory.push({
+            id: `inv_${requestId.replace(/[^a-zA-Z0-9]/g, '')}`,
+            character_id: cleanCharacterId,
+            item_name: FIRST_REFINE_KIT.oreName,
+            item_type: 'material',
+            quantity: FIRST_REFINE_KIT.oreQuantity,
+            stats: {},
+            emoji: ITEMS[FIRST_REFINE_KIT.oreName]?.emoji,
+            price: ITEMS[FIRST_REFINE_KIT.oreName]?.price || 0,
+        });
+        const inventoryQuantity = inventory.reduce((sum, item) => sum + (item.item_name === FIRST_REFINE_KIT.oreName ? Math.max(0, Number(item.quantity) || 0) : 0), 0);
+        const result = {
+            ok: true, serverAuthoritative: false, requestId,
+            receiptId: FIRST_REFINE_KIT.receiptId, granted: true,
+            goldGranted: FIRST_REFINE_KIT.gold, oreGranted: FIRST_REFINE_KIT.oreQuantity,
+            gold: character.gold, item_name: FIRST_REFINE_KIT.oreName,
+            item_type: 'material', inventory_quantity: inventoryQuantity,
+        };
+        localDb.set(`char_${cleanCharacterId}`, character);
+        localDb.set(inventoryKey, inventory);
+        localDb.set(receiptKey, result);
+        return result;
+    }
+
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่');
+    if (pendingFirstRefineSupplyClaims.has(requestId)) throw new Error('กำลังรับชุดตีบวกเริ่มต้นอยู่');
+    attachFirstRefineSupplyListeners(socket);
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingFirstRefineSupplyClaims.delete(requestId);
+            reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า ชุดตีบวกจะลองใหม่ครั้งถัดไป'));
+        }, 12000);
+        pendingFirstRefineSupplyClaims.set(requestId, { resolve, reject, timeout, requestId });
+        socket.emit('first_refine_supply_claim', { requestId });
     });
 }
 
