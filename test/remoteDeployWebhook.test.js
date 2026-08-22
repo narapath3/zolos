@@ -61,10 +61,13 @@ test('one-time installer locks the secret and runner uses non-interactive update
   assert.match(installer, /New-ScheduledTaskAction/);
   assert.match(installer, /New-ScheduledTaskTrigger -Once/);
   assert.match(installer, /Register-ScheduledTask/);
+  assert.match(installer, /-MultipleInstances IgnoreNew/);
   assert.match(installer, /-User 'SYSTEM'/);
   assert.doesNotMatch(installer, /\/SC['\"\s,)]*ONDEMAND/i);
   assert.doesNotMatch(installer, /Invoke-Expression/);
   assert.match(runner, /ZOLOS-Update-Backend-OneClick\.bat/);
+  assert.match(runner, /Global\\ZOLOS-RemoteDeploy/);
+  assert.match(runner, /WaitOne\(0\)/);
   assert.match(runner, /-NoPause/);
   assert.match(batch, /%~1/);
   assert.match(batch, /-NoPause/);

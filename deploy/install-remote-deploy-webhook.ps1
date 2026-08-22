@@ -90,11 +90,12 @@ if ([string]::IsNullOrWhiteSpace($taskPath)) { $taskPath = '\' }
 $taskLeaf = Split-Path -Leaf $TaskName
 $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' `
     -Argument ('-NoLogo -NoProfile -ExecutionPolicy Bypass -File "{0}" -RepoPath "{1}"' -f $Runner, $RepoPath)
-# schtasks.exe has no ONDEMAND schedule type. A one-time trigger far in the
+# schtasks.exe has no on-demand schedule type. A one-time trigger far in the
 # future makes the task dormant; the webhook starts it explicitly with /Run.
 $taskTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddYears(10)
+$taskSettings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew
 Register-ScheduledTask -TaskName $taskLeaf -TaskPath $taskPath -Action $taskAction `
-    -Trigger $taskTrigger -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+    -Trigger $taskTrigger -Settings $taskSettings -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
 
 Write-Host ''
 Write-Host '[ZOLOS][OK] Remote deploy Scheduled Task is installed.' -ForegroundColor Green
