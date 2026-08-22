@@ -8,6 +8,7 @@ import { runQuery } from './data.js';
 import { callRpc } from './rpc.js';
 import * as ipMonitor from './ipMonitor.js';
 import { registerBugReportRoutes } from './bugReports.js';
+import { registerDeployRoutes } from './deploy.js';
 
 export function createApiRouter() {
     const r = express.Router();
@@ -49,6 +50,9 @@ export function createApiRouter() {
     });
 
     registerBugReportRoutes(r, wrap);
+    // The deploy route remains inert unless a strong secret and repository
+    // path are configured; the handler authenticates every request.
+    registerDeployRoutes(r, wrap);
 
     // ---- auth ----
     r.post('/auth/signup', authLimiter, wrap(async (req, res) => {

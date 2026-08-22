@@ -1,0 +1,49 @@
+name: Remote Deploy to Windows VPS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zolos-remote-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Request VPS deployment
+        shell: bash
+        env:
+          DEPLOY_URL: ${{ vars.ZOLOS_DEPLOY_WEBHOOK_URL || secrets.ZOLOS_DEPLOY_WEBHOOK_URL }}
+          DEPLOY_SECRET: ${{ secrets.ZOLOS_DEPLOY_WEBHOOK_SECRET }}
+          REQUEST_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DEPLOY_URL}" || -z "${DEPLOY_SECRET}" ]]; then
+            echo 'Required GitHub Actions secrets are not configured.' >&2
+            exit 1
+          fi
+          if (( ${#DEPLOY_SECRET} < 32 )); then
+            echo 'ZOLOS_DEPLOY_WEBHOOK_SECRET is too short.' >&2
+            exit 1
+          fi
+          body='{"action":"update","ref":"main"}'
+          timestamp="$(date +%s)"
+          digest="$(printf '%s.%s' "${timestamp}" "${body}" | openssl dgst -sha256 -hmac "${DEPLOY_SECRET}" -hex | awk '{print $2}')"
+          signature="sha256=${digest}"
+          response="$(curl --fail-with-body --silent --show-error --retry 2 --retry-delay 2 --max-time 20 \
+            -X POST "${DEPLOY_URL}" \
+            -H 'Content-Type: application/json' \
+            -H "X-Zolos-Deploy-Timestamp: ${timestamp}" \
+            -H "X-Zolos-Deploy-Signature: ${signature}" \
+            -H "X-Zolos-Deploy-Idempotency: ${REQUEST_ID}" \
+            --data "${body}")"
+          if [[ "${response}" != *'"ok":true'* ]]; then
+            echo 'VPS rejected the deploy request.' >&2
+            exit 1
+          fi
+          echo "VPS accepted deployment request ${REQUEST_ID}."
