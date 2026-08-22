@@ -3,6 +3,7 @@
 // enforced. The authed user id comes from the JWT, never from the client body.
 import { query } from './db.js';
 import { httpErr } from './auth.js';
+import { normalizePersistedJob } from '../securityPolicy.js';
 
 // ownership models:
 //   'public'            — anyone may SELECT
@@ -118,6 +119,18 @@ function assertClientWriteAllowed(table, action, values, filters = []) {
     }
     if (table !== 'characters') return;
     const input = values || {};
+    if (Object.hasOwn(input, 'job')) {
+        // A newly-created character may start as Novice (null), but every
+        // selected class must use one canonical persisted id. Legacy UI ids are
+        // accepted only as aliases and are normalized before SQL is built.
+        if (input.job === null && ['insert', 'upsert'].includes(action)) {
+            // Keep the explicit Novice value for character creation.
+        } else {
+            const normalizedJob = normalizePersistedJob(input.job);
+            if (!normalizedJob) throw httpErr(400, 'invalid character job');
+            input.job = normalizedJob;
+        }
+    }
     if (['update', 'upsert'].includes(action)) {
         const blocked = Object.keys(input).filter(key => SERVER_AUTHORITATIVE_CHARACTER_FIELDS.has(key));
         if (blocked.length) {

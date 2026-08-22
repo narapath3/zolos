@@ -1,8 +1,8 @@
 // Character Manager — Player character 3D model, animations, and state
 import * as THREE from 'three';
-import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult, getMonsterCombatMeta, getJobTierInfo } from './GameData.js';
+import { getExpRequired, getStatGains, SKILLS, ITEMS, JOBS, getJobSkills, getJobMods, getRefineMult, getMonsterCombatMeta, getJobTierInfo, normalizeJobId } from './GameData.js';
 import { buildPet } from './PetModels.js';
-import { getDeterministicGuestName, isPlaceholderName } from '../network/SupabaseClient.js';
+import { getDeterministicGuestName, isPlaceholderName, getGuestJobHint } from '../network/SupabaseClient.js';
 import { getCard } from '../cards/CardCatalog.js';
 import { normalizeCardState } from '../cards/CardProgression.js';
 import { getEquipmentVisualSpec } from './EquipmentVisualSpecs.js';
@@ -3444,8 +3444,11 @@ export class CharacterManager {
         this.stats.def = isNaN(Number(data.def)) ? 5 : Number(data.def);
         this.stats.gold = isNaN(Number(data.gold)) ? 0 : Number(data.gold);
         this.stats.zol = isNaN(Number(data.zol)) ? 0 : Number(data.zol);
-        // Job: null/unknown means Novice (hasn't chosen a path yet).
-        this.stats.job = JOBS[data.job] ? data.job : null;
+        // Canonicalize legacy class ids before the job picker decides whether
+        // this character is still a Novice. A local Guest hint also protects a
+        // just-selected class while an online save is still catching up.
+        const savedJob = normalizeJobId(data.job) || getGuestJobHint(data.user_id || data.id);
+        this.stats.job = normalizeJobId(savedJob);
         this._applyJobAppearance(); // render the class silhouette once the job is known
         this.stats.total_kills = isNaN(Number(data.total_kills)) ? 0 : Number(data.total_kills);
         this.stats.play_time = isNaN(Number(data.play_time)) ? 0 : Number(data.play_time);

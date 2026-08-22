@@ -26,6 +26,14 @@ const PROGRESSION_RULES = {
 };
 
 const EQUIPMENT_FIELDS = new Set(['weapon', 'hat', 'glasses', 'shield', 'armor']);
+const PERSISTED_JOB_ALIASES = Object.freeze({ swordman: 'swordsman', acolyte: 'priest' });
+const PERSISTED_JOB_IDS = new Set(['swordsman', 'mage', 'archer', 'priest']);
+
+export function normalizePersistedJob(value) {
+    const raw = String(value ?? '').trim().toLowerCase();
+    const canonical = PERSISTED_JOB_ALIASES[raw] || raw;
+    return PERSISTED_JOB_IDS.has(canonical) ? canonical : null;
+}
 const COLOR_FIELDS = new Set(['body_color', 'hair_color', 'pants_color']);
 const BOOLEAN_FIELDS = new Set(['sound_enabled', 'fps_enabled']);
 const GRAPHICS_QUALITIES = new Set(['low', 'medium', 'high', 'ultra', 'auto']);
@@ -172,6 +180,9 @@ export function sanitizeSaveUpdates(updates, previousUpdates = null, elapsedMs =
             if (name) sanitized.name = name;
         } else if (key === 'last_map') {
             sanitized.last_map = normalizeMapId(value);
+        } else if (key === 'job') {
+            const job = normalizePersistedJob(value);
+            if (job) sanitized.job = job;
         } else if (EQUIPMENT_FIELDS.has(key)) {
             sanitized[key] = String(value ?? '').slice(0, 64);
         } else if (COLOR_FIELDS.has(key)) {

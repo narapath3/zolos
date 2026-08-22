@@ -1385,15 +1385,25 @@ export const JOBS = {
     },
 };
 
+// Normalize legacy/UI job ids to the canonical ids used by JOBS and persistence.
+// Older UI payloads used `swordman` and `acolyte`; accepting them on load
+// prevents a valid existing class from being treated as a fresh Novice.
+export function normalizeJobId(jobId) {
+    const aliases = { swordman: 'swordsman', acolyte: 'priest' };
+    const raw = String(jobId || '').trim().toLowerCase();
+    const normalized = aliases[raw] || raw;
+    return JOBS[normalized] ? normalized : null;
+}
+
 // The 3 skill ids a character currently has (Novice until they pick a job).
 export function getJobSkills(jobId) {
-    const job = JOBS[jobId];
+    const job = JOBS[normalizeJobId(jobId)];
     return job ? job.skills : NOVICE_SKILLS;
 }
 
 // Per-job combat multipliers ({hp,sp,atk,def}); all 1.0 for a job-less Novice.
 export function getJobMods(jobId) {
-    const job = JOBS[jobId];
+    const job = JOBS[normalizeJobId(jobId)];
     return (job && job.mods) ? job.mods : { hp: 1, sp: 1, atk: 1, def: 1 };
 }
 
@@ -1452,7 +1462,8 @@ export function refineTierColor(level) {
 // STR/AGI/INT attributes for a class, grown with level along the job's focus.
 // Novice (no job) gets a balanced spread. Shown on the profile screens.
 export function getJobStats(jobId, level = 1) {
-    const base = (JOBS[jobId] && JOBS[jobId].stats) || { str: 4, agi: 4, int: 4 };
+    const canonicalJobId = normalizeJobId(jobId);
+    const base = (JOBS[canonicalJobId] && JOBS[canonicalJobId].stats) || { str: 4, agi: 4, int: 4 };
     const lvl = Math.max(1, Math.floor(level) || 1);
     const grow = (b) => b + Math.floor((lvl - 1) * b * 0.12);
     return { str: grow(base.str), agi: grow(base.agi), int: grow(base.int) };

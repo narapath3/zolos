@@ -1,5 +1,5 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig, FIRST_REFINE_KIT, STARTER_PET } from '../engine/GameData.js';
-import { supabase, isSelfHostMode } from '../network/SupabaseClient.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig, FIRST_REFINE_KIT, STARTER_PET, normalizeJobId } from '../engine/GameData.js';
+import { supabase, isSelfHostMode, saveGuestJobHint } from '../network/SupabaseClient.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestStarterPet, requestNpcSale, requestFirstRefineSupply, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
@@ -8894,7 +8894,7 @@ export class GameUI {
 
     // Spin up the rotating 3D hero preview.
     const canvas = card.querySelector('#job-canvas');
-    const startJob = (current && JOBS[current]) ? current : 'swordsman';
+    const startJob = normalizeJobId(current) || 'swordsman';
     this._previewJob = startJob;
     import('../engine/JobPreview.js').then(({ JobPreview }) => {
       if (!document.getElementById('job-canvas')) return; // closed before load
@@ -8911,16 +8911,18 @@ export class GameUI {
 
   // Switch the previewed class: rotate model + refresh the info panel.
   _setPreviewJob(jobId) {
-    if (!JOBS[jobId]) return;
-    this._previewJob = jobId;
-    if (this._jobPreview) this._jobPreview.setJob(jobId);
+    const canonicalJobId = normalizeJobId(jobId);
+    if (!canonicalJobId) return;
+    this._previewJob = canonicalJobId;
+    if (this._jobPreview) this._jobPreview.setJob(canonicalJobId);
     const card = document.getElementById('job-card');
-    if (card) card.querySelectorAll('.job-chip').forEach(c => c.classList.toggle('active', c.dataset.job === jobId));
-    this._renderJobInfo(jobId);
+    if (card) card.querySelectorAll('.job-chip').forEach(c => c.classList.toggle('active', c.dataset.job === canonicalJobId));
+    this._renderJobInfo(canonicalJobId);
   }
 
   _renderJobInfo(jobId) {
-    const job = JOBS[jobId];
+    const canonicalJobId = normalizeJobId(jobId);
+    const job = JOBS[canonicalJobId];
     if (!job) return;
     const s = this.character.stats;
     const gold = Number(s.gold) || 0;
@@ -8954,12 +8956,12 @@ export class GameUI {
 
     const btn = document.getElementById('job-select-btn');
     if (btn) {
-      if (current === jobId) { btn.textContent = '✔ อาชีพปัจจุบันของคุณ'; btn.disabled = true; btn.onclick = null; }
+      if (current === canonicalJobId) { btn.textContent = '✔ อาชีพปัจจุบันของคุณ'; btn.disabled = true; btn.onclick = null; }
       else if (isChange && gold < JOB_CHANGE_COST) { btn.textContent = `Zeny ไม่พอ (ต้องการ ${JOB_CHANGE_COST.toLocaleString()})`; btn.disabled = true; btn.onclick = null; }
       else {
         btn.disabled = false;
         btn.textContent = isChange ? `เปลี่ยนเป็น ${job.name} · ${JOB_CHANGE_COST.toLocaleString()} Zeny` : `⚔️ เลือกเป็น ${job.name}`;
-        btn.onclick = () => this.chooseJob(jobId, isChange);
+        btn.onclick = () => this.chooseJob(canonicalJobId, isChange);
       }
     }
   }
@@ -8972,10 +8974,11 @@ export class GameUI {
   }
 
   async chooseJob(jobId, isChange) {
-    const job = JOBS[jobId];
+    const canonicalJobId = normalizeJobId(jobId);
+    const job = JOBS[canonicalJobId];
     if (!job || !this.character) return;
     const s = this.character.stats;
-    if (s.job === jobId) return;
+    if (s.job === canonicalJobId) return;
 
     if (isChange) {
       if ((Number(s.gold) || 0) < JOB_CHANGE_COST) {
@@ -8985,7 +8988,11 @@ export class GameUI {
       s.gold -= JOB_CHANGE_COST;
     }
 
-    s.job = jobId;
+    s.job = canonicalJobId;
+    // Save a local recovery hint immediately for Guest/anonymous sessions.
+    // The server save still remains the source of truth; this only prevents a
+    // successful first pick from reopening the picker while that save catches up.
+    saveGuestJobHint(this.character.userId || this.characterId, canonicalJobId);
     // Job modifiers can change max HP/SP immediately. Clamp current resources
     // before the next HUD tick so a new class never starts with SP/HP above its
     // displayed maximum.

@@ -147,6 +147,31 @@ export function isPlaceholderName(name) {
   return !name || name === 'Novice' || name === 'Guest' || name === 'Adventurer';
 }
 
+const GUEST_JOB_IDS = new Set(['swordsman', 'mage', 'archer', 'priest']);
+const guestJobKey = identity => `zolos_guest_job_${String(identity || '').slice(0, 160)}`;
+
+export function saveGuestJobHint(identity, jobId) {
+  const key = String(identity || '');
+  if (!key || !GUEST_JOB_IDS.has(jobId)) return false;
+  try {
+    localStorage.setItem(guestJobKey(key), jobId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getGuestJobHint(identity) {
+  const key = String(identity || '');
+  if (!key) return null;
+  try {
+    const jobId = localStorage.getItem(guestJobKey(key));
+    return GUEST_JOB_IDS.has(jobId) ? jobId : null;
+  } catch {
+    return null;
+  }
+}
+
 function getReusableLocalGuestId() {
   const activeUserId = localDb.get('active_session_user_id');
   if (typeof activeUserId !== 'string' || !/^guest_[a-z0-9]+$/i.test(activeUserId)) return null;
