@@ -58,6 +58,24 @@ export function getAutoNavigationWaypoints(from, target, sceneManager = null) {
     const direct = target.clone ? target.clone() : new THREE.Vector3(Number(target.x) || 0, Number(target.y) || 0, Number(target.z) || 0);
     if (!from || (sceneManager?.currentMap || '') !== 'prontera') return [direct];
 
+    // A player starting on the bridge must leave through a bridge end before
+    // heading across the dry bank. A direct diagonal to an off-bridge target
+    // otherwise enters the handrail from the side and movement collision keeps
+    // resolving the player at the same x coordinate forever.
+    const bridgeHalfWidth = 1.8;
+    const bridgeMinZ = -10.35;
+    const bridgeMaxZ = 6.35;
+    const bridgeDeckOpen = point => Math.abs(Number(point?.x) || 0) < bridgeHalfWidth
+        && Number(point?.z) >= bridgeMinZ && Number(point?.z) <= bridgeMaxZ;
+    if (bridgeDeckOpen(from) && !bridgeDeckOpen(direct)) {
+        const exitZ = (Number(direct.z) || 0) >= -2 ? bridgeMaxZ + 0.6 : bridgeMinZ - 0.6;
+        const exitX = Math.max(-1.2, Math.min(1.2, Number(from.x) || 0));
+        return [
+            new THREE.Vector3(exitX, Number(direct.y) || Number(from.y) || 0, exitZ),
+            direct,
+        ];
+    }
+
     // Prontera's river is a winding barrier. When the player and target are on
     // opposite banks, route through the real bridge corridor instead of asking
     // movement collision to push the player against a rail forever.

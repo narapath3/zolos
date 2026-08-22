@@ -13,6 +13,7 @@ const serverRpc = fs.readFileSync(new URL('../server/api/rpc.js', import.meta.ur
 const zolosClient = fs.readFileSync(new URL('../src/network/ZolosApiClient.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const combatSource = fs.readFileSync(new URL('../src/engine/CombatSystem.js', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8');
 
 test('First 30 Minutes starts with a safe, ordered journey', () => {
@@ -99,6 +100,14 @@ test('extended onboarding is wired to real Card, refine, and pet outcomes', () =
   assert.match(gameUI, /summon_first_pet: \[this\._isPetSummoned\(\)/);
   assert.match(gameUI, /grow_pet_one_level: \[this\._hasPetLevelled\(\)/);
   assert.match(main, /needsNpcInteraction = stepId === 'open_weapon_forge' \|\| stepId === 'open_pet_sanctuary'/);
+});
+
+test('world tutorial navigation exits the bridge before entering NPC destinations', () => {
+  assert.match(combatSource, /bridgeDeckOpen\(from\) && !bridgeDeckOpen\(direct\)/);
+  assert.match(combatSource, /const exitZ = .*bridgeMaxZ.*bridgeMinZ/);
+  assert.match(main, /getAutoNavigationWaypoints\(character\.getPosition\(\), target, sceneManager\)/);
+  assert.match(main, /waypoints: route\.length \? route : \[target\.clone\(\)\]/);
+  assert.match(main, /waypointIndex: 0/);
 });
 
 test('Journey UI exposes map-aware navigation and viewport-safe spotlight contracts', () => {

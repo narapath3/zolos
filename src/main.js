@@ -54,7 +54,7 @@ import { SkyrailActivitySession, getSkyrailStatus } from './events/SkyrailBazaar
 // `new X(...)` uses below keep working untouched — every one of them runs
 // after the loader has resolved.
 let CharacterManager, MonsterManager, SceneManager, CombatSystem, ParticleSystem, SoundManager, AdaptiveRendererSystem;
-let GameUI, AdminUI, TutorialSystem, GlobalAnnouncements, initBGMHUD;
+let GameUI, AdminUI, TutorialSystem, GlobalAnnouncements, initBGMHUD, getAutoNavigationWaypoints;
 import { applyWorldBossCardEffects } from './cards/CardEffects.js';
 import { resolveCardDrops } from './cards/CardDrops.js';
 import { getCard } from './cards/CardCatalog.js';
@@ -103,6 +103,7 @@ function loadGameModules() {
         AdaptiveRendererSystem = adaptive.AdaptiveRendererSystem;
         GameUI = ui.GameUI;
         initBGMHUD = bgm.initBGMHUD;
+        getAutoNavigationWaypoints = combat.getAutoNavigationWaypoints;
         AdminUI = admin.AdminUI;
         TutorialSystem = tutorial.TutorialSystem;
         GlobalAnnouncements = announce.GlobalAnnouncements;
@@ -252,6 +253,13 @@ function updateJourneyNavigation() {
     const marker = document.getElementById('journey-world-marker');
     const target = journeyNavigation.target;
     const distance = character.getPosition().distanceTo(target);
+    const waypoints = journeyNavigation.waypoints || [target];
+    while (journeyNavigation.waypointIndex < waypoints.length - 1
+        && character.getPosition().distanceTo(waypoints[journeyNavigation.waypointIndex]) <= 0.7) {
+        journeyNavigation.waypointIndex += 1;
+        autoPath = waypoints[journeyNavigation.waypointIndex].clone();
+        window.autoPath = autoPath;
+    }
     if (distance <= journeyNavigation.radius) {
         const stepId = journeyNavigation.stepId;
         stopJourneyNavigation();
@@ -298,10 +306,19 @@ window.startJourneyNavigation = (position, radius = 3.2, stepId = null) => {
         }
     }
     const target = new THREE.Vector3(Number(position.x) || 0, Number(character.baseY) || 1.2, Number(position.z) || 0);
-    journeyNavigation = { target, radius: Math.max(1, Number(radius) || 3.2), stepId };
+    const route = typeof getAutoNavigationWaypoints === 'function'
+        ? getAutoNavigationWaypoints(character.getPosition(), target, sceneManager)
+        : [target.clone()];
+    journeyNavigation = {
+        target,
+        waypoints: route.length ? route : [target.clone()],
+        waypointIndex: 0,
+        radius: Math.max(1, Number(radius) || 3.2),
+        stepId,
+    };
     disengageManualCombat();
     character.targetMonster = null;
-    autoPath = target.clone();
+    autoPath = journeyNavigation.waypoints[0].clone();
     window.autoPath = autoPath;
     particles?.createClickIndicator?.(target, 0xffd65a);
     gameUI?.addCombatLog?.('🧭 กำลังนำทางไปยังจุดหมายสีทอง แตะพื้นเพื่อเปลี่ยนเส้นทางได้', 'system');
