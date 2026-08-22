@@ -1,0 +1,48 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const supabaseClient = fs.readFileSync(new URL('../src/network/SupabaseClient.js', import.meta.url), 'utf8');
+const authUI = fs.readFileSync(new URL('../src/ui/AuthUI.js', import.meta.url), 'utf8');
+const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
+const main = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+
+test('local Guest reuse selects the active guest identity instead of randomizing on every entry', () => {
+  assert.match(supabaseClient, /function getReusableLocalGuestId\(\)/);
+  assert.match(supabaseClient, /active_session_user_id/);
+  assert.match(supabaseClient, /profile_\$\{activeUserId\}/);
+  assert.match(supabaseClient, /char_\$\{activeUserId\}/);
+  assert.match(supabaseClient, /export async function signInAnonymously\(\{ forceNew = false \} = \{\}\)/);
+  assert.match(supabaseClient, /!forceNew && getReusableLocalGuestId\(\)/);
+  assert.match(supabaseClient, /saveActiveSession\(userId\)/);
+});
+
+test('existing guest session can resume even when only the character record remains', () => {
+  const localSessionBlock = supabaseClient.slice(
+    supabaseClient.indexOf('export async function getSession()'),
+    supabaseClient.indexOf('export function getProfile'),
+  );
+  assert.match(localSessionBlock, /const profile = localDb\.get\(`profile_\$\{activeUserId\}`\)/);
+  assert.match(localSessionBlock, /const character = localDb\.get\(`char_\$\{activeUserId\}`\)/);
+  assert.match(localSessionBlock, /if \(profile \|\| character\)/);
+  const fallbackSessionBlock = supabaseClient.slice(supabaseClient.indexOf('// Fallback to local guest session'));
+  assert.match(fallbackSessionBlock, /const character = localDb\.get\(`char_\$\{activeUserId\}`\)/);
+  assert.match(fallbackSessionBlock, /if \(profile \|\| character\)/);
+});
+
+test('normal Guest entry resumes while explicit Guest ใหม่ is the only fresh-session action', () => {
+  assert.match(authUI, /btn-guest.*addEventListener\('click', \(\) => this\._handleGuest\(\)\)/);
+  assert.match(authUI, /_splashGuestBtn\.addEventListener\('click', \(\) => this\._handleGuest\(\{ forceNew: true \}\)\)/);
+  assert.match(authUI, /signInAnonymously\(\{ forceNew \}\)/);
+  assert.match(authUI, /Resuming guest session/);
+  assert.match(authUI, /Starting a new guest/);
+});
+
+test('Guest job persistence still targets the same character identity', () => {
+  assert.match(gameSync, /if \(isOfflineMode \|\| !supabase \|\| characterId\.startsWith\('guest_'\) \|\| characterId\.startsWith\('local_'\)\)/);
+  assert.match(gameSync, /const char = localDb\.get\(`char_\$\{userId\}`\)/);
+  assert.match(gameSync, /const merged = \{ \.\.\.char, \.\.\.updates/);
+  assert.match(gameSync, /job: null/);
+  assert.match(main, /userId = sessionData\.userId/);
+  assert.match(main, /loadCharacter\(userId\)/);
+});

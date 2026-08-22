@@ -134,7 +134,7 @@ export class AuthUI {
         // resumes the welcome-back session. Keeping those semantics explicit
         // prevents accidental loss of the player's expected guest identity.
         if (this._splashGuestBtn) {
-            this._splashGuestBtn.addEventListener('click', () => this._handleGuest());
+            this._splashGuestBtn.addEventListener('click', () => this._handleGuest({ forceNew: true }));
         }
     }
 
@@ -573,10 +573,10 @@ export class AuthUI {
         }
     }
 
-    async _handleGuest() {
-        this._setStatus('Starting as guest...', 'info');
+    async _handleGuest({ forceNew = false } = {}) {
+        this._setStatus(forceNew ? 'Starting a new guest...' : 'Resuming guest session...', 'info');
         try {
-            const data = await signInAnonymously();
+            const data = await signInAnonymously({ forceNew });
 
             // Part 2.1: Check profiles table for guest username fallback
             const profile = await getProfile(data.user.id);

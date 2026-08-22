@@ -147,21 +147,46 @@ export function isPlaceholderName(name) {
   return !name || name === 'Novice' || name === 'Guest' || name === 'Adventurer';
 }
 
-export async function signInAnonymously() {
-  if (isOfflineMode || !supabase) {
-    const userId = 'guest_' + Math.random().toString(36).substring(2, 10);
-    const guestName = getDeterministicGuestName(userId);
-    const profile = { id: userId, username: guestName, created_at: new Date().toISOString() };
-    localDb.set(`profile_${userId}`, profile);
-    saveActiveSession(userId);
-    return { user: { id: userId, is_anonymous: true }, guestName };
-  }
+function getReusableLocalGuestId() {
+  const activeUserId = localDb.get('active_session_user_id');
+  if (typeof activeUserId !== 'string' || !/^guest_[a-z0-9]+$/i.test(activeUserId)) return null;
+  const profile = localDb.get(`profile_${activeUserId}`);
+  const character = localDb.get(`char_${activeUserId}`);
+  return profile || character ? activeUserId : null;
+}
+
+function createLocalGuestSession({ forceNew = false } = {}) {
+  const userId = !forceNew && getReusableLocalGuestId()
+    ? getReusableLocalGuestId()
+    : `guest_${Math.random().toString(36).substring(2, 10)}`;
+  const guestName = getDeterministicGuestName(userId);
+  const profile = localDb.get(`profile_${userId}`) || { id: userId, username: guestName, created_at: new Date().toISOString() };
+  if (!profile.username || isPlaceholderName(profile.username)) profile.username = guestName;
+  localDb.set(`profile_${userId}`, profile);
+  saveActiveSession(userId);
+  return { user: { id: userId, is_anonymous: true }, guestName: profile.username };
+}
+
+export async function signInAnonymously({ forceNew = false } = {}) {
+  if (isOfflineMode || !supabase) return createLocalGuestSession({ forceNew });
 
   try {
+    // Reuse the authenticated anonymous session when the player presses the
+    // normal Guest entry point. A new anonymous identity is only created by an
+    // explicit "Guest ใหม่" action.
+    if (!forceNew) {
+      const existing = await getSession();
+      if (existing?.user?.is_anonymous === true) {
+        const guestName = getDeterministicGuestName(existing.user.id);
+        return { user: existing.user, session: existing, guestName };
+      }
+    } else {
+      await supabase.auth.signOut();
+    }
+
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error) throw error;
 
-    // Create guest profile
     if (data.user) {
       const guestName = getDeterministicGuestName(data.user.id);
       await supabase.from('profiles').upsert({
@@ -173,12 +198,7 @@ export async function signInAnonymously() {
     return data;
   } catch (e) {
     console.warn("Supabase anonymous sign-in failed, utilizing local guest session fallback:", e.message);
-    const userId = 'guest_' + Math.random().toString(36).substring(2, 10);
-    const guestName = getDeterministicGuestName(userId);
-    const profile = { id: userId, username: guestName, created_at: new Date().toISOString() };
-    localDb.set(`profile_${userId}`, profile);
-    saveActiveSession(userId);
-    return { user: { id: userId, is_anonymous: true }, guestName };
+    return createLocalGuestSession({ forceNew });
   }
 }
 
@@ -188,7 +208,8 @@ export async function getSession() {
     const activeUserId = localDb.get('active_session_user_id');
     if (activeUserId) {
       const profile = localDb.get(`profile_${activeUserId}`);
-      if (profile) {
+      const character = localDb.get(`char_${activeUserId}`);
+      if (profile || character) {
         return { user: { id: activeUserId, is_anonymous: activeUserId.startsWith('guest_') } };
       }
     }
@@ -204,7 +225,8 @@ export async function getSession() {
   const activeUserId = localDb.get('active_session_user_id');
   if (activeUserId && activeUserId.startsWith('guest_')) {
     const profile = localDb.get(`profile_${activeUserId}`);
-    if (profile) {
+    const character = localDb.get(`char_${activeUserId}`);
+    if (profile || character) {
       return { user: { id: activeUserId, is_anonymous: true } };
     }
   }
