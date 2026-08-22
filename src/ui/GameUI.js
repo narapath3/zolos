@@ -10601,8 +10601,9 @@ export class GameUI {
     if (!prompt) {
       prompt = document.createElement('aside');
       prompt.id = 'journey-next-prompt';
-      prompt.setAttribute('role', 'status');
-      prompt.setAttribute('aria-live', 'polite');
+      prompt.setAttribute('role', 'dialog');
+      prompt.setAttribute('aria-modal', 'true');
+      prompt.setAttribute('aria-label', 'FIRST 30 MINUTES ทำต่อเนื่อง');
       document.body.appendChild(prompt);
     }
     this._journeyNextPromptEl = prompt;
@@ -10615,12 +10616,23 @@ export class GameUI {
     const needsCrossMapTravel = active.kind === 'world' && !sameStarterMap(active.mapId);
     const actionLabel = active.kind === 'ui' ? 'ชี้ปุ่มให้ดู' : active.kind === 'map' ? 'เปิดแผนที่ปลายทาง' : active.kind === 'world' ? (needsCrossMapTravel ? `วาร์ปไป ${escape(this._journeyMapLabel(active.mapId))}` : active.id === 'open_weapon_forge' ? 'ไปโรงตีเหล็ก' : active.id === 'open_pet_sanctuary' ? 'ไป Pet Sanctuary' : 'นำทางไปที่นี่') : active.kind === 'fishing' ? 'ดูวิธีรอรับปลา' : 'ดูเป้าหมายต่อไป';
     prompt.innerHTML = `<div class="journey-next-prompt-card" data-testid="journey-next-prompt"><div class="journey-next-prompt-art" style="--journey-next-image:url(${presentation.image})" aria-hidden="true"></div><div class="journey-next-prompt-copy"><span class="journey-next-prompt-kicker">FIRST 30 MINUTES · ทำต่อเนื่อง</span><small>${escape(doneTitle)}</small><h3>บทที่ ${active.chapter} · ${escape(active.title)}</h3><p>${escape(presentation.hint)}</p><div class="journey-next-prompt-actions"><button type="button" class="journey-primary journey-next-prompt-continue" data-home-journey-action="continue-next">${actionLabel} <span>→</span></button><button type="button" class="journey-next-prompt-later" data-home-journey-action="later-next">ไว้ก่อน</button></div><em>กดปุ่มเพื่อ ${actionLabel} ระบบจะพาไปยังขั้นตอนถัดไป</em></div></div>`;
+    // Use one delegated handler on the modal itself. On mobile Safari/Chrome,
+    // binding click + pointerup + touchend to each replaced button can either
+    // double-fire or lose the target after the prompt is re-rendered. The modal
+    // owns the full touch surface; the handler is idempotent across native
+    // pointer/click synthesis and always resolves the nearest action button.
     let lastTouchActionAt = 0;
     const handlePromptAction = event => {
-      const button = event.currentTarget;
+      const button = event.target?.closest?.('[data-home-journey-action]');
+      if (!button || !prompt.contains(button)) return;
       const now = performance.now();
-      if (event.type === 'click' && (now - lastTouchActionAt < 700 || this._journeyPromptActionLock)) return;
-      if (event.type === 'touchend' || event.type === 'pointerup') lastTouchActionAt = now;
+      if (this._journeyPromptActionLock || now - lastTouchActionAt < 700) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        return;
+      }
+      lastTouchActionAt = now;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
@@ -10628,11 +10640,16 @@ export class GameUI {
       if (action === 'continue-next') this._continueFirstThirtyJourney();
       if (action === 'later-next') this._hideJourneyNextPrompt(true);
     };
-    prompt.querySelectorAll('[data-home-journey-action]').forEach(button => {
-      button.addEventListener('click', handlePromptAction);
-      button.addEventListener('pointerup', handlePromptAction, { passive: false });
-      button.addEventListener('touchend', handlePromptAction, { passive: false });
-    });
+    prompt._journeyPromptActionCleanup?.();
+    const listenerOptions = { capture: true, passive: false };
+    prompt.addEventListener('click', handlePromptAction, listenerOptions);
+    prompt.addEventListener('pointerup', handlePromptAction, listenerOptions);
+    prompt.addEventListener('touchend', handlePromptAction, listenerOptions);
+    prompt._journeyPromptActionCleanup = () => {
+      prompt.removeEventListener('click', handlePromptAction, listenerOptions);
+      prompt.removeEventListener('pointerup', handlePromptAction, listenerOptions);
+      prompt.removeEventListener('touchend', handlePromptAction, listenerOptions);
+    };
     prompt.style.display = 'block';
   }
 

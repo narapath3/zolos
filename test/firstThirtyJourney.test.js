@@ -228,13 +228,15 @@ test('Combat chapter shows completion popup only after the first guided kill', (
 
 test('Journey completion offers the next chapter automatically without reopening the Journal', () => {
   assert.match(gameUI, /_showJourneyNextPrompt\(completedStep\)/);
+  assert.match(gameUI, /prompt\.setAttribute\('role', 'dialog'\)/);
+  assert.match(gameUI, /prompt\.setAttribute\('aria-modal', 'true'\)/);
   assert.match(gameUI, /_continueFirstThirtyJourney\(\)/);
   assert.match(gameUI, /data-home-journey-action="continue-next"/);
   assert.match(gameUI, /data-home-journey-action="later-next"/);
   assert.match(gameUI, /journey-next-prompt/);
   assert.match(gameUI, /_hideJourneyNextPrompt\(true\)/);
   assert.match(css, /\.home-journey-guide\.is-next-prompt-hidden\{visibility:hidden!important/);
-  assert.match(css, /#journey-next-prompt\{position:fixed;inset:0;z-index:2380/);
+  assert.match(css, /#journey-next-prompt\{position:fixed;inset:0;z-index:2380;display:none;pointer-events:auto/);
   assert.match(css, /\.journey-next-prompt-card\{[^}]*pointer-events:auto/);
 });
 
@@ -249,8 +251,9 @@ test('Combat completion advances through the same next-chapter prompt without st
 test('Auto-advance prompt buttons are protected from world touch input on mobile', () => {
   assert.match(gameUI, /target\.closest\('#journey-next-prompt'\)/);
   assert.match(gameUI, /target\.closest\('#journey-combat-complete'\)/);
-  assert.match(gameUI, /button\.addEventListener\('touchend', handlePromptAction/);
-  assert.match(gameUI, /button\.addEventListener\('pointerup', handlePromptAction/);
+  assert.match(gameUI, /prompt\.addEventListener\('touchend', handlePromptAction/);
+  assert.match(gameUI, /prompt\.addEventListener\('pointerup', handlePromptAction/);
+  assert.match(gameUI, /prompt\.addEventListener\('click', handlePromptAction/);
   assert.match(gameUI, /this\._journeyPromptActionLock/);
   assert.match(gameUI, /requestAnimationFrame\(navigate\)/);
   assert.match(gameUI, /event\.stopImmediatePropagation\?\.\(\)/);
