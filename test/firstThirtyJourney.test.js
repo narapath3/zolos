@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createFirstThirtyState, FIRST_THIRTY_STEPS, firstThirtyProgress, sanitizeFirstThirtyState, updateFirstThirtyState } from '../src/progression/FirstThirtyJourney.js';
 
+const gameData = fs.readFileSync(new URL('../src/engine/GameData.js', import.meta.url), 'utf8');
 const gameUI = fs.readFileSync(new URL('../src/ui/GameUI.js', import.meta.url), 'utf8');
 const gameSync = fs.readFileSync(new URL('../src/network/GameSync.js', import.meta.url), 'utf8');
 const serverAuth = fs.readFileSync(new URL('../server/api/auth.js', import.meta.url), 'utf8');
@@ -238,6 +239,17 @@ test('Guest binding resolves profile username conflicts without exposing raw dat
   assert.match(gameUI, /const safeBindError = \(error\)/);
   assert.match(gameUI, /bindInFlight = true/);
   assert.doesNotMatch(gameUI, /ผิดพลาด: \$\{err\.message\}/);
+});
+
+test('Fishing rod shop exposes only paid rods and keeps the starter rod free', () => {
+  assert.match(gameData, /'Fishing Rod': [^\n]*price: 0[^\n]*starterOnly: true/);
+  assert.match(gameData, /'Silver Fishing Rod': [^\n]*price: 15000/);
+  assert.match(gameData, /'Golden Fishing Rod': [^\n]*price: 75000/);
+  assert.doesNotMatch(gameData, /\{ name: 'Fishing Rod', price:/);
+  assert.match(gameData, /\{ name: 'Silver Fishing Rod', price: 15000 \}/);
+  assert.match(gameData, /\{ name: 'Golden Fishing Rod', price: 75000 \}/);
+  assert.match(gameUI, /if \(this\.currentShopTab === 'fishing'\) return itemData\.type === 'fishing_rod'/);
+  assert.match(index, /data-tab="fishing">🎣 คันเบ็ด<\/button>/);
 });
 
 test('Fishing rod purchases use an atomic, catalog-bound self-host RPC', () => {

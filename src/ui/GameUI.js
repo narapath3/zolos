@@ -6098,10 +6098,13 @@ export class GameUI {
       const itemData = ITEMS[item.name];
       if (!itemData) return false;
 
-      if (this.currentShopTab === 'all') return itemData.type !== 'pet'; // pets have their own tab
-      if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
-      if (this.currentShopTab === 'equip') return ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
-      if (this.currentShopTab === 'pet') return itemData.type === 'pet';
+       const isStarterRod = itemData.type === 'fishing_rod' && itemData.starterOnly === true;
+       if (isStarterRod) return false;
+       if (this.currentShopTab === 'all') return itemData.type !== 'pet'; // pets have their own tab
+       if (this.currentShopTab === 'usable') return itemData.type === 'usable' || itemData.type === 'consumable';
+       if (this.currentShopTab === 'equip') return ['weapon', 'fishing_rod', 'armor', 'shield', 'hat', 'glasses'].includes(itemData.type);
+       if (this.currentShopTab === 'fishing') return itemData.type === 'fishing_rod';
+       if (this.currentShopTab === 'pet') return itemData.type === 'pet';
       return false;
     });
 

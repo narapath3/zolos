@@ -3097,9 +3097,21 @@ a,
    ============================================ */
 .shop-tabs {
   display: flex;
+  flex-wrap: wrap;
   margin-top: 10px;
   border-bottom: 2px solid rgba(255, 255, 255, 0.08);
   gap: 4px;
+}
+
+.shop-tabs .shop-tab {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+@media (max-width: 420px) {
+  .shop-tabs .shop-tab {
+    flex-basis: calc(50% - 4px);
+  }
 }
 
 /* Standardized shop-tab handled by unified rules */

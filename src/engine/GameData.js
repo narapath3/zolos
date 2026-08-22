@@ -82,7 +82,7 @@ export const ITEMS = {
     'Sword': { emoji: '🗡️', type: 'weapon', rarity: 'rare', desc: 'ดาบเหล็กกล้าคลาสสิกของ Novice เพิ่มพลังโจมตี ATK +15 หน่วยเมื่อสวมใส่', price: 200, atkBonus: 15 },
     'Bow': { emoji: '🏹', type: 'weapon', rarity: 'rare', desc: 'ธนูไม้ดัดที่มีความยืดหยุ่นสูง เพิ่มพลังโจมตี ATK +10 และฟื้นฟู SP +10 หน่วยเมื่อสวมใส่', price: 250, atkBonus: 10, spBonus: 10 },
     'Gun': { emoji: '🔫', type: 'weapon', rarity: 'rare', desc: 'ปืนสั้นกลไกสไตล์กัปตัน เพิ่มพลังโจมตี ATK +22 หน่วยเมื่อสวมใส่', price: 400, atkBonus: 22 },
-    'Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'common', desc: 'คันเบ็ดไม้ธรรมดาสำหรับผู้เริ่มต้น ตกปลา Common ได้ และใช้ตกปลาได้ที่ริมน้ำ', price: 150, atkBonus: 2, isFishingRod: true, rodTier: 'wood', maxFishRarity: 'common' },
+    'Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'common', desc: 'คันเบ็ดไม้ธรรมดาสำหรับผู้เริ่มต้น แจกฟรีให้ผู้เล่นทุกคน ตกปลา Common ได้ที่ริมน้ำ', price: 0, atkBonus: 2, isFishingRod: true, rodTier: 'wood', maxFishRarity: 'common', starterOnly: true },
     'Silver Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'epic', desc: 'คันเบ็ดเงินเนื้อแน่นสำหรับนักตกปลาจริงจัง ตกปลา Common, Uncommon และ Rare ได้', price: 15000, atkBonus: 4, isFishingRod: true, rodTier: 'silver', maxFishRarity: 'rare' },
     'Golden Fishing Rod': { emoji: '🎣', type: 'fishing_rod', rarity: 'legendary', desc: 'คันเบ็ดทองคำระดับสูงสุด ปลดล็อกโอกาสตกปลาในตำนานจากแหล่งน้ำอันตราย', price: 75000, atkBonus: 8, isFishingRod: true, rodTier: 'gold', maxFishRarity: 'legendary' },
     'Sunglasses': { emoji: '🕶️', type: 'glasses', rarity: 'rare', desc: 'แว่นกันแดดสีดำสุดคูล ปิดบังดวงตาเสริมคาริสมาแสดงออกให้ดูเท่แบบลับๆ', price: 300 },
@@ -270,7 +270,7 @@ export const FISH_RARITY_ORDER = Object.freeze(['common', 'uncommon', 'rare', 'l
 // Fishing rods are tools, not combat weapons. The server uses this same catalog
 // to decide which fish tiers an equipped rod may actually claim.
 export const FISHING_ROD_CONFIG = Object.freeze({
-    'Fishing Rod': { tier: 'wood', label: 'คันเบ็ดไม้', maxRarity: 'common', maxRarityLabel: 'ปลาธรรมดา', price: 150 },
+    'Fishing Rod': { tier: 'wood', label: 'คันเบ็ดไม้', maxRarity: 'common', maxRarityLabel: 'ปลาธรรมดา', price: 0, starterOnly: true },
     'Silver Fishing Rod': { tier: 'silver', label: 'คันเบ็ดเงิน', maxRarity: 'rare', maxRarityLabel: 'ปลาหายาก', price: 15000 },
     'Golden Fishing Rod': { tier: 'gold', label: 'คันเบ็ดทองคำ', maxRarity: 'legendary', maxRarityLabel: 'ปลาในตำนาน', price: 75000 },
 });
@@ -1636,7 +1636,7 @@ export const SHOP_ITEMS = [
     { name: 'Bow', price: 250 },
     { name: 'Gun', price: 400 },
     { name: 'Mage Staff', price: 600 },
-    { name: 'Fishing Rod', price: 150 },
+    // Fishing Rod is starter-only and intentionally not sold here.
     { name: 'Silver Fishing Rod', price: 15000 },
     { name: 'Golden Fishing Rod', price: 75000 },
     { name: 'Silver Dagger', price: 3200 },
