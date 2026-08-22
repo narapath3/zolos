@@ -179,9 +179,10 @@ test('connected sessions fail closed for client-only reward paths', () => {
   assert.match(gameSync, /fish_claim_result/);
 });
 
-test('guest splash distinguishes a new guest from resuming the active session', () => {
-  assert.match(indexHtml, /<span>Guest ใหม่<\/span>/);
-  assert.match(authUI, /START GAME above/);
-  assert.match(authUI, /_splashGuestLabelEl\.textContent = 'Guest ใหม่'/);
-  assert.match(authUI, /เริ่ม Guest ใหม่ — START GAME ใช้สำหรับกลับเข้า session เดิม/);
+test('guest splash resumes the active session instead of creating a new character from a casual tap', () => {
+  assert.match(indexHtml, /<span>เล่นเป็น Guest<\/span>/);
+  assert.match(authUI, /_splashGuestBtn\.addEventListener\('click', \(\) => this\._handleGuest\(\)\)/);
+  assert.match(authUI, /_splashGuestLabelEl\.textContent = 'เล่น Guest เดิม'/);
+  assert.match(authUI, /กลับเข้า Guest เดิมที่บันทึกไว้/);
+  assert.match(authUI, /signInAnonymously\(\{ forceNew \}\)/);
 });

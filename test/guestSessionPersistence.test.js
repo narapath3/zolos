@@ -30,12 +30,12 @@ test('existing guest session can resume even when only the character record rema
   assert.match(fallbackSessionBlock, /if \(profile \|\| character\)/);
 });
 
-test('normal Guest entry resumes while explicit Guest ใหม่ is the only fresh-session action', () => {
+test('all normal Guest entry points resume instead of silently creating a new identity', () => {
   assert.match(authUI, /btn-guest.*addEventListener\('click', \(\) => this\._handleGuest\(\)\)/);
-  assert.match(authUI, /_splashGuestBtn\.addEventListener\('click', \(\) => this\._handleGuest\(\{ forceNew: true \}\)\)/);
+  assert.match(authUI, /_splashGuestBtn\.addEventListener\('click', \(\) => this\._handleGuest\(\)\)/);
+  assert.match(authUI, /เล่น Guest เดิม/);
   assert.match(authUI, /signInAnonymously\(\{ forceNew \}\)/);
   assert.match(authUI, /Resuming guest session/);
-  assert.match(authUI, /Starting a new guest/);
 });
 
 test('Guest job persistence still targets the same character identity', () => {

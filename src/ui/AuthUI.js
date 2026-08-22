@@ -130,11 +130,11 @@ export class AuthUI {
                 this._handleSignOut();
             });
         }
-        // "Guest ใหม่" starts a fresh anonymous identity; START GAME above
-        // resumes the welcome-back session. Keeping those semantics explicit
-        // prevents accidental loss of the player's expected guest identity.
+        // Both welcome actions resume the existing Guest identity. A fresh
+        // identity is intentionally not exposed as a casual tap, because it
+        // creates a new character and can look like the player's progress reset.
         if (this._splashGuestBtn) {
-            this._splashGuestBtn.addEventListener('click', () => this._handleGuest({ forceNew: true }));
+            this._splashGuestBtn.addEventListener('click', () => this._handleGuest());
         }
     }
 
@@ -375,17 +375,17 @@ export class AuthUI {
         }
         if (this._welcomeEl) this._welcomeEl.style.display = 'flex';
         if (this._splashAltEl) this._splashAltEl.style.display = 'flex';
-        if (this._splashGuestLabelEl) this._splashGuestLabelEl.textContent = 'Guest ใหม่';
-        this._splashGuestBtn?.setAttribute('aria-label', 'เริ่ม Guest ใหม่ — START GAME ใช้สำหรับกลับเข้า session เดิม');
-        this._splashGuestBtn?.setAttribute('title', 'เริ่ม Guest ใหม่ (START GAME เพื่อกลับเข้าเกมเดิม)');
+        if (this._splashGuestLabelEl) this._splashGuestLabelEl.textContent = 'เล่น Guest เดิม';
+        this._splashGuestBtn?.setAttribute('aria-label', 'เล่น Guest เดิม — กลับเข้า session ที่บันทึกไว้');
+        this._splashGuestBtn?.setAttribute('title', 'กลับเข้า Guest เดิมที่บันทึกไว้');
     }
 
     _hideWelcomeChip() {
         if (this._welcomeEl) this._welcomeEl.style.display = 'none';
         if (this._splashAltEl) this._splashAltEl.style.display = 'none';
-        if (this._splashGuestLabelEl) this._splashGuestLabelEl.textContent = 'Guest ใหม่';
-        this._splashGuestBtn?.setAttribute('aria-label', 'เริ่ม Guest ใหม่');
-        this._splashGuestBtn?.setAttribute('title', 'เริ่ม Guest ใหม่');
+        if (this._splashGuestLabelEl) this._splashGuestLabelEl.textContent = 'เล่นเป็น Guest';
+        this._splashGuestBtn?.setAttribute('aria-label', 'เล่นเป็น Guest');
+        this._splashGuestBtn?.setAttribute('title', 'เล่นเป็น Guest');
     }
 
     _showSessionMode(username) {
