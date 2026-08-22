@@ -1,6 +1,6 @@
 # ZOLOS Remote Deploy Webhook
 
-ระบบนี้ทำให้ผู้ดูแลสั่งอัปเดต Windows VPS จาก GitHub Actions หรือจาก PowerShell ได้ โดยไม่ต้องเปิด RDP และไม่ต้องไปดับเบิลคลิกไฟล์บน VPS ทุกครั้ง
+ระบบนี้ทำให้การเปลี่ยนแปลง backend/deployment ที่ push เข้า `main` สั่งอัปเดต Windows VPS จาก GitHub Actions โดยอัตโนมัติ โดยไม่ต้องเปิด RDP และไม่ต้องไปดับเบิลคลิกไฟล์บน VPS ทุกครั้ง ผู้ดูแลยังสามารถกด workflow แบบ manual ได้เฉพาะกรณีฉุกเฉินหรือทดสอบ
 
 > การติดตั้งครั้งแรกยังต้องเข้าถึง Windows VPS หนึ่งครั้งเพื่อสร้าง Scheduled Task และเก็บ secret ในเครื่อง หลังจากนั้นการ deploy ใช้คำสั่งภายนอกได้
 
@@ -46,9 +46,11 @@ deploy\\ZOLOS-Update-Backend-OneClick.bat
 
 ไม่ต้องเปิด port ใหม่ เพราะ webhook ใช้ public API host และ port เดิมของ backend. หาก reverse proxy ใช้ host อื่น ให้ใช้ URL ของ backend ที่เข้าถึงได้จากอินเทอร์เน็ตแทน.
 
-## การสั่งจากมือถือ
+## การทำงานอัตโนมัติและการสั่งจากมือถือ
 
-หลังติดตั้งแล้ว ให้เปิด repository บน GitHub แล้วไปที่ **Actions → Remote Deploy to Windows VPS → Run workflow → Run workflow**. Workflow จะส่งคำขอไปยัง VPS และแสดงว่า request ถูก `accepted`. จากนั้น VPS จะทำงานต่อเองตามขั้นตอน updater. เปิด workflow run เพื่อดูผลสำเร็จหรือล้มเหลว; ไม่ต้องเปิดหน้า VPS.
+หลังติดตั้งแล้ว เมื่อ push commit เข้า `main` และมีไฟล์ที่อยู่ใน path filter ของ workflow เช่น `server/**`, `deploy/**` หรือไฟล์ package/config ที่เกี่ยวข้อง GitHub Actions จะส่งคำขอไปยัง VPS ให้อัตโนมัติทันที. การแก้ frontend-only ที่อยู่ใน `src/**` จะ deploy ผ่าน Vercel ตามเดิมและไม่สั่ง restart VPS โดยไม่จำเป็น.
+
+หากต้องการตรวจผล ให้เปิด **Actions → Remote Deploy to Windows VPS** แล้วเลือก workflow run ล่าสุด. ผู้ดูแลไม่ต้องเปิดหน้า VPS. ปุ่ม **Run workflow** ยังมีไว้เป็น manual fallback สำหรับกรณีฉุกเฉินหรือทดสอบเท่านั้น ไม่ใช่ขั้นตอนปกติของการ deploy.
 
 การกดซ้ำใน workflow run เดิมจะไม่ทำให้คำสั่งเดิมถูกส่งซ้ำ เพราะใช้ idempotency key จาก `run_id` และ `run_attempt`. การกด Run workflow คนละรอบเป็นคนละ deployment request และ backend จะ serialize ที่ระดับ Scheduled Task/updater ตามกลไกตรวจ process เดิม.
 
@@ -87,4 +89,4 @@ Log ของ webhook receipt อยู่ใน `logs\\remote-deploy-receipts`.
 
 ## ขอบเขตความปลอดภัย
 
-Workflow นี้ใช้ `workflow_dispatch` เท่านั้น ไม่มี trigger จาก pull request และใช้ runner ของ GitHub ไม่ใช่ runner ที่อยู่บน VPS. Repository ปัจจุบันเป็น public ดังนั้นไม่ควรติดตั้ง self-hosted GitHub Actions runner สำหรับ workflow ที่มีสิทธิ์แตะ VPS. Secret ต้องเก็บเฉพาะใน GitHub Actions Secrets และ `.env`/ไฟล์ ProgramData บน VPS.
+Workflow นี้ใช้ `push` เฉพาะ branch `main` และมี `workflow_dispatch` เป็น fallback เท่านั้น ไม่มี trigger จาก pull request และใช้ runner ของ GitHub ไม่ใช่ runner ที่อยู่บน VPS. Repository ปัจจุบันเป็น public ดังนั้นไม่ควรติดตั้ง self-hosted GitHub Actions runner สำหรับ workflow ที่มีสิทธิ์แตะ VPS. Secret ต้องเก็บเฉพาะใน GitHub Actions Secrets และ `.env`/ไฟล์ ProgramData บน VPS.

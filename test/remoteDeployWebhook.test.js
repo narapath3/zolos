@@ -44,7 +44,9 @@ test('webhook schedules only a fixed Windows task and stores an atomic receipt',
   assert.match(apiSource, /registerDeployRoutes\(r, wrap\)/);
 });
 
-test('GitHub trigger is manual-only, least-privilege, and does not execute repository code on the VPS runner', () => {
+test('GitHub auto trigger is main-only, path-filtered, least-privilege, and does not execute repository code on the VPS runner', () => {
+  assert.match(workflow, /push:\n\s+branches:\n\s+- main/);
+  assert.match(workflow, /paths:\n(?:\s+- .+\n)+/);
   assert.match(workflow, /workflow_dispatch/);
   assert.match(workflow, /permissions:\n\s+contents: read/);
   assert.match(workflow, /runs-on: ubuntu-latest/);
