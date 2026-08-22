@@ -2,7 +2,7 @@
 import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName, saveActiveSession } from './SupabaseClient.js';
 import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
 import { getCard } from '../cards/CardCatalog.js';
-import { FIRST_REFINE_KIT, ITEMS } from '../engine/GameData.js';
+import { FIRST_REFINE_KIT, STARTER_PET, ITEMS } from '../engine/GameData.js';
 import { fuseCard } from '../cards/CardProgression.js';
 export { getDeterministicGuestName, isPlaceholderName };
 
@@ -26,6 +26,7 @@ const pendingNpcSales = new Map();
 const pendingFishingClaims = new Map();
 const pendingStarterCardClaims = new Map();
 const pendingFirstRefineSupplyClaims = new Map();
+const pendingStarterPetClaims = new Map();
 let clientMeasuredPing = null;
 const inventoryMutationQueues = new Map();
 
@@ -71,6 +72,21 @@ function isCommittedStarterCard(result) {
         && Number.isInteger(result.pity) && result.pity >= 0);
 }
 
+function isCommittedStarterPet(result, expectedRequestId) {
+    return Boolean(result
+        && result.ok === true
+        && result.serverAuthoritative === true
+        && result.requestId === expectedRequestId
+        && result.receiptId === STARTER_PET.receiptId
+        && result.item_name === STARTER_PET.itemName
+        && result.item_type === 'pet'
+        && result.pet_key === STARTER_PET.petKey
+        && result.price === 0
+        && Number.isSafeInteger(result.quantity) && result.quantity >= 1 && result.quantity <= 200
+        && result.stats && Array.isArray(result.stats.instances)
+        && (result.granted !== true || (result.instance && typeof result.instance.uid === 'string')));
+}
+
 function isCommittedFirstRefineSupply(result, expectedRequestId) {
     return Boolean(result
         && result.ok === true
@@ -113,6 +129,7 @@ function rejectPendingSocketRequests() {
     rejectPendingMap(pendingFishingClaims, message);
     rejectPendingMap(pendingStarterCardClaims, message);
     rejectPendingMap(pendingFirstRefineSupplyClaims, message);
+    rejectPendingMap(pendingStarterPetClaims, message);
     rejectPendingMap(pendingCardFusions, message);
     rejectPendingMap(pendingCardRefines, message);
 }
@@ -354,6 +371,98 @@ export async function requestFirstRefineSupply(characterId) {
         }, 12000);
         pendingFirstRefineSupplyClaims.set(requestId, { resolve, reject, timeout, requestId });
         socket.emit('first_refine_supply_claim', { requestId });
+    });
+}
+
+function attachStarterPetListeners(socket) {
+    if (socket._zolosStarterPetListeners) return;
+    socket._zolosStarterPetListeners = true;
+    socket.on('starter_pet_result', result => {
+        const pending = pendingStarterPetClaims.get(result?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingStarterPetClaims.delete(result.requestId);
+        if (!isCommittedStarterPet(result, pending.requestId)) {
+            pending.reject(new Error('ผลสัตว์เลี้ยงเริ่มต้นไม่ถูกต้อง'));
+            return;
+        }
+        pending.resolve(result);
+    });
+    socket.on('starter_pet_error', error => {
+        const pending = pendingStarterPetClaims.get(error?.requestId);
+        if (!pending) return;
+        clearTimeout(pending.timeout);
+        pendingStarterPetClaims.delete(error.requestId);
+        pending.reject(new Error(error?.message || 'รับสัตว์เลี้ยงเริ่มต้นไม่สำเร็จ'));
+    });
+}
+
+export async function requestStarterPet(characterId) {
+    const cleanCharacterId = String(characterId || '');
+    const requestId = `starter-pet:${cleanCharacterId}:v1`;
+    if (!cleanCharacterId) throw new Error('ไม่พบตัวละคร');
+
+    if (isOfflineMode || !supabase || /^(guest_|local_)/i.test(cleanCharacterId)) {
+        const receiptKey = `starter_pet_${cleanCharacterId}_v1`;
+        const previous = localDb.get(receiptKey);
+        if (previous) return previous;
+        const inventoryKey = `inventory_${cleanCharacterId}`;
+        const inventory = localDb.get(inventoryKey) || [];
+        let row = inventory.find(item => item.item_name === STARTER_PET.itemName && item.item_type === 'pet');
+        if (row) {
+            const instances = Array.isArray(row.stats?.instances) ? row.stats.instances : [];
+            if (instances.length === 0) {
+                const instance = { uid: `pet_${STARTER_PET.petKey}_${Date.now().toString(36)}`, name: null, level: 1, xp: 0 };
+                row.stats = { ...(row.stats || {}), instances: [instance] };
+                row.quantity = 1;
+            }
+            const result = {
+                ok: true, serverAuthoritative: false, requestId,
+                receiptId: STARTER_PET.receiptId, granted: false,
+                item_name: STARTER_PET.itemName, item_type: 'pet', pet_key: STARTER_PET.petKey,
+                price: 0, quantity: row.quantity, stats: row.stats,
+                instance: row.stats.instances[0] || null,
+            };
+            localDb.set(inventoryKey, inventory);
+            localDb.set(receiptKey, result);
+            return result;
+        }
+        const instance = { uid: `pet_${STARTER_PET.petKey}_${cleanCharacterId.replace(/[^a-zA-Z0-9]/g, '').slice(-18) || Date.now().toString(36)}`, name: null, level: 1, xp: 0 };
+        row = {
+            id: `inv_${requestId.replace(/[^a-zA-Z0-9]/g, '')}`,
+            character_id: cleanCharacterId,
+            item_name: STARTER_PET.itemName,
+            item_type: 'pet',
+            quantity: 1,
+            stats: { instances: [instance] },
+            emoji: ITEMS[STARTER_PET.itemName]?.emoji,
+            price: 0,
+            rarity: ITEMS[STARTER_PET.itemName]?.rarity,
+            desc: ITEMS[STARTER_PET.itemName]?.desc,
+        };
+        inventory.push(row);
+        const result = {
+            ok: true, serverAuthoritative: false, requestId,
+            receiptId: STARTER_PET.receiptId, granted: true,
+            item_name: STARTER_PET.itemName, item_type: 'pet', pet_key: STARTER_PET.petKey,
+            price: 0, quantity: 1, stats: row.stats, instance,
+        };
+        localDb.set(inventoryKey, inventory);
+        localDb.set(receiptKey, result);
+        return result;
+    }
+
+    const socket = getSocket();
+    if (!socket || !isSocketConnected()) throw new Error('เซิร์ฟเวอร์ยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่');
+    if (pendingStarterPetClaims.has(requestId)) throw new Error('กำลังรับสัตว์เลี้ยงเริ่มต้นอยู่');
+    attachStarterPetListeners(socket);
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            pendingStarterPetClaims.delete(requestId);
+            reject(new Error('เซิร์ฟเวอร์ตอบสนองช้า สัตว์เลี้ยงเริ่มต้นจะลองใหม่ครั้งถัดไป'));
+        }, 12000);
+        pendingStarterPetClaims.set(requestId, { resolve, reject, timeout, requestId });
+        socket.emit('starter_pet_claim', { requestId });
     });
 }
 

@@ -119,6 +119,10 @@ export const ITEMS = {
     'Bloom Fairy Pet': { emoji: '🧚', type: 'pet', pet: 'bloom_fairy', rarity: 'legendary', desc: 'ภูตดอกไม้แห่งพงไพร ปีกแก้วสะท้อนสีรุ้งทุกครั้งที่บิน', price: 95000 },
     'Ember Phoenix Pet': { emoji: '🔥', type: 'pet', pet: 'ember_phoenix', rarity: 'mythic', desc: 'วิหคเพลิงเกิดใหม่ เปลวไฟไม่เผาเจ้าของและส่องประกายดั่งอาทิตย์', price: 180000 },
 
+    // One-time onboarding companion. It is granted by the trusted server/local
+    // guest fallback, not sold as a free shop item.
+    'Starter Poring Pet': { emoji: '🩷', type: 'pet', pet: 'poring', rarity: 'common', desc: 'โพริ่งคู่ใจตัวแรกสำหรับนักผจญภัย ช่วยให้เรียนรู้การเรียกและการเติบโตของสัตว์เลี้ยง', price: 0, starterOnly: true },
+
     // ---- REFINE ORES (แร่ตีบวก) ----
     'Oridecon': { emoji: '🔩', type: 'material', rarity: 'rare', desc: 'แร่ออริดิคอนแข็งแกร่ง ใช้ตีบวกอาวุธให้ทรงพลังยิ่งขึ้น ยิ่งบวกสูงยิ่งใช้มาก', price: 2500 },
     'Elunium': { emoji: '💠', type: 'material', rarity: 'rare', desc: 'แร่อีลูเนียมเปล่งประกาย ใช้ตีบวกเกราะและโล่ให้ป้องกันเหนือชั้น', price: 2500 },
@@ -1684,6 +1688,13 @@ export const SHOP_ITEMS = [
 
 // Dedicated Pet Sanctuary catalog. Pets intentionally do not appear in the
 // general Kafra item shop, so the boutique owns discovery and presentation.
+export const STARTER_PET = Object.freeze({
+    itemName: 'Starter Poring Pet',
+    petKey: 'poring',
+    receiptId: 'starter-pet:v1',
+    price: 0,
+});
+
 export const PET_SHOP = [
     'Poring Pet', 'Chick Pet', 'Kitten Pet', 'Puppy Pet', 'Sunfox Pet',
     'Moss Turtle Pet', 'Owl Pet', 'Cloudling Pet', 'Moon Hare Pet',

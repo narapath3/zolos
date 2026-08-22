@@ -23,6 +23,7 @@ import { ensurePetEconomy, PET_CATALOG } from './api/petEconomy.js';
 import { ensureNpcSaleEconomy, sellItemToNpc } from './api/npcSale.js';
 import { ensureFishingEconomy, claimFishingReward, isFishingRequestId } from './api/fishing.js';
 import { ensureFirstRefineEconomy, claimFirstRefineSupply, REQUEST_ID_RE as FIRST_REFINE_REQUEST_ID_RE } from './api/firstRefine.js';
+import { ensureStarterPetEconomy, claimStarterPet, REQUEST_ID_RE as STARTER_PET_REQUEST_ID_RE } from './api/starterPet.js';
 import { startMonsterEngine, reloadWorld, applyHit as monEngineApplyHit, isRunning as monEngineRunning, clearAggroForCharacter } from './game/monsterEngine.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -851,6 +852,50 @@ io.on('connection', (socket) => {
             if (message.toLowerCase().includes('no celestial ore')) return reject('ไม่มี Celestial Ore สำหรับแปลง');
             console.error('[Server] Ore conversion failed:', message);
             reject('แปลงแร่ไม่สำเร็จ แร่ยังอยู่ครบ กรุณาลองใหม่');
+        }
+    });
+
+    socket.on('starter_pet_claim', async (payload) => {
+        const player = trustedSender(socket);
+        const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+        const stableRequestId = player?.characterId ? `starter-pet:${player.characterId}:v1` : requestId;
+        const reject = message => socket.emit('starter_pet_error', { requestId, message });
+        if (!player || player.verified !== true || !player.characterId || !player.userId || !supabase) {
+            return reject('ไม่สามารถยืนยันตัวละครเพื่อรับสัตว์เลี้ยงเริ่มต้นได้');
+        }
+        if (!STARTER_PET_REQUEST_ID_RE.test(requestId) || requestId !== stableRequestId) {
+            return reject('รหัสคำขอสัตว์เลี้ยงเริ่มต้นไม่ถูกต้อง');
+        }
+        if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
+        if (shouldRateLimitEvent(socket._rateLimitTracker, 'starter_pet_claim', 2, 10000)) {
+            return reject('กดรับสัตว์เลี้ยงเร็วเกินไป กรุณารอสักครู่');
+        }
+        try {
+            const result = USE_LOCAL_DB
+                ? await claimStarterPet({ characterId: player.characterId, userId: player.userId, requestId: stableRequestId })
+                : await (async () => {
+                    const { data, error } = await supabase.rpc('claim_starter_pet', {
+                        p_character_id: player.characterId,
+                        p_user_id: player.userId,
+                        p_idempotency_key: stableRequestId,
+                    });
+                    if (error || !data) throw error || new Error('empty starter pet result');
+                    return data;
+                })();
+            if (!result || result.ok !== true || result.serverAuthoritative !== true
+                || result.receiptId !== 'starter-pet:v1'
+                || result.item_name !== 'Starter Poring Pet'
+                || result.item_type !== 'pet'
+                || result.pet_key !== 'poring'
+                || result.price !== 0
+                || !Number.isSafeInteger(Number(result.quantity)) || Number(result.quantity) < 1
+                || (result.granted === true && (!result.instance || typeof result.instance.uid !== 'string'))) {
+                throw new Error('invalid starter pet result');
+            }
+            socket.emit('starter_pet_result', { ...result, requestId });
+        } catch (error) {
+            console.error('[Server] starter pet claim failed:', error?.message || error);
+            reject('รับสัตว์เลี้ยงเริ่มต้นไม่สำเร็จ กรุณาลองใหม่');
         }
     });
 
@@ -2027,6 +2072,7 @@ httpServer.listen(PORT, HOST, () => {
                 await ensureNpcSaleEconomy();
                 await ensureFishingEconomy();
                 await ensureFirstRefineEconomy();
+                await ensureStarterPetEconomy();
                 await ensureBugReportTables();
                 if (WORLD_MONSTERS) await startMonsterEngine({ io, onlinePlayers });
             } catch (e) { console.error('[MonsterCfg] init failed:', e.message); }

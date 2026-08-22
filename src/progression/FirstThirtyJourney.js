@@ -188,7 +188,7 @@ export const FIRST_THIRTY_STEPS = Object.freeze([
     chapter: 17,
     title: 'เรียกสัตว์เลี้ยงออกเดินทาง',
     titleEn: 'Summon your first pet',
-    description: 'รับเลี้ยงสัตว์เลี้ยงจาก Sanctuary แล้วเปิด BAG → แท็บ Pet แตะตัวที่ต้องการเพื่อเรียกออกมาเป็นเพื่อน',
+    description: 'ไป Sanctuary เพื่อรับ Starter Poring Pet ฟรีหนึ่งตัว แล้วเปิด BAG → แท็บ Pet แตะ Poring ที่ได้รับเพื่อเรียกออกมาเป็นเพื่อน การเปิดร้านอย่างเดียวจะยังไม่ผ่านบทนี้',
     kind: 'ui',
     target: '#btn-inventory',
     icon: '🐶',

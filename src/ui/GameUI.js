@@ -1,7 +1,7 @@
-import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig, FIRST_REFINE_KIT } from '../engine/GameData.js';
+import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNIR_MONSTERS, ABYSS_MONSTERS, WATER_MONSTERS, getAllMonsters, SHOP_ITEMS, PET_SHOP, DIVINE_ZOL_SHOP, SKILLS, FISH_SPECIES, FORGE_RECIPES, PICKAXES, JOBS, JOB_UNLOCK_LEVEL, JOB_CHANGE_COST, canEquipItem, itemJob, EQUIP_SLOTS, ARMOR_SLOTS, getEquipSlot, getJobStats, petModelOf, REFINABLE_TYPES, refineInfo, refineOreFor, getRefineMult, refineTierColor, cardFitsSlot, cardCategoryForSlot, RARITY_COLOR, getPetCombat, getFishingRodConfig, FIRST_REFINE_KIT, STARTER_PET } from '../engine/GameData.js';
 import { supabase, isSelfHostMode } from '../network/SupabaseClient.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
-import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestNpcSale, requestFirstRefineSupply, getClientPing } from '../network/GameSync.js';
+import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestStarterPet, requestNpcSale, requestFirstRefineSupply, getClientPing } from '../network/GameSync.js';
 import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { FIRST_THIRTY_STEPS, createFirstThirtyState, firstThirtyProgress, getFirstThirtyStep, sanitizeFirstThirtyState, updateFirstThirtyState } from '../progression/FirstThirtyJourney.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
@@ -80,6 +80,7 @@ export class GameUI {
     this._journeyNextPromptEl = null;
     this._journeyPromptActionLock = false;
     this._firstRefineSupplyPromise = null;
+    this._starterPetPromise = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -577,6 +578,7 @@ export class GameUI {
         tabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         this.currentTab = tab.getAttribute('data-tab');
+        if (this.currentTab === 'pet') this._ensureStarterPet();
         this._renderInventory();
       });
     });
@@ -1902,6 +1904,49 @@ export class GameUI {
     }
     this._renderInventory();
     if (this.selectedItemName === item.name) this._updateDetailBox();
+  }
+
+  async _ensureStarterPet() {
+    if (this.firstThirtyJourney?.activeStep !== 'summon_first_pet' || !this.characterId || !this.character) return null;
+    if (this._allPetInstances().length > 0) return null;
+    if (this._starterPetPromise) return this._starterPetPromise;
+    this._starterPetPromise = requestStarterPet(this.characterId)
+      .then(result => {
+        if (!result || result.ok !== true || result.item_name !== STARTER_PET.itemName) {
+          throw new Error('ผลสัตว์เลี้ยงเริ่มต้นไม่ถูกต้อง');
+        }
+        let row = this.inventory.find(item => item.item_name === STARTER_PET.itemName && item.item_type === 'pet');
+        const meta = ITEMS[STARTER_PET.itemName] || {};
+        if (!row) {
+          row = {
+            item_name: STARTER_PET.itemName,
+            item_type: 'pet',
+            quantity: Number(result.quantity) || 1,
+            stats: result.stats || { instances: [result.instance] },
+            emoji: meta.emoji,
+            rarity: meta.rarity,
+            desc: meta.desc,
+            price: 0,
+          };
+          this.inventory.push(row);
+        } else {
+          row.quantity = Number(result.quantity) || 1;
+          row.stats = result.stats || row.stats || { instances: [result.instance] };
+        }
+        this._ensurePetInstances(row);
+        this._renderInventory();
+        if (result.granted) {
+          this.addCombatLog('ได้รับ Starter Poring Pet ฟรีจาก Pet Sanctuary แล้ว เปิดแท็บ Pet เพื่อเรียกออกมา', 'levelup');
+          this._equipToast('ได้รับ Poring คู่ใจฟรี', true);
+        }
+        return result;
+      })
+      .catch(error => {
+        this.addCombatLog(error?.message || 'รับสัตว์เลี้ยงเริ่มต้นไม่สำเร็จ กรุณาแตะแท็บ Pet อีกครั้ง', 'warning');
+        return null;
+      })
+      .finally(() => { this._starterPetPromise = null; });
+    return this._starterPetPromise;
   }
 
   _renderInventory() {
@@ -6509,6 +6554,7 @@ export class GameUI {
     modal.innerHTML = `<section class="pet-boutique" role="dialog" aria-modal="true" aria-label="Pet Sanctuary"><header class="pet-boutique__hero"><h2>✦ Pet Sanctuary</h2><p>เลือกเพื่อนคู่ใจ ดูพลัง และรับเลี้ยงจากลาน sanctuary</p><div class="pet-boutique__wallet">Zeny ${gold.toLocaleString()}</div><div class="pet-boutique__summary"><span>สะสม <strong>${ownedPetCount}</strong> ตัว</span><span>${this.character?.equippedPetUid ? 'มีเพื่อนออกเดินทางแล้ว' : 'ยังไม่มีเพื่อนที่เรียกใช้งาน'}</span></div><button class="pet-boutique__close" aria-label="ปิด">×</button></header><div class="pet-boutique__tools" role="toolbar" aria-label="ตัวกรองสัตว์เลี้ยง"><button class="pet-boutique__filter is-active" type="button" data-pet-filter="all">ทั้งหมด</button><button class="pet-boutique__filter" type="button" data-pet-filter="owned">มีแล้ว</button><button class="pet-boutique__filter" type="button" data-pet-filter="available">ยังไม่มี</button><button class="pet-boutique__filter" type="button" data-pet-filter="common">ธรรมดา</button><button class="pet-boutique__filter" type="button" data-pet-filter="rare">หายาก</button><button class="pet-boutique__filter" type="button" data-pet-filter="epic">มหากาพย์</button><button class="pet-boutique__filter" type="button" data-pet-filter="legendary">ตำนาน</button><button class="pet-boutique__filter" type="button" data-pet-filter="mythic">มหาเทพ</button><select class="pet-boutique__sort" aria-label="เรียงรายการ"><option value="featured">แนะนำ</option><option value="price-asc">ราคาต่ำไปสูง</option><option value="price-desc">ราคาสูงไปต่ำ</option><option value="rarity">ตามความหายาก</option></select></div><div class="pet-boutique__body"><div class="pet-boutique__grid" aria-live="polite">${PET_SHOP.map(entry=>{const data=ITEMS[entry.name];const state=getPetState(entry);const stateLabel=state.equipped?'ใช้งานอยู่':state.ownedCount?`มีแล้ว ${state.ownedCount}`:'';return `<article class="pet-card${state.equipped?' is-equipped':''}" tabindex="0" data-pet="${entry.name}" data-rarity="${String(data.rarity).toLowerCase()}" data-price="${entry.price}" data-owned="${state.ownedCount?'1':'0'}"><span class="pet-card__rarity">${data.rarity}</span>${stateLabel?`<span class="pet-card__state">${stateLabel}</span>`:''}<div class="pet-card__art">${petModelMarkup(data.pet,320)||petPortraitMarkup(data.pet)}</div><h3>${entry.name.replace(' Pet','')}</h3><div class="pet-card__foot"><span class="pet-card__price">${entry.price.toLocaleString()} z</span><button class="pet-card__buy${state.ownedCount?' is-owned':''}" ${gold<entry.price?'disabled':''}>${state.equipped?'รับเลี้ยงเพิ่ม':state.ownedCount?'รับเลี้ยงเพิ่ม':'รับเลี้ยง'}</button></div></article>`}).join('')}</div><aside class="pet-boutique__detail" aria-live="polite"></aside></div></section>`;
     modal.style.display = 'flex'; this.updateMobileControlsVisibility();
     this._completeFirstThirtyStep('open_pet_sanctuary', { prompt: false });
+    if (this.firstThirtyJourney.activeStep === 'summon_first_pet') this._ensureStarterPet();
     const close=()=>{modal.style.display='none';document.removeEventListener('keydown', onEscape);this._petBoutiqueEscapeHandler=null;if(this._petViewer)this._petViewer.pause();this.updateMobileControlsVisibility();};
     const onEscape=e=>{if(e.key==='Escape')close();};
     this._petBoutiqueEscapeHandler=onEscape;
@@ -9901,7 +9947,7 @@ export class GameUI {
       },
       summon_first_pet: {
         image: '/assets/tutorial/guide-inventory.jpg', pose: 'inventory',
-        hint: 'รับเลี้ยงสัตว์เลี้ยงก่อน แล้วเปิด BAG → แท็บ Pet → แตะสัตว์เลี้ยงเพื่อเรียกออกมาเดินทางด้วยกัน'
+        hint: 'Sanctuary จะมอบ Starter Poring Pet ฟรีให้หนึ่งตัวก่อน จากนั้นเปิด BAG → แท็บ Pet → แตะ Poring เพื่อเรียกออกมาเดินทางด้วยกัน การรับสัตว์อย่างเดียวจะยังไม่ผ่านบท'
       },
       grow_pet_one_level: {
         image: '/assets/tutorial/guide-combat.jpg', pose: 'combat',
