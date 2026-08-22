@@ -113,14 +113,19 @@ test('generic inventory writes cannot grant items or forge quantity/stats', () =
   assert.match(data, /isStarterSword/);
 });
 
-test('system inventory snapshots carry an explicit item identity on stats updates', () => {
-  assert.match(gameSync, /update\(\{ stats: questData \}\)[\s\S]*eq\('item_name', 'daily_quests'\)/);
-  assert.match(gameSync, /stats: \{ list: friendsList \}[\s\S]*eq\('item_name', 'friends_list'\)/);
+test('system inventory snapshots carry an explicit item identity on atomic upserts', () => {
+  assert.match(gameSync, /item_name: 'daily_quests'[\s\S]*item_type: 'system'[\s\S]*stats: questData/);
+  assert.match(gameSync, /item_name: 'friends_list'[\s\S]*item_type: 'system'[\s\S]*stats: \{ list: friendsList \}/);
+  assert.match(gameSync, /onConflict: 'character_id,item_name'/);
 });
 
 const serverSource = read('../server/server.js');
 
-test('save_state never persists a client inventory snapshot through service role', () => {
+test('save_state binds the verified character and never retains client inventory', () => {
+  assert.match(serverSource, /save_state character mismatch/);
+  assert.match(serverSource, /String\(data\.characterId\) !== String\(player\.characterId\)/);
+  assert.match(serverSource, /const \{ inventory: _ignoredInventory, \.\.\.clientSnapshot \} = data/);
+  assert.match(serverSource, /characterId: player\.characterId/);
   assert.match(serverSource, /Ignored client inventory backup/);
   assert.match(serverSource, /inventory is server-authoritative/);
   assert.doesNotMatch(serverSource, /const sanitized = sanitizeInventoryBackup\(inventory\)/);

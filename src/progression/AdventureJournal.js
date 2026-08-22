@@ -36,6 +36,38 @@ export function sanitizeAdventureJournal(raw) {
   return result;
 }
 
+export function mergeAdventureJournals(...sources) {
+  const journals = sources.map(sanitizeAdventureJournal);
+  const merged = createAdventureJournal();
+  const monsterNames = new Set(journals.flatMap(journal => Object.keys(journal.monsters)));
+  for (const name of monsterNames) {
+    const entries = journals.map(journal => journal.monsters[name]).filter(Boolean);
+    const kills = Math.max(...entries.map(entry => entry.kills || 0), 0);
+    if (!kills) continue;
+    const firstDates = entries.map(entry => entry.firstDefeatedAt).filter(Boolean).sort();
+    const lastDates = entries.map(entry => entry.lastDefeatedAt).filter(Boolean).sort();
+    merged.monsters[name] = {
+      kills,
+      firstDefeatedAt: firstDates[0] || null,
+      lastDefeatedAt: lastDates.at(-1) || null,
+    };
+  }
+  merged.totalKills = Object.values(merged.monsters).reduce((sum, entry) => sum + entry.kills, 0);
+  const journeySources = journals.map(journal => journal.journey);
+  const completed = new Set(journeySources.flatMap(state => state.completed));
+  const skipped = new Set(journeySources.flatMap(state => state.skipped));
+  merged.journey = sanitizeFirstThirtyState({
+    completed: [...completed],
+    skipped: [...skipped].filter(id => !completed.has(id)),
+    firstStartedAt: journeySources.map(state => state.firstStartedAt).filter(Boolean).sort()[0] || null,
+    lastUpdatedAt: journeySources.map(state => state.lastUpdatedAt).filter(Boolean).sort().at(-1) || null,
+    rewardReceipts: [...new Set(journeySources.flatMap(state => state.rewardReceipts))],
+  });
+  const journalDates = journals.map(journal => journal.lastUpdated).filter(Boolean).sort();
+  merged.lastUpdated = journalDates.at(-1) || merged.journey.lastUpdatedAt || null;
+  return merged;
+}
+
 export function recordMonsterDefeat(journal, monsterName, now = new Date().toISOString()) {
   const clean = sanitizeAdventureJournal(journal);
   const key = normalizeMonsterName(monsterName);

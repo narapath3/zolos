@@ -25,9 +25,13 @@ test('existing guest session can resume even when only the character record rema
   assert.match(localSessionBlock, /const profile = localDb\.get\(`profile_\$\{activeUserId\}`\)/);
   assert.match(localSessionBlock, /const character = localDb\.get\(`char_\$\{activeUserId\}`\)/);
   assert.match(localSessionBlock, /if \(profile \|\| character\)/);
-  const fallbackSessionBlock = supabaseClient.slice(supabaseClient.indexOf('// Fallback to local guest session'));
-  assert.match(fallbackSessionBlock, /const character = localDb\.get\(`char_\$\{activeUserId\}`\)/);
-  assert.match(fallbackSessionBlock, /if \(profile \|\| character\)/);
+  assert.match(localSessionBlock, /if \(isOfflineMode \|\| !supabase\)/);
+  const onlineSessionBlock = supabaseClient.slice(
+    supabaseClient.indexOf('export async function getSession()'),
+    supabaseClient.indexOf('export function getProfile'),
+  );
+  assert.match(onlineSessionBlock, /Do not revive a synthetic guest_/);
+  assert.doesNotMatch(onlineSessionBlock, /return \{ user: \{ id: activeUserId, is_anonymous: true \} \}/);
 });
 
 test('all normal Guest entry points resume instead of silently creating a new identity', () => {

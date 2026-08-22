@@ -10,6 +10,7 @@ import { Server } from 'socket.io';
 import { createClient } from '@supabase/supabase-js';
 import { createPgClient } from './api/pgClient.js';
 import { createApiRouter } from './api/index.js';
+import * as auth from './api/auth.js';
 import { createAdminRouter } from './api/admin.js';
 import { ensureBugReportTables } from './api/bugReports.js';
 import * as ipMonitor from './api/ipMonitor.js';
@@ -123,7 +124,49 @@ const io = new Server(httpServer, {
 // service, DNS record, or Caddy change needed. Only active data-wise when
 // USE_LOCAL_DB=true (the API always uses local Postgres).
 app.use('/api', createApiRouter());
-
+// Mobile lifecycle fallback: fetch({ keepalive: true }) can reach this route
+// after pagehide even when Socket.IO disconnect delivery is suspended. It uses
+// the same ownership-gated saver as save_state and never accepts inventory as
+// an authoritative write.
+app.post('/api/persistence/snapshot', express.json({ limit: '256kb' }), async (req, res) => {
+    const actor = auth.authFromReq(req);
+    if (!actor?.userId) return res.status(401).json({ error: 'no session' });
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({ error: 'invalid snapshot' });
+    }
+    let encoded;
+    try {
+        encoded = JSON.stringify(body);
+    } catch {
+        return res.status(400).json({ error: 'invalid snapshot' });
+    }
+    if (Buffer.byteLength(encoded, 'utf8') > 256 * 1024) {
+        return res.status(413).json({ error: 'snapshot too large' });
+    }
+    const { characterId, updates, dailyQuests, friendsList, fishingAlmanac, adventureJournal, loginStreak } = body;
+    if (typeof characterId !== 'string' || characterId.length < 1 || characterId.length > 128) {
+        return res.status(400).json({ error: 'invalid character id' });
+    }
+    try {
+        const saved = await saveCharacterToSupabase({
+            characterId,
+            updates,
+            dailyQuests,
+            friendsList,
+            fishingAlmanac,
+            adventureJournal,
+            loginStreak,
+            _ownerUserId: actor.userId,
+            _clientIp: req.ip,
+        });
+        if (!saved) return res.status(503).json({ error: 'snapshot not saved' });
+        return res.json({ saved: true });
+    } catch (error) {
+        console.error('[Server] keepalive snapshot failed:', error.message);
+        return res.status(503).json({ error: 'snapshot not saved' });
+    }
+});
 // Health check endpoint (Railway uses this)
 app.get('/', (_req, res) => {
     res.json(buildHealthPayload({
@@ -823,10 +866,24 @@ io.on('connection', (socket) => {
             if (!socket._rateLimitTracker) socket._rateLimitTracker = {};
             if (shouldRateLimitEvent(socket._rateLimitTracker, 'save_state', 3, 10000)) return;
 
-            // SECURITY: stamp the save with the socket's server-trusted userId so
-            // the DB write can be gated on ownership. A client cannot save to a
-            // character it doesn't own by lying about characterId.
-            const trusted = { ...data, _ownerUserId: player.userId, _clientIp: socket._clientIp };
+            // SECURITY: bind the snapshot to the character verified during join.
+            // Ownership alone is not enough: one account may have multiple
+            // characters, and a modified client must not target another one.
+            if (String(data.characterId) !== String(player.characterId)) {
+                console.warn(`[Server] 🚫 save_state character mismatch for user ${player.userId}`);
+                if (socket._clientIp) ipMonitor.recordSuspicious(socket._clientIp, 'save-character-mismatch');
+                return;
+            }
+            // Stamp the save with the socket's server-trusted userId so the DB
+            // write can be gated on ownership. Inventory is server-authoritative
+            // and is intentionally not retained in the pending snapshot.
+            const { inventory: _ignoredInventory, ...clientSnapshot } = data;
+            const trusted = {
+                ...clientSnapshot,
+                characterId: player.characterId,
+                _ownerUserId: player.userId,
+                _clientIp: socket._clientIp,
+            };
             player.lastSaveData = trusted;
             pendingSaves.set(player.userId, trusted);
         }
@@ -1903,11 +1960,47 @@ async function settleDuelMMR(winnerCharacterId, loserCharacterId) {
 }
 
 // ============ Periodic Save to Supabase ============
+async function saveSystemInventorySnapshot(characterId, itemName, stats) {
+    if (stats === undefined || stats === null) return;
+    if (typeof stats !== 'object' || Array.isArray(stats)) {
+        throw new Error(`Invalid ${itemName} system snapshot`);
+    }
+    // Keep a client-owned progress blob bounded before using the service-role
+    // saver. This prevents a modified browser from turning save_state into a
+    // large-payload/large-row write path.
+    let boundedStats;
+    try {
+        const encoded = JSON.stringify(stats);
+        if (encoded.length > 128 * 1024) throw new Error('system snapshot too large');
+        boundedStats = JSON.parse(encoded);
+    } catch (error) {
+        throw new Error(`Invalid ${itemName} system snapshot: ${error.message}`);
+    }
+
+    const { error } = await supabase.from('inventory').upsert({
+        character_id: characterId,
+        item_name: itemName,
+        item_type: 'system',
+        quantity: 1,
+        stats: boundedStats,
+    }, { onConflict: 'character_id,item_name' });
+    if (error) throw error;
+}
+
 async function saveCharacterToSupabase(saveData) {
     if (!supabase || !saveData || !saveData.characterId) return false;
 
     try {
-        const { characterId, updates, inventory, dailyQuests, friendsList } = saveData;
+        const {
+            characterId,
+            updates,
+            inventory,
+            dailyQuests,
+            friendsList,
+            fishingAlmanac,
+            adventureJournal,
+            loginStreak,
+        } = saveData;
 
         // SECURITY GATE: only write if this character is owned by the socket's
         // server-trusted user. Blocks cross-account stat/inventory overwrites
@@ -1948,67 +2041,16 @@ async function saveCharacterToSupabase(saveData) {
             }
         }
 
-        // 2. Save daily quests (as system inventory item)
-        if (dailyQuests) {
-            try {
-                const { data: existing, error: lookupError } = await supabase
-                    .from('inventory')
-                    .select('id')
-                    .eq('character_id', characterId)
-                    .eq('item_name', 'daily_quests')
-                    .eq('item_type', 'system')
-                    .maybeSingle();
-                if (lookupError) throw lookupError;
+        // 2-5. Save every non-authoritative system snapshot through the same
+        // bounded, ownership-gated upsert helper. These are progress records,
+        // not item grants; inventory quantities/stats remain server-authoritative.
+        await saveSystemInventorySnapshot(characterId, 'daily_quests', dailyQuests);
+        await saveSystemInventorySnapshot(characterId, 'friends_list', friendsList ? { list: friendsList } : null);
+        await saveSystemInventorySnapshot(characterId, 'fishing_almanac', fishingAlmanac);
+        await saveSystemInventorySnapshot(characterId, 'adventure_journal', adventureJournal);
+        await saveSystemInventorySnapshot(characterId, 'login_streak', loginStreak);
 
-                let mutation;
-                if (existing) {
-                    mutation = await supabase.from('inventory').update({ stats: dailyQuests }).eq('id', existing.id);
-                } else {
-                    mutation = await supabase.from('inventory').insert({
-                        character_id: characterId,
-                        item_name: 'daily_quests',
-                        item_type: 'system',
-                        quantity: 1,
-                        stats: dailyQuests
-                    });
-                }
-                if (mutation.error) throw mutation.error;
-            } catch (e) {
-                throw new Error(`Save daily quests failed: ${e.message}`);
-            }
-        }
-
-        // 3. Save friends list (as system inventory item)
-        if (friendsList) {
-            try {
-                const { data: existing, error: lookupError } = await supabase
-                    .from('inventory')
-                    .select('id')
-                    .eq('character_id', characterId)
-                    .eq('item_name', 'friends_list')
-                    .eq('item_type', 'system')
-                    .maybeSingle();
-                if (lookupError) throw lookupError;
-
-                let mutation;
-                if (existing) {
-                    mutation = await supabase.from('inventory').update({ stats: { list: friendsList } }).eq('id', existing.id);
-                } else {
-                    mutation = await supabase.from('inventory').insert({
-                        character_id: characterId,
-                        item_name: 'friends_list',
-                        item_type: 'system',
-                        quantity: 1,
-                        stats: { list: friendsList }
-                    });
-                }
-                if (mutation.error) throw mutation.error;
-            } catch (e) {
-                throw new Error(`Save friends list failed: ${e.message}`);
-            }
-        }
-
-        // 4. Do not apply a client inventory snapshot here. Even a sanitized
+        // 6. Do not apply a client inventory snapshot here. Even a sanitized
         // snapshot still lets a connected browser overwrite server-owned item
         // stats (refine/cards/equipment) through the service-role save path.
         // Inventory mutations now come from authoritative monster/economy RPCs;

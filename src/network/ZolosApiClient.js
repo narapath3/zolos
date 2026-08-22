@@ -154,6 +154,9 @@ export function createZolosClient(baseUrl) {
             const user = userFromToken(t);
             return { data: { session: { access_token: t, user } }, error: null };
         },
+        // Page lifecycle handlers need a synchronous token read: awaiting
+        // getSession() during pagehide can be suspended by mobile browsers.
+        getAccessToken() { return getToken(); },
         async updateUser({ password }) {
             try { await apiFetch('/auth/update', { method: 'POST', body: JSON.stringify({ password }) }); return { data: { user: userFromToken(getToken()) }, error: null }; }
             catch (e) { return { data: { user: null }, error: { message: e.message } }; }

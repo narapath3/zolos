@@ -1163,9 +1163,9 @@ async function initGame(charData) {
     gameUI.setGuestMode(charData.isGuest === true);
 
     // Setup bind account callback.
-    // Guests are local (no anonymous auth session on this project), so binding
-    // creates a real account and migrates the guest's progress to it, then
-    // reloads into the new account.
+    // Online Guests use a real anonymous server identity. Binding creates a
+    // real account and migrates that server-backed progress to it, then reloads
+    // into the new account. Only explicit offline mode uses local-only Guest data.
     gameUI.setupBindAccountCallback(async (email, password) => {
         const { migrateGuestToAccount } = await import('./network/GameSync.js');
         const saveData = character.getSaveData();
@@ -1569,23 +1569,30 @@ async function initGame(charData) {
         console.warn('[Zolos] Announcement socket init failed:', err);
     }
 
-    // Start auto-save
-    startAutoSave(() => {
+    // Build one complete persistence snapshot for autosave, backgrounding and
+    // logout. The socket server uses the same snapshot as a disconnect safety
+    // net, so system progress cannot be lost just because a mobile pagehide
+    // event leaves no time for separate requests to finish.
+    const buildPersistenceSnapshot = () => {
         const saveData = character.getSaveData();
-        // Auto-save daily quests, friends, AND inventory in the background
-        if (gameUI) {
-            gameUI._saveDailyQuestsToDB().catch(() => { });
-            gameUI._saveFriendsListToDB().catch(() => { });
-            // Flush inventory to DB on every auto-save tick (every 15s) so
-            // equipped state / newly bought items are always persisted.
-            gameUI._flushInventoryToDB().catch(() => { });
-        }
         return {
             characterId: charData.id,
             userId: charData.user_id,
             inventory: saveData.inventory,
-            updates: saveData.updates
+            updates: saveData.updates,
+            dailyQuests: gameUI?.dailyQuestsState || null,
+            friendsList: Array.isArray(gameUI?.friends) ? gameUI.friends : null,
+            fishingAlmanac: gameUI?.almanac || null,
+            adventureJournal: gameUI?.adventureJournal || null,
+            loginStreak: gameUI?.loginStreak || null,
         };
+    };
+
+    // Start auto-save. Keep the existing 15s cadence, but flush every
+    // player-owned subsystem instead of only quests/friends/inventory.
+    startAutoSave(() => {
+        gameUI?.flushPersistence?.()?.catch(error => console.warn('[Zolos] Autosave flush failed:', error?.message || error));
+        return buildPersistenceSnapshot();
     }, 15000);
 
     // Load Inventory, Daily Quests, and Friends List from DB
@@ -1640,14 +1647,10 @@ async function initGame(charData) {
     const pushFinalSave = () => {
         try {
             if (!isGameStarted || !character || !charData?.id) return;
-            if (gameUI && typeof gameUI._flushInventoryToDB === 'function') gameUI._flushInventoryToDB();
-            const sd = character.getSaveData();
-            sendSaveState({
-                characterId: charData.id,
-                userId: charData.user_id,
-                inventory: sd.inventory,
-                updates: sd.updates,
-            });
+            // Start all direct saves immediately, but do not await in pagehide:
+            // mobile browsers may suspend the JS task as soon as this handler ends.
+            gameUI?.flushPersistence?.()?.catch(error => console.warn('[Zolos] Final flush failed:', error?.message || error));
+            sendSaveState(buildPersistenceSnapshot(), { keepalive: true });
         } catch { /* best-effort */ }
     };
     window.addEventListener('beforeunload', pushFinalSave);
@@ -1661,8 +1664,7 @@ async function initGame(charData) {
     window.zolosSaveNow = () => {
         try {
             if (!isGameStarted || !character || !charData?.id) return;
-            const sd = character.getSaveData();
-            sendSaveState({ characterId: charData.id, userId: charData.user_id, inventory: sd.inventory, updates: sd.updates });
+            sendSaveState(buildPersistenceSnapshot());
         } catch { /* best-effort */ }
     };
 
@@ -1684,13 +1686,12 @@ async function initGame(charData) {
                     } else {
                         await saveCharacter(charData.id, saveData.updates);
                     }
-                    if (gameUI.dailyQuestsState) {
-                        await saveDailyQuests(charData.id, gameUI.dailyQuestsState);
-                    }
-                    await saveFriendsList(charData.id, gameUI.friends);
-                    // Flush inventory to DB before logout to ensure all equipped state is saved
-                    await gameUI._flushInventoryToDB();
-                    gameUI.addCombatLog('✅ บันทึกข้อมูลสำเร็จ', 'system');
+                    // Send the complete snapshot before disconnecting, then await
+                    // every direct persistence adapter (journal, almanac, streak,
+                    // quests, friends and inventory).
+                    sendSaveState(buildPersistenceSnapshot());
+                    const flushOk = await gameUI.flushPersistence();
+                    gameUI.addCombatLog(flushOk ? '✅ บันทึกข้อมูลสำเร็จ' : '⚠️ บันทึกบางส่วนไม่สำเร็จ จะลองใหม่เมื่อเข้าเกมอีกครั้ง', 'system');
                 } catch (e) {
                     console.error('Final state save error:', e);
                 }

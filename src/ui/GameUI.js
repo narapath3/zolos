@@ -2,7 +2,7 @@ import { getExpRequired, ITEMS, MONSTERS, PAYON_MONSTERS, GLAST_MONSTERS, MJOLNI
 import { supabase, isSelfHostMode, saveGuestJobHint } from '../network/SupabaseClient.js';
 import { itemIconMarkup } from '../engine/ItemVisuals.js';
 import { fetchLeaderboard, fetchPublicCharacterById, loadInventory, saveInventoryItem, setInventoryItemQuantity, updateInventoryItemStats, fetchMarketListings, listMarketItem, buyMarketItem, cancelMarketListing, fetchMarketPriceStats, getDeterministicGuestName, isPlaceholderName, sendTradeRequestPacket, sendTradeResponsePacket, sendTradeCancelPacket, executeDecentralizedSenderTrade, executeDecentralizedReceiverTrade, resolveCharacterByUid, searchCharactersByName, sendCardMail, fetchCardMail, claimCardMail, returnCardMail, sendFriendRequestPacket, sendFriendResponsePacket, sendWarpRequest, saveDailyQuests, loadDailyQuests, saveFriendsList, loadFriendsList, saveFishingAlmanac, loadFishingAlmanac, saveAdventureJournal, loadAdventureJournal, saveLoginStreak, loadLoginStreak, broadcastKillStreak, requestCardFusion, requestCardRefine, requestCardEcon, requestOreConversion, requestPetPurchase, requestStarterPet, requestNpcSale, requestFirstRefineSupply, getClientPing } from '../network/GameSync.js';
-import { createAdventureJournal, sanitizeAdventureJournal, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
+import { createAdventureJournal, sanitizeAdventureJournal, mergeAdventureJournals, recordMonsterDefeat, masteryForKills, getMonsterJournalEntry, summarizeJournal } from '../progression/AdventureJournal.js';
 import { FIRST_THIRTY_STEPS, createFirstThirtyState, firstThirtyProgress, getFirstThirtyStep, sanitizeFirstThirtyState, updateFirstThirtyState } from '../progression/FirstThirtyJourney.js';
 import { hydrateMonsterPortraits } from './MonsterPortraitRenderer.js';
 import { observeItemPortraits } from './ItemPortraitRenderer.js';
@@ -81,6 +81,7 @@ export class GameUI {
     this._journeyPromptActionLock = false;
     this._firstRefineSupplyPromise = null;
     this._starterPetPromise = null;
+    this._persistenceFlushPromise = null;
 
     // Leaderboard category state
     this.leaderboardCategory = 'level';
@@ -1265,6 +1266,33 @@ export class GameUI {
   }
 
   // ============ Daily Quests load/save helpers ============
+  _mergeDailyQuestStates(...sources) {
+    const states = sources.filter(state => state && typeof state === 'object' && Array.isArray(state.quests));
+    if (!states.length) return null;
+    const today = new Date().toDateString();
+    const sameDay = states.filter(state => state.lastDate === today);
+    const base = sameDay[0] || states[0];
+    const byId = new Map();
+    for (const state of sameDay.length ? sameDay : [base]) {
+      for (const quest of state.quests) {
+        if (!quest || typeof quest.id !== 'string') continue;
+        const previous = byId.get(quest.id);
+        byId.set(quest.id, previous ? {
+          ...previous,
+          ...quest,
+          current: Math.max(Number(previous.current) || 0, Number(quest.current) || 0),
+          isClaimed: Boolean(previous.isClaimed || quest.isClaimed),
+        } : { ...quest });
+      }
+    }
+    return {
+      ...base,
+      streak: Math.max(...(sameDay.length ? sameDay : [base]).map(state => Number(state.streak) || 0), 0),
+      rouletteSpent: (sameDay.length ? sameDay : [base]).some(state => state.rouletteSpent === true),
+      quests: [...byId.values()],
+    };
+  }
+
   async loadDailyQuestsFromDB(characterId) {
     if (!characterId) return;
     this.characterId = characterId;
@@ -1282,14 +1310,9 @@ export class GameUI {
       if (!this._isCharacterLoadCurrent(characterId, generation)) return;
       const today = new Date().toDateString();
 
-      let selectedState = null;
-      if (dbQuests && dbQuests.lastDate === today) {
-        selectedState = dbQuests;
-      } else if (localData && localData.lastDate === today) {
-        selectedState = localData;
-      }
+      const selectedState = this._mergeDailyQuestStates(dbQuests, localData);
 
-      if (selectedState) {
+      if (selectedState && selectedState.lastDate === today) {
         this.dailyQuestsState = selectedState;
         localStorage.setItem(localKey, JSON.stringify(selectedState));
         localStorage.setItem('zolos_daily_quests', JSON.stringify(selectedState));
@@ -1308,16 +1331,18 @@ export class GameUI {
 
   async _saveDailyQuestsToDB() {
     const state = this.dailyQuestsState;
-    if (!state) return;
+    if (!state) return true;
     try {
       localStorage.setItem('zolos_daily_quests', JSON.stringify(state));
       if (this.characterId) {
         const localKey = `zolos_daily_quests_${this.characterId}`;
         localStorage.setItem(localKey, JSON.stringify(state));
-        await saveDailyQuests(this.characterId, state);
+        return (await saveDailyQuests(this.characterId, state)) !== false;
       }
+      return true;
     } catch (e) {
       console.error('[Zolos] Failed to save daily quests:', e);
+      return false;
     }
   }
 
@@ -1336,11 +1361,10 @@ export class GameUI {
 
       const dbFriends = await loadFriendsList(characterId);
       if (!this._isCharacterLoadCurrent(characterId, generation)) return;
-      if (dbFriends && dbFriends.length > 0) {
-        this.friends = dbFriends;
-      } else {
-        this.friends = localFriends;
-      }
+      this.friends = [...new Set([
+        ...(Array.isArray(dbFriends) ? dbFriends : []),
+        ...(Array.isArray(localFriends) ? localFriends : []),
+      ].filter(name => typeof name === 'string' && name.trim()).map(name => name.trim()))];
 
       localStorage.setItem(localKey, JSON.stringify(this.friends));
       localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
@@ -1352,14 +1376,49 @@ export class GameUI {
   }
 
   async _saveFriendsListToDB() {
-    if (!this.characterId) return;
+    if (!this.characterId) return true;
     try {
       const localKey = `zolos_friends_${this.characterId}`;
       localStorage.setItem(localKey, JSON.stringify(this.friends));
       localStorage.setItem('zolos_friends', JSON.stringify(this.friends));
-      await saveFriendsList(this.characterId, this.friends);
+      return (await saveFriendsList(this.characterId, this.friends)) !== false;
     } catch (e) {
       console.error('[Zolos] Failed to save friends list:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Flush every player-owned state before logout/backgrounding. Each subsystem
+   * also keeps its local cache, but server-backed sessions must not rely on a
+   * delayed timer when the mobile browser is about to suspend or terminate.
+   */
+  async flushPersistence() {
+    if (!this.characterId) return true;
+    if (this._persistenceFlushPromise) return this._persistenceFlushPromise;
+
+    const run = async () => {
+      const tasks = [];
+      if (this.dailyQuestsState) tasks.push(this._saveDailyQuestsToDB());
+      if (Array.isArray(this.friends)) tasks.push(this._saveFriendsListToDB());
+      if (this.almanac) tasks.push(this._saveFishingAlmanac());
+      if (this.loginStreak) tasks.push(this._saveLoginStreak());
+      if (this.adventureJournal) tasks.push(this._saveAdventureJournalNow());
+      if (this.inventory) tasks.push(this._flushInventoryToDB());
+      const results = await Promise.allSettled(tasks);
+      const failed = results.filter(result => result.status === 'rejected' || result.value === false);
+      if (failed.length) {
+        console.error(`[Zolos] ❌ flushPersistence had ${failed.length} failed task(s)`);
+      }
+      return failed.length === 0;
+    };
+
+    const promise = run();
+    this._persistenceFlushPromise = promise;
+    try {
+      return await promise;
+    } finally {
+      if (this._persistenceFlushPromise === promise) this._persistenceFlushPromise = null;
     }
   }
 
@@ -1369,12 +1428,13 @@ export class GameUI {
    * the correct quantity AND stats, so nothing is lost on reload.
    */
   async _flushInventoryToDB() {
-    if (!this.characterId || !this.inventory) return;
+    if (!this.characterId || !this.inventory) return true;
     // Fold live pet growth into its item's stats so it's saved with the batch.
     this._syncPetItemStats();
     // Fold live card sockets into card-row stats so they're saved with the batch.
     this._syncCardItemStats();
     const { setInventoryItemQuantity } = await import('../network/GameSync.js');
+    let ok = true;
 
     // Flush ALL items (not just equipped ones) so that items bought but never
     // equipped still have a confirmed DB row with the right quantity.
@@ -1383,12 +1443,15 @@ export class GameUI {
     // which inflated quantities without bound (the "หลักหมื่นหลักแสน" bug).
     for (const item of this.inventory) {
       try {
-        await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity, item.stats || {});
+        const saved = await setInventoryItemQuantity(this.characterId, item.item_name, item.item_type, item.quantity, item.stats || {});
+        if (saved === false) ok = false;
       } catch (e) {
+        ok = false;
         console.error(`[Zolos] ❌ _flushInventoryToDB failed for ${item.item_name}:`, e.message);
       }
     }
-    console.log(`[Zolos] 💾 _flushInventoryToDB completed for ${this.inventory.length} items, characterId=${this.characterId}`);
+    console.log(`[Zolos] 💾 _flushInventoryToDB completed for ${this.inventory.length} items, characterId=${this.characterId}, ok=${ok}`);
+    return ok;
   }
 
   // ============ Fishing Almanac ============
@@ -1426,14 +1489,16 @@ export class GameUI {
   }
 
   async _saveFishingAlmanac() {
-    if (!this.almanac) return;
+    if (!this.almanac) return true;
     try {
       if (this.characterId) {
         localStorage.setItem(`zolos_almanac_${this.characterId}`, JSON.stringify(this.almanac));
-        await saveFishingAlmanac(this.characterId, this.almanac);
+        return (await saveFishingAlmanac(this.characterId, this.almanac)) !== false;
       }
+      return true;
     } catch (e) {
       console.error('[Zolos] Failed to save fishing almanac:', e);
+      return false;
     }
   }
 
@@ -7113,8 +7178,14 @@ export class GameUI {
       const localKey = `zolos_login_streak_${characterId}`;
       let localData = null;
       try { localData = JSON.parse(localStorage.getItem(localKey) || 'null'); } catch (e) { /* ignore */ }
-      // Prefer whichever record is most recent
-      this.loginStreak = (dbData && (!localData || (dbData.lastClaim || '') >= (localData.lastClaim || ''))) ? dbData : (localData || dbData) || { streak: 0, lastClaim: null };
+      // Prefer the newest claim date; if both records refer to the same day,
+      // keep the higher streak so a delayed server write cannot roll progress back.
+      const candidates = [dbData, localData].filter(value => value && typeof value === 'object');
+      const newestClaim = candidates.map(value => value.lastClaim || '').sort().at(-1) || null;
+      const sameDay = candidates.filter(value => (value.lastClaim || null) === newestClaim);
+      this.loginStreak = sameDay.length
+        ? { ...sameDay[0], streak: Math.max(...sameDay.map(value => Number(value.streak) || 0), 0) }
+        : { streak: 0, lastClaim: null };
       localStorage.setItem(localKey, JSON.stringify(this.loginStreak));
     } catch (e) {
       this.loginStreak = { streak: 0, lastClaim: null };
@@ -7127,9 +7198,14 @@ export class GameUI {
   }
 
   async _saveLoginStreak() {
-    if (!this.characterId) return;
+    if (!this.characterId) return true;
     localStorage.setItem(`zolos_login_streak_${this.characterId}`, JSON.stringify(this.loginStreak));
-    try { await saveLoginStreak(this.characterId, this.loginStreak); } catch (e) { /* keep local */ }
+    try {
+      return (await saveLoginStreak(this.characterId, this.loginStreak)) !== false;
+    } catch (e) {
+      console.error('[Zolos] Failed to save login streak:', e);
+      return false;
+    }
   }
 
   // Pulse the HUD 🎁 button while a reward is claimable
@@ -9866,11 +9942,24 @@ export class GameUI {
     try { local = JSON.parse(localStorage.getItem(`zolos_adventure_journal_${characterId}`) || 'null'); } catch { /* ignore */ }
     const remote = await loadAdventureJournal(characterId);
     if (!this._isCharacterLoadCurrent(characterId, generation)) return;
-    this.adventureJournal = sanitizeAdventureJournal(remote || local);
+    // Merge the browser cache with the server snapshot. A mobile pagehide can
+    // leave a newer local journal while the server still has the previous tick;
+    // choosing `remote || local` would make that progress appear to disappear.
+    this.adventureJournal = mergeAdventureJournals(remote, local);
     this.firstThirtyJourney = sanitizeFirstThirtyState(this.adventureJournal.journey);
     this.adventureJournal.journey = this.firstThirtyJourney;
     this._renderJourneyGuide();
     this._renderWiki();
+  }
+
+  async _saveAdventureJournalNow() {
+    if (!this.characterId) return false;
+    clearTimeout(this._journalSaveTimer);
+    this._journalSaveTimer = null;
+    this.adventureJournal.journey = sanitizeFirstThirtyState(this.firstThirtyJourney);
+    localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
+    await saveAdventureJournal(this.characterId, this.adventureJournal);
+    return true;
   }
 
   _saveAdventureJournalSoon() {
@@ -9878,7 +9967,9 @@ export class GameUI {
     this.adventureJournal.journey = sanitizeFirstThirtyState(this.firstThirtyJourney);
     localStorage.setItem(`zolos_adventure_journal_${this.characterId}`, JSON.stringify(this.adventureJournal));
     clearTimeout(this._journalSaveTimer);
-    this._journalSaveTimer = setTimeout(() => saveAdventureJournal(this.characterId, this.adventureJournal), 700);
+    this._journalSaveTimer = setTimeout(() => {
+      this._saveAdventureJournalNow().catch(error => console.error('[Zolos] Failed to flush adventure journal:', error));
+    }, 700);
   }
 
   _journeyEscape(value) {

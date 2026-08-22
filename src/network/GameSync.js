@@ -1,5 +1,5 @@
 // Game Sync — Save/Load character data to Supabase + Realtime via Socket.io
-import { supabase, isOfflineMode, localDb, getDeterministicGuestName, isPlaceholderName, saveActiveSession } from './SupabaseClient.js';
+import { supabase, isOfflineMode, isSelfHostMode, apiBaseUrl, localDb, getDeterministicGuestName, isPlaceholderName, saveActiveSession } from './SupabaseClient.js';
 import { getSocket, isSocketConnected, isSocketMode, connectSocket, disconnectSocket } from './SocketClient.js';
 import { getCard } from '../cards/CardCatalog.js';
 import { FIRST_REFINE_KIT, STARTER_PET, ITEMS } from '../engine/GameData.js';
@@ -1221,39 +1221,23 @@ export async function saveCharacterByUserId(userId, updates) {
 export async function saveDailyQuests(characterId, questData) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         localDb.set(`daily_quests_${characterId}`, questData);
-        return;
+        return true;
     }
 
     try {
-        const { data: existing } = await supabase
-            .from('inventory')
-            .select('*')
-            .eq('character_id', characterId)
-            .eq('item_name', 'daily_quests')
-            .eq('item_type', 'system')
-            .maybeSingle();
-
-        if (existing) {
-            await supabase
-                .from('inventory')
-                .update({ stats: questData })
-                .eq('id', existing.id)
-                .eq('item_name', 'daily_quests')
-                .eq('item_type', 'system');
-        } else {
-            await supabase
-                .from('inventory')
-                .insert({
-                    character_id: characterId,
-                    item_name: 'daily_quests',
-                    item_type: 'system',
-                    quantity: 1,
-                    stats: questData
-                });
-        }
+        const { error } = await supabase.from('inventory').upsert({
+            character_id: characterId,
+            item_name: 'daily_quests',
+            item_type: 'system',
+            quantity: 1,
+            stats: questData,
+        }, { onConflict: 'character_id,item_name' });
+        if (error) throw error;
     } catch (e) {
         console.error('[GameSync] Failed to save daily quests to DB:', e);
+        return false;
     }
+    return true;
 }
 
 export async function loadDailyQuests(characterId) {
@@ -1282,32 +1266,22 @@ export async function loadDailyQuests(characterId) {
 export async function saveFishingAlmanac(characterId, almanacData) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         localDb.set(`fishing_almanac_${characterId}`, almanacData);
-        return;
+        return true;
     }
     try {
-        const { data: existing } = await supabase
-            .from('inventory')
-            .select('id')
-            .eq('character_id', characterId)
-            .eq('item_name', 'fishing_almanac')
-            .eq('item_type', 'system')
-            .maybeSingle();
-
-        if (existing) {
-            await supabase.from('inventory').update({ stats: almanacData })
-                .eq('id', existing.id).eq('item_name', 'fishing_almanac').eq('item_type', 'system');
-        } else {
-            await supabase.from('inventory').insert({
-                character_id: characterId,
-                item_name: 'fishing_almanac',
-                item_type: 'system',
-                quantity: 1,
-                stats: almanacData
-            });
-        }
+        const { error } = await supabase.from('inventory').upsert({
+            character_id: characterId,
+            item_name: 'fishing_almanac',
+            item_type: 'system',
+            quantity: 1,
+            stats: almanacData,
+        }, { onConflict: 'character_id,item_name' });
+        if (error) throw error;
     } catch (e) {
         console.error('[GameSync] Failed to save fishing almanac to DB:', e);
+        return false;
     }
+    return true;
 }
 
 export async function loadFishingAlmanac(characterId) {
@@ -1336,21 +1310,22 @@ export async function loadFishingAlmanac(characterId) {
 export async function saveAdventureJournal(characterId, journalData) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         localDb.set(`adventure_journal_${characterId}`, journalData);
-        return;
+        return true;
     }
     try {
-        const { data: existing } = await supabase.from('inventory').select('id')
-            .eq('character_id', characterId).eq('item_name', 'adventure_journal')
-            .eq('item_type', 'system').maybeSingle();
-        if (existing) {
-            await supabase.from('inventory').update({ stats: journalData })
-                .eq('id', existing.id).eq('item_name', 'adventure_journal').eq('item_type', 'system');
-        } else {
-            await supabase.from('inventory').insert({ character_id: characterId, item_name: 'adventure_journal', item_type: 'system', quantity: 1, stats: journalData });
-        }
+        const { error } = await supabase.from('inventory').upsert({
+            character_id: characterId,
+            item_name: 'adventure_journal',
+            item_type: 'system',
+            quantity: 1,
+            stats: journalData,
+        }, { onConflict: 'character_id,item_name' });
+        if (error) throw error;
     } catch (e) {
         console.error('[GameSync] Failed to save adventure journal:', e);
+        return false;
     }
+    return true;
 }
 
 export async function loadAdventureJournal(characterId) {
@@ -1375,32 +1350,22 @@ export async function loadAdventureJournal(characterId) {
 export async function saveLoginStreak(characterId, streakData) {
     if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         localDb.set(`login_streak_${characterId}`, streakData);
-        return;
+        return true;
     }
     try {
-        const { data: existing } = await supabase
-            .from('inventory')
-            .select('id')
-            .eq('character_id', characterId)
-            .eq('item_name', 'login_streak')
-            .eq('item_type', 'system')
-            .maybeSingle();
-
-        if (existing) {
-            await supabase.from('inventory').update({ stats: streakData })
-                .eq('id', existing.id).eq('item_name', 'login_streak').eq('item_type', 'system');
-        } else {
-            await supabase.from('inventory').insert({
-                character_id: characterId,
-                item_name: 'login_streak',
-                item_type: 'system',
-                quantity: 1,
-                stats: streakData
-            });
-        }
+        const { error } = await supabase.from('inventory').upsert({
+            character_id: characterId,
+            item_name: 'login_streak',
+            item_type: 'system',
+            quantity: 1,
+            stats: streakData,
+        }, { onConflict: 'character_id,item_name' });
+        if (error) throw error;
     } catch (e) {
         console.error('[GameSync] Failed to save login streak to DB:', e);
+        return false;
     }
+    return true;
 }
 
 export async function loadLoginStreak(characterId) {
@@ -1570,41 +1535,24 @@ export async function migrateGuestToAccount(email, password, guest) {
 
 // ============ Friends List DB Sync (System Inventory Fallback) ============
 export async function saveFriendsList(characterId, friendsList) {
-    if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
+        if (isOfflineMode || !supabase || characterId.startsWith('guest_') || characterId.startsWith('local_')) {
         localDb.set(`friends_${characterId}`, friendsList);
-        return;
+        return true;
     }
-
     try {
-        const { data: existing } = await supabase
-            .from('inventory')
-            .select('*')
-            .eq('character_id', characterId)
-            .eq('item_name', 'friends_list')
-            .eq('item_type', 'system')
-            .maybeSingle();
-
-        if (existing) {
-            await supabase
-                .from('inventory')
-                .update({ stats: { list: friendsList } })
-                .eq('id', existing.id)
-                .eq('item_name', 'friends_list')
-                .eq('item_type', 'system');
-        } else {
-            await supabase
-                .from('inventory')
-                .insert({
-                    character_id: characterId,
-                    item_name: 'friends_list',
-                    item_type: 'system',
-                    quantity: 1,
-                    stats: { list: friendsList }
-                });
-        }
+        const { error } = await supabase.from('inventory').upsert({
+            character_id: characterId,
+            item_name: 'friends_list',
+            item_type: 'system',
+            quantity: 1,
+            stats: { list: friendsList },
+        }, { onConflict: 'character_id,item_name' });
+        if (error) throw error;
     } catch (e) {
         console.error('[GameSync] Failed to save friends list to DB:', e);
+        return false;
     }
+    return true;
 }
 
 export async function loadFriendsList(characterId) {
@@ -2616,15 +2564,47 @@ export function leavePresence() {
 }
 
 // ============ Send save state to server (for server-side save-on-disconnect) ============
-export function sendSaveState(saveData) {
+export function sendSaveState(saveData, { keepalive = false } = {}) {
+    if (!saveData || typeof saveData !== 'object') return false;
+    // Inventory is server-authoritative. Do not send the full client inventory
+    // through either lifecycle path; authoritative RPCs already persist item
+    // mutations and the server explicitly ignores client inventory backups.
+    const { inventory: _ignoredInventory, ...snapshot } = saveData;
     const socket = getSocket();
-    if (socket && isSocketConnected() && saveData) {
-        // Ensure userId is present for server-side RLS-compliant saves
+    let sent = false;
+    if (socket && isSocketConnected()) {
         socket.emit('save_state', {
-            ...saveData,
-            userId: saveData.userId || null
+            ...snapshot,
+            userId: snapshot.userId || null,
         });
+        sent = true;
     }
+
+    // Socket.IO disconnect delivery is not reliable after mobile pagehide. The
+    // self-host API accepts the same ownership-gated snapshot over a short-lived
+    // fetch keepalive request, using the JWT already held by the auth shim.
+    if (keepalive && isSelfHostMode && apiBaseUrl && typeof fetch === 'function') {
+        const token = supabase?.auth?.getAccessToken?.();
+        if (token) {
+            try {
+                const body = JSON.stringify(snapshot);
+                void fetch(`${apiBaseUrl.replace(/\/$/, '')}/persistence/snapshot`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body,
+                    keepalive: true,
+                    credentials: 'omit',
+                }).catch(error => console.warn('[Zolos] Keepalive snapshot failed:', error?.message || error));
+                sent = true;
+            } catch (error) {
+                console.warn('[Zolos] Keepalive snapshot could not be prepared:', error?.message || error);
+            }
+        }
+    }
+    return sent;
 }
 
 // ============ Auto-Save ============

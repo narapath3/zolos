@@ -222,8 +222,12 @@ export async function signInAnonymously({ forceNew = false } = {}) {
     }
     return data;
   } catch (e) {
-    console.warn("Supabase anonymous sign-in failed, utilizing local guest session fallback:", e.message);
-    return createLocalGuestSession({ forceNew });
+    // If an online backend exists, never silently downgrade to a synthetic
+    // guest_ id. That mode writes only to localStorage and makes the player
+    // believe progress is server-backed when it is not. Local fallback is
+    // reserved for the explicit offline path above.
+    console.error("Online anonymous sign-in failed; refusing local-only Guest mode:", e.message);
+    throw e;
   }
 }
 
@@ -246,16 +250,9 @@ export async function getSession() {
     return data.session;
   }
 
-  // Fallback to local guest session if offline guest fallback was used
-  const activeUserId = localDb.get('active_session_user_id');
-  if (activeUserId && activeUserId.startsWith('guest_')) {
-    const profile = localDb.get(`profile_${activeUserId}`);
-    const character = localDb.get(`char_${activeUserId}`);
-    if (profile || character) {
-      return { user: { id: activeUserId, is_anonymous: true } };
-    }
-  }
-
+  // Do not revive a synthetic guest_ session while an online backend exists.
+  // That legacy fallback is local-only and would make the player appear to
+  // resume successfully while none of the progress can reach the server.
   return null;
 }
 
