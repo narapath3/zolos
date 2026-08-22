@@ -7,6 +7,7 @@ const fishing = read('../server/api/fishing.js');
 const server = read('../server/server.js');
 const gameSync = read('../src/network/GameSync.js');
 const main = read('../src/main.js');
+const gameUI = read('../src/ui/GameUI.js');
 
  test('server fishing reward uses a shared fish catalog and returns a committed receipt', async () => {
   const { rollFishingCatch } = await import('../server/api/fishing.js');
@@ -57,6 +58,15 @@ test('rod tiers gate fish rarity and preserve map progression', async () => {
   assert.match(fishing, /getFishingRodConfig/);
   assert.match(fishing, /ต้องสวมคันเบ็ดก่อนตกปลา/);
   assert.match(fishing, /rod_max_rarity/);
+});
+
+test('local guest fallback keeps fishing on the local reward path', () => {
+  assert.match(gameUI, /_isLocalGuestSession\(\)/);
+  assert.match(gameUI, /window\.__serverRewards !== true[\s\S]*!this\._isLocalGuestSession\(\)/);
+  assert.match(main, /gameUI && gameUI\._onlineSessionWithoutAuthority\?\.\(\)/);
+  assert.match(main, /event\.item\?\.type === 'fish' && gameUI\?\._onlineSessionWithoutAuthority\?\.\(\)\) break/);
+  assert.match(main, /rawMessage\.startsWith\('บันทึกรางวัลปลาไม่สำเร็จ'\)/);
+  assert.match(main, /rawMessage \|\| 'กรุณาลองใหม่'/);
 });
 
 test('socket fishing claim is authenticated, state-gated, rate-limited and server-owned', () => {

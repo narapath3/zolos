@@ -386,14 +386,20 @@ export class GameUI {
       && this.characterId === characterId;
   }
 
-  // Client-only reward paths are fail-closed for connected sessions. The
-  // monster handshake currently advertises only monster authority; it must not
-  // be treated as proof that fishing/quests/roulette are server-authoritative.
-  // A future signed reward-capability handshake may set __serverRewards=true
-  // after those RPCs are deployed and verified.
+  _isLocalGuestSession() {
+    const ids = [this.character?.characterId, this.character?.userId];
+    return ids.some(id => /^(guest_|local_)/i.test(String(id || '')));
+  }
+
+  // Client-only reward paths are fail-closed for connected authenticated
+  // sessions. A local guest fallback is deliberately different: it has no
+  // server-owned character or economy row, so it must use the same local
+  // reward path as offline mode instead of emitting fish_claim with an
+  // identity the VPS cannot persist. Real anonymous accounts use UUID ids and
+  // remain fail-closed until the server returns an authoritative receipt.
   _onlineSessionWithoutAuthority() {
     try {
-      return isSocketConnected() && window.__serverRewards !== true;
+      return isSocketConnected() && window.__serverRewards !== true && !this._isLocalGuestSession();
     } catch {
       return false;
     }

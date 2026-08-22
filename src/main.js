@@ -769,7 +769,11 @@ async function initGame(charData) {
                         gameUI.recordFishCatch?.(item);
                     gameUI._completeFirstThirtyStep?.('catch_first_fish');
                     }).catch((error) => {
-                        gameUI.addCombatLog(`⚠️ บันทึกรางวัลปลาไม่สำเร็จ: ${error.message}`, 'warning');
+                        const rawMessage = String(error?.message || '').trim();
+                        const failureMessage = rawMessage.startsWith('บันทึกรางวัลปลาไม่สำเร็จ')
+                            ? rawMessage
+                            : `บันทึกรางวัลปลาไม่สำเร็จ: ${rawMessage || 'กรุณาลองใหม่'}`;
+                        gameUI.addCombatLog(`⚠️ ${failureMessage}`, 'warning');
                     }).finally(() => {
                         gameUI.resolveFishingReward?.();
                     });
