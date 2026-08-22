@@ -43,6 +43,13 @@ const PET_ATLAS_ORDER = [
   'Moon Hare Pet', 'Baby Dragon Pet', 'Bloom Fairy Pet', 'Ember Phoenix Pet',
 ];
 
+// The free onboarding pet has a distinct inventory name but is the same
+// species/art as the catalog Poring Pet. Keep the atlas order stable and map
+// aliases instead of inserting a duplicate slot that would shift every crop.
+const PET_ATLAS_ALIASES = Object.freeze({
+  'Starter Poring Pet': 'Poring Pet',
+});
+
 const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 export const ITEM_VISUALS = Object.freeze(Object.fromEntries([
@@ -64,7 +71,8 @@ export function itemIconPath(itemOrName) {
 
 export function itemIconMarkup(itemOrName, _legacyFallback = '', className = '') {
   const name = canonicalItemName(itemOrName);
-  const petIndex = PET_ATLAS_ORDER.indexOf(name);
+  const petAtlasName = PET_ATLAS_ALIASES[name] || name;
+  const petIndex = PET_ATLAS_ORDER.indexOf(petAtlasName);
   const path = itemIconPath(name);
   const safeName = String(name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   if (petIndex >= 0) {
