@@ -55,6 +55,9 @@ test('GitHub auto trigger is main-only, path-filtered, least-privilege, and does
   assert.match(workflow, /ZOLOS_DEPLOY_WEBHOOK_SECRET/);
   assert.match(workflow, /X-Zolos-Deploy-Signature/);
   assert.match(workflow, /X-Zolos-Deploy-Idempotency/);
+  assert.ok(workflow.includes('timestamp="${EPOCHSECONDS}"'));
+  assert.ok(workflow.split('\n').some((line) => line.includes('response="$(curl') && line.includes('--data "${body}")')));
+  assert.match(workflow, /\.github\/workflows\/remote-deploy\.yml/);
 });
 
 test('one-time installer locks the secret and runner uses non-interactive updater mode', () => {
