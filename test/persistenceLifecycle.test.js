@@ -101,6 +101,9 @@ test('Guest logout requires an explicit bind, continue, or risky unbound exit ch
   assert.match(gameUI, /บัญชีของคุณยังเป็น Guest และยังไม่ได้ผูกอีเมล/);
   assert.match(gameUI, /ประวัติการเล่นอาจสูญหายได้/);
   assert.match(gameUI, /data-guest-exit-action="bind"/);
+  assert.match(gameUI, /modal\.className = 'modal-popup guest-exit-warning-modal'/);
+  assert.match(gameUI, /pointer-events: auto !important/);
+  assert.match(gameUI, /element\.addEventListener\('pointerup'/);
   assert.match(gameUI, /data-guest-exit-action="cancel"/);
   assert.match(gameUI, /ออกโดยไม่ผูกบัญชี \(เสี่ยงข้อมูลหาย\)/);
   assert.match(gameUI, /reload: false, source: 'exit-warning'/);
